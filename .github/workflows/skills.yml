@@ -1,0 +1,32 @@
+name: skills
+
+on:
+  # 只守護預設分支；功能分支的檢查由 PR 觸發，避免 draft 期間的每次推送都跑。
+  push:
+    branches: [main]
+    paths: ['.agents/**', 'docs/product/**', 'plan/01/**', 'scripts/lint-skills.mjs', '.github/workflows/skills.yml']
+  pull_request:
+    # ready_for_review 讓 draft 轉正時補跑一次；draft 期間的 synchronize
+    # 仍會發事件，但由下方的 if 略過。
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ['.agents/**', 'docs/product/**', 'plan/01/**', 'scripts/lint-skills.mjs', '.github/workflows/skills.yml']
+
+jobs:
+  lint:
+    # draft PR 不跑；push 事件沒有 pull_request 物件，照常執行。
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # 規則與理由見 plan/01/06-acceptance-and-validation.md
+      - name: Lint skills and verify index freshness
+        run: node scripts/lint-skills.mjs --check
+      # docs/product 與 plan/01 也列入觸發條件：權威文件的改動可能讓
+      # 某個 skill 引用的需求 ID 或宣告的關係消失，這正是要攔的情形。
+      - name: Verify index is reproducible
+        run: |
+          node scripts/lint-skills.mjs --write-index
+          git diff --exit-code -- .agents/skills
