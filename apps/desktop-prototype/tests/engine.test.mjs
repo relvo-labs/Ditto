@@ -1,0 +1,11 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {defaults,copy,interpret,validate,diff,preset} from '../src/engine.mjs';
+test('cross-module development intent preserves requested color',()=>{const c={...copy(defaults),theme:'mint'};const p=interpret('幫我做開發桌面，保留原本配色',c);assert.equal(p.next.theme,'mint');assert.equal(p.next.dock,'left');assert.equal(p.next.layout,'tiled');assert.equal(p.next.notifications,false);assert.ok(p.next.plugins.includes('terminal'));validate(p.next);assert.equal(c.dock,'bottom');});
+test('compound intent changes dock, theme, and actually creates a widget',()=>{const p=interpret('把 Dock 放左邊，換成薄荷綠，再加一個待辦面板',copy(defaults));assert.equal(p.next.dock,'left');assert.equal(p.next.theme,'mint');assert.ok(p.next.plugins.includes('tasks')||p.next.widgets.some(w=>w.type==='tasks'));validate(p.next);});
+test('custom title is data, bounded template is validated',()=>{const p=interpret('建立一個叫「我的下一步」的待辦面板',copy(defaults));assert.equal(p.next.widgets[0].title,'我的下一步');assert.equal(p.next.widgets[0].type,'tasks');validate(p.next);});
+test('unsupported input never reports a change',()=>{assert.equal(interpret('把郵件寄給所有人',copy(defaults)).action,'unsupported');});
+test('known action already matching config is no-op',()=>{assert.equal(interpret('Dock 放底部',copy(defaults)).action,'noop');});
+test('invalid imports reject missing dependencies and core services',()=>{assert.throws(()=>validate({...copy(defaults),plugins:['project','dock','launcher']}));assert.throws(()=>validate({...copy(defaults),plugins:[]}));assert.throws(()=>validate({...copy(defaults),theme:'injected'}));assert.throws(()=>validate({...copy(defaults),widgets:[{type:'script',title:'bad',id:'x'}]}));});
+test('profiles remain independent snapshots',()=>{const c=copy(defaults),p=preset('dev',c);p.plugins.push('focus');assert.equal(c.plugins.includes('focus'),false);assert.ok(diff(c,p).length>=4);});
+test('negative notification commands and state restoration intents',()=>{assert.equal(interpret('關閉通知',copy(defaults)).next.notifications,false);assert.equal(interpret('撤銷上一步',copy(defaults)).action,'undo');assert.equal(interpret('切換工作區 3',copy(defaults)).workspace,3);});
