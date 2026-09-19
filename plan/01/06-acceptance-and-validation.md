@@ -91,10 +91,14 @@ my-skills 目前**沒有**跨 skill 的自動化 lint 或 CI，一致性靠人�
 
 | 管線 | 觸發 | 內容 | 阻擋合併 |
 | --- | --- | --- | --- |
-| skills lint | 任何 `.agents/**`、`docs/product/**`、`scripts/lint-skills.mjs` 變更 | `node scripts/lint-skills.mjs --check` | 是 |
+| skills lint | **非 draft** 的 PR（`opened`／`synchronize`／`reopened`／`ready_for_review`），以及 push 到 `main` | `node scripts/lint-skills.mjs --check` | 是 |
 | 索引新鮮度 | 同上 | `--write-index` 後 `git diff --exit-code` | 是 |
 
+路徑條件：`.agents/**`、`docs/product/**`、`plan/01/**`、`scripts/lint-skills.mjs`、workflow 自身。
+
 `docs/product/**` 也列入觸發條件：PRD 改動可能讓某個 skill 引用的需求 ID 消失，這正是 `requirement-ids-resolve` 要攔的情形。
+
+**draft 期間不跑。** 草稿階段的 skill 常處於半完成狀態（`## Authority` 還沒填、related 還沒回列），此時的失敗是雜訊不是訊號。轉為 ready 時由 `ready_for_review` 補跑一次，因此不會有「一路 draft 到底、合併前從未檢查」的漏洞。push 事件限定 `main`，用意是守護預設分支，功能分支的檢查交給 PR。
 
 ## 5. 有效性抽樣測試
 
