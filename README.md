@@ -9,6 +9,8 @@ Ditto 同時是專案名稱與預設角色。Soft Jelly／柔光果凍是預設�
 - [完整 PRD v0.4.0](docs/product/Ditto-PRD-v0.4.0.md)：26 節、116 項需求、32 組驗收情境。
 - [前端互動原型](apps/desktop-prototype/)：完整原始碼、角色素材、配置測試與建置設定。
 - [研究與互動決策](docs/research/RESEARCH-AND-INTERACTION.md)：來源、設計對應、原型邊界與原生移植接點。
+- [分階段實作計畫](milestones/01/README.md)：G0～G5 工作分解、驗收矩陣、風險與待決策。
+- [開發導覽 AGENTS.md](AGENTS.md)：權威文件位置、五條不可違反原則與 [skill 集合](.agents/skills/README.md)。
 - [已部署體驗](https://ditto-soft-jelly-desktop.neil0628.chatgpt.site)：依既有存取權限開放，並非 GitHub Pages。
 
 ## 正式架構方向
