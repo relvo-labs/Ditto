@@ -1,0 +1,15 @@
+[package]
+name = "ditto-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ditto-protocol = { path = "../ditto-protocol" }
+ditto-compositor = { path = "../ditto-compositor" }
+serde.workspace = true
+serde_json.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+dittoctl = { path = "../dittoctl" }

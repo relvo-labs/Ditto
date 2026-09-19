@@ -1,0 +1,200 @@
+{
+  "$defs": {
+    "Availability": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "always",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Resolved when Core connects to a compositor; the exported catalog cannot\nknow it, so it names the capability matrix row instead of guessing.",
+          "properties": {
+            "kind": {
+              "const": "resolved_at_runtime",
+              "type": "string"
+            },
+            "matrix_row": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "matrix_row"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "bound_to": {
+              "description": "Compositor-specific path this capability is bound to, when no\nneutral Wayland protocol covers it.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "depends_on_compositor",
+              "type": "string"
+            },
+            "matrix_row": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "matrix_row",
+            "available"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CapabilityDescriptor": {
+      "additionalProperties": false,
+      "description": "A capability contract. `availability` is the only runtime-resolved field:\nthe exported catalog declares which matrix row a capability depends on, and\nCore fills in what the connected compositor actually offers.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/Availability"
+        },
+        "cancellable": {
+          "type": "boolean"
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "claimable": {
+          "type": "boolean"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorName"
+          },
+          "type": "array"
+        },
+        "idempotency": {
+          "$ref": "#/$defs/Idempotency"
+        },
+        "input_schema": true,
+        "output_schema": true,
+        "provider": {
+          "type": "string"
+        },
+        "readback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resource_scope": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "timeout_ms": {
+          "$ref": "#/$defs/Timeout"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability_id",
+        "version",
+        "input_schema",
+        "output_schema",
+        "errors",
+        "resource_scope",
+        "cancellable",
+        "idempotency",
+        "timeout_ms",
+        "claimable",
+        "provider",
+        "availability"
+      ],
+      "type": "object"
+    },
+    "ErrorName": {
+      "enum": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "type": "string"
+    },
+    "Idempotency": {
+      "enum": [
+        "none",
+        "key-based",
+        "natural"
+      ],
+      "type": "string"
+    },
+    "Timeout": {
+      "additionalProperties": false,
+      "properties": {
+        "default_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "default_ms",
+        "max_ms"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/CapabilityDescriptor"
+      },
+      "type": "array"
+    },
+    "catalog_revision": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "catalog_revision",
+    "capabilities"
+  ],
+  "title": "CapabilitiesListOutput",
+  "type": "object"
+}

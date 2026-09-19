@@ -1,0 +1,20 @@
+{
+  "$defs": {
+    "WindowSessionId": {
+      "description": "An opaque identifier valid only for the current compositor session.",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "window_id": {
+      "$ref": "#/$defs/WindowSessionId"
+    }
+  },
+  "required": [
+    "window_id"
+  ],
+  "title": "WindowIdInput",
+  "type": "object"
+}

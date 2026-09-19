@@ -11,6 +11,7 @@
 | [docs/product/Ditto-PRD-v0.4.0.md](docs/product/Ditto-PRD-v0.4.0.md) | 需求權威：26 節、116 項需求、32 組驗收情境 | 任何功能決定之前 |
 | [milestones/01/](milestones/01/README.md) | 實作順序權威：G0～G5 分階段計畫、架構、Cordis 沿用、驗收矩陣、風險與決策 | 排序、估算、出口評審之前 |
 | [docs/research/RESEARCH-AND-INTERACTION.md](docs/research/RESEARCH-AND-INTERACTION.md) | 互動決策依據與原型邊界 | 設計互動之前 |
+| [plan/02/](plan/02/README.md) | G0 執行計畫：範圍界線、九項出口門檻、19 個工作包、週序與決策時點 | G0 期間動手之前 |
 | [.agents/skills/](.agents/skills/README.md) | 把上述原則轉成可觸發判斷程序的 skill 集合 | 見下方觸發速查 |
 
 衝突時以權威文件為準，skill 次之，本檔最後。
@@ -42,15 +43,17 @@
 
 ## 專案現況
 
-實作尚未開工。目前只有前端互動原型（`apps/desktop-prototype/`，**凍結為互動契約參考，不是實作起點**）、PRD 與實作計畫。Rust Core、Cordis 桌面宿主、QML Shell 與 Agent 皆待 G0 開始。
+G0 進行中。開發容器內可啟動 Quickshell 工作階段：面板、Dock 與角色層由 Core 的 13 項 `desktop.*` 能力驅動，狀態來自快照與事件，寫操作回讀比對後才算成功，合成器做不到的操作回 `unsupported`；客戶端身分由受控啟動器綁定。**尚未成立**：實體參考機與真機 runner、D-02 合成器決策、輸入法、點擊穿透驗證、有效的幀時與 PSS 數字、登入管理器工作階段、Cordis 宿主與 Agent。容器與開發 VM 的結果都是開發證據，不是出口判定；逐項現況見[進度紀錄](plan/02/06-workplan.md#7-進度紀錄)。前端原型（`apps/desktop-prototype/`）**凍結為互動契約參考，不是實作起點**。
 
 ## 目錄
 
 ```
 docs/          PRD、研究、後續的架構與契約文件
 milestones/01/ 分階段實作計畫
-plan/01/       .agents skill 集合的建置計畫
+plan/          skill 建置計畫與 G0 執行計畫
 .agents/       skill 集合與決策紀錄
 apps/          前端原型（凍結）
-scripts/       倉庫工具（目前：skill lint）
+crates/        G0 Rust 契約、Core、診斷 CLI 與量測工具
+packages/、schema/ 產生的 TS 契約與 Rust 匯出的 schema
+tools/、tests/g0/、scripts/ Wayland 工具、合成器探針、驗證輸入與 skill lint
 ```

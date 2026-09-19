@@ -1,0 +1,22 @@
+{
+  "run_id": "REPLACED-BY-RUNNER",
+  "state": "desktop_full_no_agent_g0_subset",
+  "fingerprint": {
+    "kernel": "fill from uname -r",
+    "compositor": "fill from the compositor's own version output",
+    "qt": "fill from qmake6 -query QT_VERSION",
+    "quickshell": "fill from quickshell --version",
+    "rust": "fill from rustc --version",
+    "node": "fill from node --version",
+    "ditto_commit": "fill from git rev-parse HEAD"
+  },
+  "units": [
+    { "name": "ditto-core.service", "layer": "core", "scope": "user" },
+    { "name": "ditto-shell.service", "layer": "shell", "scope": "user" },
+    { "name": "sway.service", "layer": "compositor", "scope": "user" }
+  ],
+  "excluded": [
+    { "unit": "firefox.scope", "reason": "application the user opened" },
+    { "unit": "foot.scope", "reason": "application the user opened" }
+  ]
+}

@@ -1,0 +1,43 @@
+name: nightly-refmachine
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+# Graphics, timing and window control need the frozen reference machine. Until
+# one is registered with this label the workflow simply does not run; a green
+# result here is the only kind that may be cited for EX-01, EX-03 and EX-04.
+jobs:
+  verify:
+    runs-on: [self-hosted, ditto-refmachine]
+    timeout-minutes: 90
+    env:
+      DITTO_REFERENCE_MACHINE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version fingerprint
+        run: |
+          mkdir -p artifacts/g0
+          {
+            echo "kernel=$(uname -r)"
+            echo "compositor=$(sway --version 2>/dev/null || echo unknown)"
+            echo "qt=$(qmake6 -query QT_VERSION 2>/dev/null || echo unknown)"
+            echo "quickshell=$(quickshell --version 2>&1 | head -1)"
+            echo "rust=$(rustc --version)"
+            echo "node=$(node --version)"
+            echo "ditto_commit=$GITHUB_SHA"
+          } | tee "artifacts/g0/fingerprint-$GITHUB_RUN_ID.txt"
+      - run: cargo build --locked --workspace --bins
+      - name: EX-01 window capability matrix
+        run: bash tests/g0/window-matrix/run.sh
+      - name: EX-03 shell restart survival
+        run: bash tests/g0/shell-restart-survival/run.sh
+      - name: EX-04 frame time and hot path
+        run: bash tests/g0/hotpath/run.sh
+      - name: Compositor capability probe
+        run: bash tests/g0/compositor-probe/run.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g0-nightly-${{ github.run_id }}
+          path: artifacts/g0/
+          retention-days: 90

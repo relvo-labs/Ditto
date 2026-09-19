@@ -1,0 +1,19 @@
+{
+  "run_id": "REPLACED-BY-RUNNER",
+  "state": "development",
+  "fingerprint": {
+    "kernel": "filled by the runner",
+    "compositor": "none in a format check",
+    "qt": "none in a format check",
+    "quickshell": "none in a format check",
+    "rust": "filled by the runner",
+    "node": "filled by the runner",
+    "ditto_commit": "filled by the runner"
+  },
+  "units": [
+    { "name": "ditto-format-check.service", "layer": "core", "scope": "user" }
+  ],
+  "excluded": [
+    { "unit": "everything else on this machine", "reason": "format check only; this is not a measurement" }
+  ]
+}

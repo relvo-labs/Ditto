@@ -1,0 +1,27 @@
+name: weekly-measure
+on:
+  schedule:
+    - cron: '0 20 * * 0'
+  workflow_dispatch:
+# The full measurement flow: cold start, warm up, sample, three times. It runs
+# only on the frozen reference machine, because a number from anywhere else
+# cannot be compared with the next one.
+jobs:
+  measure:
+    runs-on: [self-hosted, ditto-refmachine]
+    timeout-minutes: 180
+    env:
+      DITTO_REFERENCE_MACHINE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --locked --workspace --bins
+      - name: Resource measurement
+        run: bash tests/g0/measure/run.sh tests/g0/measure/manifest.json tests/g0/measure/conditions.json
+      - name: Tool quota baseline
+        run: bash tests/g0/quota-baseline/run.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g0-measure-${{ github.run_id }}
+          path: artifacts/g0/
+          retention-days: 180

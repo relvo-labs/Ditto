@@ -1,0 +1,31 @@
+name: contracts
+on:
+  push:
+    branches: [main]
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'schema/**', 'packages/protocol/**', 'shell/**', 'tools/avatar-mask/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/contracts.yml']
+  pull_request:
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'schema/**', 'packages/protocol/**', 'shell/**', 'tools/avatar-mask/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/contracts.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - run: pnpm install --frozen-lockfile
+      - run: cargo run --locked -p ditto-protocol --bin export-schema -- --check
+      - run: pnpm --filter @ditto/protocol check:generated
+      - name: Capability catalog consistency
+        run: cargo test --locked -p ditto-core every_catalog_entry_has_a_handler_and_a_consumer
+      - name: Capability contract behaviour
+        run: cargo test --locked -p ditto-core --lib tests::
+      - name: Avatar hit mask is current
+        run: python3 tools/avatar-mask/generate.py --source apps/desktop-prototype/public/ditto-body.png --output shell/avatar/layers/hit-mask.json --check
+      - run: cargo build --locked -p ditto-core
+      - run: pnpm --filter @ditto/protocol test

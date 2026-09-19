@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "type": "boolean"
+    },
+    "height": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "name": {
+      "type": "string"
+    },
+    "scale": {
+      "format": "double",
+      "type": "number"
+    },
+    "width": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "x": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "y": {
+      "format": "int32",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "width",
+    "height",
+    "scale",
+    "x",
+    "y",
+    "enabled"
+  ],
+  "title": "Output",
+  "type": "object"
+}

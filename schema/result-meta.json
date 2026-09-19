@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "not_cancellable": {
+      "description": "Set when a cancellation arrived for a capability declared\nnon-cancellable: the request ran to completion and was not cancelled.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "readback_verified": {
+      "type": "boolean"
+    },
+    "revision": {
+      "description": "Observation sequence, not a persistent Profile revision in G0.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "revision",
+    "readback_verified"
+  ],
+  "title": "ResultMeta",
+  "type": "object"
+}

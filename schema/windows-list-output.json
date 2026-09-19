@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "Window": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/WindowSessionId"
+        },
+        "state": {
+          "$ref": "#/$defs/WindowState"
+        },
+        "title": {
+          "type": "string"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "workspace_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "x": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "y": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "app_id",
+        "focused",
+        "state"
+      ],
+      "type": "object"
+    },
+    "WindowSessionId": {
+      "description": "An opaque identifier valid only for the current compositor session.",
+      "type": "string"
+    },
+    "WindowState": {
+      "enum": [
+        "normal",
+        "minimized",
+        "maximized",
+        "fullscreen"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "windows": {
+      "items": {
+        "$ref": "#/$defs/Window"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "windows"
+  ],
+  "title": "WindowsListOutput",
+  "type": "object"
+}

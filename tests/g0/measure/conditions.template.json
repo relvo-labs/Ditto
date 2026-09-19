@@ -1,0 +1,12 @@
+{
+  "reference_machine_id": "fill with the frozen reference machine identifier",
+  "physical_reference_machine": true,
+  "cold_login_each_run": true,
+  "warmup_seconds": 300,
+  "fixed_variables": [
+    "background image and scaling",
+    "character assets and idle state",
+    "reference applications, their versions and open content",
+    "display mode 1080p at 60 Hz"
+  ]
+}
