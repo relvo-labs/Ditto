@@ -1,0 +1,52 @@
+{
+  "$defs": {
+    "ClientInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "version"
+      ],
+      "type": "object"
+    },
+    "HandshakeAuth": {
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "auth": {
+      "$ref": "#/$defs/HandshakeAuth"
+    },
+    "client": {
+      "$ref": "#/$defs/ClientInfo"
+    },
+    "protocol_version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "client",
+    "auth"
+  ],
+  "title": "HandshakeInput",
+  "type": "object"
+}

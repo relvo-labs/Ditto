@@ -1,0 +1,5 @@
+# G0 development pin. D-03 remains open until the reference platform is frozen.
+[toolchain]
+channel = "1.98.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

@@ -1,0 +1,32 @@
+{
+  "$defs": {
+    "WindowSessionId": {
+      "description": "An opaque identifier valid only for the current compositor session.",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "height": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "width": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "window_id": {
+      "$ref": "#/$defs/WindowSessionId"
+    }
+  },
+  "required": [
+    "window_id",
+    "width",
+    "height"
+  ],
+  "title": "WindowResizeInput",
+  "type": "object"
+}

@@ -1,0 +1,33 @@
+{
+  "$defs": {
+    "WindowSessionId": {
+      "description": "An opaque identifier valid only for the current compositor session.",
+      "type": "string"
+    },
+    "WindowState": {
+      "enum": [
+        "normal",
+        "minimized",
+        "maximized",
+        "fullscreen"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "$ref": "#/$defs/WindowState"
+    },
+    "window_id": {
+      "$ref": "#/$defs/WindowSessionId"
+    }
+  },
+  "required": [
+    "window_id",
+    "state"
+  ],
+  "title": "WindowSetStateInput",
+  "type": "object"
+}

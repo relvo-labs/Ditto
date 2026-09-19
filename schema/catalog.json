@@ -1,0 +1,1690 @@
+{
+  "capabilities": [
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.capabilities.list",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "Availability": {
+            "oneOf": [
+              {
+                "properties": {
+                  "kind": {
+                    "const": "always",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Resolved when Core connects to a compositor; the exported catalog cannot\nknow it, so it names the capability matrix row instead of guessing.",
+                "properties": {
+                  "kind": {
+                    "const": "resolved_at_runtime",
+                    "type": "string"
+                  },
+                  "matrix_row": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "matrix_row"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "bound_to": {
+                    "description": "Compositor-specific path this capability is bound to, when no\nneutral Wayland protocol covers it.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kind": {
+                    "const": "depends_on_compositor",
+                    "type": "string"
+                  },
+                  "matrix_row": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "matrix_row",
+                  "available"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "CapabilityDescriptor": {
+            "additionalProperties": false,
+            "description": "A capability contract. `availability` is the only runtime-resolved field:\nthe exported catalog declares which matrix row a capability depends on, and\nCore fills in what the connected compositor actually offers.",
+            "properties": {
+              "availability": {
+                "$ref": "#/$defs/Availability"
+              },
+              "cancellable": {
+                "type": "boolean"
+              },
+              "capability_id": {
+                "type": "string"
+              },
+              "claimable": {
+                "type": "boolean"
+              },
+              "errors": {
+                "items": {
+                  "$ref": "#/$defs/ErrorName"
+                },
+                "type": "array"
+              },
+              "idempotency": {
+                "$ref": "#/$defs/Idempotency"
+              },
+              "input_schema": true,
+              "output_schema": true,
+              "provider": {
+                "type": "string"
+              },
+              "readback": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "resource_scope": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "timeout_ms": {
+                "$ref": "#/$defs/Timeout"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "capability_id",
+              "version",
+              "input_schema",
+              "output_schema",
+              "errors",
+              "resource_scope",
+              "cancellable",
+              "idempotency",
+              "timeout_ms",
+              "claimable",
+              "provider",
+              "availability"
+            ],
+            "type": "object"
+          },
+          "ErrorName": {
+            "enum": [
+              "unsupported",
+              "invalid_params",
+              "not_found",
+              "permission_denied",
+              "timeout",
+              "cancelled",
+              "conflict",
+              "unavailable",
+              "protocol_version_unsupported",
+              "identity_rejected",
+              "internal"
+            ],
+            "type": "string"
+          },
+          "Idempotency": {
+            "enum": [
+              "none",
+              "key-based",
+              "natural"
+            ],
+            "type": "string"
+          },
+          "Timeout": {
+            "additionalProperties": false,
+            "properties": {
+              "default_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "max_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "default_ms",
+              "max_ms"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/$defs/CapabilityDescriptor"
+            },
+            "type": "array"
+          },
+          "catalog_revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "catalog_revision",
+          "capabilities"
+        ],
+        "title": "CapabilitiesListOutput",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-06"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.outputs.list",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "Output": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "height": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "scale": {
+                "format": "double",
+                "type": "number"
+              },
+              "width": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "x": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "y": {
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "width",
+              "height",
+              "scale",
+              "x",
+              "y",
+              "enabled"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "outputs": {
+            "items": {
+              "$ref": "#/$defs/Output"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "outputs"
+        ],
+        "title": "OutputsListOutput",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-05"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.workspaces.list",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "Workspace": {
+            "additionalProperties": false,
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "active"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "workspaces": {
+            "items": {
+              "$ref": "#/$defs/Workspace"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "workspaces"
+        ],
+        "title": "WorkspacesListOutput",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-05"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.workspaces.get",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "title": "WorkspaceIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "title": "Workspace",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-05"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.workspaces.activate",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "title": "WorkspaceIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "title": "Workspace",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": "desktop.workspaces.get",
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-02"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.list",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "Window": {
+            "additionalProperties": false,
+            "properties": {
+              "app_id": {
+                "type": "string"
+              },
+              "focused": {
+                "type": "boolean"
+              },
+              "height": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/WindowSessionId"
+              },
+              "state": {
+                "$ref": "#/$defs/WindowState"
+              },
+              "title": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "workspace_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "x": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "y": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "app_id",
+              "focused",
+              "state"
+            ],
+            "type": "object"
+          },
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "windows": {
+            "items": {
+              "$ref": "#/$defs/Window"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "windows"
+        ],
+        "title": "WindowsListOutput",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-02"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.get",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "window_id": {
+            "$ref": "#/$defs/WindowSessionId"
+          }
+        },
+        "required": [
+          "window_id"
+        ],
+        "title": "WindowIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "height": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/$defs/WindowSessionId"
+          },
+          "state": {
+            "$ref": "#/$defs/WindowState"
+          },
+          "title": {
+            "type": "string"
+          },
+          "width": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "app_id",
+          "focused",
+          "state"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-03"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.focus",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "window_id": {
+            "$ref": "#/$defs/WindowSessionId"
+          }
+        },
+        "required": [
+          "window_id"
+        ],
+        "title": "WindowIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "height": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/$defs/WindowSessionId"
+          },
+          "state": {
+            "$ref": "#/$defs/WindowState"
+          },
+          "title": {
+            "type": "string"
+          },
+          "width": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "app_id",
+          "focused",
+          "state"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": "desktop.windows.get",
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-04"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.move",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "window_id": {
+            "$ref": "#/$defs/WindowSessionId"
+          },
+          "x": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "y": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window_id",
+          "x",
+          "y"
+        ],
+        "title": "WindowMoveInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "height": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/$defs/WindowSessionId"
+          },
+          "state": {
+            "$ref": "#/$defs/WindowState"
+          },
+          "title": {
+            "type": "string"
+          },
+          "width": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "app_id",
+          "focused",
+          "state"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": "desktop.windows.get",
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-04"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.resize",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "width": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "window_id": {
+            "$ref": "#/$defs/WindowSessionId"
+          }
+        },
+        "required": [
+          "window_id",
+          "width",
+          "height"
+        ],
+        "title": "WindowResizeInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "height": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/$defs/WindowSessionId"
+          },
+          "state": {
+            "$ref": "#/$defs/WindowState"
+          },
+          "title": {
+            "type": "string"
+          },
+          "width": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "app_id",
+          "focused",
+          "state"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": "desktop.windows.get",
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-03"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.set_state",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "$ref": "#/$defs/WindowState"
+          },
+          "window_id": {
+            "$ref": "#/$defs/WindowSessionId"
+          }
+        },
+        "required": [
+          "window_id",
+          "state"
+        ],
+        "title": "WindowSetStateInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "height": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "$ref": "#/$defs/WindowSessionId"
+          },
+          "state": {
+            "$ref": "#/$defs/WindowState"
+          },
+          "title": {
+            "type": "string"
+          },
+          "width": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "x": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "y": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "app_id",
+          "focused",
+          "state"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": "desktop.windows.get",
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-03"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.windows.close_request",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "key-based",
+      "input_schema": {
+        "$defs": {
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "window_id": {
+            "$ref": "#/$defs/WindowSessionId"
+          }
+        },
+        "required": [
+          "window_id"
+        ],
+        "title": "WindowIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "description": "Accepted means the request reached the compositor. It does not mean the\napplication closed; observe a window event or read windows.list.",
+            "type": "boolean"
+          },
+          "operation_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accepted",
+          "operation_id"
+        ],
+        "title": "CloseRequestOutput",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": "desktop.windows.list",
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime",
+        "matrix_row": "C-02"
+      },
+      "cancellable": true,
+      "capability_id": "desktop.events.subscribe",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "after_seq": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "title": "EventsSubscribeInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "DesktopSnapshot": {
+            "additionalProperties": false,
+            "properties": {
+              "outputs": {
+                "items": {
+                  "$ref": "#/$defs/Output"
+                },
+                "type": "array"
+              },
+              "windows": {
+                "items": {
+                  "$ref": "#/$defs/Window"
+                },
+                "type": "array"
+              },
+              "workspaces": {
+                "items": {
+                  "$ref": "#/$defs/Workspace"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "outputs",
+              "workspaces",
+              "windows"
+            ],
+            "type": "object"
+          },
+          "Output": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "height": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "scale": {
+                "format": "double",
+                "type": "number"
+              },
+              "width": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "x": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "y": {
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "width",
+              "height",
+              "scale",
+              "x",
+              "y",
+              "enabled"
+            ],
+            "type": "object"
+          },
+          "Window": {
+            "additionalProperties": false,
+            "properties": {
+              "app_id": {
+                "type": "string"
+              },
+              "focused": {
+                "type": "boolean"
+              },
+              "height": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/WindowSessionId"
+              },
+              "state": {
+                "$ref": "#/$defs/WindowState"
+              },
+              "title": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "workspace_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "x": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "y": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "app_id",
+              "focused",
+              "state"
+            ],
+            "type": "object"
+          },
+          "WindowSessionId": {
+            "description": "An opaque identifier valid only for the current compositor session.",
+            "type": "string"
+          },
+          "WindowState": {
+            "enum": [
+              "normal",
+              "minimized",
+              "maximized",
+              "fullscreen"
+            ],
+            "type": "string"
+          },
+          "Workspace": {
+            "additionalProperties": false,
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "active"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "resynced": {
+            "description": "Set when the requested `after_seq` had already left the retained window:\nthe consumer must rebuild from this snapshot instead of continuing.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "seq": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "snapshot": {
+            "$ref": "#/$defs/DesktopSnapshot"
+          },
+          "subscription_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "subscription_id",
+          "snapshot",
+          "seq"
+        ],
+        "title": "EventsSubscribeOutput",
+        "type": "object"
+      },
+      "provider": "compositor-adapter",
+      "readback": null,
+      "resource_scope": [],
+      "timeout_ms": {
+        "default_ms": 5000,
+        "max_ms": 30000
+      },
+      "version": "1.0.0"
+    }
+  ],
+  "catalog_revision": 2
+}

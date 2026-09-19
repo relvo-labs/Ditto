@@ -1,0 +1,11 @@
+{
+  "name": "ditto-g0-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "engines": {"node": ">=22.19.0"},
+  "scripts": {
+    "generate": "pnpm --filter @ditto/protocol generate",
+    "check:generated": "pnpm --filter @ditto/protocol check:generated",
+    "typecheck": "pnpm --filter @ditto/protocol typecheck"
+  }
+}

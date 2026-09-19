@@ -1,0 +1,202 @@
+{
+  "$defs": {
+    "DesktopSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/Output"
+          },
+          "type": "array"
+        },
+        "windows": {
+          "items": {
+            "$ref": "#/$defs/Window"
+          },
+          "type": "array"
+        },
+        "workspaces": {
+          "items": {
+            "$ref": "#/$defs/Workspace"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "outputs",
+        "workspaces",
+        "windows"
+      ],
+      "type": "object"
+    },
+    "Output": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "scale": {
+          "format": "double",
+          "type": "number"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "width",
+        "height",
+        "scale",
+        "x",
+        "y",
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "Window": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/WindowSessionId"
+        },
+        "state": {
+          "$ref": "#/$defs/WindowState"
+        },
+        "title": {
+          "type": "string"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "workspace_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "x": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "y": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "app_id",
+        "focused",
+        "state"
+      ],
+      "type": "object"
+    },
+    "WindowSessionId": {
+      "description": "An opaque identifier valid only for the current compositor session.",
+      "type": "string"
+    },
+    "WindowState": {
+      "enum": [
+        "normal",
+        "minimized",
+        "maximized",
+        "fullscreen"
+      ],
+      "type": "string"
+    },
+    "Workspace": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "active"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "resynced": {
+      "description": "Set when the requested `after_seq` had already left the retained window:\nthe consumer must rebuild from this snapshot instead of continuing.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/DesktopSnapshot"
+    },
+    "subscription_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "subscription_id",
+    "snapshot",
+    "seq"
+  ],
+  "title": "EventsSubscribeOutput",
+  "type": "object"
+}

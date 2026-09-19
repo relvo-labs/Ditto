@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["crates/ditto-protocol", "crates/ditto-compositor", "crates/ditto-core", "crates/dittoctl", "crates/ditto-measure"]
+
+[workspace.package]
+edition = "2021"
+license = "UNLICENSED"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"

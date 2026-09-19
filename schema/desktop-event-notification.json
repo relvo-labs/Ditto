@@ -1,0 +1,289 @@
+{
+  "$defs": {
+    "DesktopEventPayload": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "window_upsert",
+              "type": "string"
+            },
+            "window": {
+              "$ref": "#/$defs/Window"
+            }
+          },
+          "required": [
+            "type",
+            "window"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "window_removed",
+              "type": "string"
+            },
+            "window_id": {
+              "$ref": "#/$defs/WindowSessionId"
+            }
+          },
+          "required": [
+            "type",
+            "window_id"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "workspace_upsert",
+              "type": "string"
+            },
+            "workspace": {
+              "$ref": "#/$defs/Workspace"
+            }
+          },
+          "required": [
+            "type",
+            "workspace"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "workspace_removed",
+              "type": "string"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "workspace_id"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "output": {
+              "$ref": "#/$defs/Output"
+            },
+            "type": {
+              "const": "output_upsert",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "output"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "output_name": {
+              "type": "string"
+            },
+            "type": {
+              "const": "output_removed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "output_name"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "type": {
+              "const": "resync_required",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Output": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "scale": {
+          "format": "double",
+          "type": "number"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "width",
+        "height",
+        "scale",
+        "x",
+        "y",
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "Window": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/WindowSessionId"
+        },
+        "state": {
+          "$ref": "#/$defs/WindowState"
+        },
+        "title": {
+          "type": "string"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "workspace_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "x": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "y": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "app_id",
+        "focused",
+        "state"
+      ],
+      "type": "object"
+    },
+    "WindowSessionId": {
+      "description": "An opaque identifier valid only for the current compositor session.",
+      "type": "string"
+    },
+    "WindowState": {
+      "enum": [
+        "normal",
+        "minimized",
+        "maximized",
+        "fullscreen"
+      ],
+      "type": "string"
+    },
+    "Workspace": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "active"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "payload": {
+      "$ref": "#/$defs/DesktopEventPayload"
+    },
+    "revision": {
+      "description": "Observation revision; no persistent Profile exists in G0.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "subscription_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "subscription_id",
+    "seq",
+    "revision",
+    "payload"
+  ],
+  "title": "DesktopEventNotification",
+  "type": "object"
+}

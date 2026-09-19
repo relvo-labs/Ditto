@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "catalog_revision": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "compositor": {
+      "description": "Which compositor Core is bound to, for measurement fingerprints.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "protocol_version": {
+      "type": "string"
+    },
+    "server": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocol_version",
+    "catalog_revision",
+    "server"
+  ],
+  "title": "HandshakeOutput",
+  "type": "object"
+}
