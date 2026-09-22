@@ -46,14 +46,22 @@ Vite 會輸出本機網址；正式靜態檔案產生在 `apps/desktop-prototype
 
 已建立 [Rust 契約與 Core](crates/ditto-core/README.md)、[合成器轉接](crates/ditto-compositor/README.md)、[診斷 CLI](crates/dittoctl/README.md)、[Quickshell 工作階段](shell/README.md)、[合成器探針](tools/compositor-probe/README.md)與[資源採樣器](crates/ditto-measure/README.md)。
 
-在開發容器內，13 項 `desktop.*` 能力可以列舉並操作真實的原生視窗：寫操作回讀比對後才算成功，合成器做不到的操作回 `unsupported`；Shell 的視窗與工作區只來自快照與事件，動畫期間不發任何請求；客戶端身分由受控啟動器綁定。
+13 項 `desktop.*` 能力可以列舉並操作真實的原生視窗：寫操作回讀比對後才算成功，合成器做不到的操作回 `unsupported`；Shell 的視窗與工作區只來自快照與事件，動畫期間不發任何請求；客戶端身分由受控啟動器綁定。
 
-**還沒有**：實體參考機與真機 runner、合成器選型決策（D-02）、輸入法、透明區點擊穿透驗證、有效的幀時與記憶體數字、登入管理器工作階段。容器與開發 VM 的結果是開發證據，不是出口門檻的判定。逐項現況見[進度紀錄](plan/02/06-workplan.md#7-進度紀錄)。
+主要開發機是[開發工作站](docs/platform/dev-wayland-environment.md)：Qt 6.10.2、Quickshell 0.3.1 與 Wayfire 0.11.0 都在其上自源碼建置。**合成器是 Wayfire**（[D-02 決策紀錄](.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)）；Sway 支援已遺棄，只保留為該決策的對照。在 Wayfire 上能力矩陣 12 格回讀驗證、0 格 `unsupported`，透明區點擊穿透雙向成立（[能力差異表](docs/platform/compositor-capability-matrix.md)）。
+
+**還沒有**：實體參考機與真機 runner、輸入法（C-08，D-02 唯一未結的判準）、有效的幀時與記憶體數字、登入管理器工作階段。工作站與容器的結果都是開發證據，不是出口門檻的判定。逐項現況見[進度紀錄](plan/02/06-workplan.md#7-進度紀錄)。
 
 ```sh
-bash tests/g0/run-in-container.sh window-matrix   # 能力 × 視窗形態矩陣
-bash tests/g0/run-in-container.sh shell-session   # 工作階段、命中遮罩、熱路徑
+export PATH=~/wayfire/bin:$PATH LD_LIBRARY_PATH=~/wayfire/lib
+export DITTO_WORKSPACE=$PWD DITTO_ARTIFACTS=$PWD/artifacts/g0 \
+       DITTO_BINARIES=$PWD/target/debug WLR_RENDERER=gles2
+
+bash tests/g0/compositor-probe/run.sh   # 兩層能力探測，含 C-07 點擊穿透
+bash tests/g0/window-matrix/run.sh      # 能力 × 視窗形態矩陣
 ```
+
+已遺棄的 Sway 對照仍可重現：`bash tests/g0/run-in-container.sh compositor-probe`。
 
 ## 目前完成範圍
 

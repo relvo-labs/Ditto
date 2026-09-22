@@ -26,11 +26,14 @@
 | Rust | `rust-toolchain.toml`：1.98.1；`Cargo.lock` | 開發 pin，D-03 未核定 |
 | Node | `.nvmrc`：22.23.2，符合本機 Harness 的 `>=22.19.0` 範圍 | 開發 pin，D-03 未核定 |
 | pnpm | 根目錄 `packageManager`：10.11.0；`pnpm-lock.yaml` | 開發 pin，D-03 未核定 |
-| Qt／Quickshell | [開發 VM 紀錄](dev-wayland-environment.md) 的 Qt 6.10.2／Quickshell 0.3.1 | 僅容器驗證；正式版本未凍結 |
+| Qt／Quickshell | [開發工作站紀錄](dev-wayland-environment.md) 的 Qt 6.10.2／Quickshell 0.3.1 | 工作站與容器皆為此版本；正式版本未凍結 |
+| 合成器 | 同上：Wayfire 0.11.0（自建，含自建依賴鏈） | [D-02 已選 Wayfire](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)，Sway 已遺棄；自建組合不對應任何發行版，版本仍未凍結 |
 
-## 開發 VM 已量到的平台事實
+## 兩台開發機已量到的平台事實
 
-這些值只描述目前的開發 VM（Ubuntu 22.04.5、核心 5.15.0-186-generic），**不是參考機的凍結值**；取得方式見 [工具配額基線](resource-quota-baseline.md)，原始輸出在 `artifacts/g0/quota-baseline-<run_id>.json`。
+以下是**開發機**的值，不是參考機的凍結值。主要開發機已從 2026-09-19 的 KVM VM 改為工作站（見[開發工作站紀錄](dev-wayland-environment.md)），兩台的值並列在 [工具配額基線 §3](resource-quota-baseline.md) —— 差距大到足以改變結論（Landlock ABI 1 對 7、CPU 配額未生效對生效、Secret Service 不可用對可用），這正是參考機必須另外凍結的理由。取得方式同上，原始輸出在 `artifacts/g0/quota-baseline-<run_id>.json`。
+
+下表是舊 VM 的值，保留為對照：
 
 | 事實 | 值 | 取得方式 |
 | --- | --- | --- |
