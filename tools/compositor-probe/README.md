@@ -14,7 +14,18 @@ tools/compositor-probe/run.sh <compositor-label>               # 只做第一層
 tools/compositor-probe/run.sh <compositor-label> --functional  # 兩層合併成一份 JSON
 ```
 
-開發容器內的完整流程（會自行啟動合成器並保存 artifacts）：
+功能層對合成器的每一次查詢都經過 [`functional/compositor.sh`](functional/compositor.sh)，由 `DITTO_COMPOSITOR` 選後端（`sway` 或 `wayfire`）。後端不把自己的模型轉換成另一個的形狀——工作區是具名清單還是固定格線、exclusive zone 從視窗位置還是 work area 量到，都照實記錄，因為這些差異正是合成器決策的依據。Wayfire 沒有相容於 sway 的 IPC，其查詢走 [`functional/wayfire-ipc.py`](functional/wayfire-ipc.py)。
+
+工作站上對 Wayfire 的完整流程（自行啟動合成器並保存 artifacts）：
+
+```sh
+export PATH=~/wayfire/bin:$PATH LD_LIBRARY_PATH=~/wayfire/lib
+DITTO_COMPOSITOR=wayfire DITTO_WORKSPACE=$PWD \
+DITTO_ARTIFACTS=$PWD/artifacts/g0 DITTO_BINARIES=$PWD/target/debug \
+WLR_RENDERER=gles2 bash tests/g0/compositor-probe/run.sh
+```
+
+開發容器內對 Sway 的對照流程：
 
 ```sh
 bash tests/g0/run-in-container.sh compositor-probe

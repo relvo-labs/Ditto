@@ -7,3 +7,4 @@ dist/
 .DS_Store
 /target/
 /artifacts/
+__pycache__/

@@ -12,7 +12,7 @@ trap stop_all EXIT INT TERM
 RUN_ID="$(run_id)"
 mkdir -p "$ARTIFACTS"
 start_compositor
-label="sway-$(sway --version | awk '{print $3}')"
+label="$(compositor_label)"
 OUTPUT="$ARTIFACTS/compositor-probe-$label-$RUN_ID.json"
 bash "$WORKSPACE/tools/compositor-probe/run.sh" "$label" --functional >"$OUTPUT"
 python3 - "$OUTPUT" <<'PYEOF'

@@ -14,7 +14,7 @@ start_compositor
 
 # Launcher mode: no shared token exists. Each client is bound to the PID the
 # launcher spawned before the token reaches it.
-"$BINARIES/ditto-core" serve --compositor sway \
+"$BINARIES/ditto-core" serve --compositor "${DITTO_COMPOSITOR:-wayfire}" \
   --launch "dittoctl 0.1.0 $BINARIES/dittoctl probe capabilities" \
   --launch "token-client 0.1.0 /usr/bin/bash $HERE/token-client.sh" \
   >"$RUNTIME_DIR/core.log" 2>&1 &
