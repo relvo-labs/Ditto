@@ -1,6 +1,18 @@
-//! Sway IPC backend. Window coordinates and workspaces are not covered by the
-//! neutral Wayland protocols (matrix rows C-04 and C-05), so this backend is
-//! compositor-bound by design; every capability it serves reports that binding.
+//! Sway IPC backend. **Abandoned.**
+//!
+//! D-02 selected Wayfire on 2026-09-22 (`.agents/notes/decisions/`), and Sway is
+//! no longer a support target: it takes no new capabilities, the default paths
+//! and the G0 scripts do not run it, and nothing here is expected to keep up
+//! with `wayfire.rs`.
+//!
+//! It is kept, and kept compiling, for one reason: it is the other half of the
+//! comparison D-02 was decided on. Deleting it would leave the decision record
+//! pointing at evidence that can no longer be reproduced, and Sway is the first
+//! option that would be reconsidered if Wayfire turns out to be blocked.
+//!
+//! Window coordinates and workspaces are not covered by the neutral Wayland
+//! protocols (matrix rows C-04 and C-05), so this backend is compositor-bound by
+//! design; every capability it serves reports that binding.
 
 use std::{
     io::{Read, Write},

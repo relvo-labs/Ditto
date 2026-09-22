@@ -69,12 +69,24 @@ impl Client {
             .expect("shutdown");
         drop(self.stream);
         drop(self.reader);
-        self.worker
+        let served = self
+            .worker
             .take()
             .expect("worker")
             .join()
-            .expect("worker joined")
-            .expect("connection served");
+            .expect("worker joined");
+        // The client closes its end while the connection may still be writing a
+        // published event, so the write losing its reader is this test's own
+        // doing and not a fault in the code under test. Any other failure is.
+        match served {
+            Ok(()) => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::ConnectionReset | io::ErrorKind::BrokenPipe
+                ) => {}
+            Err(error) => panic!("connection served: {error:?}"),
+        }
     }
 }
 

@@ -5,6 +5,7 @@
 
 pub mod fixture;
 pub mod sway;
+pub mod wayfire;
 
 use ditto_protocol::{DesktopSnapshot, Output, Window, WindowSessionId, WindowState, Workspace};
 
