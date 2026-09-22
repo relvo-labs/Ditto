@@ -225,23 +225,23 @@
 | ID | 狀態 | 證據與缺口 |
 | --- | --- | --- |
 | G0-PLAT-01 參考平台凍結 | **未開始** | 實體機未到位。[支援矩陣草稿](../../docs/platform/support-matrix.md)已記錄候選規格與開發 VM 的平台事實（Landlock ABI 1、cgroup 控制器、`systemd --user` 未委派 `cpu`、`bwrap` 0.6.1、無 Secret Service）。`packaging/reference-image/` 尚不存在 |
-| G0-PLAT-02 工具鏈凍結 | **進行中** | `rust-toolchain.toml`、`.nvmrc`、`packageManager` 與兩份鎖定檔已進版控；Qt／Quickshell／合成器版本目前只有[開發容器的值](../../docs/platform/dev-wayland-environment.md)。D-03 未核定 |
-| G0-PLAT-03 合成器盤點與 D-02 | **進行中** | 探針已有兩層並實跑：全域列舉 55 個 global，功能探測給出 C-01 支援、C-02 支援、C-03 部分支援（maximize／minimize 請求後狀態不變）、C-04 需轉接、C-05 需轉接（`ext_workspace_manager_v1` 有公告但無客戶端）、C-06 部分支援。[能力差異表](../../docs/platform/compositor-capability-matrix.md)已建立。**C-07、C-08、C-09～C-14 未探測；Wayfire 完全未測；D-02 未決** |
+| G0-PLAT-02 工具鏈凍結 | **進行中** | `rust-toolchain.toml`、`.nvmrc`、`packageManager` 與兩份鎖定檔已進版控；Qt 6.10.2、Quickshell 0.3.1、Wayfire 0.11.0 與其自建依賴鏈的值記在[開發工作站紀錄](../../docs/platform/dev-wayland-environment.md)，**都不是凍結快照**（aqtinstall 與上游 git tag）。D-03 未核定 |
+| G0-PLAT-03 合成器盤點與 D-02 | **進行中** | 探針已是合成器中立的兩層實作，並對兩個合成器實跑。Wayfire 0.11.0（工作站、GPU）：51 個 global，C-01 支援（以 work area 量到 40 px）、C-02 支援、**C-03 六項請求全部回讀成立**、**C-07 雙向成立**（透明區點擊穿到下層並轉移焦點、不透明區由角色層接收，經 `stipc` 注入指標）、C-05 不公告 `ext_workspace_manager_v1` 且模型是 3×3 固定格線、C-06 部分支援（scale 改讀啟動設定）。Sway 1.12（已遺棄，保留為對照）：C-03 的 maximize／minimize 請求後狀態不變，C-07 無探測路徑。對照見[能力差異表](../../docs/platform/compositor-capability-matrix.md)。**[D-02 已決定方向：Wayfire](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)；C-08 未探測，出口門檻未通過；C-09～C-14 只列舉** |
 | G0-PLAT-04 輸入法鏈路 | **未開始** | 容器未安裝輸入法；`docs/platform/input-method-report.md` 尚不存在 |
 | G0-PLAT-05 真機 runner | **進行中** | `nightly-refmachine.yml` 與 `weekly-measure.yml` 已建立並指向 `ditto-refmachine` 標籤；**沒有自架 runner，兩條工作流一次都沒有執行過** |
 | G0-CORE-01 倉庫骨架與 CI | **開發環境已完成** | `ditto-protocol`／`ditto-compositor`／`ditto-core`／`dittoctl`／`ditto-measure` 五個 crate、pnpm workspace、六條工作流齊備。nightly 與 weekly 待 runner |
 | G0-CORE-02 契約管線與能力目錄 | **開發環境已完成** | 13 項能力的描述子由 Rust 產生 `schema/*.json` 與 TS 型別；目錄一致性 gate（handler、consumer、readback、`claimable`）與 schema 新鮮度在 PR 快檢執行。EX-06 的五項判準逐項有對應檢查，出口評審時核對 CI 紀錄 |
 | G0-CORE-03 最小 IPC | **開發環境已完成** | 換行分幀、`params._meta` 信封、握手與版本拒絕、11 個封閉錯誤、事件快照與 `seq`、佇列上限與 `resync_required`、重連補事件、`$/cancel`（不可取消者明確回報未取消）、逾時與 `outcome: "unknown"`；Rust 21 項與 TS 9 項測試涵蓋跨語言編解碼、錯版拒絕、重訂閱與溢位 |
 | G0-CORE-04 呼叫身分綁定 | **開發環境已完成** | 受控啟動器實際接線：token 經已開啟的描述子交付、先綁 PID 與執行檔再釋放。三項負例在容器實跑全部被拒（`tests/g0/identity-negative`）。開發模式仍是共用 token，程式與文件都標明不是 EX-07 證據 |
-| G0-CORE-05 合成器轉接 | **開發環境已完成** | 13 項能力對真實合成器可用；每個寫操作回讀比對，回讀不一致回 `conflict`；平鋪視窗座標與 minimize／maximize 回 `unsupported`；斷線立即標記不可用並送 `resync_required`，重連重建投影。矩陣 23 格全部有明確結果（`artifacts/g0/window-matrix-*.jsonl`）。**參考應用集合只有終端一種** |
+| G0-CORE-05 合成器轉接 | **開發環境已完成** | 13 項能力對真實合成器可用；每個寫操作回讀比對，回讀不一致回 `conflict`；斷線立即標記不可用並送 `resync_required`，重連重建投影。**Wayfire 後端（`wayfire.rs`）已實作**：矩陣 31 格全部有明確結果，12 格回讀驗證、0 格 `unsupported`，四種視窗狀態皆成立（`artifacts/g0/window-matrix-*-35a1.jsonl`）。加入後端時 `CompositorAdapter` 介面、Core 路由與 Shell 都沒有改動。已遺棄的 Sway 後端保留可編譯。**參考應用集合只有終端一種；工作區歸屬是推導而非合成器回報** |
 | G0-CORE-06 `dittoctl probe` | **完成** | 七個子命令（handshake／capabilities／outputs／workspaces／windows／window／events），寫操作自動回讀，`--json` 是矩陣腳本的資料來源；文件明說不是救援 CLI |
 | G0-SHELL-01 最小 Quickshell 工作階段 | **進行中** | 背景、頂部面板、Dock、工作區指示與視窗清單可用，exclusive zone 實測生效（平鋪視窗被限制在 59～664 之間）。**沒有登入管理器工作階段檔，「從登入管理器進入」未驗證** |
 | G0-SHELL-02 角色層與本機動畫 | **開發環境已完成** | 呼吸、不等間隔眨眼、注視、點擊回彈；終止 Core 後角色存活且動畫不中斷。身體層沿用凍結原型素材，臉部由 QML 繪製，來源已登記（`shell/avatar/layers/SOURCES.md`）。未做思考等無對應任務的狀態 |
-| G0-SHELL-03 命中區 | **進行中** | 命中遮罩由 alpha 通道在建置期產生（24 個矩形）並以 `set_input_region` 套用，新鮮度進 PR 快檢。**透明區與不透明區的雙向點擊驗證沒有做**：容器的 headless seat 沒有指標裝置 |
+| G0-SHELL-03 命中區 | **開發環境已完成** | 命中遮罩由 alpha 通道在建置期產生（24 個矩形）並以 `set_input_region` 套用，新鮮度進 PR 快檢。**雙向點擊驗證已做**：在 Wayfire 上以 `stipc` 注入指標，焦點置於另一視窗後點擊透明區，下層視窗取得焦點且遮罩層未收到事件；點擊不透明區由遮罩層收到（探針文件的 C-07 列）。**驗證用的是單矩形夾具，不是角色層的 24 個矩形**；實體輸入裝置與參考機仍待驗 |
 | G0-SHELL-04 狀態訂閱與命令接線 | **開發環境已完成** | 快照＋事件投影、`seq` 不連續即重新訂閱、Core 不可用時顯示真實狀態。閒置、游標與拖曳期間請求數為 0；5 次明確命令各 1 個請求 |
 | G0-QA-01 資源量測工具與報告 | **開發環境已完成** | `ditto-measure` 的採樣與報告、固定變因清單、完整流程腳本（冷啟動、暖機、三次重複）；工具本身拒絕在非參考機產生可引用的數字。GPU 欄位與實機採樣未做 |
 | G0-QA-02 UI 重啟存活 | **開發環境已完成** | 20 次循環（10 次正常、10 次 `SIGKILL`）全部通過，未儲存內容雜湊不變，重啟中位數 130 ms。**編輯器目前是替身程序**，參考機須改用凍結的編輯器 |
-| G0-QA-03 工具配額基線 | **進行中** | 三案例在開發 VM 實跑：記憶體生效（scope 被終止、見證程序不受影響）、程序數生效（64 次 fork 只成功 15 次）、**CPU 未生效**（`systemd --user` 未委派 `cpu` 控制器）。建議初始值尚未提出 |
+| G0-QA-03 工具配額基線 | **進行中** | 三案例在開發工作站實跑，**全部生效**：記憶體（scope 被終止、見證程序不受影響）、CPU（20% 配額下取得 0.202 wall time）、程序數（64 次 fork 成功 15 次）。舊 VM 的 CPU 未生效，差別在 `systemd --user` 是否委派 `cpu`。同時記到 Landlock ABI 7（舊 VM 為 1）與 Secret Service 可用（舊 VM 不可用）。**建議初始值仍未提出**，且兩台開發機的值差距大到不能代替參考機 |
 | G0-QA-04 幀時與熱路徑 | **開發環境已完成** | 四段互動腳本、逐幀取樣與逐段請求計數已可重跑並產出 artifacts。**軟體算繪的幀時不是 NFR-05 數據** |
 
 ### 7.2 出口門檻現況

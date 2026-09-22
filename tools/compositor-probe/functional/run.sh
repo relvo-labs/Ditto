@@ -12,25 +12,31 @@ label="${1:?usage: run.sh <compositor-label>}"
 runtime="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}"
 results="$(mktemp)"
 
+# Everything the compositor is asked about goes through this layer, so the same
+# probe runs against more than one compositor without either of them being
+# described in the other's terms.
+source "$here/compositor.sh"
+
 app_id=ditto-probe
 foot --app-id="$app_id" sh -c 'sleep 120' >"$runtime/probe-window.log" 2>&1 &
 window_pid=$!
 trap 'kill "$window_pid" 2>/dev/null || true; rm -f "$results"' EXIT
 
-for _ in $(seq 1 100); do
-  swaymsg --raw --type get_tree 2>/dev/null | jq -e --arg id "$app_id" '[.. | objects | select(.app_id? == $id)] | length == 1' >/dev/null && break
-  sleep 0.1
-done
+compositor_wait_for_window "$app_id" || true
 
 export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software DITTO_PROBE_APP_ID="$app_id"
 toplevel_output="$(timeout 40 quickshell --no-color -p "$here/toplevel-probe.qml" 2>&1 || true)"
 toplevel_json="$(sed -n 's/.*PROBE_JSON //p' <<<"$toplevel_output" | head -1)"
 [[ -n "$toplevel_json" ]] || toplevel_json='{"enumeration":{"supported":false,"reason":"the probe produced no result"}}'
 
-# C-01: a panel with an exclusive zone must push tiled windows out of its area.
-# The comparison is against the same window before the panel exists, so window
-# decorations are not mistaken for the zone.
-baseline_top="$(swaymsg --raw --type get_tree | jq --arg id "$app_id" 'first(.. | objects | select(.app_id? == $id) | .rect.y)')"
+# C-01: a panel with an exclusive zone must reserve its area. The comparison is
+# against the same measurement before the panel exists, so window decorations
+# are not mistaken for the zone. Where the compositor reports the area it leaves
+# to applications, that is the measurement; where it does not, the position of a
+# tiled window is. Which one was used is recorded with the result, because a
+# compositor that places windows freely would otherwise look like a failure.
+baseline_top="$(compositor_window_top "$app_id")"
+baseline_usable="$(compositor_usable_top)"
 cat >"$runtime/layer-probe.qml" <<'QML'
 import QtQuick
 import Quickshell
@@ -48,17 +54,36 @@ quickshell --no-color -p "$runtime/layer-probe.qml" >"$runtime/layer-probe.log" 
 layer_pid=$!
 for _ in $(seq 1 100); do grep -aq LAYER_PROBE_READY "$runtime/layer-probe.log" && break; sleep 0.1; done
 sleep 1
-window_top="$(swaymsg --raw --type get_tree | jq --arg id "$app_id" 'first(.. | objects | select(.app_id? == $id) | .rect.y)')"
+window_top="$(compositor_window_top "$app_id")"
+usable_top="$(compositor_usable_top)"
 layer_error="$(grep -a 'ERROR' "$runtime/layer-probe.log" | head -1 || true)"
 kill "$layer_pid" 2>/dev/null || true
 layer_json="$(jq -nc --argjson top "${window_top:-0}" --argjson baseline "${baseline_top:-0}" \
+  --argjson usable "${usable_top:-null}" --argjson usable_baseline "${baseline_usable:-null}" \
   --arg error "${layer_error:-}" \
-  '{supported: (($top - $baseline) == 40), window_top: $top, baseline_top: $baseline, shift: ($top - $baseline),
-    probe_error: (if $error == "" then null else $error end),
-    requirement: "a tiled window must move down by exactly the 40 px exclusive zone"}')"
+  '(if $usable == null or $usable_baseline == null
+    then {measured_through: "tiled window position", shift: ($top - $baseline)}
+    else {measured_through: "output work area", shift: ($usable - $usable_baseline)}
+    end) as $measure
+   | {supported: ($measure.shift == 40)}
+     + $measure
+     + {window_top: $top, baseline_top: $baseline, window_shift: ($top - $baseline),
+        usable_top: $usable, baseline_usable_top: $usable_baseline,
+        probe_error: (if $error == "" then null else $error end),
+        requirement: "the 40 px exclusive zone must be reserved: exactly 40 px off the measured edge"}')"
 
-outputs_json="$(swaymsg --raw --type get_outputs | jq -c '{count: length, first: (.[0] | {name, width: .rect.width, height: .rect.height, scale})}')"
-workspaces_json="$(swaymsg --raw --type get_workspaces | jq -c '{count: length}')"
+outputs_json="$(compositor_outputs_json)"
+workspaces_json="$(compositor_workspaces_json)"
+
+# C-07 needs a pointer this environment can drive. Where there is none the row
+# keeps its reason and no verdict, which is what it had before any compositor
+# could be probed for it.
+if [[ "$(compositor_pointer_injection)" == "yes" ]]; then
+  hit_region_json="$(bash "$here/hit-region.sh" 2>/dev/null | tail -1)"
+  [[ -n "$hit_region_json" ]] || hit_region_json='{"probed": false, "reason": "the hit region probe produced no result"}'
+else
+  hit_region_json='{"probed": false, "reason": "no pointer injection in this environment"}'
+fi
 neutral_workspaces="$(wayland-info 2>/dev/null | grep -c ext_workspace_manager_v1 || true)"
 
 jq -nc \
@@ -68,6 +93,7 @@ jq -nc \
   --argjson outputs "$outputs_json" \
   --argjson workspaces "$workspaces_json" \
   --argjson neutral "${neutral_workspaces:-0}" \
+  --argjson hit_region "$hit_region_json" \
   '{
      compositor_label: $label,
      results: [
@@ -77,7 +103,7 @@ jq -nc \
        {row: "C-04", protocol: "none", probe: "no neutral protocol carries window coordinates", evidence: {supported: false, reason: "coordinates need the compositor IPC; see the window matrix run"}},
        {row: "C-05", protocol: "ext_workspace_manager_v1", probe: "enumerate and switch workspaces", evidence: ($workspaces + {neutral_protocol_advertised: ($neutral > 0), probed_through: "compositor IPC", reason: "the neutral protocol is advertised but no client implements it in G0"})},
        {row: "C-06", protocol: "wl_output", probe: "enumerate outputs", evidence: $outputs},
-       {row: "C-07", protocol: "wl_surface.set_input_region", probe: "click the transparent area and the opaque area", evidence: {probed: false, reason: "no pointer injection in this environment"}},
+       {row: "C-07", protocol: "wl_surface.set_input_region", probe: "click the transparent area and the opaque area", evidence: $hit_region},
        {row: "C-08", protocol: "text_input_v3 + input_method_v2", probe: "type Chinese in three applications", evidence: {probed: false, reason: "no input method installed in this environment"}},
        {row: "C-09", protocol: "xdg_activation_v1", probe: "focus follows a launch", evidence: {probed: false, reason: "not exercised yet"}},
        {row: "C-10", protocol: "ext_session_lock_v1", probe: "minimal lock flow", evidence: {probed: false, reason: "inventory only in G0"}},

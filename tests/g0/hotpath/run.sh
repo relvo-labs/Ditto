@@ -41,18 +41,18 @@ phase pointer
 end=$((SECONDS + PHASE_SECONDS))
 while (( SECONDS < end )); do
   for x in 1100 1140 1180 1140; do
-    swaymsg seat - cursor set "$x" 560 >/dev/null 2>&1 || true
+    compositor_move_cursor "$x" 560 || true
     sleep 0.1
   done
 done
 
 # 3: dragging a window: the position updates belong to the compositor.
 phase drag
-swaymsg '[app_id=ditto-hotpath] floating enable' >/dev/null
+compositor_make_floating ditto-hotpath
 end=$((SECONDS + PHASE_SECONDS))
 while (( SECONDS < end )); do
   for offset in 0 40 80 40; do
-    swaymsg "[app_id=ditto-hotpath] move absolute position $((200 + offset)) 200" >/dev/null
+    compositor_move_window ditto-hotpath $((200 + offset)) 200
     sleep 0.25
   done
 done

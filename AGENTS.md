@@ -43,7 +43,7 @@
 
 ## 專案現況
 
-G0 進行中。開發容器內可啟動 Quickshell 工作階段：面板、Dock 與角色層由 Core 的 13 項 `desktop.*` 能力驅動，狀態來自快照與事件，寫操作回讀比對後才算成功，合成器做不到的操作回 `unsupported`；客戶端身分由受控啟動器綁定。**尚未成立**：實體參考機與真機 runner、D-02 合成器決策、輸入法、點擊穿透驗證、有效的幀時與 PSS 數字、登入管理器工作階段、Cordis 宿主與 Agent。容器與開發 VM 的結果都是開發證據，不是出口判定；逐項現況見[進度紀錄](plan/02/06-workplan.md#7-進度紀錄)。前端原型（`apps/desktop-prototype/`）**凍結為互動契約參考，不是實作起點**。
+G0 進行中。主要開發機是[開發工作站](docs/platform/dev-wayland-environment.md)（Ubuntu 24.04、實體 GPU、Qt 6.10.2＋Quickshell 0.3.1＋Wayfire 0.11.0 皆自建）。**合成器是 Wayfire（D-02 已於 2026-09-22 決定方向），Sway 支援已遺棄**——`sway.rs` 與開發容器只保留為該決策的對照證據，見[決策紀錄](.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)。Quickshell 工作階段可啟動：面板、Dock 與角色層由 Core 的 13 項 `desktop.*` 能力驅動，狀態來自快照與事件，寫操作回讀比對後才算成功，合成器做不到的操作回 `unsupported`；客戶端身分由受控啟動器綁定。在 Wayfire 上能力矩陣 12 格回讀驗證、0 格 `unsupported`，命中區點擊穿透（C-07）雙向成立。**尚未成立**：實體參考機與真機 runner、輸入法（C-08，也是 D-02 唯一未結的判準）、有效的幀時與 PSS 數字、登入管理器工作階段、Cordis 宿主與 Agent。工作站與容器的結果都是開發證據，不是出口判定；逐項現況見[進度紀錄](plan/02/06-workplan.md#7-進度紀錄)。前端原型（`apps/desktop-prototype/`）**凍結為互動契約參考，不是實作起點**。
 
 ## 目錄
 

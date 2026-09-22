@@ -6,18 +6,19 @@ mod launcher;
 
 use std::{env, io, os::unix::net::UnixListener, path::PathBuf, sync::Arc, thread, time::Duration};
 
-use ditto_compositor::{fixture::FixtureCompositor, sway, CompositorAdapter, EventSource};
+use ditto_compositor::{fixture::FixtureCompositor, sway, wayfire, CompositorAdapter, EventSource};
 use ditto_core::{
     identity::IdentityRegistry,
     session::{self, Session},
 };
 
-const USAGE: &str = "usage: ditto-core serve [--compositor sway|fixture]\n\
+const USAGE: &str = "usage: ditto-core serve [--compositor wayfire|sway|fixture]\n\
                      \x20            [--launch \"<kind> <version> <executable> [args...]\"]...\n\
                      \x20            [--development]\n\
                      G0 diagnostics and session service. Not a rescue entry point.";
 
 enum Compositor {
+    Wayfire,
     Sway,
     Fixture,
 }
@@ -34,7 +35,13 @@ fn parse_options() -> io::Result<Options> {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, USAGE));
     }
     let mut options = Options {
-        compositor: if env::var_os("SWAYSOCK").is_some() {
+        // Whichever compositor is actually running here. Wayfire is the
+        // selected compositor (D-02) and is checked first; Sway is abandoned
+        // and only reached by an explicit socket or flag. A session with
+        // neither gets the fixture and says so in its label.
+        compositor: if env::var_os("WAYFIRE_SOCKET").is_some() {
+            Compositor::Wayfire
+        } else if env::var_os("SWAYSOCK").is_some() {
             Compositor::Sway
         } else {
             Compositor::Fixture
@@ -46,6 +53,7 @@ fn parse_options() -> io::Result<Options> {
         match argument.as_str() {
             "--compositor" => {
                 options.compositor = match arguments.next().as_deref() {
+                    Some("wayfire") => Compositor::Wayfire,
                     Some("sway") => Compositor::Sway,
                     Some("fixture") => Compositor::Fixture,
                     _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, USAGE)),
@@ -73,6 +81,13 @@ fn connect(
     compositor: &Compositor,
 ) -> io::Result<(Box<dyn CompositorAdapter>, Box<dyn EventSource>)> {
     match compositor {
+        Compositor::Wayfire => {
+            let adapter = wayfire::WayfireAdapter::from_environment()
+                .map_err(|error| io::Error::other(format!("{error:?}")))?;
+            let events = wayfire::WayfireEventSource::from_environment()
+                .map_err(|error| io::Error::other(format!("{error:?}")))?;
+            Ok((Box::new(adapter), Box::new(events)))
+        }
         Compositor::Sway => {
             let adapter = sway::SwayAdapter::from_environment()
                 .map_err(|error| io::Error::other(format!("{error:?}")))?;

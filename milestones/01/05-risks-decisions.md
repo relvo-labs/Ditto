@@ -6,7 +6,7 @@
 
 | ID | 風險 | 等級 | 徵兆 | 處理與決策門檻 |
 | --- | --- | --- | --- | --- |
-| R-01 | **Quickshell 與 Wayfire 對接不完整**。Quickshell 的工作區整合清單為 Hyprland／i3／Sway，未列 Wayfire | 阻斷 | G0 盤點發現 layer-shell、toplevel 管理或工作區協定缺口 | G0 驗證工作區、視窗控制、特效、焦點；必要時寫轉接或改選合成器。**G0 出口必須做出合成器決策** |
+| R-01 | **Quickshell 與 Wayfire 對接不完整**。Quickshell 的工作區整合清單為 Hyprland／i3／Sway，未列 Wayfire | 阻斷 → **降為中**（2026-09-22） | G0 盤點發現 layer-shell、toplevel 管理或工作區協定缺口 | 已處理：layer-shell（C-01）、toplevel 管理（C-02／C-03）與命中區（C-07）在 Wayfire 上實測成立；工作區不經 Quickshell，改走 Core 的 `desktop.workspaces.*`（`wayfire.rs`，回讀驗證）。合成器決策見 [D-02 紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)。**剩餘風險：C-08 輸入法未探測** |
 | R-02 | **Cordis 上游 API 未穩定**（4.0.0-rc），浮動版本上線 | 高 | 同步上游後契約測試大量失敗 | 鎖定 vendored commit，隔離移植修改集，交付契約測試與更新紀錄（[02 §1](02-cordis-adoption.md#1-來源與版本鎖定)） |
 | R-03 | **上游 loader 非交易式**，插件啟用失敗留下部分套用的樹 | 高 | G1 prepare／commit 測試出現殘留實例 | 自建兩階段交易層；必要時降為候選 realm 整棵 dispose 的粗粒度回復，並在「部分完成」語意內明確回報 |
 | R-04 | **對話只停留在設定捷徑**，未證明可組合性 | 高 | 任務集全是單一設定項 | MVP 強制跨模組任務、多輪修正與受限新插件生成；任務集組成比例列入 QA 驗收 |
@@ -34,7 +34,7 @@
 | # | 議題 | 本計畫預設 | 最晚時點 | 決策者 |
 | --- | --- | --- | --- | --- |
 | D-01 | 發行版、GPU 與 XWayland 範圍 | 固定單一參考平台與應用列表 | G0 | 平台工程 |
-| D-02 | **合成器選擇**（Wayfire vs Sway／Hyprland vs 自寫轉接） | 優先驗證 Wayfire，不假設現成相容 | **G0 出口** | 平台工程＋產品 |
+| D-02 | **合成器選擇**（Wayfire vs Sway／Hyprland vs 自寫轉接） | **2026-09-22 已決定：Wayfire，Sway 遺棄**（[紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)）。C-08 仍未探測，出口門檻尚未通過 | **G0 出口** | 平台工程＋產品 |
 | D-03 | Qt／Quickshell／Rust／Node 版本 | 固定工具鏈、相容矩陣與鎖定檔 | G0 | 全體 |
 | D-04 | **Cordis 來源**（Harness vendored fork vs 上游） | 沿用 Harness fork 的鎖定 commit；理由見 [02 §1](02-cordis-adoption.md#1-來源與版本鎖定) | G1 前 | Runtime |
 | D-05 | Harness 移植範圍（哪些具體套件） | 模型適配器、工具、會話三類；具體清單由 G0／G1 盤點決定 | G2 前 | Runtime＋Agent |

@@ -36,7 +36,7 @@ record() {
   local role="$1" app_id="$2"
   shift 2
   probe "$@" | jq -c --arg run "$RUN_ID" --arg role "$role" --arg app "$app_id" \
-    --arg env "$(environment_label)" --arg compositor "$(sway --version)" \
+    --arg env "$(environment_label)" --arg compositor "$(compositor_label)" \
     '. + {run_id: $run, role: $role, app_id: $app, environment: $env, compositor: $compositor}' >>"$OUTPUT"
 }
 
@@ -53,17 +53,28 @@ for app_id in "${TARGETS[@]}"; do
   record terminal "$app_id" probe window "$window" --resize 640 480
   record terminal "$app_id" probe window "$window" --state fullscreen
   record terminal "$app_id" probe window "$window" --state normal
+  # All four states are asked for, not only the two every compositor has. A
+  # compositor without a maximize or minimize state answers `unsupported`, and
+  # that answer is the matrix cell; leaving the request out would hide the
+  # difference between the compositors instead of recording it.
+  record terminal "$app_id" probe window "$window" --state maximized
+  record terminal "$app_id" probe window "$window" --state normal
+  record terminal "$app_id" probe window "$window" --state minimized
+  record terminal "$app_id" probe window "$window" --state normal
 done
 
-# A floating window is the only shape a wlroots compositor gives coordinates to;
+# An untiled window is the only shape a wlroots compositor gives coordinates to;
 # both shapes are recorded so the gap shows up as a matrix cell, not as a note.
 floating="${TARGETS[0]}"
-swaymsg "[app_id=$floating] floating enable" >/dev/null
+compositor_make_floating "$floating"
 floating_window="$(window_id_for "$floating")"
 record terminal-floating "$floating" probe window "$floating_window" --move 120 140
 record terminal-floating "$floating" probe window "$floating_window" --resize 640 480
 
-workspace="$(swaymsg --raw --type get_workspaces | jq -r 'first(.[] | select(.focused == false) | .name) // first(.[] | .name)')"
+# The workspace to switch to is chosen from what Core reports, not from the
+# compositor's own listing: the id has to be one the capability accepts, and its
+# shape differs per compositor.
+workspace="$(probe probe workspaces | jq -r 'first(.result.workspaces[] | select(.active | not) | .id) // first(.result.workspaces[] | .id)')"
 record fixture-free - probe workspaces --activate "$workspace"
 record fixture-free - probe workspaces --get "$workspace"
 
