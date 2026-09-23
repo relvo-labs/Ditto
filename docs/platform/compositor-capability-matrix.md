@@ -7,7 +7,7 @@
 | 探測對象 | **Wayfire 0.11.0**（選定；工作站、headless backend、`gles2` 實體 GPU）與 **Sway 1.12**（**已遺棄**；開發容器、headless、Pixman 軟體算繪，保留為決策對照） |
 | 產生方式 | Wayfire：`DITTO_COMPOSITOR=wayfire bash tests/g0/compositor-probe/run.sh`；Sway：`bash tests/g0/run-in-container.sh compositor-probe`。輸出於 `artifacts/g0/compositor-probe-<compositor>-<run_id>.json` |
 
-這份表只記錄**已實際探測**的事實。兩個環境都沒有實體輸入裝置、沒有輸入法、沒有 X11 應用，因此 C-07、C-08、C-13 等列無法在此判定；它們列在 [§4](#4-尚未探測的列) 而不是被給一個看起來像通過的判定。四態（支援／部分支援／不支援／需轉接）只用於已探測的列。
+這份表只記錄**已實際探測**的事實。Wayfire 工作站能透過 `stipc` 注入合成指標，因此 C-07 已完成單矩形探針表面的透明與不透明區域雙向探測；Sway 容器沒有同等注入路徑，所以該側仍未探測。C-08 雖已安裝 fcitx5 並確認原生 Wayland 所需 global、session bus 與引擎可用，仍未完成 QML 文字輸入、終端與編輯器的實際輸入、候選視窗位置及剪貼簿互通驗證。這項環境就緒資訊來自[開發工作站紀錄](dev-wayland-environment.md)，目前探針產物對 C-08 仍使用靜態的「未安裝輸入法」原因，不能用來判斷工作站狀態。C-09～C-14 也只有列舉結果。未形成判定的列留在 [§4](#4-尚未探測的列)，不把環境就緒誤寫成通過。四態（支援／部分支援／不支援／需轉接）只用於已探測的列。
 
 **兩次探測不在同一台機器、也不在同一個算繪路徑上。** Wayfire 跑在工作站的 GPU 上，Sway 跑在容器的 Pixman 軟體算繪上。協定的有無與請求的回讀結果可以對照；與算繪器相關的全域（`zwp_linux_dmabuf_v1`、`wp_linux_drm_syncobj_manager_v1`）差異**不是**合成器差異，任何效能數字都不可比。
 
@@ -78,7 +78,7 @@ C-04（視窗移動與調整大小）沒有中立協定，兩個合成器都必�
 
 | 能力 | 協定 | Wayfire 的全域狀態 | 為什麼還沒探測 | 需要什麼才能探測 |
 | --- | --- | --- | --- | --- |
-| C-08 中文輸入 | `text_input_v3`＋`input_method_v2` | 公告 v1／v1，**但只在 `workarounds/enable_input_method_v2` 開啟時**；預設關閉 | 未安裝輸入法 | fcitx5 與可見的候選視窗；EX-08。另須記錄「Wayfire 視其為 workaround 選項」這件事對支援承諾的影響 |
+| C-08 中文輸入 | `text_input_v3`＋`input_method_v2` | 公告 v1／v1，**但只在 `workarounds/enable_input_method_v2` 開啟時**；預設關閉 | fcitx5、session bus、chewing 引擎與原生 Wayland 路徑已就緒，但尚未在 QML 文字輸入、終端與編輯器逐一輸入，也未驗證候選視窗位置與剪貼簿互通 | 三處人工輸入、候選視窗及複製貼上證據；EX-08。另須記錄「Wayfire 視其為 workaround 選項」對支援承諾的影響 |
 | C-09 焦點轉移 | `xdg_activation_v1` | 公告 v1（需 `xdg-activation` plugin） | 尚未做啟動後取得焦點的功能探測 | 啟動器路徑 |
 | C-10 工作階段鎖定 | `ext_session_lock_manager_v1` | 公告 v1（需 `session-lock` plugin） | G0 只列舉 | — |
 | C-11 截圖與螢幕分享 | `zwlr_screencopy_manager_v1`、portal | 公告 v3，另有 `ext_image_copy_capture_manager_v1` v1 | G0 只列舉 | — |

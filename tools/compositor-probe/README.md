@@ -39,7 +39,8 @@ bash tests/g0/run-in-container.sh compositor-probe
 | C-02／C-03 | 以中立的 foreign-toplevel 介面列舉視窗，再逐項請求 activate／maximize／fullscreen／minimize 並回讀協定回報的狀態 |
 | C-04／C-05 | 記錄中立協定是否涵蓋；座標與工作區的實際結果來自[視窗能力矩陣](../../tests/g0/window-matrix/run.sh) |
 | C-06 | 輸出列舉（熱插拔屬於實體參考機） |
-| C-07～C-14 | 標記 `probed: false` 並寫明原因，**不給判定** |
+| C-07 | 有可控指標注入時，先把焦點放在另一個視窗，再驗證透明區點擊穿到下層且單矩形探針表面未收到事件，以及不透明區由該探針表面收到；沒有注入路徑時保留 `probed: false`。這不涵蓋正式角色層的 24 個矩形或鍵盤喚回路徑 |
+| C-08～C-14 | 標記 `probed: false` 並寫明原因，**不給判定**。C-08 的原因目前是靜態文字，尚未感知工作站已安裝的輸入法；工作站環境事實以[環境紀錄](../../docs/platform/dev-wayland-environment.md)為準，仍不得視為 EX-08 通過 |
 
 輸出的 `coverage` 會是 `globals_only` 或 `globals_and_functional`。沒有功能結果的列不會得到四態判定；差異表見 [`docs/platform/compositor-capability-matrix.md`](../../docs/platform/compositor-capability-matrix.md)。
 

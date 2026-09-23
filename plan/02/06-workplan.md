@@ -218,7 +218,7 @@
 
 ## 7. 進度紀錄
 
-更新日期 2026-09-19。狀態只有四種：**未開始**、**進行中**、**開發環境已完成**（程式與腳本可重複執行，但判定所需的實體參考機證據還沒有）、**完成**。門檻的通過與否一律在出口評審判定，本表不代表出口結果。
+更新日期 2026-09-22。狀態只有四種：**未開始**、**進行中**、**開發環境已完成**（程式與腳本可重複執行，但判定所需的實體參考機證據還沒有）、**完成**。門檻的通過與否一律在出口評審判定，本表不代表出口結果。
 
 ### 7.1 工作包狀態
 
@@ -227,7 +227,7 @@
 | G0-PLAT-01 參考平台凍結 | **未開始** | 實體機未到位。[支援矩陣草稿](../../docs/platform/support-matrix.md)已記錄候選規格與開發 VM 的平台事實（Landlock ABI 1、cgroup 控制器、`systemd --user` 未委派 `cpu`、`bwrap` 0.6.1、無 Secret Service）。`packaging/reference-image/` 尚不存在 |
 | G0-PLAT-02 工具鏈凍結 | **進行中** | `rust-toolchain.toml`、`.nvmrc`、`packageManager` 與兩份鎖定檔已進版控；Qt 6.10.2、Quickshell 0.3.1、Wayfire 0.11.0 與其自建依賴鏈的值記在[開發工作站紀錄](../../docs/platform/dev-wayland-environment.md)，**都不是凍結快照**（aqtinstall 與上游 git tag）。D-03 未核定 |
 | G0-PLAT-03 合成器盤點與 D-02 | **進行中** | 探針已是合成器中立的兩層實作，並對兩個合成器實跑。Wayfire 0.11.0（工作站、GPU）：51 個 global，C-01 支援（以 work area 量到 40 px）、C-02 支援、**C-03 六項請求全部回讀成立**、**C-07 雙向成立**（透明區點擊穿到下層並轉移焦點、不透明區由角色層接收，經 `stipc` 注入指標）、C-05 不公告 `ext_workspace_manager_v1` 且模型是 3×3 固定格線、C-06 部分支援（scale 改讀啟動設定）。Sway 1.12（已遺棄，保留為對照）：C-03 的 maximize／minimize 請求後狀態不變，C-07 無探測路徑。對照見[能力差異表](../../docs/platform/compositor-capability-matrix.md)。**[D-02 已決定方向：Wayfire](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)；C-08 未探測，出口門檻未通過；C-09～C-14 只列舉** |
-| G0-PLAT-04 輸入法鏈路 | **未開始** | 容器未安裝輸入法；`docs/platform/input-method-report.md` 尚不存在 |
+| G0-PLAT-04 輸入法鏈路 | **進行中** | 工作站已安裝 fcitx5 與 chewing，Wayfire 夾具開啟 `input_method_v2`，並確認原生 Wayland global、session bus、引擎可用；Qt plugin 路徑因版本不相容而不採用。QML 文字輸入、終端、編輯器的實際輸入、候選視窗位置與剪貼簿互通仍未驗證，`docs/platform/input-method-report.md` 尚不存在；合成器探針的 C-08 原因仍是未感知環境的靜態文字 |
 | G0-PLAT-05 真機 runner | **進行中** | `nightly-refmachine.yml` 與 `weekly-measure.yml` 已建立並指向 `ditto-refmachine` 標籤；**沒有自架 runner，兩條工作流一次都沒有執行過** |
 | G0-CORE-01 倉庫骨架與 CI | **開發環境已完成** | `ditto-protocol`／`ditto-compositor`／`ditto-core`／`dittoctl`／`ditto-measure` 五個 crate、pnpm workspace、六條工作流齊備。nightly 與 weekly 待 runner |
 | G0-CORE-02 契約管線與能力目錄 | **開發環境已完成** | 13 項能力的描述子由 Rust 產生 `schema/*.json` 與 TS 型別；目錄一致性 gate（handler、consumer、readback、`claimable`）與 schema 新鮮度在 PR 快檢執行。EX-06 的五項判準逐項有對應檢查，出口評審時核對 CI 紀錄 |
@@ -249,13 +249,13 @@
 | 門檻 | 現況 | 還缺什麼 |
 | --- | --- | --- |
 | EX-01 原生應用可控 | 機制成立，證據不足 | 凍結的參考應用集合（瀏覽器／終端／編輯器）與參考機上的矩陣執行 |
-| EX-02 合成器缺口與 D-02 | 未達成 | C-07、C-08 等未探測；備案合成器未測；決策紀錄未寫 |
+| EX-02 合成器缺口與 D-02 | 方向已決定，出口未達成 | Wayfire 的 C-07 已雙向成立，D-02 決策紀錄已寫；C-08 仍未形成判定，且 Sway 只保留決策當下的已遺棄對照，不再補探測 |
 | EX-03 Shell 重啟零終止 | 腳本可重跑，容器內全數通過 | 參考機、凍結編輯器 |
 | EX-04 幀時與熱路徑 | 熱路徑判準已機械化通過 | 參考機的幀時數字與 `wp_presentation` 交叉驗證 |
 | EX-05 PSS 預算與配額 | 流程與工具就緒 | 參考機三次量測；CPU 配額委派問題；決策核定 |
 | EX-06 契約與目錄一致性 | 檢查已在 PR 快檢執行 | 出口評審逐項核對 CI 紀錄 |
 | EX-07 身分無法自述 | 三項負例在容器全部被拒 | 參考機重跑並納入評審 |
-| EX-08 中文輸入 | 未開始 | 輸入法安裝與三處人工驗證 |
+| EX-08 中文輸入 | 環境就緒，功能證據未達成 | 在 QML 文字輸入、終端、編輯器完成實際輸入、候選視窗位置與複製貼上互通驗證，並產出 `docs/platform/input-method-report.md` |
 | EX-09 真機 runner 與 nightly | 未達成 | 註冊 runner，連續三晚綠燈 |
 
 ### 7.3 期間的其他紀錄
@@ -265,5 +265,6 @@
 | 2026-09-19 | G0 整體 owner（D-12 的 G0 部分） | Lei-k 已確認；各工作流負責人未指派 |
 | 2026-09-19 | 開發環境 | [Wayland／Qt／Quickshell 容器紀錄](../../docs/platform/dev-wayland-environment.md)；所有容器結果皆為開發證據 |
 | 2026-09-19 | 決策紀錄 | [G0 合成器轉接路徑](../../.agents/notes/decisions/2026-09-19-g0-compositor-adapter-seam.md)、[啟動器 token 交付方式](../../.agents/notes/decisions/2026-09-19-launcher-identity-handover.md) |
-| 2026-09-19 | `ditto-qml-shell` skill | 仍為 `draft`。轉 `stable` 的條件是 C-07 的雙向點擊驗證完成；目前未完成，不得改標記 |
+| 2026-09-19 | `ditto-qml-shell` skill | 仍為 `draft`。原列的 C-07 雙向點擊驗證已於 2026-09-22 完成；升為 `stable` 前仍須依 skill 自述重新核對合成器差異與第 4 步，不在本進度回填中逕改狀態 |
+| 2026-09-22 | D-02 與 C-07 | [D-02](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md) 決定採 Wayfire、遺棄 Sway 支援；Wayfire 的 C-07 以合成指標完成透明／不透明區雙向驗證。C-08 仍是 D-02 唯一未結判準，G0 出口未通過 |
 | 2026-09-19 | 對計畫的偏離 | `shell/providers/` 的目錄名改用底線（`panel_top`、`dock_bottom`）：QML 模組名不接受連字號。`dittoctl probe` 比計畫多一個 `outputs` 子命令，因為 `desktop.outputs.list` 需要一個 Consumer |
