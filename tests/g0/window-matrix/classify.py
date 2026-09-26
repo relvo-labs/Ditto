@@ -38,17 +38,32 @@ def outcome_of(cell: dict) -> str:
 
 def main() -> int:
     counts: dict[str, int] = {}
+    environments: set[str] = set()
+    roles: set[str] = set()
     for line in open(sys.argv[1], encoding="utf-8"):
         cell = json.loads(line)
+        environments.add(cell["environment"])
+        if cell["role"] != "fixture-free":
+            roles.add(cell["role"].removesuffix("-floating"))
         outcome = outcome_of(cell)
         counts[outcome] = counts.get(outcome, 0) + 1
         detail = "" if cell["ok"] else cell["error"]["message"]
         print(f'{outcome:12} {cell["capability"]:32} {cell["role"]:18} {detail}')
     print()
+    if not counts:
+        print("the matrix has no cells; an empty run is not a result")
+        return 1
     print(" ".join(f"{name}={value}" for name, value in sorted(counts.items())))
     if counts.get("difference"):
         print("differences must be entered in docs/platform/compositor-capability-matrix.md")
-    print("this run is development evidence; EX-01 is decided on the frozen reference machine")
+    if environments == {"reference-machine"}:
+        missing = {"browser", "terminal", "editor"} - roles
+        if missing:
+            print(f"reference run is missing frozen roles: {sorted(missing)}")
+            return 1
+        print("reference-machine matrix: all three frozen application roles are present")
+    else:
+        print("this run is development evidence; EX-01 is decided on the frozen reference machine")
     return 1 if counts.get("undecided") else 0
 
 

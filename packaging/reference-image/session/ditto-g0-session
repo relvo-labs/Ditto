@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Display-manager entry point for the G0 reference session. Wayfire owns the
+# session; Core then launches Quickshell through the controlled-launcher path.
+set -euo pipefail
+
+workspace="${DITTO_WORKSPACE:-/home/neil/funlab/Ditto}"
+qt_prefix="${DITTO_QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
+wayfire_prefix="${DITTO_WAYFIRE_PREFIX:-$HOME/wayfire}"
+core="$workspace/target/release/ditto-core"
+wayfire_pid=""
+fcitx_pid=""
+fcitx_config_home="$XDG_RUNTIME_DIR/ditto-g0-fcitx-config"
+
+cleanup() {
+  [[ -n "$fcitx_pid" ]] && kill "$fcitx_pid" 2>/dev/null || true
+  [[ -n "$wayfire_pid" ]] && kill "$wayfire_pid" 2>/dev/null || true
+  wait 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+[[ -x "$core" ]] || { echo "missing $core; run packaging/reference-image/install-session.sh" >&2; exit 1; }
+[[ -x "$wayfire_prefix/bin/wayfire" ]] || { echo "missing frozen Wayfire" >&2; exit 1; }
+[[ -x "$qt_prefix/bin/quickshell" ]] || { echo "missing frozen Quickshell" >&2; exit 1; }
+
+export PATH="$wayfire_prefix/bin:$qt_prefix/bin:$HOME/.cargo/bin:$PATH"
+export LD_LIBRARY_PATH="$wayfire_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export XDG_CURRENT_DESKTOP=Wayfire
+export XDG_SESSION_DESKTOP=ditto-g0
+export QT_QPA_PLATFORM=wayland
+export QT_IM_MODULES=wayland
+export QT_IM_MODULE=wayland
+export XMODIFIERS=@im=fcitx
+export _WAYFIRE_SOCKET="$XDG_RUNTIME_DIR/ditto-wayfire-ipc.sock"
+export WAYFIRE_SOCKET="$_WAYFIRE_SOCKET"
+unset DISPLAY SWAYSOCK
+# A previous login can leave the fixed IPC pathname behind after an abort.
+# Wayfire must create a fresh socket before Core starts probing it.
+rm -f -- "$WAYFIRE_SOCKET"
+
+marker="$(mktemp "$XDG_RUNTIME_DIR/ditto-g0-start.XXXXXX")"
+"$wayfire_prefix/bin/wayfire" --config "$workspace/packaging/reference-image/session/wayfire.ini" &
+wayfire_pid=$!
+for _ in $(seq 1 200); do
+  socket="$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -newer "$marker" -type s -name 'wayland-*' -print -quit)"
+  [[ -n "$socket" && -S "$WAYFIRE_SOCKET" ]] && break
+  kill -0 "$wayfire_pid" 2>/dev/null || { echo 'Wayfire stopped during login' >&2; exit 1; }
+  sleep 0.1
+done
+rm -f -- "$marker"
+[[ -n "${socket:-}" ]] || { echo 'Wayland socket did not appear during login' >&2; exit 1; }
+export WAYLAND_DISPLAY="${socket##*/}"
+# D-Bus-activated services (xdg-desktop-portal and its backends) start from the
+# user manager, not from this script. Without the display they fail, and every
+# portal client — the Firefox snap forces GTK_USE_PORTAL=1 — stalls on timeouts.
+dbus-update-activation-environment --systemd \
+  WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP QT_QPA_PLATFORM XMODIFIERS
+
+install -d -m 0700 "$fcitx_config_home/fcitx5"
+install -m 0600 "$workspace/tests/g0/input-method/fcitx5-profile" \
+  "$fcitx_config_home/fcitx5/profile"
+XDG_CONFIG_HOME="$fcitx_config_home" fcitx5 -d --replace
+fcitx_pid="$(pgrep -n -u "$(id -u)" -x fcitx5 || true)"
+
+"$core" serve --compositor wayfire \
+  --launch "quickshell 0.3.1 $qt_prefix/bin/quickshell --no-color -p $workspace/shell/shell.qml"

@@ -73,10 +73,13 @@ impl Probe {
     fn connect(json: bool) -> io::Result<(Self, Value)> {
         let socket = match env::var_os(LAUNCHER_SOCKET_ENV) {
             Some(path) => PathBuf::from(path),
-            None => PathBuf::from(env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
-                io::Error::new(io::ErrorKind::NotFound, "XDG_RUNTIME_DIR is required")
-            })?)
-            .join("ditto/core.sock"),
+            None => match env::var_os("DITTO_RUNTIME_DIR") {
+                Some(directory) => PathBuf::from(directory).join("core.sock"),
+                None => PathBuf::from(env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::NotFound, "XDG_RUNTIME_DIR is required")
+                })?)
+                .join("ditto/core.sock"),
+            },
         };
         let token = launcher_token()?;
         let stream = UnixStream::connect(&socket)?;

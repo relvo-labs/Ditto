@@ -5,6 +5,7 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/session.sh"
+source "$(cd "$(dirname "$0")/.." && pwd)/lib/reference-apps.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 WINDOW_PIDS=()
@@ -20,7 +21,7 @@ start_compositor
 start_core
 export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software
 
-buffer_socket="$RUNTIME_DIR/unsaved.sock"
+buffer_socket="$RUNTIME_DIR/ditto-unsaved-$$.sock"
 python3 "$HERE/unsaved-buffer.py" "$buffer_socket" "未儲存的內容 $(date -u +%s)" >"$RUNTIME_DIR/buffer.log" 2>&1 &
 BUFFER_PID=$!
 for _ in $(seq 1 100); do [[ -S "$buffer_socket" ]] && break; sleep 0.1; done
@@ -36,9 +37,27 @@ print(connection.makefile().readline().strip())
 }
 initial_hash="$(read_buffer)"
 
-start_window ditto-restart-1
-start_window ditto-restart-2
-initial_pids=("${WINDOW_PIDS[@]}" "$BUFFER_PID")
+if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+  for command in firefox kate qdbus wl-paste; do
+    command -v "$command" >/dev/null || { echo "reference application dependency missing: $command" >&2; exit 1; }
+  done
+  start_all_reference_apps
+  unsaved_content="未儲存的內容 $(date -u +%s)"
+  kate_open_unsaved "$unsaved_content"
+  initial_hash="$(printf %s "$unsaved_content" | sha256sum | awk '{print $1}')"
+  current_hash="$(kate_unsaved_hash)"
+  [[ "$current_hash" == "$initial_hash" ]] || {
+    echo 'could not read back the initial unsaved Kate buffer' >&2
+    exit 1
+  }
+  initial_pids=("${REFERENCE_APP_PIDS[@]}")
+  editor_label='Kate 23.08.5 unsaved buffer, read back through clipboard'
+else
+  start_window ditto-restart-1
+  start_window ditto-restart-2
+  initial_pids=("${WINDOW_PIDS[@]}" "$BUFFER_PID")
+  editor_label='stand-in holding unsaved content in memory; development evidence only'
+fi
 
 start_shell() {
   quickshell --no-color -p "$WORKSPACE/shell/shell.qml" >>"$RUNTIME_DIR/shell.log" 2>&1 &
@@ -71,7 +90,11 @@ for cycle in $(seq 1 20); do
   for pid in "${initial_pids[@]}"; do
     kill -0 "$pid" 2>/dev/null || alive=false
   done
-  current_hash="$(read_buffer)"
+  if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+    current_hash="$(kate_unsaved_hash)"
+  else
+    current_hash="$(read_buffer)"
+  fi
   windows="$("$BINARIES/dittoctl" --json probe windows | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["result"]["windows"]))')"
   results="$(python3 -c "
 import json, sys
@@ -89,15 +112,15 @@ print(json.dumps(entries))
   [[ "$current_hash" == "$initial_hash" ]] || { echo "cycle $cycle: unsaved content changed" >&2; break; }
 done
 
-python3 - "$OUTPUT" "$RUN_ID" "$(environment_label)" "$results" <<'PYEOF'
+python3 - "$OUTPUT" "$RUN_ID" "$(environment_label)" "$editor_label" "$results" <<'PYEOF'
 import json, sys
 
-output, run_id, environment, results = sys.argv[1:5]
+output, run_id, environment, editor, results = sys.argv[1:6]
 cycles = json.loads(results)
 record = {
     "run_id": run_id,
     "environment": environment,
-    "editor": "stand-in holding unsaved content in memory; the reference machine uses the frozen editor",
+    "editor": editor,
     "cycles": cycles,
     "applications_survived": all(cycle["applications_alive"] for cycle in cycles),
     "unsaved_content_preserved": all(cycle["buffer_unchanged"] for cycle in cycles),
@@ -111,4 +134,8 @@ print(f'{len(cycles)} cycles, applications survived: {record["applications_survi
 raise SystemExit(0 if len(cycles) == 20 and record["applications_survived"]
                  and record["unsaved_content_preserved"] else 1)
 PYEOF
-echo 'development-container evidence; EX-03 is decided on the reference machine with the frozen application set'
+if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+  echo 'reference-machine evidence: Firefox, foot and Kate survived; Kate unsaved content was read back every cycle'
+else
+  echo 'development evidence only; EX-03 is decided on the reference machine with the frozen application set'
+fi

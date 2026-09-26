@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+user="${SUDO_USER:-${USER:-neil}}"
+[[ "$user" != root ]] || user="neil"
+mapfile -t sessions < <(loginctl list-sessions --no-legend | awk -v u="$user" '$3 == u {print $1}')
+for session in "${sessions[@]}"; do
+  loginctl terminate-session "$session" || true
+done
+exec systemctl restart gdm

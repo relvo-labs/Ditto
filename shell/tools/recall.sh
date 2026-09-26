@@ -4,7 +4,7 @@
 # through the shell's own capability path. Bind these to keys in the compositor
 # configuration; G0 only needs the path to exist.
 set -euo pipefail
-socket="${XDG_RUNTIME_DIR:-/tmp}/ditto/shell.sock"
+socket="${DITTO_RUNTIME_DIR:-${XDG_RUNTIME_DIR:-/tmp}/ditto}/shell.sock"
 command="${*:-recall}"
 python3 -c "
 import socket, sys

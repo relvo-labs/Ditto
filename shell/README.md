@@ -12,8 +12,8 @@ Quickshell／QML 的桌面工作階段：背景、頂部面板、底部 Dock、�
 
 ## 這個工作階段還沒做到什麼
 
-- **透明區點擊穿透尚未驗證**：開發容器沒有指標注入，C-07 仍是未探測的列。
-- **幀時沒有有效數字**：容器是軟體算繪；EX-04 的判定在實體參考機。
+- **幀時尚未形成出口數字**：熱路徑 RPC 已是 0，但 EX-04 還需要參考機固定條件的三次幀時結果。
+- 登入管理器項目已可安裝，但仍需從實體登入管理器進入一次，完成參考應用與輸入法驗證。
 - 連線中斷後無法自動復原：一次性 token 已用掉，介面會顯示「需重新啟動工作階段」。工作階段監督是 G1。
 - 只有一個 Dock 供應者。第二個供應者（DES-10）屬於 G1，現在做會把還沒定案的契約寫死。
 - 角色只有待命狀態。思考／執行等狀態沒有對應任務，AVA-04 禁止用動畫表示它們。
@@ -23,8 +23,8 @@ Quickshell／QML 的桌面工作階段：背景、頂部面板、底部 Dock、�
 Core 自己啟動 Shell，身分由啟動器綁定：
 
 ```sh
-ditto-core serve --compositor sway \
-  --launch "quickshell 0.1.0 /usr/bin/quickshell -p shell/shell.qml"
+ditto-core serve --compositor wayfire \
+  --launch "quickshell 0.3.1 /usr/bin/quickshell -p shell/shell.qml"
 ```
 
 開發時也可以先啟動 `ditto-core serve --development`（共用 token，**不是身分證據**），再自行執行 `quickshell -p shell/shell.qml`。
@@ -50,3 +50,5 @@ shell/tools/recall.sh "workspace 2"   # 與點擊面板同一條能力路徑
 | `providers/panel_top`、`providers/dock_bottom` | 兩個表面供應者（目錄名用底線：QML 模組名不接受連字號） |
 
 素材來源與授權狀態見 [`avatar/layers/SOURCES.md`](avatar/layers/SOURCES.md)。
+
+命中區有兩層證據：合成器中立的一矩形夾具，以及 `tests/g0/avatar-hit-region/run.sh` 對生產用 24 矩形遮罩的直接測試；兩者都要求透明區穿透、實心區接收事件。

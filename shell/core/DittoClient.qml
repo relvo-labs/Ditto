@@ -9,7 +9,8 @@ QtObject {
     id: client
 
     readonly property string socketPath: Quickshell.env("DITTO_CORE_SOCKET")
-        || (Quickshell.env("XDG_RUNTIME_DIR") + "/ditto/core.sock")
+        || ((Quickshell.env("DITTO_RUNTIME_DIR")
+            || (Quickshell.env("XDG_RUNTIME_DIR") + "/ditto")) + "/core.sock")
     readonly property string protocolVersion: "0.1.0"
 
     property bool online: false

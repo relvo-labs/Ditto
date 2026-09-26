@@ -48,7 +48,7 @@
 
 | Skill | Status | 交付 | 職責 |
 |---|---|---|---|
-| [ditto-qml-shell](ditto-qml-shell/SKILL.md) | draft | Wave 3 | QML／Quickshell 元件與角色：本機動畫、命中區、可替換供應者與無障礙。 |
+| [ditto-qml-shell](ditto-qml-shell/SKILL.md) | stable | Wave 3 | QML／Quickshell 元件與角色：本機動畫、命中區、可替換供應者與無障礙。 |
 
 ## Category: quality
 

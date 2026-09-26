@@ -1,0 +1,17 @@
+[Unit]
+Description=GitHub Actions runner for Ditto reference machine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/actions-runner-ditto-ref
+ExecStart=%h/actions-runner-ditto-ref/runsvc.sh
+Restart=always
+RestartSec=5
+KillMode=control-group
+Environment=PATH=%h/.cargo/bin:%h/.nvm/versions/node/v22.23.2/bin:%h/Qt/6.10.2/gcc_64/bin:%h/wayfire/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin
+Environment=LD_LIBRARY_PATH=%h/wayfire/lib
+
+[Install]
+WantedBy=default.target

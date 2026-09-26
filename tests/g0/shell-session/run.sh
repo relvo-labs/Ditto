@@ -91,4 +91,8 @@ CORE_PID=""
 sleep 3
 kill -0 "$SHELL_PID" || { echo 'check 5 failed: the shell died with the desktop service' >&2; exit 1; }
 echo 'check 5: the character layer outlives the desktop service; its animation never waited on a request'
-echo 'development-container evidence; EX-04 frame time and EX-05 memory are measured on the reference machine'
+if [[ "$(environment_label)" == reference-machine ]]; then
+  echo 'reference-machine functional evidence; frame time and PSS remain separate measurements'
+else
+  echo 'development evidence; EX-04 frame time and EX-05 memory are measured on the reference machine'
+fi

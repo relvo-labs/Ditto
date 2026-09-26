@@ -7,7 +7,7 @@ on:
     paths: ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**', '.github/workflows/rust.yml']
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ditto-ci]
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned Rust

@@ -1,0 +1,23 @@
+{
+  "run_id": "REPLACED-BY-RUNNER",
+  "state": "desktop_full_no_agent_g0_subset",
+  "fingerprint": {
+    "kernel": "6.17.0-40-generic",
+    "compositor": "0.11.0-d3990237",
+    "qt": "6.10.2",
+    "quickshell": "0.3.1",
+    "rust": "1.98.1",
+    "node": "22.23.2",
+    "ditto_commit": "REPLACED-BY-RUNNER"
+  },
+  "units": [
+    {"name": "ditto-core.service", "layer": "core", "scope": "user"},
+    {"name": "ditto-shell.service", "layer": "shell", "scope": "user"},
+    {"name": "ditto-wayfire.service", "layer": "compositor", "scope": "user"}
+  ],
+  "excluded": [
+    {"unit": "firefox.scope", "reason": "user-opened reference application"},
+    {"unit": "foot.scope", "reason": "user-opened reference application"},
+    {"unit": "kate.scope", "reason": "user-opened reference application"}
+  ]
+}

@@ -1,6 +1,6 @@
 # G0 依賴與授權盤點起點
 
-此清單跟隨第一批 G0 程式碼建立。版本取自 `Cargo.lock` 與 `pnpm-lock.yaml`；CI 的 [`licenses.yml`](../../.github/workflows/licenses.yml) 會輸出完整 Cargo metadata 與 pnpm 依賴授權清單供逐項審查。**這不是發行前授權審查完成的聲明**；NOTICE 彙整與系統套件的正式版本待平台凍結。
+此清單跟隨第一批 G0 程式碼建立。版本取自 `Cargo.lock`、`pnpm-lock.yaml` 與凍結參考平台；CI 的 [`licenses.yml`](../../.github/workflows/licenses.yml) 會輸出完整 Cargo metadata 與 pnpm 依賴授權清單供逐項審查。**這不是發行前授權審查完成的聲明**；NOTICE 彙整、Qt 模組逐項義務、名稱與角色素材權利仍屬 D-11。
 
 ## Rust 直接依賴
 
@@ -25,4 +25,24 @@
 
 這些套件及其傳遞依賴**不進 G0 桌面工作階段或預期的執行包**。來源與授權由 `pnpm-lock.yaml` 與 CI `node-licenses.json` 保留；若未來將其中任何套件放進執行包，須改列為執行期並重審散布義務。
 
-`tools/dev-wayland` 的 Debian 容器與 Sway、Qt、Quickshell、wayland-utils 目前只供無 GPU 開發測試，不是正式參考映像或發行包。正式平台套件、來源與授權在 D-01／D-03 凍結後另行盤點。
+## 凍結桌面堆疊與系統資產
+
+| 名稱 | 凍結版本／來源 | 授權標示 | G0 用途與處理 |
+| --- | --- | --- | --- |
+| Wayfire | 0.11.0，[WayfireWM/wayfire](https://github.com/WayfireWM/wayfire)；revision 見 `source-builds.lock` | MIT | 合成器；散布時攜帶上游 `LICENSE` |
+| wlroots | 0.20.2，Wayfire subproject | MIT | Wayland compositor library；攜帶 subproject `LICENSE` |
+| wf-config／wf-utils 等 Wayfire subprojects | revision 隨 `source-builds.lock` | 主要為 MIT；完整清單以來源樹為準 | 目前由 Wayfire 私有前綴連結，發行包需逐項彙整 NOTICE |
+| Qt | 6.10.2 gcc_64 官方 binary archive | 商業／LGPLv3／GPLv2+／GPLv3，多授權依實際模組 | G0 選 LGPL 相容路徑的可行性；正式散布前須列出實際動態連結模組、重連結材料與對應授權文 |
+| Quickshell | 0.3.1，commit `1a4716…` | LGPL-3.0（另附 GPL-3.0 文本） | Shell 執行期；保留來源 revision、授權文與修改狀態（無本地 source patch） |
+| cpptrace | commit `91b6b78…`，[jeremy-rifkin/cpptrace](https://github.com/jeremy-rifkin/cpptrace) | MIT | Quickshell crash handler；無本地 source patch，散布時攜帶 MIT 授權文 |
+| Noto CJK | Ubuntu `1:20230817+repack1-3` | 字型檔主要 SIL OFL 1.1；Debian source 另含 GPL-3+ 檔案 | 中文顯示；若打包字型，只納入已確認為 OFL 的字型檔並附 OFL 文本 |
+| Firefox／foot／Kate／Fcitx5 | 版本見支援矩陣 | 由 Ubuntu／snap 各自提供 metadata | 參考應用與輸入法，不宣稱是 Ditto 發行包內嵌元件 |
+
+`tools/dev-wayland` 的 Debian 容器與已遺棄的 Sway 後端只供開發與決策對照，不進 G0 參考工作階段或預期發行包。`packaging/reference-image/apt-packages.txt` 與 `source-builds.lock` 是平台重建清單；它們不是 NOTICE 檔的替代品。
+
+## 素材與權利缺口
+
+- `shell/avatar/layers/body.png` 來自凍結原型，來源已登記，但權利**未釐清**；公開發行前不能把它標為可散布。
+- `hit-mask.json` 是從 `body.png` alpha 產生，權利隨來源素材。
+- 眼睛、嘴、陰影與其他 Shell 圖形由本倉庫 QML 繪製，沒有額外圖示包或第三方角色素材。
+- 名稱「Ditto」與角色設計尚未完成權利審查；G0 不把內部測試工作階段誤寫成公開發布核准。

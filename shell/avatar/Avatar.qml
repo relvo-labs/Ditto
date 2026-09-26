@@ -173,6 +173,7 @@ Item {
             if (!avatar.tokens.reducedMotion) {
                 pressAnimation.restart();
             }
+            console.log("ditto-avatar-hit")
             avatar.pressed();
         }
     }

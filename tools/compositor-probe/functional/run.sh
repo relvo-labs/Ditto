@@ -6,7 +6,7 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-workspace="${DITTO_WORKSPACE:-/workspace}"
+workspace="${DITTO_WORKSPACE:-$(cd "$here/../../.." && pwd)}"
 label="${1:?usage: run.sh <compositor-label>}"
 : "${WAYLAND_DISPLAY:?a live Wayland session is required}"
 runtime="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is required}"
@@ -20,7 +20,8 @@ source "$here/compositor.sh"
 app_id=ditto-probe
 foot --app-id="$app_id" sh -c 'sleep 120' >"$runtime/probe-window.log" 2>&1 &
 window_pid=$!
-trap 'kill "$window_pid" 2>/dev/null || true; rm -f "$results"' EXIT
+x11_pid=""
+trap 'kill "$window_pid" "$x11_pid" 2>/dev/null || true; rm -f "$results"' EXIT
 
 compositor_wait_for_window "$app_id" || true
 
@@ -28,6 +29,28 @@ export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software DITTO_PROBE_APP_ID="$ap
 toplevel_output="$(timeout 40 quickshell --no-color -p "$here/toplevel-probe.qml" 2>&1 || true)"
 toplevel_json="$(sed -n 's/.*PROBE_JSON //p' <<<"$toplevel_output" | head -1)"
 [[ -n "$toplevel_json" ]] || toplevel_json='{"enumeration":{"supported":false,"reason":"the probe produced no result"}}'
+
+# C-13 repeats the neutral C-02/C-03 probe against a real XWayland client. The
+# server is associated by its inherited WAYLAND_DISPLAY, not by a global :N,
+# so a developer's unrelated desktop XWayland cannot be selected accidentally.
+xwayland_json='{"probed":false,"reason":"no XWayland display or xterm in this environment"}'
+if command -v xterm >/dev/null && x11_display="$(compositor_xwayland_display 2>/dev/null)"; then
+  DISPLAY="$x11_display" xterm -class DittoX11 -title DittoX11 -e sleep 120 \
+    >"$runtime/probe-x11.log" 2>&1 &
+  x11_pid=$!
+  if compositor_wait_for_window DittoX11; then
+    x11_output="$(DITTO_PROBE_APP_ID=DittoX11 timeout 40 quickshell --no-color -p "$here/toplevel-probe.qml" 2>&1 || true)"
+    x11_result="$(sed -n 's/.*PROBE_JSON //p' <<<"$x11_output" | head -1)"
+    if [[ -n "$x11_result" ]]; then
+      xwayland_json="$(jq -nc --argjson result "$x11_result" \
+        '{probed:true, supported: (($result.enumeration.supported == true) and ([ $result.control[].observed ] | all)), c02:$result.enumeration, c03:$result.control}')"
+    else
+      xwayland_json='{"probed":true,"supported":false,"reason":"the XWayland toplevel probe produced no result"}'
+    fi
+  else
+    xwayland_json='{"probed":true,"supported":false,"reason":"xterm did not map as an XWayland toplevel"}'
+  fi
+fi
 
 # C-01: a panel with an exclusive zone must reserve its area. The comparison is
 # against the same measurement before the panel exists, so window decorations
@@ -85,6 +108,42 @@ else
   hit_region_json='{"probed": false, "reason": "no pointer injection in this environment"}'
 fi
 neutral_workspaces="$(wayland-info 2>/dev/null | grep -c ext_workspace_manager_v1 || true)"
+screencopy_globals="$(wayland-info 2>/dev/null | grep -Ec 'zwlr_screencopy_manager_v1|ext_image_copy_capture_manager_v1' || true)"
+idle_globals="$(wayland-info 2>/dev/null | grep -Ec 'ext_idle_notifier_v1|zwp_idle_inhibit_manager_v1' || true)"
+presentation_file="$runtime/ditto-presentation-probe-$$.jsonl"
+if wayland-info 2>/dev/null | grep -q 'wp_presentation' \
+    && command -v cc >/dev/null && command -v wayland-scanner >/dev/null \
+    && pkg-config --exists wayland-client wayland-protocols; then
+  if bash "$workspace/tools/presentation-probe/run.sh" 3 "$presentation_file" >/dev/null 2>&1; then
+    presentation_json="$(jq -sc '{supported: (length == 3), probed: true, samples: length,
+      timestamps_ns: map(.timestamp_ns), clock_id: (first.clock_id)}' "$presentation_file")"
+  else
+    presentation_json='{"supported": false, "probed": true, "reason": "presentation feedback client failed"}'
+  fi
+else
+  presentation_json='{"supported": false, "probed": false, "reason": "wp_presentation or probe build dependencies unavailable"}'
+fi
+session_lock_json='{"supported":false,"probed":false,"reason":"ext_session_lock_v1 or probe build dependencies unavailable"}'
+if wayland-info 2>/dev/null | grep -q 'ext_session_lock_manager_v1' \
+    && command -v cc >/dev/null && command -v wayland-scanner >/dev/null \
+    && pkg-config --exists wayland-client wayland-protocols; then
+  if lock_result="$(bash "$workspace/tools/session-lock-probe/run.sh" 2>/dev/null)"; then
+    session_lock_json="$lock_result"
+  else
+    session_lock_json='{"supported":false,"probed":true,"reason":"minimal lock flow failed"}'
+  fi
+fi
+activation_json='{"supported":false,"probed":false,"reason":"xdg_activation_v1, pointer injection, or probe build dependencies unavailable"}'
+if wayland-info 2>/dev/null | grep -q 'xdg_activation_v1' \
+    && [[ "$(compositor_pointer_injection)" == yes ]] \
+    && command -v cc >/dev/null && command -v wayland-scanner >/dev/null \
+    && pkg-config --exists wayland-client wayland-protocols; then
+  if activation_result="$(bash "$workspace/tools/activation-probe/run.sh" 2>/dev/null)"; then
+    activation_json="$activation_result"
+  else
+    activation_json='{"supported":false,"probed":true,"reason":"pointer-authorized activation flow failed"}'
+  fi
+fi
 
 jq -nc \
   --arg label "$label" \
@@ -93,7 +152,13 @@ jq -nc \
   --argjson outputs "$outputs_json" \
   --argjson workspaces "$workspaces_json" \
   --argjson neutral "${neutral_workspaces:-0}" \
+  --argjson screencopy "${screencopy_globals:-0}" \
+  --argjson idle "${idle_globals:-0}" \
   --argjson hit_region "$hit_region_json" \
+  --argjson presentation "$presentation_json" \
+  --argjson xwayland "$xwayland_json" \
+  --argjson session_lock "$session_lock_json" \
+  --argjson activation "$activation_json" \
   '{
      compositor_label: $label,
      results: [
@@ -104,12 +169,12 @@ jq -nc \
        {row: "C-05", protocol: "ext_workspace_manager_v1", probe: "enumerate and switch workspaces", evidence: ($workspaces + {neutral_protocol_advertised: ($neutral > 0), probed_through: "compositor IPC", reason: "the neutral protocol is advertised but no client implements it in G0"})},
        {row: "C-06", protocol: "wl_output", probe: "enumerate outputs", evidence: $outputs},
        {row: "C-07", protocol: "wl_surface.set_input_region", probe: "click the transparent area and the opaque area", evidence: $hit_region},
-       {row: "C-08", protocol: "text_input_v3 + input_method_v2", probe: "type Chinese in three applications", evidence: {probed: false, reason: "no input method installed in this environment"}},
-       {row: "C-09", protocol: "xdg_activation_v1", probe: "focus follows a launch", evidence: {probed: false, reason: "not exercised yet"}},
-       {row: "C-10", protocol: "ext_session_lock_v1", probe: "minimal lock flow", evidence: {probed: false, reason: "inventory only in G0"}},
-       {row: "C-11", protocol: "wlr_screencopy / portal", probe: "enumerate backends", evidence: {probed: false, reason: "inventory only in G0"}},
-       {row: "C-12", protocol: "wp_presentation", probe: "one presentation timestamp", evidence: {probed: false, reason: "cross-check belongs to the reference machine"}},
-       {row: "C-13", protocol: "XWayland", probe: "repeat C-02 and C-03 with an X11 application", evidence: {probed: false, reason: "no X11 application in this environment"}},
-       {row: "C-14", protocol: "ext_idle_notify_v1", probe: "enumerate", evidence: {probed: false, reason: "inventory only in G0"}}
+       {row: "C-08", protocol: "text_input_v3 + input_method_v2", probe: "type Chinese in three applications", evidence: {probed: false, reason: "requires the separate input-method diagnostic plus physical-keyboard checks in QML, terminal, and editor"}},
+       {row: "C-09", protocol: "xdg_activation_v1", probe: "focus follows a pointer-authorized launcher token", evidence: $activation},
+       {row: "C-10", protocol: "ext_session_lock_v1", probe: "minimal lock flow", evidence: $session_lock},
+       {row: "C-11", protocol: "wlr_screencopy / portal", probe: "enumerate backends", evidence: {probed: true, supported: ($screencopy > 0), advertised_matching_globals: $screencopy}},
+       {row: "C-12", protocol: "wp_presentation", probe: "presentation feedback timestamps", evidence: $presentation},
+       {row: "C-13", protocol: "XWayland", probe: "repeat C-02 and C-03 with an X11 application", evidence: $xwayland},
+       {row: "C-14", protocol: "ext_idle_notify_v1", probe: "enumerate", evidence: {probed: true, supported: ($idle > 0), advertised_matching_globals: $idle}}
      ]
    }'
