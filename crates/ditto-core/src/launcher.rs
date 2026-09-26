@@ -50,6 +50,37 @@ fn parse(specification: &str) -> io::Result<Specification> {
     })
 }
 
+/// With `DITTO_LAUNCH_SCOPE_PREFIX` set, the client runs in its own systemd
+/// user scope `<prefix>-<kind>.scope`, so a resource sampler can attribute it
+/// to its layer by cgroup. `systemd-run --scope` execs the client in place:
+/// the PID bound below, the inherited token descriptor and the executable that
+/// identity checks read from `/proc/<pid>/exe` are all the client's own.
+fn scoped_command(kind: &str, executable: &Path) -> io::Result<Command> {
+    let Some(prefix) = std::env::var_os("DITTO_LAUNCH_SCOPE_PREFIX") else {
+        return Ok(Command::new(executable));
+    };
+    let valid = |value: &str| {
+        !value.is_empty()
+            && value
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    };
+    let prefix = prefix.to_string_lossy().into_owned();
+    if !valid(&prefix) || !valid(kind) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "launch scope names allow only ASCII letters, digits, '-' and '_'",
+        ));
+    }
+    let mut command = Command::new("/usr/bin/systemd-run");
+    command
+        .args(["--user", "--scope", "--quiet", "--collect"])
+        .arg(format!("--unit={prefix}-{kind}"))
+        .arg("--")
+        .arg(executable);
+    Ok(command)
+}
+
 /// Spawn the client, bind its PID, then hand over the token. The order matters:
 /// nothing usable reaches the client before Core knows which process may use it.
 pub fn launch(
@@ -63,10 +94,13 @@ pub fn launch(
     let client_fd: OwnedFd = client_end.into();
     let inherited = client_fd.as_raw_fd();
 
-    let mut command = Command::new(&executable);
+    let mut command = scoped_command(&parsed.kind, &executable)?;
     command
         .args(&parsed.arguments)
         .env_remove("DITTO_DEV_TOKEN")
+        // Scopes are Core's to create; a Core the client itself starts (a
+        // test fixture, say) must not reuse the session's scope names.
+        .env_remove("DITTO_LAUNCH_SCOPE_PREFIX")
         .env(LAUNCHER_TOKEN_FD_ENV, TOKEN_FD.to_string())
         .env(LAUNCHER_SOCKET_ENV, socket)
         .env(LAUNCHER_KIND_ENV, &parsed.kind)

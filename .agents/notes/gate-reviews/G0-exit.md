@@ -58,6 +58,8 @@ D-06b 的三項控制器案例已成立：記憶體超限只終止 scope、CPU q
 - 2026-09-26：當參考機同時登入 Ditto 工作階段時，參考夾具會與登入中的 Core／Shell 共用 `$XDG_RUNTIME_DIR/ditto/`。夾具 Core 綁定失敗，`dittoctl` 與 Shell 改連到登入中的 Core，被以 `identity_rejected` 拒絕；hotpath 的明確命令也送不到夾具 Shell。window-matrix 還把全部沒有回應的探測記錄成一份空矩陣並判為通過。已改成：Core、`dittoctl` 與 Shell 接受 `DITTO_RUNTIME_DIR`，參考夾具使用自己的目錄；沒有回應的探測記為不通過的格；空矩陣判為失敗；hotpath 的 phase 記錄改為每次執行各自一份。
 - 2026-09-26：Ditto 登入工作階段沒有把 `WAYLAND_DISPLAY` 匯入 systemd／D-Bus activation 環境，`xdg-desktop-portal-gtk` 因此以 `cannot open display` 失敗。Firefox snap 強制 `GTK_USE_PORTAL=1`，每次 portal 呼叫都要等約 25 秒逾時。`ditto-g0-session` 已補上 `dbus-update-activation-environment --systemd`，重新執行 `install-session.sh` 並重新登入後生效。
 - 以上修正後，參考機以軟體算繪（這時 seat 在 GDM greeter，沒有 GPU）跑的 window-matrix、shell-restart、shell-session、hotpath（功能部分）、avatar-hit-region、identity-negative 全部通過。這些是未進版工作樹、非 GPU 的開發證據，不列為出口證據。
+- 2026-09-26：登入畫面擋住登入（`Couldn't find session for user`）。原因是 21:02 從 tty3 重啟 GDM 時，舊 Ditto 工作階段的 `gdm-session-worker` 5 秒內沒結束，GDM 就放棄了它；新的 GDM 沒有這個工作階段的紀錄，卻拒絕同一使用者再登入。已新增 `gdm.service` drop-in：GDM 停止與啟動時只結束執行 `ditto-g0-session` 的工作階段；`ditto-g0-relogin` 也改成不再結束 tty 登入。
+- 2026-09-26：實際登入時，Wayfire、Core、Shell、Fcitx 與 GDM 的輔助程序同在一個 `session-N.scope`，`ditto-measure` 無法依 cgroup 分出 Core／Shell／合成器，所以 EX-05 的 cold-login 量測原本無法執行。登入 script 已把四者各放進 user scope（Shell 由 Core 的受控啟動器以 `systemd-run --scope` 就地 exec，PID、token fd 與 `/proc/<pid>/exe` 都不變，身分負例照常通過），登出或上一次登入殘留時都會清理；另新增 `tests/g0/measure/cold-login.sh` 與 `DITTO_AVATAR=off`。
 - 參考機是一種可驗證角色，不是唯一開發環境。其他機器可開發與跑非出口測試；效能數字不得跨機混算。
 
 ## 5. 下一階段的估算修正

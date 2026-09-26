@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Run by gdm.service (drop-in gdm-ditto-g0.conf) when the display manager stops
+# and again before it starts. A GDM restart does not wait for a Ditto session:
+# its session worker is abandoned after five seconds, the session stays open on
+# its VT, and the new GDM instance refuses the next login for that user
+# ("Couldn't find session for user"). Ending the orphan here keeps the login
+# screen usable. Only sessions running the Ditto G0 entry point are touched.
+set -uo pipefail
+
+entry=/usr/local/libexec/ditto-g0-session
+while read -r session _; do
+  [[ -n "$session" ]] || continue
+  scope="$(loginctl show-session "$session" -p Scope --value 2>/dev/null)" || continue
+  procs="/sys/fs/cgroup/user.slice/user-$(loginctl show-session "$session" -p User --value).slice/$scope/cgroup.procs"
+  [[ -r "$procs" ]] || continue
+  while read -r pid; do
+    if tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -qF "$entry"; then
+      echo "ending orphaned Ditto G0 session $session"
+      loginctl terminate-session "$session" || true
+      break
+    fi
+  done <"$procs"
+done < <(loginctl list-sessions --no-legend 2>/dev/null)
+exit 0

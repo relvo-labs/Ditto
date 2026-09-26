@@ -27,6 +27,7 @@ bash tests/g0/run-in-container.sh <script>
 | --- | --- | --- |
 | `quota-baseline/run.sh` | QA-03 | 記憶體、CPU、程序數三個配額案例與平台事實；開發 VM 上 CPU 配額因未委派控制器而未生效 |
 | `measure/run.sh` | QA-01／EX-05 | 暖機、採樣、三次重複與報告；以三個 user service 提供穩定 cgroup 歸屬。非參考機需 `DITTO_FORMAT_CHECK=1`。自動 runner 只重啟服務、不是登入管理器 cold login，因此現行條件檔會誠實標成不可作 EX-05 最終證據 |
+| `measure/cold-login.sh` | EX-05 | 每次從登入管理器登入後量一次：`prepare <狀態>` 選下一次登入的桌面狀態（`standard`／`avatar-off`／`reduced-motion`），登入後 `sample` 開啟參考應用、暖機 300 秒、採樣 600 秒；同一狀態累積三次不同登入後 `report <狀態>`。Wayfire、Core、Shell、Fcitx 由登入 script 各放在自己的 user scope，依 cgroup 分層；登入超過 600 秒或狀態不符即拒絕 |
 
 ## 為什麼容器的結果不能當出口證據
 

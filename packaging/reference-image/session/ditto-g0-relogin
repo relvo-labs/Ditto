@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
+# Return the reference machine to a clean login screen: end the Ditto G0
+# graphical sessions, then restart GDM. Text logins (a tty used to run this)
+# and other users' sessions are left alone.
 set -euo pipefail
-
-user="${SUDO_USER:-${USER:-neil}}"
-[[ "$user" != root ]] || user="neil"
-mapfile -t sessions < <(loginctl list-sessions --no-legend | awk -v u="$user" '$3 == u {print $1}')
-for session in "${sessions[@]}"; do
-  loginctl terminate-session "$session" || true
-done
+[[ "$(id -u)" == 0 ]] || exec sudo "$0" "$@"
+/usr/local/libexec/ditto-g0-end-sessions
 exec systemctl restart gdm
