@@ -90,7 +90,7 @@ EX-01 與 EX-03 都要用到，必須同時凍結版本：
 | C-05 | 工作區列舉與切換 | `ext_workspace_v1` 或合成器專屬 IPC | 建立／切換／列舉；驗證事件 | 需轉接；無可行路徑時阻斷 | DES-04 |
 | C-06 | 輸出列舉、縮放與熱插拔 | `wl_output` v4、`xdg_output` | 列舉；模擬拔除（或以 `wlr-randr` 等工具停用輸出），驗證事件與視窗重新定位 | 阻斷 | DES-08 |
 | C-07 | 命中區與點擊穿透 | `wl_surface.set_input_region` | 設定非矩形 input region，在透明區點擊，驗證事件到達下層應用 | 阻斷 | AVA-05 |
-| C-08 | 中文輸入 | `text_input_v3` ＋ `input_method_v2` | 見 §6 | 阻斷 | DES-07 |
+| C-08 | 中文輸入 | `text_input_v3` ＋已驗證的合成器輸入法 bridge | 見 §6；Wayfire 採 `input-method-v1`，見[決策紀錄](../../.agents/notes/decisions/2026-09-23-g0-input-method-bridge.md) | 阻斷 | DES-07 |
 | C-09 | 焦點轉移 | `xdg_activation_v1` | 從啟動器啟動應用後，驗證新視窗取得焦點 | 需轉接 | DES-02 |
 | C-10 | 工作階段鎖定 | `ext_session_lock_v1` | 列舉與最小鎖定流程 | 記錄 | DES-06、SEC-08（G1） |
 | C-11 | 截圖與螢幕分享 | `wlr_screencopy`、xdg-desktop-portal | 列舉後端與可用介面 | 記錄 | DES-11（P1） |

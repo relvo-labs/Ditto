@@ -1,0 +1,19 @@
+# component|source|revision|install-prefix
+wayfire|https://github.com/WayfireWM/wayfire.git|d39902379c5737eebe1dc3a830659fa3f0fa22e0|$HOME/wayfire
+wlroots|https://gitlab.freedesktop.org/wlroots/wlroots.git|d783533489e1f75d6886c2ab5c5960090ef268f8|$HOME/wayfire
+wf-config|https://github.com/WayfireWM/wf-config.git|add9ba7a47492d4f86482b0a308d9054a825637e|$HOME/wayfire
+wf-utils|https://github.com/WayfireWM/wf-utils.git|329c3ff01724d82947f61c45332f75d3534e8454|$HOME/wayfire
+wf-touch|https://github.com/WayfireWM/wf-touch.git|d7ae5e7fa4de9536e2de2af74f168f981eb8a77a|$HOME/wayfire
+wf-json|https://github.com/WayfireWM/wf-json.git|70039e13cdeaebd8ec498ed30bf5ab91c2e313ec|$HOME/wayfire
+libdisplay-info|https://gitlab.freedesktop.org/emersion/libdisplay-info.git|62a9346c3dce2bddba1d4dc186949e4320d6f801|$HOME/wayfire
+v4l-utils|https://git.linuxtv.org/v4l-utils.git|1316a80455ef70889bea89491f37cd69170f3ee7|$HOME/wayfire
+yyjson|https://github.com/ibireme/yyjson.git|6447536015f3d600f3d65323b10976103b337ca7|$HOME/wayfire
+wlroots-vkfx|https://gitlab.freedesktop.org/ammen99/wlroots|4c89d4b687826641b37e65441ad1cdd1eca40551|$HOME/wayfire
+libwayland|https://gitlab.freedesktop.org/wayland/wayland.git|87cc8a8728a923fc57938faa81ba0e74f34ecdc7|$HOME/wayfire
+wayland-protocols|https://gitlab.freedesktop.org/wayland/wayland-protocols.git|819004adb3ab7e46f3fa3caef05b96e20434b244|$HOME/wayfire
+libdrm|https://gitlab.freedesktop.org/mesa/drm.git|e984d448b8b17aab853369e6c203e53719f46de1|$HOME/wayfire
+pixman|https://gitlab.freedesktop.org/pixman/pixman.git|9cc163c9da0fb4da430641715313d95a6ec466d9|$HOME/wayfire
+libxkbcommon|https://github.com/xkbcommon/libxkbcommon.git|dd642359f8d43c09968e34ca7f1eb1121b2dfd70|$HOME/wayfire
+qt|Qt online archive via aqtinstall|6.10.2 gcc_64|$HOME/Qt/6.10.2/gcc_64
+quickshell|https://github.com/quickshell-mirror/quickshell.git|1a4716cde794a59928d9d9fc15f2afc7a95de360|$HOME/Qt/6.10.2/gcc_64
+cpptrace|https://github.com/jeremy-rifkin/cpptrace.git|91b6b78e408a8b1c0b7146c9034a03156c082da2|/usr/local

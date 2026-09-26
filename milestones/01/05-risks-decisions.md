@@ -6,7 +6,7 @@
 
 | ID | 風險 | 等級 | 徵兆 | 處理與決策門檻 |
 | --- | --- | --- | --- | --- |
-| R-01 | **Quickshell 與 Wayfire 對接不完整**。Quickshell 的工作區整合清單為 Hyprland／i3／Sway，未列 Wayfire | 阻斷 → **降為中**（2026-09-22） | G0 盤點發現 layer-shell、toplevel 管理或工作區協定缺口 | 已處理：layer-shell（C-01）、toplevel 管理（C-02／C-03）與命中區（C-07）在 Wayfire 上實測成立；工作區不經 Quickshell，改走 Core 的 `desktop.workspaces.*`（`wayfire.rs`，回讀驗證）。合成器決策見 [D-02 紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)。**剩餘風險：C-08 輸入法未探測** |
+| R-01 | **Quickshell 與 Wayfire 對接不完整**。Quickshell 的工作區整合清單為 Hyprland／i3／Sway，未列 Wayfire | 阻斷 → **降為中**（2026-09-22） | G0 盤點發現 layer-shell、toplevel 管理或工作區協定缺口 | 已處理：layer-shell（C-01）、toplevel 管理（C-02／C-03）與命中區（C-07）在 Wayfire 上實測成立；工作區不經 Quickshell，改走 Core 的 `desktop.workspaces.*`（`wayfire.rs`，回讀驗證）。合成器決策見 [D-02 紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)。**剩餘風險：C-08 的虛擬鍵盤診斷沒有中文提交，待實體鍵盤判定** |
 | R-02 | **Cordis 上游 API 未穩定**（4.0.0-rc），浮動版本上線 | 高 | 同步上游後契約測試大量失敗 | 鎖定 vendored commit，隔離移植修改集，交付契約測試與更新紀錄（[02 §1](02-cordis-adoption.md#1-來源與版本鎖定)） |
 | R-03 | **上游 loader 非交易式**，插件啟用失敗留下部分套用的樹 | 高 | G1 prepare／commit 測試出現殘留實例 | 自建兩階段交易層；必要時降為候選 realm 整棵 dispose 的粗粒度回復，並在「部分完成」語意內明確回報 |
 | R-04 | **對話只停留在設定捷徑**，未證明可組合性 | 高 | 任務集全是單一設定項 | MVP 強制跨模組任務、多輪修正與受限新插件生成；任務集組成比例列入 QA 驗收 |
@@ -24,7 +24,7 @@
 | R-16 | **沙箱強制執行僅 partial 被當作 full** | 中高 | 較舊 Landlock ABI 或核心版本 | 平台凍結時固定核心版本；`partial` 必須向上暴露；要求絕對邊界的消費方拒絕 |
 | R-17 | **秘密外洩至日誌、匯出或崩潰報告** | 高 | 掃描命中 | 秘密只存引用；每階段出口執行外洩掃描；遙測預設不傳視窗標題、文件、剪貼簿與對話 |
 | R-18 | **角色與名稱權利未釐清** | 中 | 公開發布前才發現 | G4 完成名稱、角色、圖示與素材使用權審查；本計畫不假設已完成法律審查 |
-| R-19 | **真機 CI 不可得或不穩定** | 中 | 效能數字波動大、無法重現 | 實體參考機為必要基礎設施，列入 G0 採購／配置；虛擬機僅用於非圖形測試 |
+| R-19 | **真機 CI 不可得或不穩定** | 中 → **低（待三晚觀察）** | 效能數字波動大、無法重現 | `ditto-ref-ws-rtx4060-01` 已註冊 user-service runner 並通過 preflight；仍以 EX-09 三個連續夜間結果確認穩定度，虛擬機不代替圖形證據 |
 | R-20 | **各工作流尚未指派 owner** | 中 | 決策或工作包停滯 | G0 整體 owner 已由 Lei-k 擔任；各工作流負責人仍須指派，見 [G0 啟動進度](../../plan/02/06-workplan.md#7-進度紀錄) |
 
 ## 2. 待決策清單
@@ -33,30 +33,30 @@
 
 | # | 議題 | 本計畫預設 | 最晚時點 | 決策者 |
 | --- | --- | --- | --- | --- |
-| D-01 | 發行版、GPU 與 XWayland 範圍 | 固定單一參考平台與應用列表 | G0 | 平台工程 |
-| D-02 | **合成器選擇**（Wayfire vs Sway／Hyprland vs 自寫轉接） | **2026-09-22 已決定：Wayfire，Sway 遺棄**（[紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)）。C-08 仍未探測，出口門檻尚未通過 | **G0 出口** | 平台工程＋產品 |
-| D-03 | Qt／Quickshell／Rust／Node 版本 | 固定工具鏈、相容矩陣與鎖定檔 | G0 | 全體 |
+| D-01 | 發行版、GPU 與 XWayland 範圍 | **2026-09-22 已決定**：Ubuntu 24.04.2／kernel 6.17／RTX 4060；Firefox、foot、Kate；XWayland 僅診斷（[紀錄](../../.agents/notes/decisions/2026-09-22-d01-reference-platform.md)）；2026-09-26 Firefox 改為 156.0.1 rev 8969（[D-01a](../../.agents/notes/decisions/2026-09-26-d01a-firefox-156-0-1.md)） | G0 | 平台工程 |
+| D-02 | **合成器選擇**（Wayfire vs Sway／Hyprland vs 自寫轉接） | **2026-09-22 已決定：Wayfire，Sway 遺棄**（[紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)）。C-08 自動診斷未得到中文提交，出口門檻尚未通過 | **G0 出口** | 平台工程＋產品 |
+| D-03 | Qt／Quickshell／Rust／Node 版本 | **2026-09-22 已決定**：Qt 6.10.2、Quickshell 0.3.1、Rust 1.98.1、Node 22.23.2、pnpm 10.11.0（[紀錄](../../.agents/notes/decisions/2026-09-22-d03-toolchain-freeze.md)） | G0 | 全體 |
 | D-04 | **Cordis 來源**（Harness vendored fork vs 上游） | 沿用 Harness fork 的鎖定 commit；理由見 [02 §1](02-cordis-adoption.md#1-來源與版本鎖定) | G1 前 | Runtime |
 | D-05 | Harness 移植範圍（哪些具體套件） | 模型適配器、工具、會話三類；具體清單由 G0／G1 盤點決定 | G2 前 | Runtime＋Agent |
-| D-06 | 分層資源預算與工具硬上限 | 依 19.1 實測核定，變更需附數據與決策紀錄 | G0／G1 | 全體 |
+| D-06 | 分層資源預算與工具硬上限 | **部分已決定**：D-06b 工具三類初始配額已核定（[紀錄](../../.agents/notes/decisions/2026-09-22-d06b-tool-quotas.md)）；D-06a Core／Shell PSS 等合格三次量測 | G0／G1 | 全體 |
 | D-07 | 嵌入式腳本引擎（QuickJS／Lua） | **不列入 MVP**；P1 另行選型 | P1 | Runtime |
 | D-08 | 生成執行隔離實作 | 先受限模板與隔離試載入，不直接啟用任意程式 | G1 前 | Runtime＋安全 |
 | D-09 | 模型、預算與憑證儲存 | 一供應者、可替換契約、獨立秘密引用（Secret Service 首選） | G2 前 | Agent＋產品 |
 | D-10 | 套件格式與發布來源 | 核可來源＋本機包，固定版本與雜湊 | G1 | Runtime |
 | D-11 | 商業授權與角色素材 | 以實際發行包完成審查 | 公開發布前 | 產品＋法務 |
 | D-12 | 團隊、owner 與工期 | G0 結果後估算 | G0 結束 | 管理 |
-| D-13 | **契約型別方向**（Rust-first schemars vs TS-first） | Rust 為單一事實來源，匯出 JSON Schema 產生 TS | G0 | Core |
-| D-14 | **IPC 傳輸細節**（Unix socket 路徑、認證方式、事件佇列上限） | `$XDG_RUNTIME_DIR/ditto/core.sock`、0600、受控啟動器建立身分綁定 | G0 | Core |
+| D-13 | **契約型別方向**（Rust-first schemars vs TS-first） | **2026-09-22 已決定**：Rust-first schemars → JSON Schema → TS（[紀錄](../../.agents/notes/decisions/2026-09-22-d13-rust-first-contracts.md)） | G0 | Core |
+| D-14 | **IPC 傳輸細節**（Unix socket 路徑、認證方式、事件佇列上限） | **2026-09-22 已決定**：Unix socket 0600、受控啟動器綁定身分、佇列 1024（[紀錄](../../.agents/notes/decisions/2026-09-22-d14-ipc-transport.md)） | G0 | Core |
 | D-15 | **Profile 儲存格式**（SQLite 結構與匯出文字格式） | SQLite 為權威，匯出採可審查文字格式 | G1 | Core |
 | D-16 | **兩個非 AI Cordis 服務插件的具體選型** | 任務／待辦資料服務 ＋ 通知策略服務 | G1 早期 | Host＋產品 |
 | D-17 | **兩種受限生成插件的具體選型** | 待辦摘要面板 ＋ 工作區快捷動作面板 | G3 前 | Agent＋產品 |
 | D-18 | **安裝與發行形態**（原生套件 vs Flatpak vs tarball） | 工作階段安裝包＋systemd user units | G4 前 | 平台工程 |
-| D-19 | **真機 CI runner 的取得方式** | 實體參考機，列入 G0 基礎設施 | G0 | 管理＋QA |
+| D-19 | **真機 CI runner 的取得方式** | **2026-09-22 已決定並註冊**：主要參考機以 user systemd service 提供 `ditto-refmachine`／`ditto-ci`（[紀錄](../../.agents/notes/decisions/2026-09-22-d19-reference-runner.md)） | G0 | 管理＋QA |
 | D-20 | **語意任務集的模型版本固定策略** | 固定版本＋保留集；模型更新時重跑並記錄 | G2 | QA＋Agent |
 | D-21 | **G0 估算修正（26 → 31 人週）** | 提案：納入 [G0 執行計畫的增補與加嚴](../../plan/02/README.md#4-對-milestones01-的增補與加嚴登記)；未核定前仍以 26 人週為上位計畫建議值 | G0 啟動評審 | 管理＋產品 |
-| D-22 | **參考編輯器選擇** | 提案：選能從外部驗證未儲存緩衝內容的編輯器，以符合 EX-03 | G0 W2 | 平台工程＋QA |
-| D-23 | **能力目錄一致性 gate 的嚴格度** | 提案：四項檢查任一失敗即擋合併 | G0 CORE-02 開工前 | Core |
-| D-24 | **`ditto-qml-shell` 轉 `stable` 的判定** | 提案：G0 結束時依實際命中區做法核對第 4 步，證據不足則維持 `draft` | G0 出口 | Shell |
+| D-22 | **參考編輯器選擇** | **2026-09-22 已決定**：Kate，以 D-Bus 建立未儲存文件、Wayland clipboard 回讀 SHA-256（[紀錄](../../.agents/notes/decisions/2026-09-22-d22-reference-editor-kate.md)） | G0 W2 | 平台工程＋QA |
+| D-23 | **能力目錄一致性 gate 的嚴格度** | **2026-09-22 已決定**：四項檢查任一失敗即擋合併（[紀錄](../../.agents/notes/decisions/2026-09-22-d23-catalog-gate-strict.md)） | G0 CORE-02 開工前 | Core |
+| D-24 | **`ditto-qml-shell` 轉 `stable` 的判定** | **2026-09-22 已決定**：生產 24 矩形遮罩雙向驗證後轉 stable（[紀錄](../../.agents/notes/decisions/2026-09-22-d24-qml-shell-stable.md)） | G0 出口 | Shell |
 
 ## 3. 團隊與估算假設
 
@@ -107,7 +107,7 @@ PRD 明示「時程待 G0 結果、人力與預算確定後估算，不以尚未
 | 2026-09-19 | G0 合成器轉接採「中立介面＋合成器 IPC 後端」，**不代表 D-02 已決定** | [紀錄](../../.agents/notes/decisions/2026-09-19-g0-compositor-adapter-seam.md) |
 | 2026-09-19 | 受控啟動器以已開啟的描述子交付一次性 token，不走環境變數 | [紀錄](../../.agents/notes/decisions/2026-09-19-launcher-identity-handover.md) |
 
-D-01、D-02、D-03、D-06、D-12、D-19 仍未決定；G0 期間取得的探測與量測資料見 [plan/02 §7](../../plan/02/06-workplan.md#7-進度紀錄)。
+D-01、D-02、D-03、D-06b、D-13、D-14、D-19、D-22、D-23、D-24 已決定；D-06a 與 D-12 的工作流分工仍未結。G0 期間取得的探測與量測資料見 [plan/02 §7](../../plan/02/06-workplan.md#7-進度紀錄)。
 
 ## 4. 決策紀錄格式
 

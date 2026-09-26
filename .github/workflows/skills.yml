@@ -15,7 +15,7 @@ jobs:
   lint:
     # draft PR 不跑；push 事件沒有 pull_request 物件，照常執行。
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ditto-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

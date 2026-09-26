@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Shared helpers for the G0 verification scripts. A run started from here is a
-# development-container run: it exercises the code paths, and it is not the
-# reference-machine evidence any exit criterion asks for.
+# development-environment run by default: it exercises the code paths, and it
+# is not the reference-machine evidence any exit criterion asks for.
 set -euo pipefail
 
-BINARIES="${DITTO_BINARIES:-/workspace/target/debug}"
-ARTIFACTS="${DITTO_ARTIFACTS:-/workspace/artifacts/g0}"
-WORKSPACE="${DITTO_WORKSPACE:-/workspace}"
+DEFAULT_WORKSPACE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+WORKSPACE="${DITTO_WORKSPACE:-$DEFAULT_WORKSPACE}"
+BINARIES="${DITTO_BINARIES:-$WORKSPACE/target/debug}"
+ARTIFACTS="${DITTO_ARTIFACTS:-$WORKSPACE/artifacts/g0}"
 DITTO_COMPOSITOR="${DITTO_COMPOSITOR:-wayfire}"
 
 # The compositor-neutral queries live with the probe, so the fixtures and the
@@ -22,8 +23,10 @@ run_id() {
 environment_label() {
   if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
     echo "reference-machine"
+  elif [[ -n "${DITTO_ENVIRONMENT_LABEL:-}" ]]; then
+    echo "$DITTO_ENVIRONMENT_LABEL"
   else
-    echo "development-container"
+    echo "development-environment"
   fi
 }
 
@@ -49,14 +52,41 @@ start_session_bus() {
 }
 
 start_compositor() {
-  RUNTIME_DIR="$(mktemp -d /tmp/ditto-g0.XXXXXX)"
-  chmod 700 "$RUNTIME_DIR"
+  if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+    # Native snaps (the frozen browser) can only reach Wayland sockets in the
+    # real user runtime. Reference jobs are serialized by the runner, so they
+    # use that runtime and unique compositor sockets instead of a /tmp island.
+    RUNTIME_DIR="${DITTO_REFERENCE_RUNTIME:-/run/user/$(id -u)}"
+    [[ -d "$RUNTIME_DIR" && -O "$RUNTIME_DIR" ]] || {
+      echo "invalid reference runtime: $RUNTIME_DIR" >&2
+      return 1
+    }
+  else
+    RUNTIME_DIR="$(mktemp -d /tmp/ditto-g0.XXXXXX)"
+    chmod 700 "$RUNTIME_DIR"
+  fi
   export XDG_RUNTIME_DIR="$RUNTIME_DIR"
-  start_session_bus
+  # The shared reference runtime may already hold a logged-in Ditto session's
+  # Core and Shell sockets. The fixture's own pair lives in a directory of its
+  # own, so it neither fails to bind nor talks to the live desktop.
+  if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+    export DITTO_RUNTIME_DIR="$RUNTIME_DIR/ditto-g0-fixture-$$"
+  else
+    export DITTO_RUNTIME_DIR="$RUNTIME_DIR/ditto"
+  fi
+  if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+    export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$RUNTIME_DIR/bus}"
+  else
+    start_session_bus
+  fi
   export WLR_BACKENDS="${WLR_BACKENDS:-headless}" WLR_RENDERER="${WLR_RENDERER:-pixman}"
   export WLR_HEADLESS_OUTPUTS=1 WLR_LIBINPUT_NO_DEVICES=1
   unset DISPLAY WAYLAND_DISPLAY SWAYSOCK
-  local log="$RUNTIME_DIR/$DITTO_COMPOSITOR.log"
+  local log="$RUNTIME_DIR/ditto-g0-$DITTO_COMPOSITOR-$$.log"
+  COMPOSITOR_LOG="$log"
+  export COMPOSITOR_LOG
+  local socket_marker="$RUNTIME_DIR/ditto-g0-socket-marker-$$"
+  touch "$socket_marker"
 
   case "$DITTO_COMPOSITOR" in
     sway)
@@ -77,7 +107,7 @@ start_compositor() {
       # The socket path is fixed here instead of being read back from the
       # compositor, because the probe is not a child of Wayfire and would not
       # inherit WAYFIRE_SOCKET.
-      export _WAYFIRE_SOCKET="$RUNTIME_DIR/wayfire-ipc.sock"
+      export _WAYFIRE_SOCKET="$RUNTIME_DIR/ditto-wayfire-ipc-$$.sock"
       export WAYFIRE_SOCKET="$_WAYFIRE_SOCKET"
       wayfire --config "$WORKSPACE/tools/dev-wayland/wayfire.ini" >"$log" 2>&1 &
       COMPOSITOR_PID=$!
@@ -94,10 +124,10 @@ start_compositor() {
       ;;
   esac
 
-  local wayland_sockets=("$RUNTIME_DIR"/wayland-*)
-  for socket in "${wayland_sockets[@]}"; do
-    [[ -S "$socket" ]] && export WAYLAND_DISPLAY="${socket##*/}" && break
-  done
+  local socket
+  socket="$(find "$RUNTIME_DIR" -maxdepth 1 -newer "$socket_marker" -type s -name 'wayland-*' -print -quit)"
+  rm -f -- "$socket_marker"
+  [[ -n "$socket" ]] && export WAYLAND_DISPLAY="${socket##*/}"
   [[ -n "${WAYLAND_DISPLAY:-}" ]] || { echo 'Wayland socket did not appear' >&2; return 1; }
 }
 
@@ -106,7 +136,7 @@ start_core() {
   "$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" --development >"$RUNTIME_DIR/core.log" 2>&1 &
   CORE_PID=$!
   for _ in $(seq 1 100); do
-    [[ -S "$XDG_RUNTIME_DIR/ditto/core.sock" ]] && return 0
+    [[ -S "$DITTO_RUNTIME_DIR/core.sock" ]] && return 0
     kill -0 "$CORE_PID" 2>/dev/null || { cat "$RUNTIME_DIR/core.log"; return 1; }
     sleep 0.1
   done
@@ -135,4 +165,7 @@ stop_all() {
   [[ -n "${COMPOSITOR_PID:-}" ]] && kill "$COMPOSITOR_PID" 2>/dev/null || true
   [[ -n "${DBUS_PID:-}" ]] && kill "$DBUS_PID" 2>/dev/null || true
   wait 2>/dev/null || true
+  if [[ "${DITTO_RUNTIME_DIR:-}" == */ditto-g0-fixture-* && -d "$DITTO_RUNTIME_DIR" ]]; then
+    rm -rf -- "$DITTO_RUNTIME_DIR"
+  fi
 }

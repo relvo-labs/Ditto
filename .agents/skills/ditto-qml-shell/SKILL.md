@@ -10,7 +10,7 @@ description: >-
 metadata:
   type: skill
   category: shell
-  status: draft
+  status: stable
   language: zh-Hant
   related:
     - ditto-process-budget
@@ -20,7 +20,7 @@ metadata:
 
 > QML／Quickshell 元件與角色：本機動畫、命中區、可替換供應者與無障礙。
 
-> **status: draft** — 合成器能力差異表與角色命中區的實際做法在 G0-PLAT-03／G0-SHELL-03 才確定，屆時須回頭核對第 4 步並改為 stable。
+> **status: stable** — G0 已以 Wayfire 的 `wl_surface.set_input_region` 與建置期 alpha 遮罩落實第 4 步；生產用 24 矩形遮罩的透明／實心雙向點擊皆有腳本證據。
 
 ## Overview
 

@@ -127,7 +127,8 @@ ShellRoot {
     /// count per explicit command measurable.
     SocketServer {
         active: true
-        path: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/ditto/shell.sock"
+        path: (Quickshell.env("DITTO_RUNTIME_DIR")
+            || ((Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/ditto")) + "/shell.sock"
         handler: Socket {
             parser: SplitParser {
                 splitMarker: "\n"

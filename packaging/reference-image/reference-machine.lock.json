@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "reference_machine_id": "ditto-ref-ws-rtx4060-01",
+  "platform": {
+    "os": "Ubuntu 24.04.2 LTS",
+    "kernel": "6.17.0-40-generic",
+    "architecture": "x86_64",
+    "systemd": "255.4",
+    "landlock_abi": 7,
+    "cgroup_controllers": "cpuset cpu io memory hugetlb pids rdma misc dmem",
+    "bubblewrap": "0.9.0"
+  },
+  "hardware": {
+    "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
+    "physical_cores": 16,
+    "logical_cpus": 32,
+    "memory_kib": 63468948,
+    "storage": "CT2000P3PSSD8",
+    "gpu": "NVIDIA GeForce RTX 4060",
+    "gpu_memory_mib": 8188,
+    "gpu_driver": "570.211.01",
+    "physical_display": "Samsung LC34G55T",
+    "measurement_mode": "1920x1080@60Hz scale=1"
+  },
+  "desktop": {
+    "wayfire": "0.11.0-d3990237",
+    "wlroots": "0.20.2",
+    "qt": "6.10.2",
+    "quickshell": "0.3.1-1a4716cde794a59928d9d9fc15f2afc7a95de360",
+    "fcitx": "5.1.7"
+  },
+  "toolchain": {
+    "rust": "1.98.1",
+    "node": "22.23.2",
+    "pnpm": "10.11.0"
+  },
+  "reference_applications": {
+    "browser": "firefox-snap-156.0.1-1-rev8969",
+    "terminal": "foot-1.16.2-2ubuntu0.1",
+    "editor": "kate-4:23.08.5-0ubuntu3",
+    "xwayland_scope": "diagnostic-only"
+  }
+}

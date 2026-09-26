@@ -130,12 +130,16 @@ fn follow_compositor(
     }
 }
 
+/// `DITTO_RUNTIME_DIR` lets a verification fixture run its own Core next to a
+/// logged-in Ditto session that already owns `$XDG_RUNTIME_DIR/ditto`.
 fn socket_path() -> io::Result<PathBuf> {
-    let runtime =
-        PathBuf::from(env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
+    let directory = match env::var_os("DITTO_RUNTIME_DIR") {
+        Some(directory) => PathBuf::from(directory),
+        None => PathBuf::from(env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
             io::Error::new(io::ErrorKind::NotFound, "XDG_RUNTIME_DIR is required")
-        })?);
-    let directory = runtime.join("ditto");
+        })?)
+        .join("ditto"),
+    };
     std::fs::create_dir_all(&directory)?;
     ditto_core::set_private_permissions(&directory, 0o700)?;
     Ok(directory.join("core.sock"))

@@ -156,4 +156,8 @@ if not enforced:
     print("at least one limit is not enforced here; G3 isolation depends on all three")
 raise SystemExit(0 if enforced else 1)
 PYEOF
-echo 'development-VM evidence; the initial quota values are approved from the reference machine (EX-05)'
+if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+  echo 'reference-machine quota evidence; initial quota values still require the EX-05 decision record'
+else
+  echo 'development evidence; the initial quota values are approved from the reference machine (EX-05)'
+fi

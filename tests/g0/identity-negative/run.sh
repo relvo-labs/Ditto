@@ -20,11 +20,11 @@ start_compositor
   >"$RUNTIME_DIR/core.log" 2>&1 &
 CORE_PID=$!
 for _ in $(seq 1 100); do
-  [[ -S "$RUNTIME_DIR/ditto/core.sock" ]] && break
+  [[ -S "$DITTO_RUNTIME_DIR/core.sock" ]] && break
   sleep 0.1
 done
-[[ -S "$RUNTIME_DIR/ditto/core.sock" ]] || { cat "$RUNTIME_DIR/core.log"; echo 'Core socket did not appear' >&2; exit 1; }
-export DITTO_CORE_SOCKET="$RUNTIME_DIR/ditto/core.sock"
+[[ -S "$DITTO_RUNTIME_DIR/core.sock" ]] || { cat "$RUNTIME_DIR/core.log"; echo 'Core socket did not appear' >&2; exit 1; }
+export DITTO_CORE_SOCKET="$DITTO_RUNTIME_DIR/core.sock"
 
 for _ in $(seq 1 150); do
   grep -q 'desktop.capabilities.list: ok' "$RUNTIME_DIR/core.log" && break
@@ -71,4 +71,8 @@ check_refused 'negative 1: a valid token used by a process the launcher did not 
 check_refused 'negative 2: a connection with no launcher binding is refused' dittoctl "0000000000000000"
 check_refused 'negative 3: a self-declared client kind is refused' privileged-plugin "$valid_token"
 
-echo 'EX-07 negatives refused here in the development container; the exit review repeats them on the reference machine'
+if [[ "$(environment_label)" == reference-machine ]]; then
+  echo 'EX-07: positive served and all three negative identities explicitly refused on the reference machine'
+else
+  echo 'EX-07 development evidence; the exit review repeats these negatives on the reference machine'
+fi

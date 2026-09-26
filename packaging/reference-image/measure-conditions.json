@@ -1,0 +1,13 @@
+{
+  "reference_machine_id": "ditto-ref-ws-rtx4060-01",
+  "physical_reference_machine": true,
+  "cold_login_each_run": false,
+  "warmup_seconds": 300,
+  "fixed_variables": [
+    "Automated runner restarts the measured user services, not the display-manager login; a cold-login series remains required before EX-05 can pass",
+    "Ditto G0 Core, Shell, Wayfire and frozen character asset",
+    "static black background at 1920x1080 60 Hz scale 1",
+    "Firefox 156.0.1-1, foot 1.16.2 and Kate 23.08.5 with the G0 fixture content",
+    "no Cordis host and no Agent; this is the desktop_full_no_agent_g0_subset state"
+  ]
+}

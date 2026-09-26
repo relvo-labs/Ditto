@@ -171,6 +171,37 @@ compositor_window_id() {
   esac
 }
 
+# PID that owns the mapped native toplevel. Reference survival tests use the
+# compositor's value rather than the launcher PID because single-instance GUI
+# applications may hand off to a different process before mapping.
+compositor_window_pid() {
+  local app_id="$1"
+  case "$DITTO_COMPOSITOR" in
+    sway)
+      swaymsg --raw --type get_tree | jq -r --arg id "$app_id" 'first(.. | objects | select(.app_id? == $id) | .pid)'
+      ;;
+    wayfire)
+      wayfire_ipc window-rules/list-views | jq -r --arg id "$app_id" 'first(.[] | select(."app-id" == $id and .mapped) | .pid)'
+      ;;
+  esac
+}
+
+# DISPLAY belonging to the XWayland server for this Wayland fixture. XWayland
+# reparents itself after startup, so parent PID is not a reliable association;
+# its inherited WAYLAND_DISPLAY is.
+compositor_xwayland_display() {
+  local pid display
+  for pid in $(pgrep Xwayland 2>/dev/null || true); do
+    [[ -r "/proc/$pid/environ" && -r "/proc/$pid/cmdline" ]] || continue
+    tr '\0' '\n' <"/proc/$pid/environ" 2>/dev/null |
+      grep -Fxq "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}" || continue
+    display="$(tr '\0' ' ' <"/proc/$pid/cmdline" |
+      sed -n 's/.*Xwayland \(:[0-9][0-9]*\).*/\1/p')"
+    [[ -n "$display" ]] && { echo "$display"; return 0; }
+  done
+  return 1
+}
+
 # Put a window in the shape that has coordinates. Sway tiles by default and has
 # to be told; Wayfire's views are already free-floating unless a tiling plugin
 # is loaded, so there is nothing to ask for and nothing is pretended.
