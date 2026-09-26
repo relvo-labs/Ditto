@@ -23,6 +23,12 @@ sed 's|@DITTO_SESSION_EXEC@|/usr/local/libexec/ditto-g0-session|g' \
 
 sudo install -D -m 0755 "$temporary/ditto-g0-session" /usr/local/libexec/ditto-g0-session
 sudo install -D -m 0644 "$temporary/ditto-g0.desktop" /usr/share/wayland-sessions/ditto-g0.desktop
+# A GDM restart otherwise leaves the Ditto session open and blocks the next
+# login for the same user; see session/ditto-g0-end-sessions.
+sudo install -D -m 0755 "$here/session/ditto-g0-end-sessions" /usr/local/libexec/ditto-g0-end-sessions
+sudo install -D -m 0755 "$here/session/ditto-g0-relogin" /usr/local/libexec/ditto-g0-relogin
+sudo install -D -m 0644 "$here/session/gdm-ditto-g0.conf" /etc/systemd/system/gdm.service.d/ditto-g0.conf
+sudo systemctl daemon-reload
 
 echo 'installed display-manager session: Ditto G0 (Wayfire)'
 echo "workspace: $workspace"

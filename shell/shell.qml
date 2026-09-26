@@ -53,71 +53,84 @@ ShellRoot {
         client: client
     }
 
-    PanelWindow {
-        id: avatarSurface
+    /// `DITTO_AVATAR=off` leaves the character out entirely: EX-05 measures the
+    /// desktop with and without it, so "off" means no surface and no timers.
+    LazyLoader {
+        id: avatarLoader
+        active: Quickshell.env("DITTO_AVATAR") !== "off"
 
-        anchors { bottom: true; right: true }
-        margins { bottom: 64; right: 32 }
-        implicitWidth: 220
-        implicitHeight: 250
-        color: "transparent"
-        exclusionMode: ExclusionMode.Ignore
-        focusable: false
-        aboveWindows: true
+        PanelWindow {
+            id: avatarSurface
 
-        /// Built from the alpha channel at build time. Without it the
-        /// transparent area would swallow clicks meant for the application
-        /// underneath.
-        mask: Region {
-            id: hitRegion
-            intersection: Intersection.Combine
-        }
+            // Inside the loader's component, `tokens: tokens` on the Avatar
+            // would bind its own property to itself; resolve the id here.
+            readonly property Tokens desktopTokens: tokens
 
-        Avatar {
-            id: avatar
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            height: parent.width
-            tokens: tokens
-        }
+            anchors { bottom: true; right: true }
+            margins { bottom: 64; right: 32 }
+            implicitWidth: 220
+            implicitHeight: 250
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            focusable: false
+            aboveWindows: true
 
-        /// The character's state is readable as text from the first day, so the
-        /// states added later cannot arrive without their wording.
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            color: tokens.foreground
-            font.pixelSize: tokens.fontSmall
-            text: avatar.stateText
-            Accessible.role: Accessible.StaticText
-            Accessible.name: avatar.stateText
-        }
-
-        FrameProbe {}
-
-        /// The mask file is read once at startup, from the shell's own
-        /// directory; the shell reads no other file and writes none.
-        FileView {
-            id: maskFile
-            path: Qt.resolvedUrl("avatar/layers/hit-mask.json").toString().replace("file://", "")
-            blockLoading: true
-        }
-
-        Component.onCompleted: {
-            const mask = JSON.parse(maskFile.text());
-            const component = Qt.createComponent(Qt.resolvedUrl("avatar/MaskRegion.qml"));
-            const regions = [];
-            for (const rectangle of mask.rectangles) {
-                regions.push(component.createObject(hitRegion, {
-                    x: Math.round(rectangle.x * avatar.width),
-                    y: Math.round(rectangle.y * avatar.height),
-                    width: Math.max(1, Math.round(rectangle.width * avatar.width)),
-                    height: Math.max(1, Math.round(rectangle.height * avatar.height))
-                }));
+            /// Built from the alpha channel at build time. Without it the
+            /// transparent area would swallow clicks meant for the application
+            /// underneath.
+            mask: Region {
+                id: hitRegion
+                intersection: Intersection.Combine
             }
-            hitRegion.regions = regions;
-            console.log("ditto-shell hit mask rectangles=" + regions.length);
+
+            Avatar {
+                id: avatar
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                height: parent.width
+                tokens: avatarSurface.desktopTokens
+            }
+
+            /// The character's state is readable as text from the first day, so the
+            /// states added later cannot arrive without their wording.
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                color: tokens.foreground
+                font.pixelSize: tokens.fontSmall
+                text: avatar.stateText
+                Accessible.role: Accessible.StaticText
+                Accessible.name: avatar.stateText
+            }
+
+            FrameProbe {}
+
+            /// The mask file is read once at startup, from the shell's own
+            /// directory; the shell reads no other file and writes none.
+            FileView {
+                id: maskFile
+                path: Qt.resolvedUrl("avatar/layers/hit-mask.json").toString().replace("file://", "")
+                blockLoading: true
+            }
+
+            Component.onCompleted: {
+                const mask = JSON.parse(maskFile.text());
+                const component = Qt.createComponent(Qt.resolvedUrl("avatar/MaskRegion.qml"));
+                const regions = [];
+                for (const rectangle of mask.rectangles) {
+                    // Bound, not copied: the loaded surface may not have
+                    // its final size yet when this runs.
+                    regions.push(component.createObject(hitRegion, {
+                        x: Qt.binding(() => Math.round(rectangle.x * avatar.width)),
+                        y: Qt.binding(() => Math.round(rectangle.y * avatar.height)),
+                        width: Qt.binding(() => Math.max(1, Math.round(rectangle.width * avatar.width))),
+                        height: Qt.binding(() => Math.max(1, Math.round(rectangle.height * avatar.height)))
+                    }));
+                }
+                hitRegion.regions = regions;
+                console.log("ditto-shell hit mask rectangles=" + regions.length);
+            }
         }
     }
 
@@ -134,9 +147,9 @@ ShellRoot {
                 splitMarker: "\n"
                 onRead: line => {
                     const command = line.trim().split(" ");
-                    if (command[0] === "recall") {
-                        avatarSurface.visible = true;
-                        avatarSurface.aboveWindows = true;
+                    if (command[0] === "recall" && avatarLoader.item) {
+                        avatarLoader.item.visible = true;
+                        avatarLoader.item.aboveWindows = true;
                         console.log("ditto-shell avatar recalled");
                     } else if (command[0] === "workspace" && command.length === 2) {
                         client.activateWorkspace(command[1]);
