@@ -11,7 +11,7 @@
 | [docs/product/Ditto-PRD-v0.4.0.md](docs/product/Ditto-PRD-v0.4.0.md) | 需求權威：26 節、116 項需求、32 組驗收情境 | 任何功能決定之前 |
 | [milestones/01/](milestones/01/README.md) | 實作順序權威：G0～G5 分階段計畫、架構、Cordis 沿用、驗收矩陣、風險與決策 | 排序、估算、出口評審之前 |
 | [docs/research/RESEARCH-AND-INTERACTION.md](docs/research/RESEARCH-AND-INTERACTION.md) | 互動決策依據與原型邊界 | 設計互動之前 |
-| [plan/02/](plan/02/README.md) | G0 執行計畫：範圍界線、九項出口門檻、19 個工作包、週序與決策時點 | G0 期間動手之前 |
+| [plan/02/](plan/02/README.md)、[plan/03/](plan/03/README.md) | G0／G1 執行計畫：範圍界線、出口門檻（G0 九項、G1 十五項）、工作包、週序與決策時點；plan/03 待評審 | 該階段（含 G1 預備期）動手之前 |
 | [.agents/skills/](.agents/skills/README.md) | 把上述原則轉成可觸發判斷程序的 skill 集合 | 見下方觸發速查 |
 
 衝突時以權威文件為準，skill 次之，本檔最後。
