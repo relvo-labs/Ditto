@@ -12,6 +12,9 @@ foot
 grim
 jq
 kate
+libjemalloc2
+libliftoff0
+libseat1
 libsecret-tools
 neovim
 python3

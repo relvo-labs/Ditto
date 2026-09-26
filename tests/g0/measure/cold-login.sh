@@ -14,6 +14,10 @@
 #       Build the report from the last three runs of that state, each from a
 #       different login.
 #
+# DITTO_FORMAT_CHECK=1 runs the same flow on a development machine or VM: no
+# reference-machine preflight, a separate series, and a report that says it is
+# not EX-05 evidence.
+#
 # Layers are attributed by cgroup: the session script runs Wayfire, Core,
 # Quickshell and Fcitx in their own user scopes. A login whose compositor fell
 # back into the logind session scope is refused rather than measured.
@@ -40,7 +44,8 @@ valid_variant() {
   return 2
 }
 
-series_file() { echo "$artifacts/cold-login-series-$1.jsonl"; }
+format_check="${DITTO_FORMAT_CHECK:-}"
+series_file() { echo "$artifacts/cold-login-series${format_check:+-format-check}-$1.jsonl"; }
 
 scope_main_pid() {
   systemctl --user show -p MainPID --value "$1" 2>/dev/null | grep -E '^[1-9][0-9]*$' ||
@@ -66,7 +71,11 @@ start_app() {
 }
 
 sample() {
-  bash "$workspace/packaging/reference-image/preflight.sh"
+  if [[ -n "$format_check" ]]; then
+    echo 'format check: reference-machine preflight skipped; this run is not EX-05 evidence' >&2
+  else
+    bash "$workspace/packaging/reference-image/preflight.sh"
+  fi
   local unit
   for unit in "${scopes[@]}"; do
     systemctl --user is-active --quiet "$unit" || {
@@ -168,7 +177,9 @@ manifest = {
         {"unit": "ditto-ref-browser.scope", "reason": "reference application the user opened"},
         {"unit": "ditto-ref-terminal.scope", "reason": "reference application the user opened"},
         {"unit": "ditto-ref-editor.scope", "reason": "reference application the user opened"},
-        {"unit": f"session-{session_id}.scope", "reason": "display manager login plumbing (gdm-session-worker, gdm-wayland-session, the session entry script)"},
+        # The same name in every run: the report compares exclusion lists, and
+        # the per-login session id is recorded in the series and conditions.
+        {"unit": "session-<login>.scope", "reason": "display manager login plumbing (gdm-session-worker, gdm-wayland-session, the session entry script)"},
     ],
 }
 json.dump(manifest, open(destination, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
@@ -177,9 +188,9 @@ PYEOF
   echo "sampling ${count} points every ${interval_ms} ms"
   "$binaries/ditto-measure" sample "$manifest" "$count" "$interval_ms" "$output"
 
-  jq -cn --arg run "$run_id" --arg session "$session_id" --argjson age "$login_age" \
+  jq -cn --arg run "$run_id" --arg session "$session_id" --argjson age "$login_age" --argjson warmup "$warmup" \
     --arg output "$output" --arg manifest "$manifest" --arg variant "$variant" \
-    '{run_id: $run, session_id: $session, login_age_seconds: $age, state: $variant, samples: $output, manifest: $manifest}' \
+    '{run_id: $run, session_id: $session, login_age_seconds: $age, warmup_seconds: $warmup, state: $variant, samples: $output, manifest: $manifest}' \
     >>"$series"
   echo "run $run_id recorded in $series ($(wc -l <"$series") so far)"
 }
@@ -192,11 +203,14 @@ report() {
   mapfile -t runs < <(jq -sr 'unique_by(.session_id) | sort_by(.run_id) | .[-3:][] | .samples' "$series")
   (( ${#runs[@]} == 3 )) || { echo "state '$1' has ${#runs[@]} runs from distinct logins; three are required" >&2; exit 1; }
   local conditions="$artifacts/cold-login-conditions-$1.json"
-  jq -n --arg state "$1" --slurpfile runs <(jq -s 'unique_by(.session_id) | sort_by(.run_id) | .[-3:]' "$series") '{
-    reference_machine_id: "ditto-ref-ws-rtx4060-01",
-    physical_reference_machine: true,
+  local machine=ditto-ref-ws-rtx4060-01 physical=true
+  [[ -n "$format_check" ]] && machine="development-$(hostname)" && physical=false
+  jq -n --arg state "$1" --arg machine "$machine" --argjson physical "$physical" --slurpfile runs <(jq -s 'unique_by(.session_id) | sort_by(.run_id) | .[-3:]' "$series") '{
+    reference_machine_id: $machine,
+    physical_reference_machine: $physical,
     cold_login_each_run: true,
-    warmup_seconds: 300,
+    # The shortest warm-up actually used, not the procedure'"'"'s nominal value.
+    warmup_seconds: ($runs[0] | map(.warmup_seconds // 0) | min),
     fixed_variables: ([
       "one display-manager login through Ditto G0 (Wayfire) per run; runs from logins \($runs[0] | map(.session_id) | join(", "))",
       "seconds from login to the start of the run: \($runs[0] | map(.login_age_seconds | tostring) | join(", "))",
@@ -207,7 +221,7 @@ report() {
       "no Cordis host and no Agent; this is the desktop_full_no_agent_g0_subset state"
     ])
   }' >"$conditions"
-  local out="$artifacts/resource-report-cold-login-$1-$(date -u +%Y-%m-%dT%H:%M:%SZ).md"
+  local out="$artifacts/resource-report-cold-login${format_check:+-format-check}-$1-$(date -u +%Y-%m-%dT%H:%M:%SZ).md"
   "$binaries/ditto-measure" report "$conditions" "${runs[@]}" "$out"
   echo "report -> $out"
 }
