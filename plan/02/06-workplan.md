@@ -267,3 +267,5 @@
 | 2026-09-19 | 決策紀錄 | [G0 合成器轉接路徑](../../.agents/notes/decisions/2026-09-19-g0-compositor-adapter-seam.md)、[啟動器 token 交付方式](../../.agents/notes/decisions/2026-09-19-launcher-identity-handover.md) |
 | 2026-09-22 | `ditto-qml-shell` skill | 已依生產 24 矩形遮罩的雙向點擊證據核對第 4 步並轉為 `stable`；見 D-24 紀錄 |
 | 2026-09-19 | 對計畫的偏離 | `shell/providers/` 的目錄名改用底線（`panel_top`、`dock_bottom`）：QML 模組名不接受連字號。`dittoctl probe` 比計畫多一個 `outputs` 子命令，因為 `desktop.outputs.list` 需要一個 Consumer |
+| 2026-09-26 | 登入工作階段 | GDM 重啟後殘留的 Ditto 工作階段會擋住下一次登入；已以 `gdm.service` drop-in 修正。實際登入時各層同在一個 session scope，EX-05 無法分層量測；登入 script 已改為四個分層 user scope，並新增 `tests/g0/measure/cold-login.sh` |
+| 2026-09-27 | 自動化測試（D-25） | 參考機上的 libvirt VM `ditto-g0-vm` 列為第一線自動化測試（`tools/dev-vm/`、`vm-regression.yml`）。VM 結果只是開發證據，任何出口門檻都不變 |

@@ -1,0 +1,36 @@
+name: vm-regression
+on:
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'shell/**'
+      - 'tests/g0/**'
+      - 'tools/**'
+      - 'packaging/reference-image/**'
+      - '.github/workflows/vm-regression.yml'
+  schedule:
+    # 00:00 Asia/Taipei, before nightly-refmachine at 02:00. The single runner
+    # runs jobs one at a time, so the VM is never up during a reference run.
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+# D-25: the first-line automated run. The libvirt VM on the reference machine
+# is restored from its snapshot, gets this tree, runs the G0 fixtures, the GDM
+# login checks and the cold-login flow, and is shut down. Everything it produces
+# is development evidence; exit gates stay on the physical reference machine.
+concurrency:
+  group: vm-regression
+  cancel-in-progress: false
+jobs:
+  vm:
+    runs-on: [self-hosted, ditto-ci]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: VM regression
+        run: bash tools/dev-vm/run.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g0-vm-${{ github.run_id }}
+          path: artifacts/g0-vm/
+          retention-days: 30

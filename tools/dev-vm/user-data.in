@@ -1,0 +1,21 @@
+#cloud-config
+# Rendered by tools/dev-vm/create.sh. @PASSWORD_HASH@, @SSH_KEY@ and
+# @PACKAGES@ are filled in there; the password itself never enters the repo.
+hostname: ditto-g0-vm
+users:
+  - name: neil
+    uid: 1000
+    groups: [adm, sudo, video, render, input]
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: '@PASSWORD_HASH@'
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - @SSH_KEY@
+ssh_pwauth: false
+package_update: true
+packages: [qemu-guest-agent, gdm3, gnome-shell, rsync, spice-vdagent, libglib2.0-bin]
+runcmd:
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [bash, -c, "DEBIAN_FRONTEND=noninteractive apt-get install -y @PACKAGES@ > /var/log/ditto-apt.log 2>&1; echo done > /var/log/ditto-apt.done"]
+  - [systemctl, set-default, graphical.target]

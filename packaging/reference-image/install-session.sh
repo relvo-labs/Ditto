@@ -13,7 +13,14 @@ for command in cargo sed sudo install; do
   command -v "$command" >/dev/null || { echo "missing installer dependency: $command" >&2; exit 1; }
 done
 
-bash "$here/preflight.sh"
+# `--development` installs the same session on a development machine or VM.
+# It skips the reference-machine preflight, so nothing measured there can enter
+# an exit review; the session itself is identical.
+if [[ "${1:-}" == --development ]]; then
+  echo 'development install: reference-machine preflight skipped' >&2
+else
+  bash "$here/preflight.sh"
+fi
 cargo build --locked --release -p ditto-core
 
 sed "s|@DITTO_WORKSPACE@|$workspace|g" \
