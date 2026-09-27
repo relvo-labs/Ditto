@@ -392,3 +392,4 @@ G1 腳本的開發機首次執行結果在 [tests/g1/README.md](../../tests/g1/R
 | 2026-09-27 | F-5 的兩項解讀 | ① hostd 的程序配額暫用 D-06b 的短工具配額，服務配額由 D-06b 核定後替換；② `session_restart` 等級的變更存成 revision、`state = committed`、每項 `scheduled`，`result` 為新增的 `scheduled`（協定 0.2 §8.2），不回 `succeeded` |
 | 2026-09-27 | SHELL 回報的平台問題 | ① 在 headless 工作階段中 `desktop.launcher.launch` 回 `accepted`，但應用的 systemd scope 沒拿到該工作階段的 Wayland 環境而不出現，`app_id` 也須是 desktop 檔 id；② Quickshell 0.3.1 從設定目錄外匯入的目錄只解析第一個型別，所以 lock／rescue 以符號連結共用 `core` 等目錄（安裝須保留），套件庫中的供應者須是單一 QML 檔；③ `ditto-core.service` 的救援介面與鎖定客戶端原本誤用 kind `quickshell`，已改為 `rescue-shell`／`lock` |
 | 2026-09-27 | 測試本身的缺陷 | `ditto-store` 離線救援測試的偶發 `Locked`（其他測試 spawn `tar` 繼承鎖描述元）；fault 測試斷言失敗時留下孤兒 Core。兩者已修，產品程式碼不受影響 |
+| 2026-09-27 | G1 出口預檢 | [十五項門檻與缺口](../../.agents/notes/gate-reviews/G1-exit.md) 已逐項登記；本機工作樹的測試通過不構成出口證據 |

@@ -9,9 +9,10 @@
 #   ⑤ the process list holds no Node process
 #   ⑥ back in normal mode hostd rebuilds its services and tasks are intact
 #
-# This runner uses the headless fixture with Core in development mode, so
-# its results are development evidence; ④'s Shell text and ⑥ need the session
-# and hostd. The process list is saved whole, and the Node check is made on
+# This runner uses an isolated headless fixture, so its results are development
+# evidence. ⑥ runs a controlled normal-mode Core and hostd on the same fixture
+# store; ④'s Shell text still needs a logged-in session. The process list is
+# saved whole, and the Node check is made on
 # the processes Ditto started (Core's descendants and the ditto-* units):
 # a developer's own editor or CLI running on Node is not Ditto's.
 set -euo pipefail
@@ -19,7 +20,11 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/common.sh"
 
 WINDOW_PIDS=()
-trap stop_all EXIT INT TERM
+cleanup_rescue() {
+  stop_all
+  g1_fixture_stop
+}
+trap cleanup_rescue EXIT INT TERM
 
 g1_begin rescue-no-node "EX1-05"
 g1_preflight
@@ -28,8 +33,46 @@ mkdir -p "$evidence_dir"
 g1_note "raw readbacks and the process list: $evidence_dir"
 
 start_compositor
+FIXTURE_ROOT="$(mktemp -d /tmp/ditto-g1.XXXXXX)"
+export DITTO_DATA_DIR="$FIXTURE_ROOT/store"
+work="$FIXTURE_ROOT/work"
+mkdir -p "$work"
+builtin_packages="${DITTO_BUILTIN_PACKAGES:-$WORKSPACE/target/ditto-packages}"
+core_args=(serve --compositor "$DITTO_COMPOSITOR" --mode rescue --development)
+if [[ -d "$builtin_packages" ]]; then
+  core_args+=(--builtin-packages "$builtin_packages")
+else
+  g1_note "built-in packages are absent; restore setup cannot create a distinct revision"
+fi
+node="$(command -v node || true)"
+hostd="$WORKSPACE/packages/host-runtime/dist/ditto-hostd.mjs"
+tasks_marker="g1-rescue-$RUN_ID"
+tasks_seeded=false
+if [[ -n "$node" && -f "$hostd" && -d "$builtin_packages" ]]; then
+  node="$(readlink -f "$node")"
+  unset DITTO_DEV_TOKEN
+  "$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" \
+    --builtin-packages "$builtin_packages" --hostd "hostd 0.2.0 $node $hostd" \
+    --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/rescue-no-node/normal-driver.mjs $work before $tasks_marker" \
+    >"$evidence_dir/normal-before.log" 2>&1 &
+  CORE_PID=$!
+  for _ in $(seq 1 225); do
+    [[ -f "$work/before.json" ]] && break
+    kill -0 "$CORE_PID" 2>/dev/null || break
+    sleep 0.2
+  done
+  if [[ -f "$work/before.json" ]]; then
+    cp "$work/before.json" "$evidence_dir/tasks-before.json"
+    if python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("ok") else 1)' "$work/before.json"; then
+      tasks_seeded=true
+    fi
+  fi
+  kill "$CORE_PID" 2>/dev/null || true
+  wait "$CORE_PID" 2>/dev/null || true
+  CORE_PID=""
+fi
 export DITTO_DEV_TOKEN="${DITTO_DEV_TOKEN:-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
-"$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" --mode rescue --development \
+"$BINARIES/ditto-core" "${core_args[@]}" \
   >"$RUNTIME_DIR/core.log" 2>&1 &
 CORE_PID=$!
 for _ in $(seq 1 100); do
@@ -51,13 +94,54 @@ check rescue-mode-starts pass "ditto-core --mode rescue is serving"
 "$BINARIES/dittoctl" --json probe capabilities >"$evidence_dir/capabilities.json" 2>/dev/null || true
 listing="$(g1_capabilities)"
 
+# A fresh Profile has no protected revision until the real 60 s observation
+# period ends. Build a distinct head by disabling tasks, so restore can be
+# judged from the document digest instead of the RPC success flag.
+protected=""
+if [[ -d "$builtin_packages" ]]; then
+  for _ in $(seq 1 70); do
+    status="$(g1_call desktop.rescue.status '{}' 2>/dev/null)" || true
+    [[ -n "$status" ]] || status='{}'
+    protected="$(python3 -c 'import json,sys; print((json.loads(sys.argv[1]).get("result") or {}).get("last_known_good") or "")' "$status" 2>/dev/null || true)"
+    [[ -n "$protected" ]] && break
+    sleep 1
+  done
+fi
+restore_setup=""
+if [[ -n "$protected" ]]; then
+  protected_record="$(g1_call desktop.profiles.get "{\"revision_id\":\"$protected\"}" 2>/dev/null)" || true
+  disable_record="$(g1_call desktop.rescue.disable '{"target":"ditto.svc.tasks"}' 2>/dev/null)" || true
+  current_record="$(g1_call desktop.profiles.get '{}' 2>/dev/null)" || true
+  printf '%s\n' "$protected_record" >"$evidence_dir/protected-profile.json"
+  printf '%s\n' "$disable_record" >"$evidence_dir/disable-tasks.json"
+  printf '%s\n' "$current_record" >"$evidence_dir/disabled-profile.json"
+  restore_setup="$(python3 - "$protected" "$protected_record" "$disable_record" "$current_record" <<'PYEOF'
+import json, sys
+try:
+    protected, before, change, current = sys.argv[1], *map(json.loads, sys.argv[2:])
+    baseline = before['result']['revision']['document_sha256']
+    head = current['result']['profile']['head_revision']
+    entries = current['result']['document']['entries']
+    disabled = any(e['package'] == 'ditto.svc.tasks' and e['disabled'] for e in entries)
+    ok = change.get('ok') and head != protected and disabled
+    print(json.dumps({'ok': bool(ok), 'protected_revision': protected, 'protected_digest': baseline,
+                      'disabled_head': head, 'tasks_disabled': disabled}))
+except (KeyError, TypeError, ValueError) as error:
+    print(json.dumps({'ok': False, 'reason': str(error)}))
+PYEOF
+)"
+fi
+[[ -n "$restore_setup" ]] || restore_setup='{"ok":false,"reason":"protected revision unavailable"}'
+printf '%s\n' "$restore_setup" >"$evidence_dir/restore-setup.json"
+
 # ① native window operations through Core, read back.
 start_window ditto-g1-rescue-app
 window="$(window_id_for ditto-g1-rescue-app)"
 results=()
 for request in "--focus" "--move 120 140" "--close"; do
   # shellcheck disable=SC2086
-  record="$("$BINARIES/dittoctl" --json probe window "$window" $request 2>/dev/null || echo '{"ok":false}')"
+  record="$("$BINARIES/dittoctl" --json probe window "$window" $request 2>/dev/null)" || true
+  [[ -n "$record" ]] || record='{"ok":false}'
   echo "$record" >>"$evidence_dir/window-operations.jsonl"
   # The first line is the operation; dittoctl follows it with a get.
   results+=("$(python3 -c 'import json, sys; r = json.loads(sys.argv[1].splitlines()[0]); print("ok" if r.get("ok") and (r.get("readback_verified") or sys.argv[2] == "--close") else "no")' "$record" "${request%% *}")")
@@ -78,13 +162,37 @@ for pair in "change-history:desktop.changes.list" "restore-last-good:desktop.res
   else
     params='{}'
     [[ "$id" == change-history ]] && params='{"limit":20}'
-    record="$(g1_call "$capability" "$params" 2>/dev/null || echo '{"ok":false}')"
+    if [[ "$id" == restore-last-good ]] && ! python3 -c 'import json,sys; sys.exit(0 if json.loads(sys.argv[1]).get("ok") else 1)' "$restore_setup"; then
+      check "$id" not_implemented "the fixture could not prepare a protected revision and a distinct head" "$restore_setup"
+      continue
+    fi
+    record="$(g1_call "$capability" "$params" 2>/dev/null)" || true
+    [[ -n "$record" ]] || record='{"ok":false}'
     echo "$record" >"$evidence_dir/$id.json"
     if python3 -c 'import json, sys; sys.exit(0 if json.loads(sys.argv[1]).get("ok") else 1)' "$record"; then
       # ③ also needs head == last_known_good read back from the store; the
       # call succeeding is not that readback.
       if [[ "$id" == restore-last-good ]]; then
-        check "$id" not_implemented "the call succeeded; the head == last_known_good readback is not written yet" "$record"
+        restored="$(g1_call desktop.profiles.get '{}' 2>/dev/null)" || true
+        printf '%s\n' "$restored" >"$evidence_dir/restored-profile.json"
+        if python3 - "$restore_setup" "$restored" <<'PYEOF'
+import json, sys
+try:
+    setup, after = map(json.loads, sys.argv[1:])
+    result = after['result']
+    head = result['profile']['head_revision']
+    digest = result['revision']['document_sha256']
+    tasks = [e for e in result['document']['entries'] if e['package'] == 'ditto.svc.tasks']
+    assert head != setup['disabled_head'] and digest == setup['protected_digest']
+    assert tasks and all(not entry['disabled'] for entry in tasks)
+except (AssertionError, KeyError, TypeError, ValueError):
+    raise SystemExit(1)
+PYEOF
+        then
+          check "$id" pass "head moved to a new revision with the protected document digest; tasks is enabled again" "$record"
+        else
+          check "$id" fail "restore returned success but the head or document readback differs" "$record"
+        fi
       else
         check "$id" pass "$capability answered in rescue mode" "$record"
       fi
@@ -159,11 +267,35 @@ else
   check no-node-process fail "Node processes started by Ditto: ${node_in_ditto[*]}" "$evidence"
 fi
 
-# ⑥ needs hostd and the tasks service.
+# ⑥ restart this same isolated store in normal mode; the task written before
+# rescue must still be present after hostd rebuilds its service.
 if has_capability "$listing" desktop.tasks.list; then
   check normal-mode-restores-tasks fail "desktop.tasks.list is available in rescue mode, which it must not be"
+elif [[ -z "$node" || ! -f "$hostd" || ! -d "$builtin_packages" ]]; then
+  check normal-mode-restores-tasks not_implemented "needs node, the built hostd bundle, and built-in packages"
+elif [[ "$tasks_seeded" != true ]]; then
+  check normal-mode-restores-tasks fail "normal-mode setup could not persist a task before rescue; see normal-before.log"
 else
-  check normal-mode-restores-tasks not_implemented "restart in normal mode with hostd and compare tasks is not written yet (needs G1-HOST)"
+  kill "$CORE_PID" 2>/dev/null || true
+  wait "$CORE_PID" 2>/dev/null || true
+  CORE_PID=""
+  unset DITTO_DEV_TOKEN
+  "$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" \
+    --builtin-packages "$builtin_packages" --hostd "hostd 0.2.0 $node $hostd" \
+    --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/rescue-no-node/normal-driver.mjs $work after $tasks_marker" \
+    >"$evidence_dir/normal-after.log" 2>&1 &
+  CORE_PID=$!
+  for _ in $(seq 1 225); do
+    [[ -f "$work/after.json" ]] && break
+    kill -0 "$CORE_PID" 2>/dev/null || break
+    sleep 0.2
+  done
+  [[ ! -f "$work/after.json" ]] || cp "$work/after.json" "$evidence_dir/tasks-after.json"
+  if [[ -f "$work/after.json" ]] && python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("ok") else 1)' "$work/after.json"; then
+    check normal-mode-restores-tasks pass "normal-mode hostd rebuilt tasks and read the same persisted task"
+  else
+    check normal-mode-restores-tasks fail "normal-mode tasks were unavailable or the persisted task is missing; see normal-after.log and tasks-after.json"
+  fi
 fi
 
 g1_finish

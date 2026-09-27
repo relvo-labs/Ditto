@@ -100,7 +100,11 @@ fn grant_references(value: &Value, out: &mut BTreeSet<String>) {
     }
 }
 
-pub fn export(name: &str, document: &ProfileDocument, packages: &PackageSet) -> ProfileExport {
+pub fn export(
+    name: &str,
+    document: &ProfileDocument,
+    packages: &PackageSet,
+) -> Result<ProfileExport, String> {
     let mut value = document.to_value();
     let offenders = scan(&value);
     let mut redacted = Vec::new();
@@ -112,8 +116,11 @@ pub fn export(name: &str, document: &ProfileDocument, packages: &PackageSet) -> 
     }
     // Nulling a field can make an entry config invalid for its schema; the
     // importer sees the pointers and is asked to fill them in again.
-    let document: ProfileDocument =
-        serde_json::from_value(value.clone()).unwrap_or_else(|_| document.clone());
+    // A required typed field cannot always be replaced with null. Returning
+    // the original document here would put the value we just found back into
+    // the export. Refuse the export instead.
+    let document: ProfileDocument = serde_json::from_value(value.clone())
+        .map_err(|error| format!("redaction would invalidate the profile document: {error}"))?;
     let mut grants = BTreeSet::new();
     grant_references(&value, &mut grants);
     let mut locks: Vec<PackageLock> = document
@@ -131,7 +138,7 @@ pub fn export(name: &str, document: &ProfileDocument, packages: &PackageSet) -> 
         .collect();
     locks.sort_by(|a, b| (&a.package, &a.version).cmp(&(&b.package, &b.version)));
     locks.dedup();
-    ProfileExport {
+    let export = ProfileExport {
         format: FORMAT.into(),
         format_version: FORMAT_VERSION,
         protocol_version: PROTOCOL_VERSION.into(),
@@ -141,7 +148,13 @@ pub fn export(name: &str, document: &ProfileDocument, packages: &PackageSet) -> 
         packages: locks,
         required_grants: grants.into_iter().collect(),
         redacted,
+    };
+    // The document scan alone does not cover the profile name or package
+    // metadata. Refuse the whole export if those contain a private value.
+    if !scan(&serde_json::to_value(&export).map_err(|error| error.to_string())?).is_empty() {
+        return Err("the profile export still contains a private value".into());
     }
+    Ok(export)
 }
 
 fn problem(kind: ImportProblemKind, blocking: bool, detail: Value) -> ImportProblem {
@@ -244,7 +257,7 @@ mod tests {
     fn exports_drop_private_paths_and_secrets_and_imports_refuse_them() {
         let mut doc = document();
         doc.entries[0].config = json!({"source": {"kind": "todo_txt", "path_grant": "grant-01J9ZZZZZZZZZZZZZZZZZZZZZZ", "path": "/home/someone/todo.txt"}, "api_key": "abc"});
-        let export = export("開發", &doc, &PackageSet::default());
+        let export = export("開發", &doc, &PackageSet::default()).unwrap();
         let text = serde_json::to_string(&export).unwrap();
         assert!(!text.contains("/home/someone"));
         assert!(!text.contains("\"abc\""));
@@ -265,5 +278,18 @@ mod tests {
         assert!(problems
             .iter()
             .any(|p| p.kind == ImportProblemKind::PackageMissing));
+    }
+
+    #[test]
+    fn export_refuses_a_sensitive_required_field_instead_of_restoring_it() {
+        let mut doc = document();
+        doc.appearance.theme = "/home/someone/private-theme".into();
+        assert!(export("開發", &doc, &PackageSet::default()).is_err());
+    }
+
+    #[test]
+    fn export_refuses_a_sensitive_profile_name() {
+        let doc = document();
+        assert!(export("/home/someone/private", &doc, &PackageSet::default()).is_err());
     }
 }

@@ -41,4 +41,5 @@ bash tools/dev-vm/run.sh login   # 只跑其中一組：fixtures、login、input
 - 快照保留建立時的 DHCP 租約；租約在主機端過期後，`domifaddr` 的 lease 表查不到位址，`lib.sh` 因此改查 ARP 與 guest agent。
 - 核心 uinput 鍵盤不是實體鍵盤，也沒有人觀察候選窗；`input-method` 通過只表示鏈路在登入工作階段中成立，EX-08 仍需實體鍵盤、操作員與錄影。
 - 夾具以開發模式執行：只用終端夾具，不用 Firefox／Kate。三個參考應用改由 cold-login 檢查在真正的登入工作階段中開啟。
+- 夾具與 VM 的已登入桌面可同時存在：`tests/g0/lib/session.sh` 為每次夾具指定獨立的 Core socket 與 `DITTO_DATA_DIR`，避免爭用登入桌面的資料庫鎖。Shell 夾具從本次建置的內建套件建立自己的 Profile。
 - 佈建時若發現凍結前綴缺少系統函式庫，`provision.sh` 會失敗並列出缺少的項目；應補進 `packaging/reference-image/apt-packages.txt`，而不是只裝進 VM。

@@ -15,8 +15,8 @@ start_compositor
 # Launcher mode: no shared token exists. Each client is bound to the PID the
 # launcher spawned before the token reaches it.
 "$BINARIES/ditto-core" serve --compositor "${DITTO_COMPOSITOR:-wayfire}" \
-  --launch "dittoctl 0.1.0 $BINARIES/dittoctl probe capabilities" \
-  --launch "token-client 0.1.0 /usr/bin/bash $HERE/token-client.sh" \
+  --launch "dittoctl 0.2.0 $BINARIES/dittoctl --json probe capabilities" \
+  --launch "token-client 0.2.0 /usr/bin/bash $HERE/token-client.sh" \
   >"$RUNTIME_DIR/core.log" 2>&1 &
 CORE_PID=$!
 for _ in $(seq 1 100); do
@@ -27,10 +27,20 @@ done
 export DITTO_CORE_SOCKET="$DITTO_RUNTIME_DIR/core.sock"
 
 for _ in $(seq 1 150); do
-  grep -q 'desktop.capabilities.list: ok' "$RUNTIME_DIR/core.log" && break
+  grep -q '"capability":"desktop.capabilities.list"' "$RUNTIME_DIR/core.log" && break
   sleep 0.1
 done
-grep -q 'desktop.capabilities.list: ok' "$RUNTIME_DIR/core.log" || {
+python3 - "$RUNTIME_DIR/core.log" <<'PYEOF' || {
+import json, sys
+for line in open(sys.argv[1], encoding='utf-8'):
+    try:
+        record = json.loads(line)
+    except ValueError:
+        continue
+    if record.get('capability') == 'desktop.capabilities.list' and record.get('ok') is True:
+        raise SystemExit(0)
+raise SystemExit(1)
+PYEOF
   cat "$RUNTIME_DIR/core.log"
   echo 'positive failed: a client started by the launcher was not served' >&2
   exit 1
@@ -54,8 +64,8 @@ connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 connection.connect(path)
 connection.sendall(json.dumps({
     "jsonrpc": "2.0", "id": "h", "method": "core.handshake",
-    "params": {"protocol_version": "0.1.0",
-               "client": {"kind": kind, "version": "0.1.0"},
+    "params": {"protocol_version": "0.2.0",
+               "client": {"kind": kind, "version": "0.2.0"},
                "auth": {"token": token}},
 }).encode() + b"\n")
 reply = json.loads(connection.makefile().readline())

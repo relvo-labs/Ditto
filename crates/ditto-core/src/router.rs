@@ -1106,9 +1106,9 @@ fn profiles_export(core: &Core, input: ProfileIdInput) -> Handled {
     let (profile, _, document) =
         core.read(|connection| profiles::head_document(connection, &input.profile_id))?;
     let packages = package_set(core)?;
-    ok(ProfilesExportOutput {
-        export: exports::export(&profile.name, &document, &packages),
-    })
+    let export = exports::export(&profile.name, &document, &packages)
+        .map_err(|reason| CoreError::invalid(reason))?;
+    ok(ProfilesExportOutput { export })
 }
 
 fn profiles_import(core: &Arc<Core>, input: ProfilesImportInput) -> Handled {
