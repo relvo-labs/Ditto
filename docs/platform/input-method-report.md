@@ -85,3 +85,20 @@ DITTO_WORKSPACE="$PWD" DITTO_ARTIFACTS="$PWD/artifacts/g0" \
 5. 候選窗必須貼近游標；若中文可輸入但位置錯誤，依計畫記為「部分支援」並說明影響，不得把 EX-08 標記通過。
 
 目前 **G0-PLAT-04 為進行中，EX-08 未通過**。參考機與真機 runner 已就緒，但仍須在登入管理器工作階段以實體鍵盤完整重跑；隔離 headless 結果不能升格為 EX-08 出口證據。
+
+## 5. 2026-09-27：登入工作階段中的核心鍵盤（開發 VM）
+
+依 [D-25](../../.agents/notes/decisions/2026-09-27-d25-vm-first-automation.md)，把 `manual-session.sh` 的步驟做成無人值守的 `tests/g0/input-method/login-session-auto.sh`，在開發 VM 由 GDM 自動登入的「Ditto G0 (Wayfire)」工作階段中執行，也就是該工作階段自己的 Wayfire、Fcitx 與 session bus。按鍵來自 `uinput-keyboard.py` 建立的核心 evdev 裝置。從 libinput 看，它和 USB 鍵盤是同一類裝置，不像 `stipc` 那樣走合成器內部的虛擬鍵盤。
+
+| 項目 | 結果（`artifacts/g0-vm/2026-09-27T05:43:05Z-45e3/`） |
+| --- | --- |
+| 切換方式 | 三個應用都以 Ctrl+Space 切到拼音（只在焦點輸入上下文未啟用時按） |
+| QML | 回讀 `你好`；組字期間出現 `DITTO_INPUT_COMPOSING` |
+| foot | 終端的 `read` 收到 `你好` |
+| Kate | `Ctrl+A`、`Ctrl+C` 後的剪貼簿為 `你好` |
+| 三方剪貼簿 | `剪貼簿互通` 貼入 foot、Kate 與 QML，三者回讀一致 |
+| 候選窗 | 三張截圖都顯示候選列緊貼輸入游標下方，第一候選是「你好」。這是看截圖的判斷，腳本不判定 |
+
+這回答了 §3 留下的第一個未知：**同一條 Wayfire input-method-v1 bridge 對核心層鍵盤可以正常組字；`stipc` 自動路徑失敗，是它繞過輸入法鍵盤 grab 的限制。** 因此 §4 第 2 步成立，自動探針（`run.sh`）只保留作協定與輸入上下文診斷。
+
+仍然**不是 EX-08 證據**：VM 不是參考機，按鍵不是人按的，也沒有錄影。EX-08 剩下的是：在參考機上從登入管理器登入，以實體鍵盤跑一次 `manual-session.sh` 讓最終 JSON 寫出，並把錄影位置補進本報告。

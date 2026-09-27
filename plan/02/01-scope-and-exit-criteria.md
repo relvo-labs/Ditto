@@ -133,9 +133,9 @@ LLM 與 Agent、Cordis 桌面宿主與任何插件、Profile／revision／SQLite
 
 | 欄位 | 內容 |
 | --- | --- |
-| 判準 | 實體參考機已註冊為 CI runner；nightly 工作流連續 3 個晚上成功執行 EX-01／03／04 的腳本並產出 artifacts；runner 的版本指紋與支援矩陣一致 |
+| 判準 | 實體參考機已註冊為 CI runner；`nightly-refmachine` 對同一個已進版 commit 成功執行 3 次獨立 job（可在同一天；任何一次失敗重新計數），每次都跑 EX-01／03／04／07 的腳本並上傳 artifacts；正式執行前，開發 VM 的 `fixtures` 已連續通過 3 輪；runner 的版本指紋與支援矩陣一致。**2026-09-27 依 [D-36](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md) 由「連續 3 個晚上」放寬** |
 | 方法 | CI 歷史紀錄 |
-| 證據 | nightly 工作流的 3 次執行紀錄 |
+| 證據 | `nightly-refmachine` 的 3 次執行紀錄 ＋ 3 輪 VM 的 `summary.jsonl` |
 | 對應 | 04-verification §4、D-19、R-19 |
 | 負責 | QA ＋ PLAT |
 

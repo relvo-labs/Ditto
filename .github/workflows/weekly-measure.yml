@@ -33,9 +33,14 @@ jobs:
         run: bash tests/g0/measure/run.sh packaging/reference-image/measure-manifest.json packaging/reference-image/measure-conditions.json
       - name: Tool quota baseline
         run: bash tests/g0/quota-baseline/run.sh
+      # Run ids carry ISO timestamps, and upload-artifact rejects ':' in file
+      # names. The archive keeps every artifact under its own name.
+      - name: Pack artifacts
+        if: always()
+        run: tar -czf g0-measure-artifacts.tar.gz --ignore-failed-read artifacts/g0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: g0-measure-${{ github.run_id }}
-          path: artifacts/g0/
+          path: g0-measure-artifacts.tar.gz
           retention-days: 180

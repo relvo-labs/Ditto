@@ -3,13 +3,19 @@
 # the current tree, run the G0 fixtures and the login-level checks, copy the
 # artifacts back, and shut the VM down.
 #
-#   tools/dev-vm/run.sh [fixtures] [login] [cold-login]   (default: all three)
+#   tools/dev-vm/run.sh [fixtures] [login] [input-method] [cold-login] [cold-login-full]
+#       (default: fixtures login input-method cold-login)
 #
 # fixtures    headless G0 fixtures in development mode
 # login       a clean relogin through GDM, and an orphaned session after GDM
 #             is killed, must both end in a new login with all four scopes
+# input-method  the C-08 chain in the login session, typed by a kernel
+#             keyboard: QML, foot and Kate commit 你好, and the three-way
+#             clipboard; candidate placement is left as screenshots
 # cold-login  three logins through GDM autologin sampled with a short
 #             cold-login format check, plus one login in each other state
+# cold-login-full  the same logins with the EX-05 durations (300 s warm-up,
+#             600 s sampling); about 90 minutes, so never in the default set
 #
 # Everything here is development evidence. Exit measurements (EX-01/03/04/05)
 # stay on the physical reference machine; this VM must not run while one is
@@ -18,7 +24,7 @@ set -uo pipefail
 source "$(dirname "$0")/lib.sh"
 
 suites=("$@")
-(( ${#suites[@]} )) || suites=(fixtures login cold-login)
+(( ${#suites[@]} )) || suites=(fixtures login input-method cold-login)
 run_id="$(date -u +%Y-%m-%dT%H:%M:%SZ)-$(git -C "$WORKSPACE" rev-parse --short=4 HEAD)"
 out="$WORKSPACE/artifacts/g0-vm/$run_id"
 mkdir -p "$out"
@@ -97,17 +103,23 @@ orphaned_session() {
     vm_ssh "journalctl -b --no-pager --since '-2min' | grep -q 'ending orphaned Ditto G0 session $before'"
 }
 
+input_method() {
+  vm_ssh "$VM_ENV"' export DITTO_ENVIRONMENT_LABEL=development-vm DITTO_ARTIFACTS=$PWD/artifacts/g0-vm;
+    timeout -k 15 300 bash tests/g0/input-method/login-session-auto.sh'
+}
+
+# cold_login_sample STATE [WARMUP SAMPLE]: the short format check by default.
 cold_login_sample() {
-  local state="$1" before
+  local state="$1" warmup="${2:-20}" duration="${3:-30}" before
   vm_ssh "$VM_ENV bash tests/g0/measure/cold-login.sh prepare $state" || return 1
   before="$(seat_session)"
   vm_ssh 'sudo /usr/local/libexec/ditto-g0-relogin' && scopes_of_new_login "$before" || return 1
-  vm_ssh "$VM_ENV"' export DITTO_FORMAT_CHECK=1 DITTO_WARMUP_SECONDS=20 DITTO_SAMPLE_SECONDS=30;
-    timeout 600 bash tests/g0/measure/cold-login.sh sample'
+  vm_ssh "$VM_ENV"' export DITTO_FORMAT_CHECK=1 DITTO_WARMUP_SECONDS='"$warmup"' DITTO_SAMPLE_SECONDS='"$duration"';
+    timeout '"$((warmup + duration + 600))"' bash tests/g0/measure/cold-login.sh sample'
 }
 
 cold_login_report() {
-  vm_ssh "$VM_ENV DITTO_FORMAT_CHECK=1 bash tests/g0/measure/cold-login.sh report standard"
+  vm_ssh "$VM_ENV DITTO_FORMAT_CHECK=1 bash tests/g0/measure/cold-login.sh report ${1:-standard}"
 }
 
 for suite in "${suites[@]}"; do
@@ -121,12 +133,17 @@ for suite in "${suites[@]}"; do
       check login-relogin-clean relogin_clean
       check login-orphaned-session orphaned_session
       ;;
-    cold-login)
+    input-method)
+      check input-method-login-session input_method
+      ;;
+    cold-login | cold-login-full)
+      durations=()
+      [[ "$suite" == cold-login-full ]] && durations=(300 600)
       vm_ssh 'rm -f ~/funlab/Ditto/artifacts/g0/cold-login-series-format-check-*.jsonl'
-      for n in 1 2 3; do check "cold-login-standard-$n" cold_login_sample standard; done
-      check cold-login-report-standard cold_login_report
-      check cold-login-avatar-off cold_login_sample avatar-off
-      check cold-login-reduced-motion cold_login_sample reduced-motion
+      for n in 1 2 3; do check "$suite-standard-$n" cold_login_sample standard "${durations[@]}"; done
+      check "$suite-report-standard" cold_login_report
+      check "$suite-avatar-off" cold_login_sample avatar-off "${durations[@]}"
+      check "$suite-reduced-motion" cold_login_sample reduced-motion "${durations[@]}"
       vm_ssh "$VM_ENV bash tests/g0/measure/cold-login.sh prepare standard" >/dev/null
       ;;
     *) echo "unknown suite: $suite" >&2; failures=$((failures + 1)) ;;
