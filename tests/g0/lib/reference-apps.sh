@@ -18,6 +18,10 @@ start_reference_app() {
     browser)
       firefox_profile="$HOME/snap/firefox/common/ditto-g0-reference-profile"
       mkdir -p "$firefox_profile"
+      # Firefox restores the last window state from xulstore.json. The matrix
+      # ends by maximizing it, so without this the next run starts maximized
+      # and move/resize answer `unsupported` (nightly 36302494395).
+      rm -f -- "$firefox_profile/xulstore.json"
       # Firefox 156.0.1 routes Wayland through its own in-process proxy; under
       # the headless fixture compositor that proxy never maps a toplevel. The
       # direct connection is the same xdg-toplevel path the matrix measures.
