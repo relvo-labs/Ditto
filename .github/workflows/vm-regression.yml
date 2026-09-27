@@ -28,9 +28,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: VM regression
         run: bash tools/dev-vm/run.sh
+      # Run ids carry ISO timestamps, and upload-artifact rejects ':' in file
+      # names. The archive keeps every artifact under its own name.
+      - name: Pack artifacts
+        if: always()
+        run: tar -czf g0-vm-artifacts.tar.gz --ignore-failed-read artifacts/g0-vm
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: g0-vm-${{ github.run_id }}
-          path: artifacts/g0-vm/
+          path: g0-vm-artifacts.tar.gz
           retention-days: 30

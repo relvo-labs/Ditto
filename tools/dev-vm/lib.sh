@@ -13,8 +13,17 @@ VM_ENV='export PATH=$HOME/.cargo/bin:$HOME/.nvm/versions/node/v22.23.2/bin:$HOME
 
 virsh_vm() { virsh -c "$VM_CONNECT" "$@"; }
 
+# A reverted snapshot keeps the DHCP lease it was taken with, which the host's
+# dnsmasq forgets once it expires: the lease table then has no address while
+# the guest still uses it. ARP and the guest agent see it either way.
 vm_ip() {
-  virsh_vm domifaddr "$VM_NAME" 2>/dev/null | awk '/ipv4/{print $4}' | cut -d/ -f1 | head -1
+  local source ip
+  for source in lease arp agent; do
+    ip="$(virsh_vm domifaddr "$VM_NAME" --source "$source" 2>/dev/null |
+      awk '$3 == "ipv4" && $4 !~ /^127\./ {print $4}' | cut -d/ -f1 | head -1)"
+    [[ -n "$ip" ]] && { echo "$ip"; return 0; }
+  done
+  return 1
 }
 
 vm_ssh() {

@@ -48,13 +48,20 @@ jobs:
         run: bash tests/g0/shell-restart-survival/run.sh
       - name: EX-04 frame time and hot path
         run: bash tests/g0/hotpath/run.sh
+      - name: EX-07 identity cannot be self-declared
+        run: bash tests/g0/identity-negative/run.sh
       - name: Production avatar hit region
         run: bash tests/g0/avatar-hit-region/run.sh
       - name: Compositor capability probe
         run: bash tests/g0/compositor-probe/run.sh
+      # Run ids carry ISO timestamps, and upload-artifact rejects ':' in file
+      # names. The archive keeps every artifact under its own name.
+      - name: Pack artifacts
+        if: always()
+        run: tar -czf g0-nightly-artifacts.tar.gz --ignore-failed-read artifacts/g0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: g0-nightly-${{ github.run_id }}
-          path: artifacts/g0/
+          path: g0-nightly-artifacts.tar.gz
           retention-days: 90

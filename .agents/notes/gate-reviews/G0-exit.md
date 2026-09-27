@@ -13,15 +13,15 @@
 
 | 門檻 | 結果 | 證據 | 備註／解除條件 |
 | --- | --- | --- | --- |
-| EX-01 原生應用可控 | 條件通過 | `artifacts/g0/window-matrix-2026-09-22T15:03:52Z-6dfa.jsonl` | Firefox／foot／Kate 得到 30 項回讀驗證、40 項讀取、3 項 close request 送達、0 項 `unsupported`。變更進版後以該 commit 重跑，讓 artifact 與來源版本一對一，即可解除條件 |
+| EX-01 原生應用可控 | 條件通過 | `artifacts/g0/window-matrix-2026-09-22T15:03:52Z-6dfa.jsonl` | Firefox／foot／Kate 得到 30 項回讀驗證、40 項讀取、3 項 close request 送達、0 項 `unsupported`。變更進版後以該 commit 重跑，讓 artifact 與來源版本一對一，即可解除條件。2026-09-27 已以已進版的 `7333c20` 在參考機重跑三次（36303881879／36303886123／36303890347），每次都是 30 項回讀驗證、43 項讀取、0 項 `unsupported`；待出口評審確認解除 |
 | EX-02 合成器缺口與 D-02 | 未通過 | `artifacts/g0/compositor-probe-wayfire-0.11.0-d3990237-2026-09-22T15:36:44Z-6dfa.json`；[能力差異表](../../../docs/platform/compositor-capability-matrix.md)；[D-02](../decisions/2026-09-22-d02-compositor-wayfire.md) | C-01～07 與 C-09～14 在 G0 要求範圍均有結論；阻斷列 C-08 尚未觀察到中文提交 |
-| EX-03 Shell 重啟存活 | 條件通過 | `artifacts/g0/shell-restart-2026-09-22T15:05:18Z-6dfa.json` | 10 次 TERM＋10 次 KILL 全部存活；Kate 未儲存緩衝雜湊一致；重啟中位數 115 ms。變更進版後以該 commit 重跑即可解除條件 |
-| EX-04 幀時與熱路徑 | 條件通過 | `artifacts/g0/frametime-2026-09-22T15:17:18Z-6dfa.jsonl`、`...15:17:56Z...`、`...15:18:34Z...` 與同 run id 的 `hotpath-rpc-count-*`／`presentation-*` | 三次均達幀時門檻且熱路徑 RPC 為 0。變更進版後以該 commit 重跑即可解除條件 |
+| EX-03 Shell 重啟存活 | 條件通過 | `artifacts/g0/shell-restart-2026-09-22T15:05:18Z-6dfa.json` | 10 次 TERM＋10 次 KILL 全部存活；Kate 未儲存緩衝雜湊一致；重啟中位數 115 ms。變更進版後以該 commit 重跑即可解除條件。2026-09-27 以 `7333c20` 重跑三次，每次 20／20 存活、Kate 緩衝不變、重啟中位數 63～64 ms；待出口評審確認解除 |
+| EX-04 幀時與熱路徑 | 條件通過；**2026-09-27 使用者裁定 36303881879 算通過** | `artifacts/g0/frametime-2026-09-22T15:17:18Z-6dfa.jsonl`、`...15:17:56Z...`、`...15:18:34Z...` 與同 run id 的 `hotpath-rpc-count-*`／`presentation-*` | 三次均達幀時門檻且熱路徑 RPC 為 0。2026-09-27 以已進版的 `7333c20` 在參考機重跑三次（見 EX-09）：熱路徑 RPC 都是 0，QML 各段 ≥98.5%；但第 1 次（36303881879）的 `wp_presentation` 整段只有 94.41% ≤16.7 ms、p95 16.701 ms，低於 95%，另兩次為 97.77%、96.09%。nightly 腳本不擋這一項，因此綠燈不代表 EX-04 成立。**2026-09-27 使用者（參考機 owner）裁定該次算通過**：判準是「每段 ≥95%」，QML 逐段最低為 98.5%，`wp_presentation` 是整段交叉檢查，差距為 0.59 個百分點、p95 超出 0.001 ms。本裁定不改變門檻；若之後的執行再出現整段低於 95%，須重新提出 |
 | EX-05 資源預算與配額核定 | 未通過 | `artifacts/g0/quota-baseline-2026-09-22T14:46:14Z-6dfa.json`；[D-06b](../decisions/2026-09-22-d06b-tool-quotas.md) | 配額已核定；仍缺三次真正 cold login、300 秒暖機、600 秒採樣，以及角色關閉／減少動畫兩組。`resource-report-2026-09-22T14:40:17Z-6dfa.md` 是縮短試跑，報告本身已標明不可作 EX-05 證據 |
 | EX-06 契約與目錄一致性 | 條件通過 | 本機 CI 等價檢查：Rust 41 tests、TS 9 tests、fmt、clippy、schema 新鮮度、15 個 skill lint 均通過 | GitHub 上的 workflow 尚未包含本工作樹；變更進版並由 `contracts.yml` 成功執行後解除條件 |
-| EX-07 身分無法自述 | 條件通過 | 參考機執行 `tests/g0/identity-negative/run.sh`：正例成功、三項負例皆 `identity_rejected` | 變更進版後在 CI 留下執行紀錄即可解除條件 |
-| EX-08 中文輸入鏈路 | 未通過 | [輸入法報告](../../../docs/platform/input-method-report.md)；`artifacts/g0/input-method-2026-09-22T13:57:25Z-6dfa.json` | 協定、Qt input context、Fcitx 拼音均啟用，但 `stipc` 回讀仍為 `nihao `。需在 Ditto 登入工作階段用實體鍵盤完成 QML／foot／Kate、候選位置、退格與三方剪貼簿，並附錄影 |
-| EX-09 真機 runner nightly | 未通過 | [D-19](../decisions/2026-09-22-d19-reference-runner.md)；runner `ditto-ref-ws-rtx4060-01` 在線 | workflow 變更尚未進版；進版後仍須連續三晚成功執行 EX-01／03／04 並保存 artifacts，這項不能以同日連跑三次替代 |
+| EX-07 身分無法自述 | 條件通過；**CI 紀錄已產生** | 參考機執行 `tests/g0/identity-negative/run.sh`：正例成功、三項負例皆 `identity_rejected` | 2026-09-27 起 `nightly-refmachine` 內含此步驟，`7333c20` 的三次參考機執行都成功，可作為 CI 執行紀錄 |
+| EX-08 中文輸入鏈路 | 未通過 | [輸入法報告](../../../docs/platform/input-method-report.md) §5；`artifacts/g0-vm/2026-09-27T05:43:05Z-45e3/` | 2026-09-27 開發 VM：在 GDM 登入工作階段中以核心 uinput 鍵盤輸入，QML／foot／Kate 都提交 `你好`，三方剪貼簿一致，候選窗截圖貼近游標。這證明 `stipc` 失敗是注入器的限制。仍缺參考機上實體鍵盤的最終 JSON 與錄影 |
+| EX-09 真機 runner nightly | 未通過 | [D-19](../decisions/2026-09-22-d19-reference-runner.md)、[D-36](../decisions/2026-09-27-d36-ex09-same-day-runs.md)；run 36269089432 | 2026-09-26 第一晚測試步驟全綠，但因上傳拒收含 `:` 的檔名而判失敗，已修正。D-36 把判準放寬為同一 commit 的 3 次獨立參考機執行。`7333c20`：VM 三輪 9／9，參考機 36303881879／36303886123／36303890347 全數成功並上傳。**依 D-36 判準成立，待出口評審確認** |
 
 ## 2. 量測數字與條件
 
@@ -44,7 +44,7 @@ D-06b 的三項控制器案例已成立：記憶體超限只終止 scope、CPU q
 | 項目 | 已知事實 | 調整提案與解除方式 |
 | --- | --- | --- |
 | C-08／EX-08 | 自動注入未產生中文，不能區分 `stipc` 限制與 Wayfire/Fcitx relay 問題 | 從登入管理器進入「Ditto G0 (Wayfire)」，執行 `tests/g0/input-method/manual-session.sh`；若實體鍵盤亦失敗，擷取 Qt／Fcitx／Wayfire protocol trace 後修正，不降低門檻 |
-| EX-05 | 自動 session fixture 不是 cold login；縮短試跑無效 | 在三次獨立登入中執行既定 300＋600 秒流程，另跑角色關閉與減少動畫；完成後建立 D-06a，不引用現有試跑數字 |
+| EX-05 | 自動 session fixture 不是 cold login；縮短試跑無效 | 在三次獨立登入中執行既定 300＋600 秒流程，另跑角色關閉與減少動畫；完成後建立 D-06a，不引用現有試跑數字。2026-09-27 開發 VM 已用完整時長跑完這套流程（`artifacts/g0-vm/2026-09-27T05:50:23Z-45e3/`，8／8），證明流程本身可以無人值守完成；數字來自軟體算繪 VM，不引用 |
 | EX-06／07 的 CI 證據 | 本機等價檢查通過，但遠端仍是舊 commit | 經 owner 核准後 commit／push；由 self-hosted `ditto-ci` runner 跑正式 workflow |
 | EX-09 | runner 已在線，但連續三晚尚未發生 | 變更進版後依排程累積三個不同夜晚；任何一晚失敗重新計數 |
 | G0-SHELL-01 | 登入項目與受控啟動器已安裝，尚未從 display manager 實際登入 | 與 EX-08 同一次實體登入完成桌面、參考應用啟動與退出驗證 |

@@ -130,6 +130,8 @@ sample() {
   # other reference fixtures. They are user-opened applications and excluded.
   local firefox_profile="$HOME/snap/firefox/common/ditto-g0-reference-profile"
   mkdir -p "$firefox_profile"
+  # The same fixed starting state as the other fixtures (reference-apps.sh).
+  rm -f -- "$firefox_profile/xulstore.json"
   start_app ditto-ref-browser firefox_firefox env MOZ_ENABLE_WAYLAND=1 MOZ_DISABLE_WAYLAND_PROXY=1 \
     firefox --no-remote --profile "$firefox_profile" about:blank
   start_app ditto-ref-terminal ditto-ref-terminal foot --app-id=ditto-ref-terminal sh -c 'sleep infinity'

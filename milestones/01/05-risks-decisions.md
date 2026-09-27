@@ -58,6 +58,7 @@
 | D-23 | **能力目錄一致性 gate 的嚴格度** | **2026-09-22 已決定**：四項檢查任一失敗即擋合併（[紀錄](../../.agents/notes/decisions/2026-09-22-d23-catalog-gate-strict.md)） | G0 CORE-02 開工前 | Core |
 | D-24 | **`ditto-qml-shell` 轉 `stable` 的判定** | **2026-09-22 已決定**：生產 24 矩形遮罩雙向驗證後轉 stable（[紀錄](../../.agents/notes/decisions/2026-09-22-d24-qml-shell-stable.md)） | G0 出口 | Shell |
 | D-25 | **自動化測試的第一線環境** | **2026-09-27 已決定**：參考機上的 libvirt 開發 VM 為第一線自動化測試；結果只是開發證據，出口門檻不變（[紀錄](../../.agents/notes/decisions/2026-09-27-d25-vm-first-automation.md)） | G0 | 平台工程＋QA |
+| D-36 | **EX-09 的判定方式** | **2026-09-27 已決定（放寬）**：由連續 3 晚改為同一已進版 commit 的 3 次獨立參考機執行，可在同一天，並須先通過 3 輪 VM；只適用 G0（[紀錄](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md)） | G0 出口 | 參考機 owner；產品 owner 於出口評審確認 |
 
 ## 3. 團隊與估算假設
 
@@ -108,7 +109,7 @@ PRD 明示「時程待 G0 結果、人力與預算確定後估算，不以尚未
 | 2026-09-19 | G0 合成器轉接採「中立介面＋合成器 IPC 後端」，**不代表 D-02 已決定** | [紀錄](../../.agents/notes/decisions/2026-09-19-g0-compositor-adapter-seam.md) |
 | 2026-09-19 | 受控啟動器以已開啟的描述子交付一次性 token，不走環境變數 | [紀錄](../../.agents/notes/decisions/2026-09-19-launcher-identity-handover.md) |
 
-D-01、D-02、D-03、D-06b、D-13、D-14、D-19、D-22、D-23、D-24、D-25 已決定；D-06a 與 D-12 的工作流分工仍未結。G0 期間取得的探測與量測資料見 [plan/02 §7](../../plan/02/06-workplan.md#7-進度紀錄)。
+D-01、D-02、D-03、D-06b、D-13、D-14、D-19、D-22、D-23、D-24、D-25、D-36 已決定；D-06a 與 D-12 的工作流分工仍未結。G0 期間取得的探測與量測資料見 [plan/02 §7](../../plan/02/06-workplan.md#7-進度紀錄)。
 
 ## 4. 決策紀錄格式
 
