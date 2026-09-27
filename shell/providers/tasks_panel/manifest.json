@@ -1,0 +1,63 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.tasks.panel",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "待辦面板",
+    "en": "Tasks panel"
+  },
+  "author": "Ditto",
+  "license": "UNLICENSED",
+  "source": "builtin",
+  "description": {
+    "zh-TW": "顯示與編輯待辦服務的項目。",
+    "en": "Shows and edits the tasks service's items."
+  },
+  "plugin_kind": "qml_provider",
+  "host_kind": "qml",
+  "trust_level": "trusted",
+  "runtime": {
+    "qt": ">=6.10"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [
+    "ui.tasks_panel"
+  ],
+  "provides": [],
+  "requires": [],
+  "optional": [
+    {
+      "capability": "desktop.tasks.list"
+    }
+  ],
+  "conflicts": [],
+  "qml_entry": "qml/TasksPanel.qml",
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "migrations": [],
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8
+  },
+  "rescue": {
+    "disable_safe": true
+  }
+}

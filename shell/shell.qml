@@ -5,19 +5,28 @@ import Quickshell.Wayland
 import "core"
 import "jelly"
 import "avatar"
-import "providers/panel_top"
-import "providers/dock_bottom"
+import "change"
+import "centers"
 
-/// Ditto's G0 session: background, top panel, dock and the character layer.
-/// The desktop state all comes through Core; the character does not depend on
-/// it, and the shell writes nothing to disk.
+/// Ditto's desktop session (G1). The Shell owns what is on screen: the
+/// background, the character, the four centers, the change bar, and the
+/// ProviderHost that mounts the replaceable UI providers (panel, dock,
+/// launcher, tasks panel, notification area) Core binds in the Profile. What
+/// is configured is Core's; the Shell keeps no configuration and writes
+/// nothing to disk.
 ShellRoot {
     id: root
 
+    Tr {
+        id: translator
+        locale: providers.appearance && providers.appearance.locale
+            ? providers.appearance.locale
+            : (Quickshell.env("DITTO_LOCALE") || "zh-TW")
+    }
+
     Tokens {
         id: tokens
-        reducedMotion: Quickshell.env("DITTO_REDUCED_MOTION") === "1"
-        reducedTransparency: Quickshell.env("DITTO_REDUCED_TRANSPARENCY") === "1"
+        appearance: providers.appearance
     }
 
     RpcCounter {
@@ -27,7 +36,59 @@ ShellRoot {
     DittoClient {
         id: client
         counter: rpcCounter
+        tr: translator
+        participant: providers
+        commandHandler: root.runCommand
     }
+
+    ProviderHost {
+        id: providers
+        client: client
+        tokens: tokens
+        counter: rpcCounter
+    }
+
+    /// Commands the Shell owns, from `shell.command` (Core decides who owns a
+    /// command; a shortcut Core bound arrives here the same way).
+    function runCommand(commandId, args) {
+        switch (commandId) {
+        case "launcher.toggle": {
+            const launcher = providers.item("ui.launcher");
+            if (launcher && typeof launcher.toggle === "function") {
+                if (!launcher.isOpen) {
+                    rpcCounter.mark("launcher.open");
+                }
+                launcher.toggle();
+            } else if (launcher && typeof launcher.open === "function") {
+                launcher.isOpen ? launcher.close() : launcher.open();
+            } else {
+                console.log("ditto-shell no launcher is mounted");
+            }
+            return;
+        }
+        case "composition.open":
+            centers.show("composition");
+            return;
+        case "plugins.open":
+            centers.show("plugins");
+            return;
+        case "history.open":
+            centers.show("history");
+            return;
+        case "personalization.open":
+            centers.show("personalization");
+            return;
+        }
+        console.log("ditto-shell ignored command " + commandId);
+    }
+
+    readonly property var shellClient: client
+    readonly property var shellTokens: tokens
+    readonly property var shellProviders: providers
+    readonly property var avatarSettings: providers.avatar
+    readonly property bool avatarEnabled: Quickshell.env("DITTO_AVATAR") !== "off"
+        && (!avatarSettings || avatarSettings.enabled !== false)
+    property bool avatarRecalled: false
 
     Variants {
         model: Quickshell.screens
@@ -40,24 +101,55 @@ ShellRoot {
             aboveWindows: false
             color: tokens.background
             WlrLayershell.layer: WlrLayer.Background
+            WlrLayershell.namespace: "ditto-background"
         }
     }
 
-    PanelTop {
-        tokens: tokens
-        client: client
+    /// The four centers share one window, loaded only while open: closed
+    /// centers render nothing and subscribe to nothing (RUN-07).
+    QtObject {
+        id: centers
+        property string page: "composition"
+        property bool open: false
+
+        function show(name) {
+            page = name;
+            open = true;
+        }
     }
 
-    DockBottom {
-        tokens: tokens
-        client: client
+    LazyLoader {
+        id: centersLoader
+        active: centers.open
+
+        // `client: client` here would bind the property to itself.
+        Centers {
+            client: root.shellClient
+            tokens: root.shellTokens
+            providers: root.shellProviders
+            page: centers.page
+            onCloseRequested: centers.open = false
+            onPageChanged: centers.page = page
+        }
+    }
+
+    /// Kept or cancelled here: a preview, or a change with a timed revert.
+    LazyLoader {
+        id: previewLoader
+        active: Object.keys(client.pendingConfirmations).length > 0
+
+        PreviewBar {
+            client: root.shellClient
+            tokens: root.shellTokens
+        }
     }
 
     /// `DITTO_AVATAR=off` leaves the character out entirely: EX-05 measures the
     /// desktop with and without it, so "off" means no surface and no timers.
+    /// The Profile's `avatar.enabled: false` does the same.
     LazyLoader {
         id: avatarLoader
-        active: Quickshell.env("DITTO_AVATAR") !== "off"
+        active: root.avatarEnabled
 
         PanelWindow {
             id: avatarSurface
@@ -65,15 +157,19 @@ ShellRoot {
             // Inside the loader's component, `tokens: tokens` on the Avatar
             // would bind its own property to itself; resolve the id here.
             readonly property Tokens desktopTokens: tokens
+            readonly property real scale: root.avatarSettings && root.avatarSettings.scale > 0
+                ? Math.max(0.5, Math.min(2.0, root.avatarSettings.scale)) : 1.0
 
+            visible: !(root.avatarSettings && root.avatarSettings.hidden === true) || root.avatarRecalled
             anchors { bottom: true; right: true }
             margins { bottom: 64; right: 32 }
-            implicitWidth: 220
-            implicitHeight: 250
+            implicitWidth: Math.round(220 * scale)
+            implicitHeight: Math.round(250 * scale)
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             focusable: false
             aboveWindows: true
+            WlrLayershell.namespace: "ditto-avatar"
 
             /// Built from the alpha channel at build time. Without it the
             /// transparent area would swallow clicks meant for the application
@@ -90,6 +186,8 @@ ShellRoot {
                 width: parent.width
                 height: parent.width
                 tokens: avatarSurface.desktopTokens
+                tr: translator
+                animations: !root.avatarSettings || root.avatarSettings.animations !== false
             }
 
             /// The character's state is readable as text from the first day, so the
@@ -138,21 +236,36 @@ ShellRoot {
     /// here, and so does the verification script. `workspace` takes exactly the
     /// same route as a click on the panel, which is what makes the request
     /// count per explicit command measurable.
+    ///
+    ///   ping <n>        → pong <n>, from this (the UI) thread, at once: the
+    ///                     supervisor's liveness check (crates/ditto-supervisor)
+    ///   recall          bring the character back when it is covered or hidden
+    ///   workspace <id>  the same capability call as a click on the panel
+    ///   command <id>    run a Shell-owned command locally (development and
+    ///                     verification; the product path is `shell.command`)
     SocketServer {
         active: true
         path: (Quickshell.env("DITTO_RUNTIME_DIR")
             || ((Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/ditto")) + "/shell.sock"
         handler: Socket {
+            id: connection
             parser: SplitParser {
                 splitMarker: "\n"
                 onRead: line => {
                     const command = line.trim().split(" ");
-                    if (command[0] === "recall" && avatarLoader.item) {
-                        avatarLoader.item.visible = true;
-                        avatarLoader.item.aboveWindows = true;
+                    if (command[0] === "ping" && command.length === 2) {
+                        connection.write("pong " + command[1] + "\n");
+                        connection.flush();
+                    } else if (command[0] === "recall") {
+                        root.avatarRecalled = true;
+                        if (avatarLoader.item) {
+                            avatarLoader.item.aboveWindows = true;
+                        }
                         console.log("ditto-shell avatar recalled");
                     } else if (command[0] === "workspace" && command.length === 2) {
                         client.activateWorkspace(command[1]);
+                    } else if (command[0] === "command" && command.length === 2) {
+                        root.runCommand(command[1], {});
                     } else {
                         console.log("ditto-shell ignored control line");
                     }

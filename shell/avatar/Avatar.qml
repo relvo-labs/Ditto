@@ -8,10 +8,17 @@ Item {
     id: avatar
 
     required property var tokens
+    /// The Shell's translator (core/Tr.qml); null leaves the source text.
+    property var tr: null
+    /// The Profile's `avatar.animations`; reduced motion stops them as well.
+    property bool animations: true
+    readonly property bool animate: animations && !tokens.reducedMotion
     /// G0 shows no task states: an animation must not suggest work that is not
     /// happening. The text label is bound to this same value.
     property string avatarState: "idle"
-    readonly property string stateText: avatarState === "idle" ? "待命中" : avatarState
+    readonly property string stateText: avatarState === "idle"
+        ? (tr ? tr.t(qsTr("待命中")) : qsTr("待命中"))
+        : avatarState
     property bool gazeActive: false
     property real gazeX: 0
     property real gazeY: 0
@@ -111,7 +118,7 @@ Item {
 
     /// Breathing: a slow scale that never stops and never asks anything of Core.
     SequentialAnimation {
-        running: avatar.visible && !avatar.tokens.reducedMotion
+        running: avatar.visible && avatar.animate
         loops: Animation.Infinite
 
         ParallelAnimation {
@@ -132,7 +139,7 @@ Item {
     /// Blinks are deliberately uneven: a fixed interval reads as a machine.
     Timer {
         id: blinkTimer
-        running: avatar.visible && !avatar.tokens.reducedMotion
+        running: avatar.visible && avatar.animate
         repeat: true
         interval: 2600 + Math.random() * 3200
         onTriggered: {
@@ -170,7 +177,7 @@ Item {
             avatar.gazeY = Math.max(-1, Math.min(1, (mouse.y - height / 2) / (height / 2)));
         }
         onClicked: {
-            if (!avatar.tokens.reducedMotion) {
+            if (avatar.animate) {
                 pressAnimation.restart();
             }
             console.log("ditto-avatar-hit")

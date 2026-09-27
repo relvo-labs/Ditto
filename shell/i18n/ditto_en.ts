@@ -1,0 +1,2184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TS>
+<TS version="2.1" language="en" sourcelanguage="zh_TW">
+<context>
+    <name>Avatar</name>
+    <message>
+        <source>待命中</source>
+        <translation>Idle</translation>
+    </message>
+</context>
+<context>
+    <name>Centers</name>
+    <message>
+        <source>Ditto 設定</source>
+        <translation>Ditto settings</translation>
+    </message>
+    <message>
+        <source>個人化設定</source>
+        <translation>Personalization</translation>
+    </message>
+    <message>
+        <source>插件中心</source>
+        <translation>Plugin center</translation>
+    </message>
+    <message>
+        <source>組合中心</source>
+        <translation>Composition center</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>Change history</translation>
+    </message>
+</context>
+<context>
+    <name>ChangeCard</name>
+    <message>
+        <source>%1 項變更</source>
+        <translation>%1 change(s)</translation>
+    </message>
+    <message>
+        <source>%1（%2）：%3</source>
+        <translation>%1 (%2): %3</translation>
+    </message>
+    <message>
+        <source>上次中斷，已於 %1 處理</source>
+        <translation>Interrupted last time; settled at %1</translation>
+    </message>
+    <message>
+        <source>兩者沒有差異。</source>
+        <translation>There is no difference between the two.</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>逐項結果</source>
+        <translation>Item by item</translation>
+    </message>
+    <message>
+        <source>，原因：%1</source>
+        <translation>; reason: %1</translation>
+    </message>
+</context>
+<context>
+    <name>ChangeText</name>
+    <message>
+        <source>%1 項</source>
+        <translation>%1 item(s)</translation>
+    </message>
+    <message>
+        <source>%1 項設定</source>
+        <translation>%1 setting(s)</translation>
+    </message>
+    <message>
+        <source>Agent 替身</source>
+        <translation>Agent stand-in</translation>
+    </message>
+    <message>
+        <source>Dock</source>
+        <translation>Dock</translation>
+    </message>
+    <message>
+        <source>個人化設定</source>
+        <translation>Personalization</translation>
+    </message>
+    <message>
+        <source>匯入</source>
+        <translation>Import</translation>
+    </message>
+    <message>
+        <source>只有部分生效，下列項目沒有還原。</source>
+        <translation>Only part of it took effect; the items below were not restored.</translation>
+    </message>
+    <message>
+        <source>命令列</source>
+        <translation>Command line</translation>
+    </message>
+    <message>
+        <source>回到一般模式後套用</source>
+        <translation>Applied once back in normal mode</translation>
+    </message>
+    <message>
+        <source>回復中</source>
+        <translation>Reverting</translation>
+    </message>
+    <message>
+        <source>在「%1」操作</source>
+        <translation>From “%1”</translation>
+    </message>
+    <message>
+        <source>外觀</source>
+        <translation>Appearance</translation>
+    </message>
+    <message>
+        <source>套用中</source>
+        <translation>Applying</translation>
+    </message>
+    <message>
+        <source>套用後沒有通過確認，已全部回復到原本的設定。</source>
+        <translation>Applied, but the check afterwards failed; everything is back to the previous settings.</translation>
+    </message>
+    <message>
+        <source>完成</source>
+        <translation>Done</translation>
+    </message>
+    <message>
+        <source>尚未生效，之後套用</source>
+        <translation>Not in effect yet; applied later</translation>
+    </message>
+    <message>
+        <source>已保存，還沒有生效：下次登入時才會套用。</source>
+        <translation>Saved, not in effect yet: it is applied at the next login.</translation>
+    </message>
+    <message>
+        <source>已保存，還沒有生效：回到一般模式後才會套用。</source>
+        <translation>Saved, not in effect yet: it is applied once back in normal mode.</translation>
+    </message>
+    <message>
+        <source>已回復</source>
+        <translation>Reverted</translation>
+    </message>
+    <message>
+        <source>已套用並確認生效。可以撤銷。</source>
+        <translation>Applied and confirmed. You can undo it.</translation>
+    </message>
+    <message>
+        <source>已套用，正在試看。按「保留」才會留下；取消或逾時會自動回復。</source>
+        <translation>Applied for a try. Press “Keep” to keep it; cancelling or waiting reverts it.</translation>
+    </message>
+    <message>
+        <source>已生效</source>
+        <translation>In effect</translation>
+    </message>
+    <message>
+        <source>已還原</source>
+        <translation>Restored</translation>
+    </message>
+    <message>
+        <source>布局</source>
+        <translation>Layout</translation>
+    </message>
+    <message>
+        <source>待下次登入套用</source>
+        <translation>Applied at the next login</translation>
+    </message>
+    <message>
+        <source>快捷鍵</source>
+        <translation>Shortcuts</translation>
+    </message>
+    <message>
+        <source>插件中心</source>
+        <translation>Plugin center</translation>
+    </message>
+    <message>
+        <source>插件服務</source>
+        <translation>Plugin services</translation>
+    </message>
+    <message>
+        <source>撤銷</source>
+        <translation>Undo</translation>
+    </message>
+    <message>
+        <source>救援</source>
+        <translation>Rescue</translation>
+    </message>
+    <message>
+        <source>新建立</source>
+        <translation>Created</translation>
+    </message>
+    <message>
+        <source>未保留，自動回復</source>
+        <translation>Not kept, reverted automatically</translation>
+    </message>
+    <message>
+        <source>未套用</source>
+        <translation>Not applied</translation>
+    </message>
+    <message>
+        <source>未生效</source>
+        <translation>Not in effect</translation>
+    </message>
+    <message>
+        <source>未通過檢查</source>
+        <translation>Did not pass the check</translation>
+    </message>
+    <message>
+        <source>未還原</source>
+        <translation>Not restored</translation>
+    </message>
+    <message>
+        <source>桌面</source>
+        <translation>Desktop</translation>
+    </message>
+    <message>
+        <source>桌面介面</source>
+        <translation>Desktop interface</translation>
+    </message>
+    <message>
+        <source>沒有套用：新的元件沒有準備好，原本的設定沒有改變。</source>
+        <translation>Not applied: the new component was not ready. The previous settings are unchanged.</translation>
+    </message>
+    <message>
+        <source>沒有套用：檢查時發現問題，原本的設定沒有改變。</source>
+        <translation>Not applied: the check found problems. The previous settings are unchanged.</translation>
+    </message>
+    <message>
+        <source>準備中</source>
+        <translation>Preparing</translation>
+    </message>
+    <message>
+        <source>無法確認</source>
+        <translation>Cannot confirm</translation>
+    </message>
+    <message>
+        <source>無法確認是否已生效。目前的實際狀態列在下方。</source>
+        <translation>It cannot be confirmed whether this took effect. The actual current state is listed below.</translation>
+    </message>
+    <message>
+        <source>確認中</source>
+        <translation>Confirming</translation>
+    </message>
+    <message>
+        <source>等待中</source>
+        <translation>Waiting</translation>
+    </message>
+    <message>
+        <source>組合中心</source>
+        <translation>Composition center</translation>
+    </message>
+    <message>
+        <source>繁體中文</source>
+        <translation>繁體中文</translation>
+    </message>
+    <message>
+        <source>自動停用（服務一再失敗）</source>
+        <translation>Disabled automatically (the service kept failing)</translation>
+    </message>
+    <message>
+        <source>複製而來</source>
+        <translation>Duplicated</translation>
+    </message>
+    <message>
+        <source>見診斷</source>
+        <translation>see diagnostics</translation>
+    </message>
+    <message>
+        <source>視窗管理</source>
+        <translation>Window management</translation>
+    </message>
+    <message>
+        <source>角色</source>
+        <translation>Character</translation>
+    </message>
+    <message>
+        <source>試看中，等待保留</source>
+        <translation>Trying, waiting to be kept</translation>
+    </message>
+    <message>
+        <source>試看列</source>
+        <translation>Try-it bar</translation>
+    </message>
+    <message>
+        <source>變更</source>
+        <translation>Change</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>Change history</translation>
+    </message>
+    <message>
+        <source>這項變更已被回復，目前是變更前的設定。</source>
+        <translation>This change was reverted; the settings are as they were before it.</translation>
+    </message>
+    <message>
+        <source>部分完成</source>
+        <translation>Partly done</translation>
+    </message>
+    <message>
+        <source>開</source>
+        <translation>On</translation>
+    </message>
+    <message>
+        <source>關</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>（無）</source>
+        <translation>(none)</translation>
+    </message>
+</context>
+<context>
+    <name>CompositionCenter</name>
+    <message>
+        <source>「%1」的版本</source>
+        <translation>Versions of “%1”</translation>
+    </message>
+    <message>
+        <source>不能匯入，原因如下。</source>
+        <translation>Cannot be imported, for these reasons.</translation>
+    </message>
+    <message>
+        <source>使用中</source>
+        <translation>In use</translation>
+    </message>
+    <message>
+        <source>使用中的組合不能刪除</source>
+        <translation>The composition in use cannot be deleted</translation>
+    </message>
+    <message>
+        <source>使用中的組合不能刪除；先切換到另一個組合。</source>
+        <translation>The composition in use cannot be deleted; switch to another one first.</translation>
+    </message>
+    <message>
+        <source>使用這個組合</source>
+        <translation>Use this composition</translation>
+    </message>
+    <message>
+        <source>刪除</source>
+        <translation>Delete</translation>
+    </message>
+    <message>
+        <source>刪除「%1」？它的版本紀錄也會一起刪除。</source>
+        <translation>Delete “%1”? Its version history is deleted with it.</translation>
+    </message>
+    <message>
+        <source>匯入</source>
+        <translation>Import</translation>
+    </message>
+    <message>
+        <source>匯入內容不是有效的組合檔</source>
+        <translation>The text to import is not a valid composition file</translation>
+    </message>
+    <message>
+        <source>匯入後的名稱</source>
+        <translation>Name after import</translation>
+    </message>
+    <message>
+        <source>匯入的組合</source>
+        <translation>Imported composition</translation>
+    </message>
+    <message>
+        <source>匯入與匯出</source>
+        <translation>Import and export</translation>
+    </message>
+    <message>
+        <source>匯出</source>
+        <translation>Export</translation>
+    </message>
+    <message>
+        <source>匯出的內容不含檔案路徑與密鑰。匯入前會先檢查，檢查結果顯示在這裡，不會立即套用。</source>
+        <translation>Exports contain no file paths and no secrets. An import is checked first; the result is shown here and nothing is applied yet.</translation>
+    </message>
+    <message>
+        <source>匯出的組合</source>
+        <translation>Exported composition</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>可以匯入。</source>
+        <translation>Can be imported.</translation>
+    </message>
+    <message>
+        <source>套用</source>
+        <translation>Apply</translation>
+    </message>
+    <message>
+        <source>差異</source>
+        <translation>Differences</translation>
+    </message>
+    <message>
+        <source>已刪除「%1」</source>
+        <translation>Deleted “%1”</translation>
+    </message>
+    <message>
+        <source>已匯入。匯入的組合不會自動套用，可以在清單中試看或使用。</source>
+        <translation>Imported. An imported composition is not applied automatically; try it or use it from the list.</translation>
+    </message>
+    <message>
+        <source>已存的組合</source>
+        <translation>Saved compositions</translation>
+    </message>
+    <message>
+        <source>已建立「%1」</source>
+        <translation>Created “%1”</translation>
+    </message>
+    <message>
+        <source>已複製到剪貼簿</source>
+        <translation>Copied to the clipboard</translation>
+    </message>
+    <message>
+        <source>已複製為「%1」</source>
+        <translation>Duplicated as “%1”</translation>
+    </message>
+    <message>
+        <source>已重新命名為「%1」</source>
+        <translation>Renamed to “%1”</translation>
+    </message>
+    <message>
+        <source>建立新組合</source>
+        <translation>Create</translation>
+    </message>
+    <message>
+        <source>從剪貼簿貼上</source>
+        <translation>Paste from the clipboard</translation>
+    </message>
+    <message>
+        <source>從預設開始</source>
+        <translation>Start from the default</translation>
+    </message>
+    <message>
+        <source>把「%1」換成「%2」</source>
+        <translation>Replace “%1” with “%2”</translation>
+    </message>
+    <message>
+        <source>新的名稱</source>
+        <translation>New name</translation>
+    </message>
+    <message>
+        <source>新組合的名稱</source>
+        <translation>Name of the new composition</translation>
+    </message>
+    <message>
+        <source>最後修改 %1</source>
+        <translation>Last changed %1</translation>
+    </message>
+    <message>
+        <source>最近可用</source>
+        <translation>Last known good</translation>
+    </message>
+    <message>
+        <source>檢查</source>
+        <translation>Check</translation>
+    </message>
+    <message>
+        <source>正在套用…</source>
+        <translation>Applying…</translation>
+    </message>
+    <message>
+        <source>正在準備試看…</source>
+        <translation>Preparing the try…</translation>
+    </message>
+    <message>
+        <source>比較</source>
+        <translation>Compare</translation>
+    </message>
+    <message>
+        <source>版本紀錄</source>
+        <translation>Versions</translation>
+    </message>
+    <message>
+        <source>版本與差異</source>
+        <translation>Versions and differences</translation>
+    </message>
+    <message>
+        <source>目前使用的組合</source>
+        <translation>The composition in use</translation>
+    </message>
+    <message>
+        <source>目前使用：%1</source>
+        <translation>In use: %1</translation>
+    </message>
+    <message>
+        <source>目前版本</source>
+        <translation>Current version</translation>
+    </message>
+    <message>
+        <source>空白</source>
+        <translation>Empty</translation>
+    </message>
+    <message>
+        <source>等待保留</source>
+        <translation>Waiting to be kept</translation>
+    </message>
+    <message>
+        <source>終點 ✓</source>
+        <translation>To ✓</translation>
+    </message>
+    <message>
+        <source>組合中心</source>
+        <translation>Composition center</translation>
+    </message>
+    <message>
+        <source>與目前使用的比較</source>
+        <translation>Compare with the one in use</translation>
+    </message>
+    <message>
+        <source>複本的名稱</source>
+        <translation>Name of the copy</translation>
+    </message>
+    <message>
+        <source>複製</source>
+        <translation>Duplicate</translation>
+    </message>
+    <message>
+        <source>複製到剪貼簿</source>
+        <translation>Copy to the clipboard</translation>
+    </message>
+    <message>
+        <source>要匯入的組合</source>
+        <translation>Composition to import</translation>
+    </message>
+    <message>
+        <source>設為終點</source>
+        <translation>Set as “to”</translation>
+    </message>
+    <message>
+        <source>設為起點</source>
+        <translation>Set as “from”</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>試看</source>
+        <translation>Try it</translation>
+    </message>
+    <message>
+        <source>請先輸入名稱</source>
+        <translation>Enter a name first</translation>
+    </message>
+    <message>
+        <source>起點 ✓</source>
+        <translation>From ✓</translation>
+    </message>
+    <message>
+        <source>選兩個版本（起點、終點）比較差異。每個版本都標示它是怎麼來的。</source>
+        <translation>Pick two versions (from, to) to compare them. Each version says where it came from.</translation>
+    </message>
+    <message>
+        <source>選擇一個元件後可以先「試看」（倒數後自動回復，按保留才留下）或直接「套用」。原本元件的設定會保留，換回來時一起恢復。</source>
+        <translation>After choosing a component you can “Try it” (it reverts after a countdown unless you keep it) or “Apply” it. The replaced component keeps its settings and gets them back when you switch back.</translation>
+    </message>
+    <message>
+        <source>重新命名</source>
+        <translation>Rename</translation>
+    </message>
+    <message>
+        <source>關閉</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <source>（不影響匯入）</source>
+        <translation> (does not prevent the import)</translation>
+    </message>
+    <message>
+        <source>（未設定）</source>
+        <translation>(not set)</translation>
+    </message>
+</context>
+<context>
+    <name>DittoClient</name>
+    <message>
+        <source>、</source>
+        <translation>, </translation>
+    </message>
+    <message>
+        <source>桌面服務以救援模式執行</source>
+        <translation>The desktop service is running in rescue mode</translation>
+    </message>
+    <message>
+        <source>桌面服務已連線</source>
+        <translation>Desktop service connected</translation>
+    </message>
+    <message>
+        <source>桌面服務未連線</source>
+        <translation>Desktop service not connected</translation>
+    </message>
+    <message>
+        <source>桌面服務未連線，需重新啟動工作階段</source>
+        <translation>Desktop service not connected; the session needs to be restarted</translation>
+    </message>
+    <message>
+        <source>桌面服務連線中</source>
+        <translation>Connecting to the desktop service</translation>
+    </message>
+    <message>
+        <source>這個動作沒有完成。可以查看診斷。</source>
+        <translation>This action did not complete. See the diagnostics.</translation>
+    </message>
+</context>
+<context>
+    <name>DittoKeys</name>
+    <message>
+        <source>card.kind.appearance</source>
+        <translation>Appearance</translation>
+    </message>
+    <message>
+        <source>card.kind.diff</source>
+        <translation>Differences</translation>
+    </message>
+    <message>
+        <source>card.kind.layout</source>
+        <translation>Layout</translation>
+    </message>
+    <message>
+        <source>card.kind.mixed</source>
+        <translation>Composition change</translation>
+    </message>
+    <message>
+        <source>card.kind.plugin_state</source>
+        <translation>Plugin on/off</translation>
+    </message>
+    <message>
+        <source>card.kind.profile_switch</source>
+        <translation>Composition switch</translation>
+    </message>
+    <message>
+        <source>card.kind.provider_swap</source>
+        <translation>Component swap</translation>
+    </message>
+    <message>
+        <source>category.AudioVideo</source>
+        <translation>Audio &amp; video</translation>
+    </message>
+    <message>
+        <source>category.Development</source>
+        <translation>Development</translation>
+    </message>
+    <message>
+        <source>category.Education</source>
+        <translation>Education</translation>
+    </message>
+    <message>
+        <source>category.Game</source>
+        <translation>Games</translation>
+    </message>
+    <message>
+        <source>category.Graphics</source>
+        <translation>Graphics</translation>
+    </message>
+    <message>
+        <source>category.Network</source>
+        <translation>Internet</translation>
+    </message>
+    <message>
+        <source>category.Office</source>
+        <translation>Office</translation>
+    </message>
+    <message>
+        <source>category.Science</source>
+        <translation>Science</translation>
+    </message>
+    <message>
+        <source>category.Settings</source>
+        <translation>Settings</translation>
+    </message>
+    <message>
+        <source>category.System</source>
+        <translation>System</translation>
+    </message>
+    <message>
+        <source>category.Utility</source>
+        <translation>Utilities</translation>
+    </message>
+    <message>
+        <source>change.appearance</source>
+        <translation>Adjust the appearance</translation>
+    </message>
+    <message>
+        <source>change.candidate_not_ready</source>
+        <translation>The new component was not ready, so nothing was applied.</translation>
+    </message>
+    <message>
+        <source>change.commit_failed</source>
+        <translation>Applying failed part-way; a revert was attempted.</translation>
+    </message>
+    <message>
+        <source>change.commit_write_failed</source>
+        <translation>The result could not be recorded; a revert was attempted.</translation>
+    </message>
+    <message>
+        <source>change.participant_unavailable</source>
+        <translation>Part of the desktop was not answering, so nothing was applied.</translation>
+    </message>
+    <message>
+        <source>change.prepare_failed</source>
+        <translation>Preparing the new component failed, so nothing was applied.</translation>
+    </message>
+    <message>
+        <source>change.readback_mismatch</source>
+        <translation>After applying, the actual state differed from the expected one; it was reverted.</translation>
+    </message>
+    <message>
+        <source>change.storage_error</source>
+        <translation>The storage refused the write; nothing was changed.</translation>
+    </message>
+    <message>
+        <source>change.storage_full</source>
+        <translation>The storage is full; nothing was changed.</translation>
+    </message>
+    <message>
+        <source>change.timed_revert_failed</source>
+        <translation>The timed revert did not complete.</translation>
+    </message>
+    <message>
+        <source>change.title.appearance</source>
+        <translation>Adjust the appearance</translation>
+    </message>
+    <message>
+        <source>change.title.layout</source>
+        <translation>Adjust the layout</translation>
+    </message>
+    <message>
+        <source>change.title.mixed</source>
+        <translation>Change the composition</translation>
+    </message>
+    <message>
+        <source>change.title.plugin_state</source>
+        <translation>Turn plugins on or off</translation>
+    </message>
+    <message>
+        <source>change.title.profile_switch</source>
+        <translation>Switch the composition</translation>
+    </message>
+    <message>
+        <source>change.title.provider_swap</source>
+        <translation>Swap desktop components</translation>
+    </message>
+    <message>
+        <source>command.composition.open</source>
+        <translation>Open the composition center</translation>
+    </message>
+    <message>
+        <source>command.history.open</source>
+        <translation>Open the change history</translation>
+    </message>
+    <message>
+        <source>command.launcher.toggle</source>
+        <translation>Open or close the launcher</translation>
+    </message>
+    <message>
+        <source>command.personalization.open</source>
+        <translation>Open personalization</translation>
+    </message>
+    <message>
+        <source>command.plugins.open</source>
+        <translation>Open the plugin center</translation>
+    </message>
+    <message>
+        <source>command.rescue.open</source>
+        <translation>Open rescue mode</translation>
+    </message>
+    <message>
+        <source>command.session.lock</source>
+        <translation>Lock the screen</translation>
+    </message>
+    <message>
+        <source>conflict.base_revision_stale</source>
+        <translation>The desktop changed while you were working; review it and try again.</translation>
+    </message>
+    <message>
+        <source>conflict.candidate_cannot_claim</source>
+        <translation>The new component cannot take over this function.</translation>
+    </message>
+    <message>
+        <source>conflict.change_in_progress</source>
+        <translation>Another change is in progress; wait for it to finish.</translation>
+    </message>
+    <message>
+        <source>conflict.profile_in_use</source>
+        <translation>The composition in use cannot be deleted; switch to another one first.</translation>
+    </message>
+    <message>
+        <source>conflict.readback_mismatch</source>
+        <translation>The actual state differs from the expected one.</translation>
+    </message>
+    <message>
+        <source>conflict.single_provider_taken</source>
+        <translation>Another component already provides this function.</translation>
+    </message>
+    <message>
+        <source>conflict.undo_blocked_by_newer_change</source>
+        <translation>Undo the newer change first</translation>
+    </message>
+    <message>
+        <source>diagnostics.shared_host_no_per_plugin_memory</source>
+        <translation>Shares its host with other plugins; its memory cannot be measured on its own.</translation>
+    </message>
+    <message>
+        <source>diff.appearance.locale</source>
+        <translation>Language</translation>
+    </message>
+    <message>
+        <source>diff.appearance.low_power_style</source>
+        <translation>Low-power style</translation>
+    </message>
+    <message>
+        <source>diff.appearance.reduced_motion</source>
+        <translation>Reduce motion</translation>
+    </message>
+    <message>
+        <source>diff.appearance.reduced_transparency</source>
+        <translation>Reduce transparency</translation>
+    </message>
+    <message>
+        <source>diff.appearance.theme</source>
+        <translation>Theme</translation>
+    </message>
+    <message>
+        <source>diff.appearance.token</source>
+        <translation>Appearance: {token}</translation>
+    </message>
+    <message>
+        <source>diff.avatar.animations</source>
+        <translation>Character animation</translation>
+    </message>
+    <message>
+        <source>diff.avatar.enabled</source>
+        <translation>Character</translation>
+    </message>
+    <message>
+        <source>diff.avatar.hidden</source>
+        <translation>Hide the character</translation>
+    </message>
+    <message>
+        <source>diff.avatar.scale</source>
+        <translation>Character size</translation>
+    </message>
+    <message>
+        <source>diff.entry.added</source>
+        <translation>Add “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.entry.config</source>
+        <translation>Settings of “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.entry.disabled</source>
+        <translation>Disable “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.entry.enabled</source>
+        <translation>Enable “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.entry.removed</source>
+        <translation>Remove “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.entry.version</source>
+        <translation>Version of “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.layout.rules</source>
+        <translation>Window rules</translation>
+    </message>
+    <message>
+        <source>diff.layout.workspace_grid</source>
+        <translation>Workspace grid</translation>
+    </message>
+    <message>
+        <source>diff.shortcuts</source>
+        <translation>Shortcuts</translation>
+    </message>
+    <message>
+        <source>diff.slot.changed</source>
+        <translation>{slot}</translation>
+    </message>
+    <message>
+        <source>error.cancelled</source>
+        <translation>Cancelled.</translation>
+    </message>
+    <message>
+        <source>error.conflict</source>
+        <translation>It conflicts with the current state and was not run.</translation>
+    </message>
+    <message>
+        <source>error.identity_rejected</source>
+        <translation>The desktop service refused this connection; the session needs to be restarted.</translation>
+    </message>
+    <message>
+        <source>error.internal</source>
+        <translation>The desktop service hit an internal error; see the diagnostics.</translation>
+    </message>
+    <message>
+        <source>error.invalid_params</source>
+        <translation>The request was not valid and was not run.</translation>
+    </message>
+    <message>
+        <source>error.not_found</source>
+        <translation>The item was not found.</translation>
+    </message>
+    <message>
+        <source>error.permission_denied</source>
+        <translation>There is no permission for this; it was not run.</translation>
+    </message>
+    <message>
+        <source>error.preflight_rejected</source>
+        <translation>The check did not pass; the settings are unchanged.</translation>
+    </message>
+    <message>
+        <source>error.protocol_version_unsupported</source>
+        <translation>The desktop service&apos;s version is not compatible.</translation>
+    </message>
+    <message>
+        <source>error.timeout</source>
+        <translation>It did not finish in time; the result is not confirmed yet.</translation>
+    </message>
+    <message>
+        <source>error.unavailable</source>
+        <translation>This is unavailable right now.</translation>
+    </message>
+    <message>
+        <source>error.unsupported</source>
+        <translation>This desktop does not support this action.</translation>
+    </message>
+    <message>
+        <source>generic.change</source>
+        <translation>The change did not complete.</translation>
+    </message>
+    <message>
+        <source>generic.command</source>
+        <translation>Command</translation>
+    </message>
+    <message>
+        <source>generic.diff</source>
+        <translation>Setting</translation>
+    </message>
+    <message>
+        <source>generic.import</source>
+        <translation>There is a problem with the import.</translation>
+    </message>
+    <message>
+        <source>generic.install</source>
+        <translation>The installation did not complete.</translation>
+    </message>
+    <message>
+        <source>generic.job</source>
+        <translation>The job did not complete.</translation>
+    </message>
+    <message>
+        <source>generic.layout</source>
+        <translation>Layout</translation>
+    </message>
+    <message>
+        <source>generic.participant</source>
+        <translation>Part of the desktop did not answer.</translation>
+    </message>
+    <message>
+        <source>generic.preflight</source>
+        <translation>The check found a problem.</translation>
+    </message>
+    <message>
+        <source>generic.recovery</source>
+        <translation>The change interrupted last time has been settled.</translation>
+    </message>
+    <message>
+        <source>generic.trust</source>
+        <translation>Trust information</translation>
+    </message>
+    <message>
+        <source>import.digest_mismatch</source>
+        <translation>The content does not match its checksum; it may have been modified.</translation>
+    </message>
+    <message>
+        <source>import.format_unsupported</source>
+        <translation>This file format or version is not supported.</translation>
+    </message>
+    <message>
+        <source>import.grant_required</source>
+        <translation>File permissions have to be granted separately; importing does not grant them.</translation>
+    </message>
+    <message>
+        <source>import.integrity_mismatch</source>
+        <translation>A required package does not match what is installed.</translation>
+    </message>
+    <message>
+        <source>import.package_missing</source>
+        <translation>The required package “{package}” is missing.</translation>
+    </message>
+    <message>
+        <source>import.private_path_detected</source>
+        <translation>The content includes a private file path and was refused.</translation>
+    </message>
+    <message>
+        <source>import.protocol_incompatible</source>
+        <translation>This composition needs an incompatible version.</translation>
+    </message>
+    <message>
+        <source>import.schema_invalid</source>
+        <translation>The content is not in the right format.</translation>
+    </message>
+    <message>
+        <source>import.secret_detected</source>
+        <translation>The content appears to contain a secret and was refused.</translation>
+    </message>
+    <message>
+        <source>install.failed</source>
+        <translation>The installation failed.</translation>
+    </message>
+    <message>
+        <source>install.integrity_mismatch</source>
+        <translation>The package does not match the expected checksum.</translation>
+    </message>
+    <message>
+        <source>install.invalid_package</source>
+        <translation>This is not a valid package.</translation>
+    </message>
+    <message>
+        <source>install.storage_full</source>
+        <translation>The storage is full; nothing was installed.</translation>
+    </message>
+    <message>
+        <source>job.interrupted</source>
+        <translation>The job was interrupted.</translation>
+    </message>
+    <message>
+        <source>layout.strategy.floating</source>
+        <translation>Floating windows</translation>
+    </message>
+    <message>
+        <source>layout.strategy.simple-tile</source>
+        <translation>Basic tiling</translation>
+    </message>
+    <message>
+        <source>participant.disconnected</source>
+        <translation>The connection dropped mid-way; the result is decided by reading back.</translation>
+    </message>
+    <message>
+        <source>participant.refused</source>
+        <translation>This part refused the change.</translation>
+    </message>
+    <message>
+        <source>participant.timeout</source>
+        <translation>This part did not answer in time.</translation>
+    </message>
+    <message>
+        <source>participant.unavailable</source>
+        <translation>This part is not running right now.</translation>
+    </message>
+    <message>
+        <source>permission_denied.approval_unavailable</source>
+        <translation>This needs approval, and there is no way to approve it right now, so it was not run.</translation>
+    </message>
+    <message>
+        <source>permission_denied.not_granted</source>
+        <translation>This permission has not been granted.</translation>
+    </message>
+    <message>
+        <source>permission_denied.policy_denied</source>
+        <translation>This action is not allowed.</translation>
+    </message>
+    <message>
+        <source>preflight.base_revision_stale</source>
+        <translation>The desktop changed while you were working; review it and try again.</translation>
+    </message>
+    <message>
+        <source>preflight.budget_exceeded</source>
+        <translation>“{package}” asks for more resources than allowed.</translation>
+    </message>
+    <message>
+        <source>preflight.command_conflict</source>
+        <translation>Two components want to own the same command.</translation>
+    </message>
+    <message>
+        <source>preflight.declared_conflict</source>
+        <translation>“{package}” declares it cannot be used together with another plugin.</translation>
+    </message>
+    <message>
+        <source>preflight.dependency_cycle</source>
+        <translation>The plugins depend on each other in a cycle.</translation>
+    </message>
+    <message>
+        <source>preflight.dependency_missing</source>
+        <translation>Something “{package}” needs is missing.</translation>
+    </message>
+    <message>
+        <source>preflight.integrity_mismatch</source>
+        <translation>The content of “{package}” does not match its record.</translation>
+    </message>
+    <message>
+        <source>preflight.package_missing</source>
+        <translation>The package “{package}” is missing.</translation>
+    </message>
+    <message>
+        <source>preflight.permission_required</source>
+        <translation>The permission “{package}” asks for cannot be given.</translation>
+    </message>
+    <message>
+        <source>preflight.precondition_failed</source>
+        <translation>The current state does not allow this change (for example the screen is locked, storage is low, or the source is not trusted).</translation>
+    </message>
+    <message>
+        <source>preflight.protocol_incompatible</source>
+        <translation>“{package}” needs a version incompatible with this Ditto.</translation>
+    </message>
+    <message>
+        <source>preflight.schema_invalid</source>
+        <translation>The change is not valid.</translation>
+    </message>
+    <message>
+        <source>preflight.shortcut_conflict</source>
+        <translation>The shortcut “{chord}” is already in use or reserved by the system.</translation>
+    </message>
+    <message>
+        <source>preflight.single_provider_violation</source>
+        <translation>A place can hold one component only, or this component cannot go there.</translation>
+    </message>
+    <message>
+        <source>preflight.stale_intent</source>
+        <translation>The settings you saw are no longer current; review them again.</translation>
+    </message>
+    <message>
+        <source>preflight.version_conflict</source>
+        <translation>“{package}” needs a version that is incompatible with what is installed.</translation>
+    </message>
+    <message>
+        <source>reason.dependency_not_ready</source>
+        <translation>a service it needs was not ready</translation>
+    </message>
+    <message>
+        <source>reason.host_not_running</source>
+        <translation>plugin services were not running; nothing had to be stopped</translation>
+    </message>
+    <message>
+        <source>reason.next_login</source>
+        <translation>applied at the next login</translation>
+    </message>
+    <message>
+        <source>reason.rescue_mode</source>
+        <translation>applied once back in normal mode</translation>
+    </message>
+    <message>
+        <source>recovery.decided</source>
+        <translation>The change interrupted last time was settled from the actual state.</translation>
+    </message>
+    <message>
+        <source>recovery.head_moved</source>
+        <translation>The composition changed after the interruption; this change cannot be confirmed.</translation>
+    </message>
+    <message>
+        <source>recovery.interrupted</source>
+        <translation>It was interrupted while being applied last time.</translation>
+    </message>
+    <message>
+        <source>recovery.no_base</source>
+        <translation>The version before the change was not found; it cannot be confirmed.</translation>
+    </message>
+    <message>
+        <source>recovery.no_target</source>
+        <translation>The version after the change was not found; it cannot be confirmed.</translation>
+    </message>
+    <message>
+        <source>recovery.participant_remembers</source>
+        <translation>Settled from what each part of the desktop remembers.</translation>
+    </message>
+    <message>
+        <source>recovery.participant_unavailable</source>
+        <translation>Part of the desktop did not answer; whether it took effect cannot be confirmed.</translation>
+    </message>
+    <message>
+        <source>recovery.read_failed</source>
+        <translation>The actual state could not be read; whether it took effect cannot be confirmed.</translation>
+    </message>
+    <message>
+        <source>recovery.state_failed</source>
+        <translation>The state could not be obtained; whether it took effect cannot be confirmed.</translation>
+    </message>
+    <message>
+        <source>recovery.transition_failed</source>
+        <translation>The outcome could not be recorded.</translation>
+    </message>
+    <message>
+        <source>shortcut.command_failed</source>
+        <translation>The shortcut&apos;s command did not run.</translation>
+    </message>
+    <message>
+        <source>slot.layout.strategy</source>
+        <translation>Layout strategy</translation>
+    </message>
+    <message>
+        <source>slot.svc.notification_policy</source>
+        <translation>Notification rules service</translation>
+    </message>
+    <message>
+        <source>slot.svc.tasks</source>
+        <translation>Tasks service</translation>
+    </message>
+    <message>
+        <source>slot.ui.dock</source>
+        <translation>Dock</translation>
+    </message>
+    <message>
+        <source>slot.ui.launcher</source>
+        <translation>Launcher</translation>
+    </message>
+    <message>
+        <source>slot.ui.notifications</source>
+        <translation>Notification area</translation>
+    </message>
+    <message>
+        <source>slot.ui.panel_top</source>
+        <translation>Top panel</translation>
+    </message>
+    <message>
+        <source>slot.ui.tasks_panel</source>
+        <translation>Tasks panel</translation>
+    </message>
+    <message>
+        <source>started.profile</source>
+        <translation>listed in the composition</translation>
+    </message>
+    <message>
+        <source>trust.core_builtin</source>
+        <translation>Built into Core; runs no code of its own.</translation>
+    </message>
+    <message>
+        <source>trust.same_host_no_isolation.cordis</source>
+        <translation>Runs in the same host as the other service plugins, with no isolation between them.</translation>
+    </message>
+    <message>
+        <source>trust.same_host_no_isolation.qml</source>
+        <translation>Runs in the desktop-interface process, with no isolation from the other desktop components.</translation>
+    </message>
+    <message>
+        <source>unavailable.compositor_offline</source>
+        <translation>The window manager is not answering right now</translation>
+    </message>
+    <message>
+        <source>unavailable.host_crash_loop</source>
+        <translation>Plugin services kept failing and are paused</translation>
+    </message>
+    <message>
+        <source>unavailable.host_unavailable</source>
+        <translation>Plugin services are not running</translation>
+    </message>
+    <message>
+        <source>unavailable.lease_expired</source>
+        <translation>The plugin providing this is not answering</translation>
+    </message>
+    <message>
+        <source>unavailable.not_bound</source>
+        <translation>No plugin provides this</translation>
+    </message>
+    <message>
+        <source>unavailable.participant_unavailable</source>
+        <translation>Part of the desktop is not running</translation>
+    </message>
+    <message>
+        <source>unavailable.recovering</source>
+        <translation>The change interrupted last time is being settled</translation>
+    </message>
+    <message>
+        <source>unavailable.rescue_mode</source>
+        <translation>Rescue mode runs no plugin services</translation>
+    </message>
+    <message>
+        <source>unavailable.session_locked</source>
+        <translation>The screen is locked</translation>
+    </message>
+    <message>
+        <source>unavailable.storage_error</source>
+        <translation>The storage refused the write; nothing was changed</translation>
+    </message>
+    <message>
+        <source>unavailable.storage_full</source>
+        <translation>The storage is full; nothing was changed</translation>
+    </message>
+    <message>
+        <source>unavailable.system_unavailable</source>
+        <translation>A system service is not answering</translation>
+    </message>
+</context>
+<context>
+    <name>DockBottom</name>
+    <message>
+        <source>目前沒有執行中的視窗</source>
+        <translation>No windows are open</translation>
+    </message>
+    <message>
+        <source>關閉</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <source>（作用中）</source>
+        <translation> (focused)</translation>
+    </message>
+</context>
+<context>
+    <name>DockPill</name>
+    <message>
+        <source>無法啟動「%1」</source>
+        <translation>Could not start “%1”</translation>
+    </message>
+    <message>
+        <source>釘選沒有變更</source>
+        <translation>The pinned list did not change</translation>
+    </message>
+    <message>
+        <source>（執行中）</source>
+        <translation> (running)</translation>
+    </message>
+    <message>
+        <source>（已釘選）</source>
+        <translation> (pinned)</translation>
+    </message>
+</context>
+<context>
+    <name>HistoryCenter</name>
+    <message>
+        <source>保留</source>
+        <translation>Keep</translation>
+    </message>
+    <message>
+        <source>取消並回復</source>
+        <translation>Cancel and revert</translation>
+    </message>
+    <message>
+        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
+        <translation>Undone. The undo is recorded as a change of its own.</translation>
+    </message>
+    <message>
+        <source>撤銷這次變更</source>
+        <translation>Undo this change</translation>
+    </message>
+    <message>
+        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
+        <translation>Every change to the desktop is recorded here, including the ones that did not apply. Undo goes back one step at a time; newer changes have to be undone first.</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>Change history</translation>
+    </message>
+    <message>
+        <source>載入較早的紀錄</source>
+        <translation>Load older entries</translation>
+    </message>
+    <message>
+        <source>還沒有任何變更。</source>
+        <translation>No changes yet.</translation>
+    </message>
+</context>
+<context>
+    <name>LauncherGrid</name>
+    <message>
+        <source>全部</source>
+        <translation>All</translation>
+    </message>
+    <message>
+        <source>應用程式</source>
+        <translation>Applications</translation>
+    </message>
+    <message>
+        <source>應用程式清單暫不可用</source>
+        <translation>The application list is unavailable right now</translation>
+    </message>
+    <message>
+        <source>方向鍵選擇，Enter 開啟，PageUp／PageDown 換類別，Esc 關閉</source>
+        <translation>Arrow keys to choose, Enter to open, PageUp/PageDown to change category, Esc to close</translation>
+    </message>
+    <message>
+        <source>正在讀取應用程式清單</source>
+        <translation>Reading the application list</translation>
+    </message>
+    <message>
+        <source>沒有找到應用程式</source>
+        <translation>No applications found</translation>
+    </message>
+    <message>
+        <source>無法啟動「%1」</source>
+        <translation>Could not start “%1”</translation>
+    </message>
+</context>
+<context>
+    <name>LauncherSearch</name>
+    <message>
+        <source>搜尋應用程式</source>
+        <translation>Search applications</translation>
+    </message>
+    <message>
+        <source>搜尋暫不可用</source>
+        <translation>Search is unavailable right now</translation>
+    </message>
+    <message>
+        <source>沒有符合的應用程式</source>
+        <translation>No matching applications</translation>
+    </message>
+    <message>
+        <source>無法啟動「%1」</source>
+        <translation>Could not start “%1”</translation>
+    </message>
+    <message>
+        <source>輸入應用程式名稱</source>
+        <translation>Type an application name</translation>
+    </message>
+</context>
+<context>
+    <name>NotificationArea</name>
+    <message>
+        <source>通知規則暫不可用，通知會全部顯示。</source>
+        <translation>Notification rules are unavailable right now; all notifications are shown.</translation>
+    </message>
+    <message>
+        <source>關閉通知</source>
+        <translation>Dismiss notification</translation>
+    </message>
+    <message>
+        <source>（已合併 %1 則）</source>
+        <translation> (%1 merged)</translation>
+    </message>
+</context>
+<context>
+    <name>PanelTop</name>
+    <message>
+        <source>%1 個視窗</source>
+        <translation>%1 window(s)</translation>
+    </message>
+    <message>
+        <source>Ditto 選單</source>
+        <translation>Ditto menu</translation>
+    </message>
+    <message>
+        <source>個人化設定</source>
+        <translation>Personalization</translation>
+    </message>
+    <message>
+        <source>工作區 %1</source>
+        <translation>Workspace %1</translation>
+    </message>
+    <message>
+        <source>插件中心</source>
+        <translation>Plugin center</translation>
+    </message>
+    <message>
+        <source>暫停</source>
+        <translation>Suspend</translation>
+    </message>
+    <message>
+        <source>沒有作用中的視窗</source>
+        <translation>No focused window</translation>
+    </message>
+    <message>
+        <source>登出</source>
+        <translation>Log out</translation>
+    </message>
+    <message>
+        <source>組合中心</source>
+        <translation>Composition center</translation>
+    </message>
+    <message>
+        <source>網路已連線</source>
+        <translation>Network connected</translation>
+    </message>
+    <message>
+        <source>網路未連線</source>
+        <translation>Network disconnected</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>Change history</translation>
+    </message>
+    <message>
+        <source>鎖定畫面</source>
+        <translation>Lock screen</translation>
+    </message>
+    <message>
+        <source>開啟啟動器</source>
+        <translation>Open the launcher</translation>
+    </message>
+    <message>
+        <source>關機</source>
+        <translation>Power off</translation>
+    </message>
+    <message>
+        <source>音量 %1%</source>
+        <translation>Volume %1%</translation>
+    </message>
+    <message>
+        <source>音量 靜音</source>
+        <translation>Volume muted</translation>
+    </message>
+    <message>
+        <source>音量不可用</source>
+        <translation>Volume unavailable</translation>
+    </message>
+    <message>
+        <source>（目前）</source>
+        <translation> (current)</translation>
+    </message>
+</context>
+<context>
+    <name>PersonalizationCenter</name>
+    <message>
+        <source>低效能樣式（關閉模糊與陰影）</source>
+        <translation>Low-power style (no blur, no shadows)</translation>
+    </message>
+    <message>
+        <source>例如 Super+Space</source>
+        <translation>e.g. Super+Space</translation>
+    </message>
+    <message>
+        <source>個人化設定</source>
+        <translation>Personalization</translation>
+    </message>
+    <message>
+        <source>加入</source>
+        <translation>Add</translation>
+    </message>
+    <message>
+        <source>動畫</source>
+        <translation>Motion</translation>
+    </message>
+    <message>
+        <source>圓角</source>
+        <translation>Corners</translation>
+    </message>
+    <message>
+        <source>外觀</source>
+        <translation>Appearance</translation>
+    </message>
+    <message>
+        <source>大</source>
+        <translation>Large</translation>
+    </message>
+    <message>
+        <source>大小</source>
+        <translation>Size</translation>
+    </message>
+    <message>
+        <source>小</source>
+        <translation>Small</translation>
+    </message>
+    <message>
+        <source>已生效</source>
+        <translation>In effect</translation>
+    </message>
+    <message>
+        <source>強調色</source>
+        <translation>Accent colour</translation>
+    </message>
+    <message>
+        <source>強調色 %1</source>
+        <translation>Accent colour %1</translation>
+    </message>
+    <message>
+        <source>快捷鍵</source>
+        <translation>Shortcuts</translation>
+    </message>
+    <message>
+        <source>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</source>
+        <translation>Ditto binds shortcuts in the window manager. A key combination can have one use only; a conflict is stopped and explained before anything is applied.</translation>
+    </message>
+    <message>
+        <source>文字大小</source>
+        <translation>Text size</translation>
+    </message>
+    <message>
+        <source>最大</source>
+        <translation>Largest</translation>
+    </message>
+    <message>
+        <source>未生效</source>
+        <translation>Not in effect</translation>
+    </message>
+    <message>
+        <source>標準</source>
+        <translation>Standard</translation>
+    </message>
+    <message>
+        <source>正在套用…</source>
+        <translation>Applying…</translation>
+    </message>
+    <message>
+        <source>減少動畫</source>
+        <translation>Reduce motion</translation>
+    </message>
+    <message>
+        <source>無障礙</source>
+        <translation>Accessibility</translation>
+    </message>
+    <message>
+        <source>移除</source>
+        <translation>Remove</translation>
+    </message>
+    <message>
+        <source>系統保留</source>
+        <translation>Reserved by the system</translation>
+    </message>
+    <message>
+        <source>系統已設定減少動畫，這裡關閉也不會恢復動畫。系統設定在桌面啟動時讀取。</source>
+        <translation>The system asks for reduced motion, so turning it off here does not bring motion back. The system setting is read when the desktop starts.</translation>
+    </message>
+    <message>
+        <source>系統的減少動畫設定在桌面啟動時讀取，兩者任一開啟都會減少動畫。</source>
+        <translation>The system&apos;s reduced-motion setting is read when the desktop starts; either one turned on reduces motion.</translation>
+    </message>
+    <message>
+        <source>繁體中文</source>
+        <translation>繁體中文</translation>
+    </message>
+    <message>
+        <source>衝突</source>
+        <translation>Conflict</translation>
+    </message>
+    <message>
+        <source>角色</source>
+        <translation>Character</translation>
+    </message>
+    <message>
+        <source>角色動畫</source>
+        <translation>Character animation</translation>
+    </message>
+    <message>
+        <source>角色大小</source>
+        <translation>Character size</translation>
+    </message>
+    <message>
+        <source>角色目前固定在畫面右下角；組合中還沒有位置設定。被視窗蓋住時可以用喚回快捷鍵叫出來。</source>
+        <translation>The character stays in the bottom-right corner for now; compositions have no position setting yet. When a window covers it, the recall shortcut brings it back.</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>語言</source>
+        <translation>Language</translation>
+    </message>
+    <message>
+        <source>較大</source>
+        <translation>Larger</translation>
+    </message>
+    <message>
+        <source>鍵盤焦點一律以外框標示，所有操作都可以只用 Tab、Enter、空白鍵與方向鍵完成。每個按鈕與欄位都有螢幕閱讀器可以讀出的名稱；狀態同時以文字表示，不只靠顏色或動畫。</source>
+        <translation>Keyboard focus is always drawn as an outline, and everything can be done with Tab, Enter, Space and the arrow keys. Every button and field has a name a screen reader can read; states are also written as text, never shown by colour or motion alone.</translation>
+    </message>
+    <message>
+        <source>開</source>
+        <translation>On</translation>
+    </message>
+    <message>
+        <source>關</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>關閉「降低透明度」後會出現倒數，按「保留」才會留下，避免看不清楚時無法改回。</source>
+        <translation>Turning “Reduce transparency” off starts a countdown; press “Keep” to keep it, so an unreadable screen reverts by itself.</translation>
+    </message>
+    <message>
+        <source>降低透明度</source>
+        <translation>Reduce transparency</translation>
+    </message>
+    <message>
+        <source>顯示 Ditto 角色</source>
+        <translation>Show the Ditto character</translation>
+    </message>
+</context>
+<context>
+    <name>PluginCenter</name>
+    <message>
+        <source>%1：%2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>.dittopkg 檔案的完整路徑</source>
+        <translation>Full path of the .dittopkg file</translation>
+    </message>
+    <message>
+        <source>Core 內建</source>
+        <translation>Built into Core</translation>
+    </message>
+    <message>
+        <source>G1 只接受內建來源的可信套件。安裝只放進套件庫，不會改變目前的組合。</source>
+        <translation>G1 accepts only trusted built-in packages. Installing only adds a package to the store; the composition in use does not change.</translation>
+    </message>
+    <message>
+        <source>「%1」%2</source>
+        <translation>“%1” %2</translation>
+    </message>
+    <message>
+        <source>不受信任</source>
+        <translation>Untrusted</translation>
+    </message>
+    <message>
+        <source>位置：%1</source>
+        <translation>Place: %1</translation>
+    </message>
+    <message>
+        <source>作者</source>
+        <translation>Author</translation>
+    </message>
+    <message>
+        <source>來源</source>
+        <translation>Source</translation>
+    </message>
+    <message>
+        <source>信任等級</source>
+        <translation>Trust level</translation>
+    </message>
+    <message>
+        <source>停用</source>
+        <translation>Disable</translation>
+    </message>
+    <message>
+        <source>內建</source>
+        <translation>Built-in</translation>
+    </message>
+    <message>
+        <source>協定 %1</source>
+        <translation>Protocol %1</translation>
+    </message>
+    <message>
+        <source>可信</source>
+        <translation>Trusted</translation>
+    </message>
+    <message>
+        <source>可信的桌面元件在同一個桌面介面程序內執行，彼此沒有隔離；服務類插件共用一個插件服務宿主。</source>
+        <translation>Trusted desktop components run in the one desktop-interface process with no isolation between them; service plugins share one plugin-service host.</translation>
+    </message>
+    <message>
+        <source>可填的位置</source>
+        <translation>Can fill</translation>
+    </message>
+    <message>
+        <source>啟動原因：%1</source>
+        <translation>Started because: %1</translation>
+    </message>
+    <message>
+        <source>啟用</source>
+        <translation>Enable</translation>
+    </message>
+    <message>
+        <source>在 Core 內執行</source>
+        <translation>Runs inside Core</translation>
+    </message>
+    <message>
+        <source>在桌面介面程序內執行（同宿主、無隔離），無法單獨計量</source>
+        <translation>Runs in the desktop-interface process (same host, no isolation); cannot be measured on its own</translation>
+    </message>
+    <message>
+        <source>執行中</source>
+        <translation>Running</translation>
+    </message>
+    <message>
+        <source>失敗：%1</source>
+        <translation>Failed: %1</translation>
+    </message>
+    <message>
+        <source>套件仍被某個組合使用，沒有移除</source>
+        <translation>A composition still uses the package; it was not removed</translation>
+    </message>
+    <message>
+        <source>安裝</source>
+        <translation>Install</translation>
+    </message>
+    <message>
+        <source>安裝工作：%1</source>
+        <translation>Install job: %1</translation>
+    </message>
+    <message>
+        <source>安裝插件</source>
+        <translation>Install a plugin</translation>
+    </message>
+    <message>
+        <source>完成</source>
+        <translation>Done</translation>
+    </message>
+    <message>
+        <source>宿主</source>
+        <translation>Host</translation>
+    </message>
+    <message>
+        <source>宿主程序 %1 MiB</source>
+        <translation>host process %1 MiB</translation>
+    </message>
+    <message>
+        <source>宿主程序未回報</source>
+        <translation>host process not reported</translation>
+    </message>
+    <message>
+        <source>尚未取得宿主狀態</source>
+        <translation>The host&apos;s state is not known yet</translation>
+    </message>
+    <message>
+        <source>尚未回報狀態</source>
+        <translation>No state reported yet</translation>
+    </message>
+    <message>
+        <source>已停用</source>
+        <translation>Disabled</translation>
+    </message>
+    <message>
+        <source>已取消</source>
+        <translation>Cancelled</translation>
+    </message>
+    <message>
+        <source>已安裝的插件</source>
+        <translation>Installed plugins</translation>
+    </message>
+    <message>
+        <source>已安裝，未啟用</source>
+        <translation>Installed, not enabled</translation>
+    </message>
+    <message>
+        <source>已授予</source>
+        <translation>Granted</translation>
+    </message>
+    <message>
+        <source>已授予：%1 %2</source>
+        <translation>Granted: %1 %2</translation>
+    </message>
+    <message>
+        <source>已撤銷授權</source>
+        <translation>Grant revoked</translation>
+    </message>
+    <message>
+        <source>已移除套件</source>
+        <translation>Package removed</translation>
+    </message>
+    <message>
+        <source>已自動停用：一再失敗（%1）</source>
+        <translation>Disabled automatically: kept failing (%1)</translation>
+    </message>
+    <message>
+        <source>已開始安裝。安裝完成後要另外啟用。</source>
+        <translation>Installation started. Enable the plugin separately once it is installed.</translation>
+    </message>
+    <message>
+        <source>授予</source>
+        <translation>Grant</translation>
+    </message>
+    <message>
+        <source>授權</source>
+        <translation>License</translation>
+    </message>
+    <message>
+        <source>插件中心</source>
+        <translation>Plugin center</translation>
+    </message>
+    <message>
+        <source>插件服務宿主</source>
+        <translation>Plugin-service host</translation>
+    </message>
+    <message>
+        <source>撤銷這項授權</source>
+        <translation>Revoke this grant</translation>
+    </message>
+    <message>
+        <source>暫不可用：%1</source>
+        <translation>Unavailable right now: %1</translation>
+    </message>
+    <message>
+        <source>未放在任何位置</source>
+        <translation>Not placed anywhere</translation>
+    </message>
+    <message>
+        <source>桌面介面程序（Shell）</source>
+        <translation>Desktop-interface process (Shell)</translation>
+    </message>
+    <message>
+        <source>桌面元件在組合中心選擇要放的位置後啟用。</source>
+        <translation>A desktop component is enabled by choosing its place in the composition center.</translation>
+    </message>
+    <message>
+        <source>檔案路徑（檔案權限才需要）</source>
+        <translation>File path (file permissions only)</translation>
+    </message>
+    <message>
+        <source>檢查</source>
+        <translation>Check</translation>
+    </message>
+    <message>
+        <source>權限範圍</source>
+        <translation>Permission scope</translation>
+    </message>
+    <message>
+        <source>正在啟動</source>
+        <translation>Starting</translation>
+    </message>
+    <message>
+        <source>正在套用…</source>
+        <translation>Applying…</translation>
+    </message>
+    <message>
+        <source>沒有啟動成功</source>
+        <translation>Did not start</translation>
+    </message>
+    <message>
+        <source>無法讀取這個套件</source>
+        <translation>This package cannot be read</translation>
+    </message>
+    <message>
+        <source>版本</source>
+        <translation>Version</translation>
+    </message>
+    <message>
+        <source>狀態：%1；過去 10 分鐘重啟 %2 次；%3</source>
+        <translation>State: %1; restarted %2 time(s) in the last 10 minutes; %3</translation>
+    </message>
+    <message>
+        <source>相容性</source>
+        <translation>Compatibility</translation>
+    </message>
+    <message>
+        <source>社群</source>
+        <translation>Community</translation>
+    </message>
+    <message>
+        <source>移除套件</source>
+        <translation>Remove package</translation>
+    </message>
+    <message>
+        <source>等待「%1」服務</source>
+        <translation>Waiting for the “%1” service</translation>
+    </message>
+    <message>
+        <source>與 %1 個插件共用宿主，無法單獨計量；%2</source>
+        <translation>Shares its host with %1 plugin(s) and cannot be measured on its own; %2</translation>
+    </message>
+    <message>
+        <source>記憶體 %1 MiB（整個宿主程序）</source>
+        <translation>Memory %1 MiB (the whole host process)</translation>
+    </message>
+    <message>
+        <source>記憶體未回報</source>
+        <translation>Memory not reported</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>請求的權限：%1</source>
+        <translation>Requested permissions: %1</translation>
+    </message>
+    <message>
+        <source>這個服務連續失敗，已被自動停用，桌面其他部分不受影響。可以查看診斷後重新啟用。</source>
+        <translation>This service failed repeatedly and was disabled automatically; the rest of the desktop is not affected. Check the diagnostics, then enable it again.</translation>
+    </message>
+    <message>
+        <source>這個版本已經安裝。</source>
+        <translation>This version is already installed.</translation>
+    </message>
+    <message>
+        <source>進行中</source>
+        <translation>In progress</translation>
+    </message>
+    <message>
+        <source>重新啟用</source>
+        <translation>Enable again</translation>
+    </message>
+    <message>
+        <source>（已撤銷）</source>
+        <translation> (revoked)</translation>
+    </message>
+</context>
+<context>
+    <name>PreviewBar</name>
+    <message>
+        <source>%1 秒後自動回復</source>
+        <translation>Reverts automatically in %1 s</translation>
+    </message>
+    <message>
+        <source>保留</source>
+        <translation>Keep</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>時間已到，正在等待自動回復</source>
+        <translation>Time is up; waiting for the automatic revert</translation>
+    </message>
+    <message>
+        <source>正在保留…</source>
+        <translation>Keeping…</translation>
+    </message>
+    <message>
+        <source>正在回復…</source>
+        <translation>Reverting…</translation>
+    </message>
+    <message>
+        <source>要保留這項變更嗎？</source>
+        <translation>Keep this change?</translation>
+    </message>
+</context>
+<context>
+    <name>TasksPanel</name>
+    <message>
+        <source>待辦 %1 項</source>
+        <translation>%1 task(s)</translation>
+    </message>
+    <message>
+        <source>待辦服務暫不可用</source>
+        <translation>The tasks service is unavailable right now</translation>
+    </message>
+    <message>
+        <source>待辦服務沒有回應，已知的待辦沒有被刪除。服務恢復後會自動重新顯示。</source>
+        <translation>The tasks service is not answering. No task has been deleted; they come back when the service does.</translation>
+    </message>
+    <message>
+        <source>待辦讀取中</source>
+        <translation>Reading tasks</translation>
+    </message>
+    <message>
+        <source>救援模式不執行插件服務，待辦會在一般模式恢復。</source>
+        <translation>Rescue mode runs no plugin services; tasks come back in normal mode.</translation>
+    </message>
+    <message>
+        <source>新增待辦</source>
+        <translation>Add a task</translation>
+    </message>
+    <message>
+        <source>新增待辦，按 Enter</source>
+        <translation>Add a task, press Enter</translation>
+    </message>
+    <message>
+        <source>示範資料</source>
+        <translation>Demo data</translation>
+    </message>
+</context>
+<context>
+    <name>Tr</name>
+    <message>
+        <source>（未翻譯的項目）</source>
+        <translation>(untranslated item)</translation>
+    </message>
+    <message>
+        <source>（無）</source>
+        <translation>(none)</translation>
+    </message>
+</context>
+<context>
+    <name>shell</name>
+    <message>
+        <source>Ditto 救援模式</source>
+        <translation>Ditto rescue mode</translation>
+    </message>
+    <message>
+        <source>修復</source>
+        <translation>Repair</translation>
+    </message>
+    <message>
+        <source>停用「%1」</source>
+        <translation>Disable “%1”</translation>
+    </message>
+    <message>
+        <source>停用最近變更的插件</source>
+        <translation>Disable the recently changed plugins</translation>
+    </message>
+    <message>
+        <source>和最近可用的組合相比，沒有新加入或變更的插件。</source>
+        <translation>Compared with the last composition known to work, no plugin was added or changed.</translation>
+    </message>
+    <message>
+        <source>密碼</source>
+        <translation>Password</translation>
+    </message>
+    <message>
+        <source>密碼不正確，請再試一次</source>
+        <translation>Wrong password, please try again</translation>
+    </message>
+    <message>
+        <source>已停用。可以回到一般模式再重新啟用。</source>
+        <translation>Disabled. It can be enabled again in normal mode.</translation>
+    </message>
+    <message>
+        <source>已恢復最近可用的組合。</source>
+        <translation>The last composition known to work is restored.</translation>
+    </message>
+    <message>
+        <source>已解鎖</source>
+        <translation>Unlocked</translation>
+    </message>
+    <message>
+        <source>已鎖定</source>
+        <translation>Locked</translation>
+    </message>
+    <message>
+        <source>恢復最近可用組合</source>
+        <translation>Restore the last composition known to work</translation>
+    </message>
+    <message>
+        <source>桌面介面沒有回應，已被停止。你的應用程式仍在執行，未儲存的內容沒有被關閉。</source>
+        <translation>The desktop interface stopped responding and was stopped. Your applications are still running; nothing unsaved was closed.</translation>
+    </message>
+    <message>
+        <source>桌面服務一再失敗。你的應用程式仍在執行，未儲存的內容沒有被關閉。</source>
+        <translation>The desktop service kept failing. Your applications are still running; nothing unsaved was closed.</translation>
+    </message>
+    <message>
+        <source>桌面沒有正常啟動。你的應用程式仍在執行，未儲存的內容沒有被關閉。</source>
+        <translation>The desktop did not start normally. Your applications are still running; nothing unsaved was closed.</translation>
+    </message>
+    <message>
+        <source>正在停用…</source>
+        <translation>Disabling…</translation>
+    </message>
+    <message>
+        <source>正在恢復…</source>
+        <translation>Restoring…</translation>
+    </message>
+    <message>
+        <source>正在確認密碼…</source>
+        <translation>Checking the password…</translation>
+    </message>
+    <message>
+        <source>沒有停用成功，原本的組合沒有改變。</source>
+        <translation>Not disabled; the composition is unchanged.</translation>
+    </message>
+    <message>
+        <source>沒有恢復成功，目前的組合沒有改變。</source>
+        <translation>Not restored; the composition in use is unchanged.</translation>
+    </message>
+    <message>
+        <source>沒有開啟中的視窗</source>
+        <translation>No open windows</translation>
+    </message>
+    <message>
+        <source>無法確認密碼（系統驗證服務沒有回應），請再試一次</source>
+        <translation>The password could not be checked (the system authentication service did not answer); please try again</translation>
+    </message>
+    <message>
+        <source>聚焦</source>
+        <translation>Focus</translation>
+    </message>
+    <message>
+        <source>要求關閉</source>
+        <translation>Ask to close</translation>
+    </message>
+    <message>
+        <source>要求關閉「%1」</source>
+        <translation>Ask “%1” to close</translation>
+    </message>
+    <message>
+        <source>輸入密碼後按 Enter 解鎖</source>
+        <translation>Type your password and press Enter to unlock</translation>
+    </message>
+    <message>
+        <source>連不上桌面服務。可以改用文字救援工具。</source>
+        <translation>The desktop service cannot be reached. The text rescue tool still works.</translation>
+    </message>
+    <message>
+        <source>還沒有最近可用的組合可以比較。</source>
+        <translation>There is no composition known to work to compare with yet.</translation>
+    </message>
+    <message>
+        <source>開啟中的視窗</source>
+        <translation>Open windows</translation>
+    </message>
+    <message>
+        <source>開啟文字救援工具</source>
+        <translation>Open the text rescue tool</translation>
+    </message>
+    <message>
+        <source>隱藏診斷</source>
+        <translation>Hide diagnostics</translation>
+    </message>
+    <message>
+        <source>顯示診斷</source>
+        <translation>Show diagnostics</translation>
+    </message>
+</context>
+</TS>

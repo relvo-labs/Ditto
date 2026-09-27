@@ -1,0 +1,33 @@
+name: shell-i18n
+# EX1-13 ④: no Ditto-owned CJK string outside qsTr(), every qsTr() source and
+# every Core translation key translated in both catalogues, and the runtime
+# catalogues (JSON, .qm) regenerated from the .ts files. qmllint then checks
+# that every Shell QML file parses (warnings are reported, not fatal: Quickshell
+# ships no qmllint type information for its grouped properties).
+on:
+  push:
+    branches: [main]
+    paths: ['shell/**', 'scripts/lint-shell-i18n.mjs', 'crates/ditto-protocol/src/change.rs', '.github/workflows/shell-i18n.yml']
+  pull_request:
+    paths: ['shell/**', 'scripts/lint-shell-i18n.mjs', 'crates/ditto-protocol/src/change.rs', '.github/workflows/shell-i18n.yml']
+jobs:
+  lint:
+    runs-on: [self-hosted, ditto-ci]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: i18n lint
+        run: node scripts/lint-shell-i18n.mjs
+      - name: qmllint (syntax)
+        run: |
+          qt="${QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
+          if [ ! -x "$qt/bin/qmllint" ]; then
+            echo "::notice::qmllint not found under $qt; QML syntax not checked on this runner"
+            exit 0
+          fi
+          # The broken-syntax fixture is broken on purpose (plan/03/04 §11 #2).
+          find shell -name '*.qml' -not -path '*/tests/fixtures/dock_broken_syntax/*' -not -path 'shell/lock/core/*' \
+            -not -path 'shell/rescue/*/*' -print0 |
+            xargs -0 "$qt/bin/qmllint" -I "$qt/qml" --max-warnings -1
