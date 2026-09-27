@@ -256,7 +256,7 @@
 | EX-06 契約與目錄一致性 | 檢查已在 PR 快檢執行 | 出口評審逐項核對 CI 紀錄 |
 | EX-07 身分無法自述 | **參考機證據通過，待版本封存** | 正例獲服務，三項負例全部明確拒絕；目前來源樹尚未 commit |
 | EX-08 中文輸入 | 未通過 | 開發 VM 的登入工作階段中，核心鍵盤在 QML／foot／Kate 都提交 `你好`，剪貼簿一致（[報告 §5](../../docs/platform/input-method-report.md)），`stipc` 失敗已確定是注入器限制。仍缺參考機實體鍵盤的最終 JSON 與錄影 |
-| EX-09 真機 runner 與 nightly | runner 已在線，門檻未達成 | 依 [D-36](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md)：VM 三輪已通過，待同一 commit 的 3 次參考機執行 |
+| EX-09 真機 runner 與 nightly | runner 已在線，門檻未達成 | 依 [D-36](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md) 判準成立：`7333c20` 的 VM 三輪與參考機三次（36303881879／36303886123／36303890347）全數成功，待出口評審確認 |
 
 ### 7.3 期間的其他紀錄
 
