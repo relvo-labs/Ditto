@@ -228,7 +228,7 @@
 | G0-PLAT-02 工具鏈凍結 | **完成** | D-03 已核定 Rust 1.98.1、Node 22.23.2、pnpm 10.11.0、Qt 6.10.2、Quickshell 0.3.1、Wayfire 0.11.0；鎖定檔、上游 revision 與 preflight 齊備，本機 release build 通過 |
 | G0-PLAT-03 合成器盤點與 D-02 | **進行中** | 探針已是合成器中立的兩層實作，並對兩個合成器實跑。Wayfire 0.11.0（參考機、GPU）：51 個 global，C-01／02／03／07／09／10／11／12／13／14 的 G0 功能範圍已成立；C-05 走 3×3 固定格線 IPC，C-06 部分支援（scale 改讀啟動設定）。C-09 使用指標 serial 與 activation token，C-10 實際收到 `locked` 後解鎖，C-13 用 xterm 重跑 C-02／03。Sway 1.12 已遺棄並只保留對照。見[能力差異表](../../docs/platform/compositor-capability-matrix.md)與 `artifacts/g0/compositor-probe-*-2026-09-22T15:36:44Z-6dfa.json`。**D-02 已選 Wayfire；只剩阻斷列 C-08 尚未得到中文提交結論，因此 EX-02 仍未通過** |
 | G0-PLAT-04 輸入法鏈路 | **功能完成，證據待封存** | 已由 v2 relay 切換為 Wayfire 的 v1 bridge；自動與實體 QML 均提交 `你好`，候選窗截圖位置正確，操作員確認 foot／Kate 拼音與複製貼上可用。驗收視窗在最終 JSON 寫入前關閉，且尚缺錄影位置，因此 EX-08 不能標為正式通過；見[輸入法報告](../../docs/platform/input-method-report.md) |
-| G0-PLAT-05 真機 runner | **進行中** | D-19 已完成：runner 2.337.0 以 user systemd service 在線，標籤為 `ditto-refmachine`／`ditto-ci`，service cgroup 不會阻擋 Firefox snap；workflow 已改為 Wayfire／凍結工具鏈並先跑 preflight。EX-09 仍需要更新後 workflow 進版、成功執行並累積連續三晚 |
+| G0-PLAT-05 真機 runner | **進行中** | D-19 已完成：runner 2.337.0 以 user systemd service 在線，標籤為 `ditto-refmachine`／`ditto-ci`，service cgroup 不會阻擋 Firefox snap；workflow 已改為 Wayfire／凍結工具鏈並先跑 preflight。2026-09-26 第一晚測試全綠、上傳失敗，已修正；EX-09 依 D-36 改為同一 commit 的 3 次獨立執行，VM 三輪已通過 |
 | G0-CORE-01 倉庫骨架與 CI | **開發環境已完成** | `ditto-protocol`／`ditto-compositor`／`ditto-core`／`dittoctl`／`ditto-measure` 五個 crate、pnpm workspace、六條工作流齊備。nightly 與 weekly 待 runner |
 | G0-CORE-02 契約管線與能力目錄 | **開發環境已完成** | 13 項能力的描述子由 Rust 產生 `schema/*.json` 與 TS 型別；目錄一致性 gate（handler、consumer、readback、`claimable`）與 schema 新鮮度在 PR 快檢執行。EX-06 的五項判準逐項有對應檢查，出口評審時核對 CI 紀錄 |
 | G0-CORE-03 最小 IPC | **開發環境已完成** | 換行分幀、`params._meta` 信封、握手與版本拒絕、11 個封閉錯誤、事件快照與 `seq`、佇列上限與 `resync_required`、重連補事件、`$/cancel`（不可取消者明確回報未取消）、逾時與 `outcome: "unknown"`；Rust 21 項與 TS 9 項測試涵蓋跨語言編解碼、錯版拒絕、重訂閱與溢位 |
@@ -255,8 +255,8 @@
 | EX-05 PSS 預算與配額 | 配額部分完成；PSS 未通過 | D-06b 已核定且參考機控制器成立；D-06a 還缺三次真正 cold-login 的 300 秒暖機／600 秒採樣與角色關閉、減少動畫兩組 |
 | EX-06 契約與目錄一致性 | 檢查已在 PR 快檢執行 | 出口評審逐項核對 CI 紀錄 |
 | EX-07 身分無法自述 | **參考機證據通過，待版本封存** | 正例獲服務，三項負例全部明確拒絕；目前來源樹尚未 commit |
-| EX-08 中文輸入 | 未通過 | 自動診斷讀回原始 `nihao `，未觀察到中文提交；須先用實體鍵盤區分 `stipc` 限制與 Wayfire/Fcitx relay 缺陷，再完成三處輸入、候選位置、退格與剪貼簿驗證 |
-| EX-09 真機 runner 與 nightly | runner 已在線，門檻未達成 | workflow 變更尚未進版；進版後仍須累積連續三晚綠燈 |
+| EX-08 中文輸入 | 未通過 | 開發 VM 的登入工作階段中，核心鍵盤在 QML／foot／Kate 都提交 `你好`，剪貼簿一致（[報告 §5](../../docs/platform/input-method-report.md)），`stipc` 失敗已確定是注入器限制。仍缺參考機實體鍵盤的最終 JSON 與錄影 |
+| EX-09 真機 runner 與 nightly | runner 已在線，門檻未達成 | 依 [D-36](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md)：VM 三輪已通過，待同一 commit 的 3 次參考機執行 |
 
 ### 7.3 期間的其他紀錄
 
