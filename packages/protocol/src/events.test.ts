@@ -9,9 +9,22 @@ const window = {
   x: 10, y: 20, width: 800, height: 600, focused: true, state: 'normal' as const,
 };
 
-function event(seq: number, payload: DesktopEventNotification['payload']): DesktopEventNotification {
-  return { subscription_id: 'sub-1', seq, revision: seq, payload };
+function event(seq: number, payload: DesktopEventNotification['payload'], prev = seq - 1): DesktopEventNotification {
+  return { subscription_id: 'sub-1', seq, prev_seq: prev, profile_revision: null, payload };
 }
+
+test('gaps in seq from other topics are fine; a broken prev_seq chain is not', () => {
+  const projection = new DesktopProjection('sub-1', empty, 4);
+  // seq 5 and 6 went to other topics; this subscription's chain says so.
+  projection.apply(event(7, { type: 'window_upsert', window: { ...windowFixture } }, 4));
+  expect(projection.seq).toBe(7);
+  expect(() => projection.apply(event(9, { type: 'window_removed', window_id: windowFixture.id }, 8))).toThrow(ResyncRequired);
+});
+
+const windowFixture = {
+  id: 'session-1/window-9', title: 'Terminal', app_id: 'foot', workspace_id: '1',
+  x: 0, y: 0, width: 400, height: 300, focused: false, state: 'normal' as const,
+};
 
 test('applies ordered compositor events to a snapshot', () => {
   const projection = new DesktopProjection('sub-1', empty, 0);

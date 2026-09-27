@@ -1,0 +1,258 @@
+{
+  "$defs": {
+    "Appearance": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "type": "string"
+        },
+        "low_power_style": {
+          "default": false,
+          "description": "No blur and no shadow; NFR-05 measures it as its own style.",
+          "type": "boolean"
+        },
+        "reduced_motion": {
+          "default": false,
+          "type": "boolean"
+        },
+        "reduced_transparency": {
+          "default": false,
+          "type": "boolean"
+        },
+        "theme": {
+          "type": "string"
+        },
+        "tokens": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "theme",
+        "locale"
+      ],
+      "type": "object"
+    },
+    "AvatarSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "animations": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "default": false,
+          "type": "boolean"
+        },
+        "scale": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "enabled",
+        "scale"
+      ],
+      "type": "object"
+    },
+    "EntryMode": {
+      "enum": [
+        "candidate",
+        "active"
+      ],
+      "type": "string"
+    },
+    "FiberState": {
+      "enum": [
+        "pending",
+        "loading",
+        "active",
+        "unloading",
+        "disposed",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "HostEntryObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": {
+          "type": "string"
+        },
+        "failure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fiber_state": {
+          "$ref": "#/$defs/FiberState"
+        },
+        "mode": {
+          "$ref": "#/$defs/EntryMode"
+        },
+        "waiting_for": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "entry_id",
+        "fiber_state",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "PanelMount": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": {
+          "type": "string"
+        },
+        "mounted": {
+          "type": "boolean"
+        },
+        "slot": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "slot",
+        "entry_id",
+        "mounted",
+        "visible"
+      ],
+      "type": "object"
+    },
+    "ShortcutBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "chord": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "chord",
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "appearance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Appearance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "avatar": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AvatarSettings"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mounts": {
+          "items": {
+            "$ref": "#/$defs/PanelMount"
+          },
+          "type": "array"
+        },
+        "role": {
+          "const": "shell",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "mounts"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/HostEntryObservation"
+          },
+          "type": "array"
+        },
+        "role": {
+          "const": "hostd",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "entries"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "const": "compositor",
+          "type": "string"
+        },
+        "shortcuts": {
+          "items": {
+            "$ref": "#/$defs/ShortcutBinding"
+          },
+          "type": "array"
+        },
+        "strategy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace_grid": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "role",
+        "shortcuts"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Observation"
+}

@@ -1,0 +1,2 @@
+{"kind": "shape", "description": "封閉錯誤集合外的名稱被拒", "type": "rpc-response", "valid": false,
+ "value": {"jsonrpc": "2.0", "id": "x", "error": {"code": -32050, "name": "totally_new_error", "message": "m"}}}

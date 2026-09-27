@@ -1,0 +1,5 @@
+{"kind": "scenario", "description": "params 自述身分被拒；非 hostd 連線帶 on_behalf_of 被拒", "client": {"kind": "dittoctl"},
+ "steps": [
+  {"send": {"method": "desktop.windows.list", "params": {"plugin_id": "privileged"}}, "expect": {"error_name": "identity_rejected"}},
+  {"send": {"method": "desktop.windows.list", "params": {}, "on_behalf_of": "ent-01M3H4J7EEWXXD01TR98PCQE7A"}, "expect": {"error_name": "identity_rejected"}}
+ ]}

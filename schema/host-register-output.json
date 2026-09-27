@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "generation": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "lease_id": {
+      "type": "string"
+    },
+    "ttl_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "lease_id",
+    "ttl_ms",
+    "generation"
+  ],
+  "title": "RegisterOutput",
+  "type": "object"
+}

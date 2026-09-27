@@ -1,15 +1,24 @@
 [package]
 name = "ditto-core"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
+
+[features]
+# Test-only fault points (G1-QA-04). A release build never enables this; CI
+# checks the release binaries contain no fault-point strings.
+fault-injection = ["ditto-store/fault-injection"]
 
 [dependencies]
 ditto-protocol = { path = "../ditto-protocol" }
 ditto-compositor = { path = "../ditto-compositor" }
+ditto-store = { path = "../ditto-store" }
+ditto-system = { path = "../ditto-system" }
 serde.workspace = true
 serde_json.workspace = true
 libc = "0.2"
+rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
+semver = "1"
 
 [dev-dependencies]
 dittoctl = { path = "../dittoctl" }

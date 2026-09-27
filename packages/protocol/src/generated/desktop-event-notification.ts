@@ -35,19 +35,156 @@ export type DesktopEventPayload =
       reason: string;
       type: 'resync_required';
       [k: string]: unknown;
+    }
+  | {
+      active: boolean;
+      head_revision: string;
+      profile_id: string;
+      type: 'profile_changed';
+      [k: string]: unknown;
+    }
+  | {
+      change: ChangeSummary;
+      type: 'change_updated';
+      [k: string]: unknown;
+    }
+  | {
+      reason: string;
+      type: 'capabilities_changed';
+      [k: string]: unknown;
+    }
+  | {
+      panels: PanelStatus[];
+      type: 'panels_changed';
+      [k: string]: unknown;
+    }
+  | {
+      job: Job;
+      type: 'jobs_updated';
+      [k: string]: unknown;
+    }
+  | {
+      notification: NotificationItem;
+      type: 'notification_posted';
+      [k: string]: unknown;
+    }
+  | {
+      id: number;
+      reason: string;
+      type: 'notification_closed';
+      [k: string]: unknown;
+    }
+  | {
+      entry_id: string;
+      name: string;
+      payload: unknown;
+      type: 'host_event';
+      [k: string]: unknown;
+    }
+  | {
+      state: SessionState;
+      type: 'session_changed';
+      [k: string]: unknown;
     };
 /**
  * An opaque identifier valid only for the current compositor session.
  */
 export type WindowSessionId = string;
 export type WindowState = 'normal' | 'minimized' | 'maximized' | 'fullscreen';
+export type Confirmation =
+  | {
+      state: 'not_required';
+      [k: string]: unknown;
+    }
+  | {
+      deadline: string;
+      state: 'pending';
+      [k: string]: unknown;
+    }
+  | {
+      at: string;
+      state: 'confirmed';
+      [k: string]: unknown;
+    }
+  | {
+      by_change: string;
+      state: 'reverted';
+      [k: string]: unknown;
+    };
+export type HotSwapLevel = 'instant' | 'controlled_handoff' | 'host_restart' | 'session_restart';
+export type ChangeOrigin =
+  | {
+      kind: 'gui';
+      surface?: string | null;
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'cli';
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'agent_standin';
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'rescue';
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'supervisor';
+      reason: string;
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'timed_revert';
+      reverts: string;
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'undo';
+      undoes: string;
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'import';
+      [k: string]: unknown;
+    };
+export type ResultKind = ('succeeded' | 'failed' | 'partial' | 'unknown') | 'scheduled';
+export type ChangeState =
+  | 'draft'
+  | 'validated'
+  | 'rejected'
+  | 'prepared'
+  | 'aborted'
+  | 'applying'
+  | 'verifying'
+  | 'committed'
+  | 'rolling_back'
+  | 'rolled_back'
+  | 'partially_applied'
+  | 'unknown';
+export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type PolicyDecision = 'show' | 'merge' | 'silence';
+export type Urgency = 'low' | 'normal' | 'critical';
 
 export interface DesktopEventNotification {
   payload: DesktopEventPayload;
   /**
-   * Observation revision; no persistent Profile exists in G0.
+   * The `seq` of the previous event delivered to this subscription (or the
+   * subscription's starting `seq`). A consumer detects a lost event when it
+   * differs from the last `seq` it saw: topics it did not ask for leave
+   * gaps in `seq`, never in this chain.
    */
-  revision: number;
+  prev_seq: number;
+  /**
+   * The active Profile head when the event was published; `null` before
+   * Core has loaded a Profile. 0.1 called an observation counter `revision`.
+   */
+  profile_revision?: string | null;
+  /**
+   * Position in Core's single event stream, shared by every topic; the
+   * value to pass as `after_seq` when resubscribing.
+   */
   seq: number;
   subscription_id: string;
 }
@@ -76,4 +213,57 @@ export interface Output {
   width: number;
   x: number;
   y: number;
+}
+export interface ChangeSummary {
+  change_id: string;
+  committed_revision?: string | null;
+  confirmation: Confirmation;
+  created_at: string;
+  hot_swap_level: HotSwapLevel;
+  origin: ChangeOrigin;
+  profile_id: string;
+  result?: ResultKind | null;
+  state: ChangeState;
+  title_key: string;
+  updated_at: string;
+}
+export interface PanelStatus {
+  bound_entry?: string | null;
+  mounted: boolean;
+  mounted_entry?: string | null;
+  package?: string | null;
+  slot: string;
+  visible: boolean;
+}
+export interface Job {
+  created_at: string;
+  error_key?: string | null;
+  idempotency_key?: string | null;
+  job_id: string;
+  kind: string;
+  progress?: number | null;
+  result?: unknown;
+  state: JobState;
+  updated_at: string;
+}
+export interface NotificationItem {
+  app_name: string;
+  body: string;
+  created_at: string;
+  decision: PolicyDecision;
+  id: number;
+  merged_count: number;
+  /**
+   * Set when the policy could not be asked: the notification is shown and
+   * the area says rules are unavailable (failing open to display).
+   */
+  policy_unavailable: boolean;
+  summary: string;
+  urgency: Urgency;
+}
+export interface SessionState {
+  lock_client_running: boolean;
+  locked: boolean;
+  logind_available: boolean;
+  preparing_for_sleep: boolean;
 }

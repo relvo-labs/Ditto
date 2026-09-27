@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "ItemReport": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "A slot name, an entry id, or `appearance`/`avatar`/`layout`/`shortcuts`.",
+          "type": "string"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/ItemStatus"
+        }
+      },
+      "required": [
+        "key",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ItemStatus": {
+      "oneOf": [
+        {
+          "enum": [
+            "ready",
+            "failed",
+            "applied",
+            "restored",
+            "not_restored"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "pending",
+          "description": "Waiting for a service: legal, but at prepare it counts as not ready.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/ItemReport"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "StepReport",
+  "type": "object"
+}

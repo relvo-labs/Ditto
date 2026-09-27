@@ -9,18 +9,25 @@
         "null"
       ]
     },
-    "readback_verified": {
-      "type": "boolean"
-    },
-    "revision": {
-      "description": "Observation sequence, not a persistent Profile revision in G0.",
+    "observed_seq": {
+      "description": "Observation sequence of the event stream (the G0 meaning of revision).",
       "format": "uint64",
       "minimum": 0,
       "type": "integer"
+    },
+    "profile_revision": {
+      "description": "Head revision of the active Profile, `null` before one is loaded.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "readback_verified": {
+      "type": "boolean"
     }
   },
   "required": [
-    "revision",
+    "observed_seq",
     "readback_verified"
   ],
   "title": "ResultMeta",

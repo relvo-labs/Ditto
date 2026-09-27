@@ -3,7 +3,7 @@
   "additionalProperties": false,
   "properties": {
     "id": {
-      "description": "Absent on notifications; `$/cancel` is the only notification G0 accepts.",
+      "description": "Absent on notifications. Ids Core itself issues start with `core-`; a\nclient may not use that prefix for its own requests.",
       "type": [
         "string",
         "null"

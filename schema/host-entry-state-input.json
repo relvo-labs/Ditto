@@ -1,0 +1,100 @@
+{
+  "$defs": {
+    "EntryMode": {
+      "enum": [
+        "candidate",
+        "active"
+      ],
+      "type": "string"
+    },
+    "EntryStateReport": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "effects": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entry_id": {
+          "type": "string"
+        },
+        "failure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fiber_state": {
+          "$ref": "#/$defs/FiberState"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntryMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subscriptions": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timers": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "waiting_for": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "entry_id",
+        "fiber_state",
+        "effects",
+        "timers",
+        "subscriptions",
+        "capabilities"
+      ],
+      "type": "object"
+    },
+    "FiberState": {
+      "enum": [
+        "pending",
+        "loading",
+        "active",
+        "unloading",
+        "disposed",
+        "failed"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/EntryStateReport"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "entries"
+  ],
+  "title": "EntryStateInput",
+  "type": "object"
+}

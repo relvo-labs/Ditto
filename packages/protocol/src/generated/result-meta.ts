@@ -6,9 +6,13 @@ export interface ResultMeta {
    * non-cancellable: the request ran to completion and was not cancelled.
    */
   not_cancellable?: boolean | null;
-  readback_verified: boolean;
   /**
-   * Observation sequence, not a persistent Profile revision in G0.
+   * Observation sequence of the event stream (the G0 meaning of revision).
    */
-  revision: number;
+  observed_seq: number;
+  /**
+   * Head revision of the active Profile, `null` before one is loaded.
+   */
+  profile_revision?: string | null;
+  readback_verified: boolean;
 }

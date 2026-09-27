@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "RevisionOrigin": {
+      "oneOf": [
+        {
+          "description": "Created from the built-in default or an empty document.",
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "create",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "from"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "duplicate",
+              "type": "string"
+            },
+            "source_revision": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_revision"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "change_id": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "change",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "change_id"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "import",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Written by `dittoctl rescue` while Core was not running.",
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "rescue_offline",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "action"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "rescue",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "action"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "type": "string"
+    },
+    "document_sha256": {
+      "type": "string"
+    },
+    "last_known_good": {
+      "default": false,
+      "type": "boolean"
+    },
+    "origin": {
+      "$ref": "#/$defs/RevisionOrigin"
+    },
+    "parent": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pending_confirmation": {
+      "default": false,
+      "description": "Committed and inside a timed-revert or preview window.",
+      "type": "boolean"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "revision_id": {
+      "type": "string"
+    },
+    "unstable": {
+      "default": false,
+      "description": "A supervisor restart or a failed entry happened in the observation\nperiod after this revision was committed.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "revision_id",
+    "profile_id",
+    "document_sha256",
+    "origin",
+    "created_at"
+  ],
+  "title": "RevisionSummary",
+  "type": "object"
+}

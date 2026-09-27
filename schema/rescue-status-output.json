@@ -1,0 +1,260 @@
+{
+  "$defs": {
+    "CoreMode": {
+      "oneOf": [
+        {
+          "enum": [
+            "normal"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "rescue",
+          "description": "No hostd: Cordis-backed capabilities report `rescue_mode`.",
+          "type": "string"
+        }
+      ]
+    },
+    "HostStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "heap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeHeap"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "process": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessResources"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "restarts_last_10_min": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "description": "`running`, `starting`, `stopped`, `crash_loop`, `not_needed`, `rescue_mode`.",
+          "type": "string"
+        },
+        "strategy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "state",
+        "restarts_last_10_min",
+        "versions"
+      ],
+      "type": "object"
+    },
+    "NodeHeap": {
+      "additionalProperties": false,
+      "properties": {
+        "array_buffers": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "external": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "heap_used": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "heap_used",
+        "external",
+        "array_buffers"
+      ],
+      "type": "object"
+    },
+    "ProcessResources": {
+      "additionalProperties": false,
+      "description": "Process-level figures Core read from `/proc`; hostd's own report is only\nused for the Node heap, listed separately and never added to these.",
+      "properties": {
+        "cpu_ticks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fds": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pss_kib": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "rss_kib": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "threads": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "pid"
+      ],
+      "type": "object"
+    },
+    "UnavailableCapability": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/UnavailableReason"
+        }
+      },
+      "required": [
+        "capability_id",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "UnavailableReason": {
+      "description": "Why a capability or a call is unavailable. Closed: a consumer can show a\nspecific product sentence for every value.",
+      "oneOf": [
+        {
+          "enum": [
+            "compositor_offline",
+            "host_unavailable",
+            "host_crash_loop",
+            "lease_expired",
+            "not_bound",
+            "rescue_mode",
+            "recovering",
+            "system_unavailable",
+            "participant_unavailable",
+            "session_locked"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "storage_full",
+          "description": "The store refused the write for lack of space; nothing changed.",
+          "type": "string"
+        },
+        {
+          "const": "storage_error",
+          "description": "The store reported an I/O error; nothing changed.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "active_profile": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "head_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "host": {
+      "$ref": "#/$defs/HostStatus"
+    },
+    "last_known_good": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "mode": {
+      "$ref": "#/$defs/CoreMode"
+    },
+    "recovered_changes": {
+      "description": "Changes whose outcome boot recovery decided, newest first.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "shell_connected": {
+      "type": "boolean"
+    },
+    "unavailable": {
+      "description": "Capabilities that depend on Cordis and are not offered right now; the\nShell says so in product language instead of letting them vanish.",
+      "items": {
+        "$ref": "#/$defs/UnavailableCapability"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "mode",
+    "host",
+    "shell_connected",
+    "unavailable",
+    "recovered_changes"
+  ],
+  "title": "RescueStatusOutput",
+  "type": "object"
+}

@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "PanelStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "bound_entry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mounted": {
+          "type": "boolean"
+        },
+        "mounted_entry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "package": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slot": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "slot",
+        "mounted",
+        "visible"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "panels": {
+      "items": {
+        "$ref": "#/$defs/PanelStatus"
+      },
+      "type": "array"
+    },
+    "reported_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "shell_connected": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "shell_connected",
+    "panels"
+  ],
+  "title": "PanelsListOutput",
+  "type": "object"
+}

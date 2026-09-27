@@ -3,12 +3,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ditto_protocol::{catalog, *};
+use ditto_protocol::{
+    catalog, change::*, host, manifest::Manifest, participant, profile::*, rpc, services::*, *,
+};
 use schemars::JsonSchema;
 use serde_json::Value;
 
-fn write_schema<T: JsonSchema>(directory: &Path, name: &str, check: bool) -> std::io::Result<()> {
+fn write_schema<T: JsonSchema>(
+    directory: &Path,
+    name: &str,
+    check: bool,
+    written: &mut Vec<String>,
+) -> std::io::Result<()> {
     let value = serde_json::to_value(schemars::schema_for!(T))?;
+    written.push(format!("{name}.json"));
     write_json(directory.join(format!("{name}.json")), &value, check)
 }
 
@@ -16,7 +24,7 @@ fn write_json(path: PathBuf, value: &Value, check: bool) -> std::io::Result<()> 
     let mut contents = serde_json::to_string_pretty(value)?;
     contents.push('\n');
     if check {
-        if fs::read_to_string(&path)? != contents {
+        if fs::read_to_string(&path).ok().as_deref() != Some(contents.as_str()) {
             return Err(std::io::Error::other(format!(
                 "stale schema: {}",
                 path.display()
@@ -28,37 +36,167 @@ fn write_json(path: PathBuf, value: &Value, check: bool) -> std::io::Result<()> 
     }
 }
 
+macro_rules! export {
+    ($directory:expr, $check:expr, $written:expr, $($name:literal => $type:ty),+ $(,)?) => {
+        $(write_schema::<$type>($directory, $name, $check, $written)?;)+
+    };
+}
+
 fn main() -> std::io::Result<()> {
     let check = std::env::args().skip(1).any(|arg| arg == "--check");
     let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schema");
     fs::create_dir_all(&directory)?;
-    write_schema::<Empty>(&directory, "empty", check)?;
-    write_schema::<Window>(&directory, "window", check)?;
-    write_schema::<Workspace>(&directory, "workspace", check)?;
-    write_schema::<Output>(&directory, "output", check)?;
-    write_schema::<WindowIdInput>(&directory, "window-id-input", check)?;
-    write_schema::<WorkspaceIdInput>(&directory, "workspace-id-input", check)?;
-    write_schema::<WindowMoveInput>(&directory, "window-move-input", check)?;
-    write_schema::<WindowResizeInput>(&directory, "window-resize-input", check)?;
-    write_schema::<WindowSetStateInput>(&directory, "window-set-state-input", check)?;
-    write_schema::<CloseRequestOutput>(&directory, "close-request-output", check)?;
-    write_schema::<OutputsListOutput>(&directory, "outputs-list-output", check)?;
-    write_schema::<WorkspacesListOutput>(&directory, "workspaces-list-output", check)?;
-    write_schema::<WindowsListOutput>(&directory, "windows-list-output", check)?;
-    write_schema::<DesktopSnapshot>(&directory, "desktop-snapshot", check)?;
-    write_schema::<EventsSubscribeInput>(&directory, "events-subscribe-input", check)?;
-    write_schema::<EventsSubscribeOutput>(&directory, "events-subscribe-output", check)?;
-    write_schema::<DesktopEventNotification>(&directory, "desktop-event-notification", check)?;
-    write_schema::<RequestMeta>(&directory, "request-meta", check)?;
-    write_schema::<ResultMeta>(&directory, "result-meta", check)?;
-    write_schema::<catalog::CapabilitiesListOutput>(&directory, "capabilities-list-output", check)?;
-    write_schema::<rpc::RpcRequest>(&directory, "rpc-request", check)?;
-    write_schema::<rpc::RpcResponse>(&directory, "rpc-response", check)?;
-    write_schema::<rpc::HandshakeInput>(&directory, "handshake-input", check)?;
-    write_schema::<rpc::HandshakeOutput>(&directory, "handshake-output", check)?;
+    let mut written = Vec::new();
+    let w = &mut written;
+    export!(&directory, check, w,
+        // G0 desktop types
+        "empty" => Empty,
+        "window" => Window,
+        "workspace" => Workspace,
+        "output" => Output,
+        "window-id-input" => WindowIdInput,
+        "workspace-id-input" => WorkspaceIdInput,
+        "window-move-input" => WindowMoveInput,
+        "window-resize-input" => WindowResizeInput,
+        "window-set-state-input" => WindowSetStateInput,
+        "close-request-output" => CloseRequestOutput,
+        "outputs-list-output" => OutputsListOutput,
+        "workspaces-list-output" => WorkspacesListOutput,
+        "windows-list-output" => WindowsListOutput,
+        "desktop-snapshot" => DesktopSnapshot,
+        "events-subscribe-input" => EventsSubscribeInput,
+        "events-subscribe-output" => EventsSubscribeOutput,
+        "desktop-event-notification" => DesktopEventNotification,
+        "request-meta" => RequestMeta,
+        "result-meta" => ResultMeta,
+        "capabilities-list-output" => catalog::CapabilitiesListOutput,
+        "rpc-request" => rpc::RpcRequest,
+        "rpc-response" => rpc::RpcResponse,
+        "handshake-input" => rpc::HandshakeInput,
+        "handshake-output" => rpc::HandshakeOutput,
+        // profiles
+        "profile-document" => ProfileDocument,
+        "profile-summary" => ProfileSummary,
+        "revision-summary" => RevisionSummary,
+        "profiles-list-output" => ProfilesListOutput,
+        "profiles-get-input" => ProfilesGetInput,
+        "profiles-get-output" => ProfilesGetOutput,
+        "profiles-create-input" => ProfilesCreateInput,
+        "profiles-duplicate-input" => ProfilesDuplicateInput,
+        "profiles-rename-input" => ProfilesRenameInput,
+        "profile-id-input" => ProfileIdInput,
+        "profiles-diff-input" => ProfilesDiffInput,
+        "profiles-diff-output" => ProfilesDiffOutput,
+        "profile-export" => ProfileExport,
+        "profiles-export-output" => ProfilesExportOutput,
+        "profiles-import-validate-input" => ProfilesImportValidateInput,
+        "profiles-import-validate-output" => ProfilesImportValidateOutput,
+        "profiles-import-input" => ProfilesImportInput,
+        // changes
+        "change-op" => ChangeOp,
+        "changes-propose-input" => ChangesProposeInput,
+        "change-record" => ChangeRecord,
+        "change-summary" => ChangeSummary,
+        "changes-get-input" => ChangesGetInput,
+        "changes-list-input" => ChangesListInput,
+        "changes-list-output" => ChangesListOutput,
+        "change-id-input" => ChangeIdInput,
+        // participants and the Shell's control methods
+        "participant-prepare-params" => participant::PrepareParams,
+        "participant-step-report" => participant::StepReport,
+        "participant-change-ref" => participant::ChangeRef,
+        "participant-state-params" => participant::StateParams,
+        "participant-state-output" => participant::StateOutput,
+        "participant-projection" => participant::Projection,
+        "participant-observation" => participant::Observation,
+        "shell-report-input" => participant::ShellObservation,
+        "shell-command-params" => participant::ShellCommandParams,
+        // hostd
+        "host-hello-input" => host::HelloInput,
+        "host-hello-output" => host::HelloOutput,
+        "host-register-input" => host::RegisterInput,
+        "host-register-output" => host::RegisterOutput,
+        "host-revoke-input" => host::RevokeInput,
+        "host-renew-input" => host::RenewInput,
+        "host-renew-output" => host::RenewOutput,
+        "host-event-input" => host::EventInput,
+        "host-event-output" => host::EventOutput,
+        "host-entry-state-input" => host::EntryStateInput,
+        "host-resources-input" => host::ResourcesInput,
+        "host-invoke-params" => host::InvokeParams,
+        "host-permission-revoked-params" => host::PermissionRevokedParams,
+        "manifest" => Manifest,
+        // services
+        "plugins-list-input" => PluginsListInput,
+        "plugins-list-output" => PluginsListOutput,
+        "plugins-get-input" => PluginsGetInput,
+        "plugins-get-output" => PluginsGetOutput,
+        "plugins-inspect-input" => PluginsInspectInput,
+        "plugins-inspect-output" => PluginsInspectOutput,
+        "plugins-install-input" => PluginsInstallInput,
+        "plugins-remove-input" => PluginsRemoveInput,
+        "plugins-remove-output" => PluginsRemoveOutput,
+        "plugins-diagnostics-input" => PluginsDiagnosticsInput,
+        "plugins-diagnostics-output" => PluginsDiagnosticsOutput,
+        "permissions-list-input" => PermissionsListInput,
+        "permissions-list-output" => PermissionsListOutput,
+        "permissions-check-input" => PermissionsCheckInput,
+        "permissions-check-output" => PermissionsCheckOutput,
+        "permissions-grant-input" => PermissionsGrantInput,
+        "grant" => Grant,
+        "grant-id-input" => GrantIdInput,
+        "appearance-get-input" => AppearanceGetInput,
+        "appearance-get-output" => AppearanceGetOutput,
+        "appearance-set-input" => AppearanceSetInput,
+        "panels-list-output" => PanelsListOutput,
+        "launcher-search-input" => LauncherSearchInput,
+        "launcher-list-input" => LauncherListInput,
+        "launcher-apps-output" => LauncherAppsOutput,
+        "launcher-launch-input" => LauncherLaunchInput,
+        "launcher-launch-output" => LauncherLaunchOutput,
+        "commands-list-output" => CommandsListOutput,
+        "commands-invoke-input" => CommandsInvokeInput,
+        "commands-invoke-output" => CommandsInvokeOutput,
+        "shortcuts-list-output" => ShortcutsListOutput,
+        "notifications-list-input" => NotificationsListInput,
+        "notifications-list-output" => NotificationsListOutput,
+        "notification-id-input" => NotificationIdInput,
+        "notifications-dismiss-output" => NotificationsDismissOutput,
+        "policy-status-output" => PolicyStatusOutput,
+        "policy-decide-input" => PolicyDecideInput,
+        "policy-decide-output" => PolicyDecideOutput,
+        "policy-get-output" => PolicyGetOutput,
+        "layout-get-output" => LayoutGetOutput,
+        "session-state" => SessionState,
+        "session-action-output" => SessionActionOutput,
+        "job" => Job,
+        "job-id-input" => JobIdInput,
+        "jobs-list-output" => JobsListOutput,
+        "task" => Task,
+        "tasks-list-input" => TasksListInput,
+        "tasks-list-output" => TasksListOutput,
+        "tasks-add-input" => TasksAddInput,
+        "tasks-complete-input" => TasksCompleteInput,
+        "tasks-subscribe-output" => TasksSubscribeOutput,
+        "rescue-status-output" => RescueStatusOutput,
+        "rescue-disable-input" => RescueDisableInput,
+        "rescue-restore-input" => RescueRestoreInput,
+    );
+    written.push("catalog.json".into());
     write_json(
         directory.join("catalog.json"),
         &serde_json::to_value(catalog::catalog())?,
         check,
-    )
+    )?;
+    // A schema file nobody exports any more is stale too.
+    for entry in fs::read_dir(&directory)? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        if name.ends_with(".json") && !written.contains(&name) {
+            if check {
+                return Err(std::io::Error::other(format!("orphan schema: {name}")));
+            }
+            fs::remove_file(directory.join(&name))?;
+        }
+    }
+    Ok(())
 }

@@ -1,0 +1,2 @@
+{"kind": "scenario", "description": "0.1 客戶端在握手即被拒（protocol_version_unsupported）", "client": {"kind": "dittoctl", "protocol_version": "0.1.0"},
+ "steps": [{"handshake": true, "expect": {"error_name": "protocol_version_unsupported"}}]}

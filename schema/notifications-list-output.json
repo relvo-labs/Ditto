@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "NotificationItem": {
+      "additionalProperties": false,
+      "properties": {
+        "app_name": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/PolicyDecision"
+        },
+        "id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "merged_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "policy_unavailable": {
+          "description": "Set when the policy could not be asked: the notification is shown and\nthe area says rules are unavailable (failing open to display).",
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "urgency": {
+          "$ref": "#/$defs/Urgency"
+        }
+      },
+      "required": [
+        "id",
+        "app_name",
+        "summary",
+        "body",
+        "urgency",
+        "decision",
+        "policy_unavailable",
+        "merged_count",
+        "created_at"
+      ],
+      "type": "object"
+    },
+    "PolicyDecision": {
+      "enum": [
+        "show",
+        "merge",
+        "silence"
+      ],
+      "type": "string"
+    },
+    "Urgency": {
+      "enum": [
+        "low",
+        "normal",
+        "critical"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "notifications": {
+      "items": {
+        "$ref": "#/$defs/NotificationItem"
+      },
+      "type": "array"
+    },
+    "server_owned": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "notifications",
+    "server_owned"
+  ],
+  "title": "NotificationsListOutput",
+  "type": "object"
+}

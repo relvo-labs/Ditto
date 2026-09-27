@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "active": {
+      "type": "boolean"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "head_revision": {
+      "type": "string"
+    },
+    "last_known_good": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile_id",
+    "name",
+    "head_revision",
+    "active",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "ProfileSummary",
+  "type": "object"
+}

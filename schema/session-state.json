@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "lock_client_running": {
+      "type": "boolean"
+    },
+    "locked": {
+      "type": "boolean"
+    },
+    "logind_available": {
+      "type": "boolean"
+    },
+    "preparing_for_sleep": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "locked",
+    "lock_client_running",
+    "preparing_for_sleep",
+    "logind_available"
+  ],
+  "title": "SessionState",
+  "type": "object"
+}

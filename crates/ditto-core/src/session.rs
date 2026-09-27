@@ -4,7 +4,7 @@
 //! after every change and after every reconnect, never a persistent cache.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::Sender,
@@ -14,8 +14,9 @@ use std::{
 
 use ditto_compositor::{AdapterError, AdapterResult, CompositorAdapter, EventSource};
 use ditto_protocol::{
-    catalog::Availability, rpc::RpcResponse, DesktopEventNotification, DesktopEventPayload,
-    DesktopSnapshot,
+    catalog::Availability,
+    rpc::{RpcRequest, RpcResponse},
+    DesktopEventNotification, DesktopEventPayload, DesktopSnapshot, EventTopic,
 };
 
 use crate::events::{Delivery, EventBroker, Registration};
@@ -26,6 +27,9 @@ pub const EVENT_QUEUE_CAPACITY: usize = 1024;
 pub enum Outgoing {
     Response(Box<RpcResponse>),
     Event(Box<DesktopEventNotification>),
+    /// A request or notification Core itself sends to the client
+    /// (`participant.*`, `host.invoke`, `shell.command`).
+    Request(Box<RpcRequest>),
 }
 
 pub struct Session {
@@ -34,6 +38,7 @@ pub struct Session {
     sinks: Mutex<HashMap<String, Sender<Outgoing>>>,
     online: AtomicBool,
     offline_reason: Mutex<Option<String>>,
+    shortcut_handler: Mutex<Option<ditto_compositor::ShortcutHandler>>,
 }
 
 impl Session {
@@ -48,17 +53,61 @@ impl Session {
             sinks: Mutex::new(HashMap::new()),
             online: AtomicBool::new(online),
             offline_reason: Mutex::new(reason),
+            shortcut_handler: Mutex::new(None),
         }
+    }
+
+    /// Where pressed global shortcuts go; kept across compositor reconnects.
+    pub fn set_shortcut_handler(&self, handler: ditto_compositor::ShortcutHandler) {
+        *self.shortcut_handler.lock().expect("shortcut handler") = Some(handler.clone());
+        self.adapter
+            .lock()
+            .expect("adapter lock")
+            .set_shortcut_handler(handler);
     }
 
     pub fn compositor_label(&self) -> String {
         self.adapter.lock().expect("adapter lock").label()
     }
 
-    /// Observation sequence reported to callers. G0 has no persistent Profile,
-    /// so this is not a configuration revision.
-    pub fn observation_revision(&self) -> u64 {
-        self.broker.lock().expect("broker lock").revision()
+    /// Observation sequence reported to callers as `observed_seq`.
+    pub fn observed_seq(&self) -> u64 {
+        self.broker.lock().expect("broker lock").seq()
+    }
+
+    pub fn profile_revision(&self) -> Option<String> {
+        self.broker.lock().expect("broker lock").profile_revision()
+    }
+
+    pub fn set_profile_revision(&self, revision: Option<String>) {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .set_profile_revision(revision);
+    }
+
+    /// Publish a non-desktop event (changes, plugins, notifications, tasks).
+    pub fn publish_event(&self, payload: DesktopEventPayload) {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .publish_event(payload);
+        self.flush();
+    }
+
+    pub fn require_resync(&self, subscription_id: &str, reason: &str) {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .require_resync(subscription_id, reason);
+        self.flush();
+    }
+
+    pub fn subscription_count(&self) -> usize {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .subscription_count()
     }
 
     pub fn is_online(&self) -> bool {
@@ -113,7 +162,20 @@ impl Session {
     }
 
     pub fn subscribe(&self, after_seq: Option<u64>, sink: Sender<Outgoing>) -> Registration {
-        let registration = self.broker.lock().expect("broker lock").register(after_seq);
+        self.subscribe_topics(after_seq, [EventTopic::Desktop].into_iter().collect(), sink)
+    }
+
+    pub fn subscribe_topics(
+        &self,
+        after_seq: Option<u64>,
+        topics: BTreeSet<EventTopic>,
+        sink: Sender<Outgoing>,
+    ) -> Registration {
+        let registration = self
+            .broker
+            .lock()
+            .expect("broker lock")
+            .register_topics(after_seq, topics);
         if let Registration::Ready {
             subscription_id, ..
         } = &registration
@@ -177,6 +239,14 @@ impl Session {
     /// every subscriber is told to resync rather than being sent replayed events.
     pub fn reconnect(&self, mut adapter: Box<dyn CompositorAdapter>) -> AdapterResult<()> {
         let snapshot = adapter.snapshot()?;
+        if let Some(handler) = self
+            .shortcut_handler
+            .lock()
+            .expect("shortcut handler")
+            .clone()
+        {
+            adapter.set_shortcut_handler(handler);
+        }
         {
             let mut current = self.adapter.lock().expect("adapter lock");
             *current = adapter;
@@ -207,7 +277,7 @@ impl Session {
             };
             let (events, closed) = match delivery {
                 Delivery::Events(events) => (events, false),
-                Delivery::ResyncRequired(event) => (vec![event], true),
+                Delivery::ResyncRequired(event) => (vec![*event], true),
             };
             let mut sinks = self.sinks.lock().expect("sinks lock");
             let mut dropped = closed;

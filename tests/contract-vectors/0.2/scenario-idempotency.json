@@ -1,0 +1,5 @@
+{"kind": "scenario", "description": "同一 idempotency_key 重送回傳既有 change_id（不重做）", "client": {"kind": "dittoctl"},
+ "steps": [
+  {"send": {"method": "desktop.changes.propose", "params": {"base_revision": "$head", "idempotency_key": "vector-idem-1", "ops": [{"op": "set_value", "path": "/avatar/hidden", "after": true}]}}, "expect": {"result_has": ["change_id", "state"]}},
+  {"send": {"method": "desktop.changes.propose", "params": {"base_revision": "$head", "idempotency_key": "vector-idem-1", "ops": [{"op": "set_value", "path": "/avatar/hidden", "after": true}]}}, "expect": {"result_path": "/change_id", "equals": "$prev./change_id"}}
+ ]}

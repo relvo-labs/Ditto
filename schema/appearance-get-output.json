@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "Appearance": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "type": "string"
+        },
+        "low_power_style": {
+          "default": false,
+          "description": "No blur and no shadow; NFR-05 measures it as its own style.",
+          "type": "boolean"
+        },
+        "reduced_motion": {
+          "default": false,
+          "type": "boolean"
+        },
+        "reduced_transparency": {
+          "default": false,
+          "type": "boolean"
+        },
+        "theme": {
+          "type": "string"
+        },
+        "tokens": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "theme",
+        "locale"
+      ],
+      "type": "object"
+    },
+    "AvatarSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "animations": {
+          "default": true,
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "default": false,
+          "type": "boolean"
+        },
+        "scale": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "enabled",
+        "scale"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "appearance": {
+      "$ref": "#/$defs/Appearance"
+    },
+    "avatar": {
+      "$ref": "#/$defs/AvatarSettings"
+    },
+    "profile_revision": {
+      "type": "string"
+    },
+    "shell_applied": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Appearance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "What the Shell last reported as applied; `null` when no Shell reported."
+    }
+  },
+  "required": [
+    "appearance",
+    "avatar",
+    "profile_revision"
+  ],
+  "title": "AppearanceGetOutput",
+  "type": "object"
+}

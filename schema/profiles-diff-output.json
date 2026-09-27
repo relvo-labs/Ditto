@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "DiffItem": {
+      "additionalProperties": false,
+      "description": "One line of a change card. The label is a translation key so Core never\nemits locale-specific text; the Shell renders it in the Profile's language.",
+      "properties": {
+        "after": true,
+        "before": true,
+        "kind": {
+          "$ref": "#/$defs/DiffKind"
+        },
+        "label_args": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "label_key": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "label_key"
+      ],
+      "type": "object"
+    },
+    "DiffKind": {
+      "enum": [
+        "added",
+        "removed",
+        "changed"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "from_revision": {
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/DiffItem"
+      },
+      "type": "array"
+    },
+    "to_revision": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "from_revision",
+    "to_revision",
+    "items"
+  ],
+  "title": "ProfilesDiffOutput",
+  "type": "object"
+}

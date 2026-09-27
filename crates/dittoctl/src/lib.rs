@@ -1,9 +1,16 @@
-//! Consumer registration. Every capability in the catalog needs at least one
-//! consumer; `dittoctl probe` is the one that works without a graphical
-//! session, which is what lets contract tests run in the PR check.
+//! `dittoctl`: the second consumer of every capability (so contracts can be
+//! exercised without a graphical session), the CLI for profiles, changes and
+//! plugins, and the rescue CLI. Rescue works online through Core, or offline
+//! through the same `ditto-store` library under the same lock when Core is not
+//! running — and offline it can only restore the last-known-good composition
+//! or disable an entry (D-29 proposal).
+
+pub mod client;
 
 use ditto_protocol::catalog;
 
+/// Every capability has a `dittoctl` path: a friendly subcommand or `call`.
+/// The catalog consistency gate checks this list against the catalog.
 pub const CONSUMED_CAPABILITIES: &[&str] = &[
     catalog::CAPABILITIES_LIST,
     catalog::OUTPUTS_LIST,
@@ -18,4 +25,61 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     catalog::WINDOWS_SET_STATE,
     catalog::WINDOWS_CLOSE_REQUEST,
     catalog::EVENTS_SUBSCRIBE,
+    catalog::PROFILES_LIST,
+    catalog::PROFILES_GET,
+    catalog::PROFILES_CREATE,
+    catalog::PROFILES_DUPLICATE,
+    catalog::PROFILES_RENAME,
+    catalog::PROFILES_DELETE,
+    catalog::PROFILES_DIFF,
+    catalog::PROFILES_EXPORT,
+    catalog::PROFILES_IMPORT_VALIDATE,
+    catalog::PROFILES_IMPORT,
+    catalog::CHANGES_PROPOSE,
+    catalog::CHANGES_GET,
+    catalog::CHANGES_LIST,
+    catalog::CHANGES_CANCEL,
+    catalog::CHANGES_UNDO,
+    catalog::CHANGES_CONFIRM,
+    catalog::PLUGINS_LIST,
+    catalog::PLUGINS_GET,
+    catalog::PLUGINS_INSPECT,
+    catalog::PLUGINS_INSTALL,
+    catalog::PLUGINS_REMOVE,
+    catalog::PLUGINS_DIAGNOSTICS,
+    catalog::PERMISSIONS_LIST,
+    catalog::PERMISSIONS_CHECK,
+    catalog::PERMISSIONS_GRANT,
+    catalog::PERMISSIONS_REVOKE,
+    catalog::APPEARANCE_GET,
+    catalog::APPEARANCE_SET,
+    catalog::PANELS_LIST,
+    catalog::LAYOUT_GET,
+    catalog::SHORTCUTS_LIST,
+    catalog::COMMANDS_LIST,
+    catalog::COMMANDS_INVOKE,
+    catalog::LAUNCHER_SEARCH,
+    catalog::LAUNCHER_LIST_APPS,
+    catalog::LAUNCHER_LAUNCH,
+    catalog::NOTIFICATIONS_LIST,
+    catalog::NOTIFICATIONS_DISMISS,
+    catalog::NOTIFICATIONS_POLICY_STATUS,
+    // `notifications.policy.decide` is Core's own call (scope `core`); its
+    // consumer is the notification server, listed in ditto-core.
+    catalog::NOTIFICATIONS_POLICY_GET,
+    catalog::SESSION_STATE,
+    catalog::SESSION_LOCK,
+    catalog::SESSION_LOGOUT,
+    catalog::SESSION_SUSPEND,
+    catalog::SESSION_POWEROFF,
+    catalog::JOBS_GET,
+    catalog::JOBS_LIST,
+    catalog::JOBS_CANCEL,
+    catalog::TASKS_LIST,
+    catalog::TASKS_ADD,
+    catalog::TASKS_COMPLETE,
+    catalog::TASKS_SUBSCRIBE,
+    catalog::RESCUE_STATUS,
+    catalog::RESCUE_DISABLE,
+    catalog::RESCUE_RESTORE_LAST_GOOD,
 ];

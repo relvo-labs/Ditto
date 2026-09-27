@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every field optional; the ones given become `set_value` ops of one\nChangeSet, so this has preflight, readback and history like any change.",
+  "properties": {
+    "base_revision": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "locale": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "low_power_style": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reduced_motion": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reduced_transparency": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "theme": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tokens": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "base_revision"
+  ],
+  "title": "AppearanceSetInput",
+  "type": "object"
+}

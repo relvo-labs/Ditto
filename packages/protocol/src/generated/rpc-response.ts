@@ -11,6 +11,7 @@ export type ErrorName =
   | 'unavailable'
   | 'protocol_version_unsupported'
   | 'identity_rejected'
+  | 'preflight_rejected'
   | 'internal';
 export type Outcome = 'unknown';
 
@@ -22,6 +23,14 @@ export interface RpcResponse {
 }
 export interface RpcError {
   code: number;
+  /**
+   * Reason codes and translation keys, never product text: `reason` for
+   * `unavailable`, `conflict` and `permission_denied`; `reasons[]` for
+   * `preflight_rejected`.
+   */
+  data?: {
+    [k: string]: unknown;
+  };
   message: string;
   name: ErrorName;
   outcome?: Outcome | null;

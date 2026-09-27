@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Starting a program is observable; a window appearing is not guaranteed,\nso this never claims success: confirm with `desktop.windows.list`.",
+  "properties": {
+    "accepted": {
+      "type": "boolean"
+    },
+    "app_id": {
+      "type": "string"
+    },
+    "operation_id": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "accepted",
+    "operation_id",
+    "unit",
+    "app_id"
+  ],
+  "title": "LauncherLaunchOutput",
+  "type": "object"
+}

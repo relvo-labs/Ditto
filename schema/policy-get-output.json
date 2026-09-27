@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "PolicyCounters": {
+      "additionalProperties": false,
+      "properties": {
+        "merge": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "show": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "silence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "show",
+        "merge",
+        "silence"
+      ],
+      "type": "object"
+    },
+    "PolicyDecision": {
+      "enum": [
+        "show",
+        "merge",
+        "silence"
+      ],
+      "type": "string"
+    },
+    "PolicyRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "app_name": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/PolicyDecision"
+        },
+        "rule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "app_name",
+        "decision",
+        "at"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "counters": {
+      "$ref": "#/$defs/PolicyCounters"
+    },
+    "recent": {
+      "items": {
+        "$ref": "#/$defs/PolicyRecord"
+      },
+      "type": "array"
+    },
+    "rules": true
+  },
+  "required": [
+    "rules",
+    "counters",
+    "recent"
+  ],
+  "title": "PolicyGetOutput",
+  "type": "object"
+}

@@ -6,8 +6,16 @@
 pub mod fixture;
 pub mod sway;
 pub mod wayfire;
+mod wayfire_bindings;
 
-use ditto_protocol::{DesktopSnapshot, Output, Window, WindowSessionId, WindowState, Workspace};
+use ditto_protocol::{
+    profile::ShortcutBinding, DesktopSnapshot, Output, Window, WindowSessionId, WindowState,
+    Workspace,
+};
+
+/// Called with the command id of a global shortcut when the compositor
+/// reports it pressed. Core owns what the command does.
+pub type ShortcutHandler = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AdapterError {
@@ -111,6 +119,47 @@ pub trait CompositorAdapter: Send {
             .into_iter()
             .find(|workspace| workspace.id == workspace_id)
             .ok_or_else(|| AdapterError::NotFound(format!("no workspace {workspace_id}")))
+    }
+
+    /// G1 layout-strategy path (C-15). The default is the honest one: no
+    /// compositor path, so a switch is refused at prepare, never faked.
+    fn supports_layout_strategy(&self, _strategy: &str) -> bool {
+        false
+    }
+
+    fn layout_strategy(&mut self) -> AdapterResult<Option<String>> {
+        Ok(None)
+    }
+
+    fn set_layout_strategy(&mut self, strategy: &str) -> AdapterResult<()> {
+        Err(AdapterError::Unsupported(format!(
+            "no runtime path to switch the layout strategy to {strategy}"
+        )))
+    }
+
+    /// G1 global-shortcut path (C-16).
+    fn supports_shortcut_binding(&self) -> bool {
+        false
+    }
+
+    fn shortcuts(&mut self) -> AdapterResult<Vec<ShortcutBinding>> {
+        Err(AdapterError::Unsupported(
+            "no shortcut readback path".into(),
+        ))
+    }
+
+    fn bind_shortcuts(&mut self, _bindings: &[ShortcutBinding]) -> AdapterResult<()> {
+        Err(AdapterError::Unsupported(
+            "no runtime shortcut binding path".into(),
+        ))
+    }
+
+    /// Where pressed shortcuts go. Adapters without a binding path ignore it.
+    fn set_shortcut_handler(&mut self, _handler: ShortcutHandler) {}
+
+    /// Workspace grid per output, when the compositor has one (Wayfire C-05).
+    fn workspace_grid(&mut self) -> AdapterResult<Option<[u32; 2]>> {
+        Ok(None)
     }
 
     fn snapshot(&mut self) -> AdapterResult<DesktopSnapshot> {

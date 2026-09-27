@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "ChangeOrigin": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "gui",
+              "type": "string"
+            },
+            "surface": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "cli",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "agent_standin",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "rescue",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "supervisor",
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "timed_revert",
+              "type": "string"
+            },
+            "reverts": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reverts"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "undo",
+              "type": "string"
+            },
+            "undoes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "undoes"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "import",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChangeState": {
+      "enum": [
+        "draft",
+        "validated",
+        "rejected",
+        "prepared",
+        "aborted",
+        "applying",
+        "verifying",
+        "committed",
+        "rolling_back",
+        "rolled_back",
+        "partially_applied",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "Confirmation": {
+      "oneOf": [
+        {
+          "properties": {
+            "state": {
+              "const": "not_required",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "deadline": {
+              "type": "string"
+            },
+            "state": {
+              "const": "pending",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "deadline"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "state": {
+              "const": "confirmed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "at"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "by_change": {
+              "type": "string"
+            },
+            "state": {
+              "const": "reverted",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "by_change"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HotSwapLevel": {
+      "enum": [
+        "instant",
+        "controlled_handoff",
+        "host_restart",
+        "session_restart"
+      ],
+      "type": "string"
+    },
+    "ResultKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "succeeded",
+            "failed",
+            "partial",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "scheduled",
+          "description": "Committed as a revision, but nothing took effect yet: every item is\n`scheduled` (session-restart level: at the next login; in rescue mode:\nwhen the normal mode returns). Never presented as \"applied\".",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "change_id": {
+      "type": "string"
+    },
+    "committed_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confirmation": {
+      "$ref": "#/$defs/Confirmation"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "hot_swap_level": {
+      "$ref": "#/$defs/HotSwapLevel"
+    },
+    "origin": {
+      "$ref": "#/$defs/ChangeOrigin"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResultKind"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "$ref": "#/$defs/ChangeState"
+    },
+    "title_key": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "change_id",
+    "profile_id",
+    "state",
+    "origin",
+    "hot_swap_level",
+    "title_key",
+    "confirmation",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "ChangeSummary",
+  "type": "object"
+}

@@ -1,0 +1,39 @@
+{
+  "$defs": {
+    "RevisionRef": {
+      "additionalProperties": false,
+      "description": "Either a revision, or the head of a Profile.",
+      "properties": {
+        "profile_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "from": {
+      "$ref": "#/$defs/RevisionRef"
+    },
+    "to": {
+      "$ref": "#/$defs/RevisionRef"
+    }
+  },
+  "required": [
+    "from",
+    "to"
+  ],
+  "title": "ProfilesDiffInput",
+  "type": "object"
+}

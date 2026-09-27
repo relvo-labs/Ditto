@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "Job": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "error_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "idempotency_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "progress": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "result": true,
+        "state": {
+          "$ref": "#/$defs/JobState"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "kind",
+        "state",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    },
+    "JobState": {
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/Job"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "jobs"
+  ],
+  "title": "JobsListOutput",
+  "type": "object"
+}

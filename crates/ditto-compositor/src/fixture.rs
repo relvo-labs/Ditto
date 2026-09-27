@@ -6,7 +6,9 @@
 
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use ditto_protocol::{Output, Window, WindowSessionId, WindowState, Workspace};
+use ditto_protocol::{
+    profile::ShortcutBinding, Output, Window, WindowSessionId, WindowState, Workspace,
+};
 
 use crate::{
     AdapterError, AdapterResult, CompositorAdapter, CompositorChange, EventSource, Support,
@@ -21,6 +23,8 @@ pub struct FixtureCompositor {
     floating: Vec<WindowSessionId>,
     changes: Sender<CompositorChange>,
     connected: bool,
+    strategy: String,
+    shortcuts: Vec<ShortcutBinding>,
 }
 
 pub struct FixtureEventSource {
@@ -82,6 +86,8 @@ impl FixtureCompositor {
             floating: vec![floating],
             changes,
             connected: true,
+            strategy: "floating".into(),
+            shortcuts: vec![],
         };
         (compositor, FixtureEventSource { changes: receiver })
     }
@@ -249,6 +255,48 @@ impl CompositorAdapter for FixtureCompositor {
         self.windows.retain(|window| window.id != *window_id);
         self.announce(CompositorChange::Windows);
         Ok(())
+    }
+
+    /// The fixture can switch between the two G1 strategies and hold a
+    /// binding table, so Core's transaction path can be tested without a
+    /// compositor. It is not evidence that a real compositor can (C-15/C-16).
+    fn supports_layout_strategy(&self, strategy: &str) -> bool {
+        matches!(strategy, "floating" | "simple-tile")
+    }
+
+    fn layout_strategy(&mut self) -> AdapterResult<Option<String>> {
+        self.online()?;
+        Ok(Some(self.strategy.clone()))
+    }
+
+    fn set_layout_strategy(&mut self, strategy: &str) -> AdapterResult<()> {
+        self.online()?;
+        if !self.supports_layout_strategy(strategy) {
+            return Err(AdapterError::Unsupported(format!(
+                "unknown strategy {strategy}"
+            )));
+        }
+        self.strategy = strategy.into();
+        Ok(())
+    }
+
+    fn supports_shortcut_binding(&self) -> bool {
+        true
+    }
+
+    fn shortcuts(&mut self) -> AdapterResult<Vec<ShortcutBinding>> {
+        self.online()?;
+        Ok(self.shortcuts.clone())
+    }
+
+    fn bind_shortcuts(&mut self, bindings: &[ShortcutBinding]) -> AdapterResult<()> {
+        self.online()?;
+        self.shortcuts = bindings.to_vec();
+        Ok(())
+    }
+
+    fn workspace_grid(&mut self) -> AdapterResult<Option<[u32; 2]>> {
+        Ok(Some([3, 3]))
     }
 }
 

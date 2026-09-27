@@ -15,19 +15,27 @@
           "type": "object"
         },
         {
-          "description": "Resolved when Core connects to a compositor; the exported catalog cannot\nknow it, so it names the capability matrix row instead of guessing.",
+          "description": "Resolved when Core runs; the exported catalog cannot know it, so it\nnames the capability-matrix row or the provider slot instead.",
           "properties": {
             "kind": {
               "const": "resolved_at_runtime",
               "type": "string"
             },
             "matrix_row": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "slot": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
-            "kind",
-            "matrix_row"
+            "kind"
           ],
           "type": "object"
         },
@@ -63,12 +71,78 @@
             "available"
           ],
           "type": "object"
+        },
+        {
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "entry_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "depends_on_provider",
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UnavailableReason"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "slot": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "slot",
+            "available"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "component": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "depends_on_system",
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UnavailableReason"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "component",
+            "available"
+          ],
+          "type": "object"
         }
       ]
     },
     "CapabilityDescriptor": {
       "additionalProperties": false,
-      "description": "A capability contract. `availability` is the only runtime-resolved field:\nthe exported catalog declares which matrix row a capability depends on, and\nCore fills in what the connected compositor actually offers.",
+      "description": "A capability contract. `availability` is the only runtime-resolved field:\nthe exported catalog declares what a capability depends on (a matrix row\nor a provider slot), and Core fills in what is actually offered.",
       "properties": {
         "availability": {
           "$ref": "#/$defs/Availability"
@@ -94,6 +168,7 @@
         "input_schema": true,
         "output_schema": true,
         "provider": {
+          "description": "`core`, `compositor-adapter`, `system`, `shell` or `hostd`; the\nserved catalog names the entry: `hostd:<entry_id>`.",
           "type": "string"
         },
         "readback": {
@@ -103,6 +178,7 @@
           ]
         },
         "resource_scope": {
+          "description": "Never empty from 0.2 on: every call goes through one authorization\nentry point, and an empty scope would be an unreviewed default.",
           "items": {
             "type": "string"
           },
@@ -143,6 +219,7 @@
         "unavailable",
         "protocol_version_unsupported",
         "identity_rejected",
+        "preflight_rejected",
         "internal"
       ],
       "type": "string"
@@ -174,6 +251,36 @@
         "max_ms"
       ],
       "type": "object"
+    },
+    "UnavailableReason": {
+      "description": "Why a capability or a call is unavailable. Closed: a consumer can show a\nspecific product sentence for every value.",
+      "oneOf": [
+        {
+          "enum": [
+            "compositor_offline",
+            "host_unavailable",
+            "host_crash_loop",
+            "lease_expired",
+            "not_bound",
+            "rescue_mode",
+            "recovering",
+            "system_unavailable",
+            "participant_unavailable",
+            "session_locked"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "storage_full",
+          "description": "The store refused the write for lack of space; nothing changed.",
+          "type": "string"
+        },
+        {
+          "const": "storage_error",
+          "description": "The store reported an I/O error; nothing changed.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

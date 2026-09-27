@@ -12,6 +12,7 @@
         "unavailable",
         "protocol_version_unsupported",
         "identity_rejected",
+        "preflight_rejected",
         "internal"
       ],
       "type": "string"
@@ -28,6 +29,9 @@
         "code": {
           "format": "int32",
           "type": "integer"
+        },
+        "data": {
+          "description": "Reason codes and translation keys, never product text: `reason` for\n`unavailable`, `conflict` and `permission_denied`; `reasons[]` for\n`preflight_rejected`."
         },
         "message": {
           "type": "string"
