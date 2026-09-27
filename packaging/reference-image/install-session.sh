@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
-# Build and install the display-manager entry for the current checked-out G0
-# reference tree. Source-built Qt, Quickshell and Wayfire must already match
-# source-builds.lock; preflight verifies them before installation.
+# Build and install the display-manager entry and the systemd user units for
+# the current checked-out reference tree. Source-built Qt, Quickshell and
+# Wayfire must already match source-builds.lock; preflight verifies them
+# before installation.
+#
+# G1 installs "Ditto (Wayfire)" (/usr/local/libexec/ditto-session) beside an
+# existing "Ditto G0 (Wayfire)" entry and does not remove it; README.md lists
+# what moved.
 set -euo pipefail
 
 workspace="$(cd "$(dirname "$0")/../.." && pwd)"
 here="$workspace/packaging/reference-image"
-temporary="$(mktemp -d /tmp/ditto-g0-session-install.XXXXXX)"
+units_source="$workspace/packaging/systemd/user"
+libexec=/usr/local/libexec
+# System-wide user units: every user manager sees them without anything being
+# written to the user's XDG_CONFIG_HOME, which Ditto does not write to.
+units_target=/etc/systemd/user
+qt_prefix="${DITTO_QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
+wayfire_prefix="${DITTO_WAYFIRE_PREFIX:-$HOME/wayfire}"
+temporary="$(mktemp -d /tmp/ditto-session-install.XXXXXX)"
 trap 'rm -rf -- "$temporary"' EXIT
 
 for command in cargo sed sudo install; do
@@ -21,22 +33,52 @@ if [[ "${1:-}" == --development ]]; then
 else
   bash "$here/preflight.sh"
 fi
-cargo build --locked --release -p ditto-core
+cargo build --locked --release -p ditto-core -p ditto-supervisor -p dittoctl
 
-sed "s|@DITTO_WORKSPACE@|$workspace|g" \
-  "$here/session/ditto-g0-session" >"$temporary/ditto-g0-session"
-sed 's|@DITTO_SESSION_EXEC@|/usr/local/libexec/ditto-g0-session|g' \
-  "$here/session/ditto-g0.desktop" >"$temporary/ditto-g0.desktop"
+# hostd runs on the frozen Node (.nvmrc), named by its canonical path.
+node="$(readlink -f "${DITTO_NODE:-$(command -v node || true)}")"
+wanted="v$(tr -d '[:space:]' <"$workspace/.nvmrc")"
+[[ -x "$node" ]] || { echo "missing Node $wanted (set DITTO_NODE)" >&2; exit 1; }
+[[ "$("$node" --version)" == "$wanted" ]] || { echo "Node at $node is $("$node" --version), not $wanted" >&2; exit 1; }
+command -v pnpm >/dev/null || { echo "missing installer dependency: pnpm" >&2; exit 1; }
+(cd "$workspace" && pnpm install --frozen-lockfile && pnpm --filter @ditto/host-runtime build)
+bash "$workspace/scripts/build-builtin-packages.sh" "$workspace/target/ditto-packages" >/dev/null
 
-sudo install -D -m 0755 "$temporary/ditto-g0-session" /usr/local/libexec/ditto-g0-session
-sudo install -D -m 0644 "$temporary/ditto-g0.desktop" /usr/share/wayland-sessions/ditto-g0.desktop
+substitute() {
+  sed -e "s|@DITTO_WORKSPACE@|$workspace|g" \
+    -e "s|@DITTO_QT_PREFIX@|$qt_prefix|g" \
+    -e "s|@DITTO_WAYFIRE_PREFIX@|$wayfire_prefix|g" \
+    -e "s|@DITTO_LIBEXEC@|$libexec|g" \
+    -e "s|@DITTO_NODE@|$node|g" \
+    -e "s|@DITTO_SESSION_EXEC@|$libexec/ditto-session|g" "$1" >"$2"
+  if grep -q '@DITTO_[A-Z_]*@' "$2"; then
+    echo "unsubstituted placeholder in $1" >&2
+    exit 1
+  fi
+}
+
+substitute "$here/session/ditto-session" "$temporary/ditto-session"
+substitute "$here/session/ditto.desktop" "$temporary/ditto.desktop"
+sudo install -D -m 0755 "$temporary/ditto-session" "$libexec/ditto-session"
+sudo install -D -m 0644 "$temporary/ditto.desktop" /usr/share/wayland-sessions/ditto.desktop
 # A GDM restart otherwise leaves the Ditto session open and blocks the next
-# login for the same user; see session/ditto-g0-end-sessions.
-sudo install -D -m 0755 "$here/session/ditto-g0-end-sessions" /usr/local/libexec/ditto-g0-end-sessions
-sudo install -D -m 0755 "$here/session/ditto-g0-relogin" /usr/local/libexec/ditto-g0-relogin
-sudo install -D -m 0644 "$here/session/gdm-ditto-g0.conf" /etc/systemd/system/gdm.service.d/ditto-g0.conf
-sudo systemctl daemon-reload
+# login for the same user; see session/ditto-end-sessions.
+for script in ditto-end-sessions ditto-relogin ditto-logout ditto-rescue-ui; do
+  sudo install -D -m 0755 "$here/session/$script" "$libexec/$script"
+done
+sudo install -D -m 0644 "$here/session/gdm-ditto.conf" /etc/systemd/system/gdm.service.d/ditto.conf
 
-echo 'installed display-manager session: Ditto G0 (Wayfire)'
+for unit in "$units_source"/*; do
+  name="$(basename "$unit")"
+  substitute "$unit" "$temporary/$name"
+  sudo install -D -m 0644 "$temporary/$name" "$units_target/$name"
+done
+sudo systemctl daemon-reload
+# The running user manager (if any) reads the new units now; a later login
+# would read them anyway.
+systemctl --user daemon-reload 2>/dev/null || echo 'no user manager reachable; the units load at the next login' >&2
+
+echo 'installed display-manager session: Ditto (Wayfire)'
+echo "installed user units: $(cd "$units_source" && echo *) -> $units_target"
 echo "workspace: $workspace"
-echo 'select it once at the login manager, then run tests/g0/input-method/manual-session.sh from foot'
+echo 'select it once at the login manager; journalctl --user -u ditto-core -u ditto-supervisor shows the supervised units'

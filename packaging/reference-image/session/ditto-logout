@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Wayfire's logout binding (wayfire.ini). Ending the logind session makes the
+# login script's trap stop ditto-session.target and the scopes.
 set -euo pipefail
 
 session="${XDG_SESSION_ID:-}"

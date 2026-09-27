@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=Ditto G0 (Wayfire)
-Comment=Frozen Ditto G0 native feasibility session
+Name=Ditto (Wayfire)
+Comment=Ditto G1 desktop session
 Exec=@DITTO_SESSION_EXEC@
 Type=Application
 DesktopNames=Wayfire;Ditto;

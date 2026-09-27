@@ -108,3 +108,29 @@ Wayfire 的協定多數由 plugin 提供，因此「Wayfire 支援什麼」這�
 - **Sway 那一欄不會再更新。** 它是決策當下的對照，不是維護中的支援目標；`sway.rs` 保留可編譯只為了讓這份對照能重現。
 
 下一步見 [plan/02 §7 的進度紀錄](../../plan/02/06-workplan.md#7-進度紀錄)。
+
+## 7. G1 探測：C-15～C-19（開發證據，headless）
+
+> **開發證據（headless）。** 以下結果來自 `ditto-ref-ws-rtx4060-01` 上的 headless Wayfire 0.11.0（`WLR_BACKENDS=headless`、`WLR_RENDERER=pixman`、合成輸入經 `stipc`），不是實體登入工作階段，也不是任何出口門檻的結果。run_id `2026-09-27T09:30:54Z-54ef`：commit 為 `54ef90b`，但探測腳本當時尚未進版（工作樹）。探測對象的 plugin 清單見 [`tools/compositor-probe/g1/wayfire.ini`](../../tools/compositor-probe/g1/wayfire.ini)（G0 夾具加上 `command`；`simple-tile` 刻意不預載）。
+>
+> 重跑：`bash tools/compositor-probe/g1/run.sh [c15 c16 c17 c18 c19]`，輸出於 `artifacts/g1-dev/compositor-probe/`（每項一份 JSON 與合成器日誌）。
+
+| 能力 | 路徑 | 觀察結果（開發證據（headless）） | 證據 | 對 Ditto 的意義 |
+| --- | --- | --- | --- | --- |
+| C-15 平鋪策略切換 | `wayfire/set-config-options` 改 `core/plugins`；`simple-tile/get-layout`／`set-layout`；`window-rules/configure-view` | **執行期可切換，但既有視窗要由呼叫端處理。** ① 執行期載入 `simple-tile` 回 `ok`，`get-layout` 隨即可用；**已存在的兩個視窗不會被平鋪**（幾何仍為 100,100 700×500、`tiled-edges=0`），之後新開的視窗才平鋪（0,0 1920×1080、`tiled-edges=15`）。② `set-layout` 把三個視窗放進同一棵樹後，回讀為三欄（x=0／645／1285），包含先前的浮動視窗。③ `set-layout` 移出某視窗後，它**離開樹但仍回報 `tiled-edges=15` 與平鋪時的幾何**；plugin 自己的 `<super> KEY_T` 切換則會還原為 100,100 700×500、`tiled-edges=0`。④ 載入中把 `simple-tile/tile_by_default` 設為 `none`，新視窗浮動。⑤ **平鋪中卸載 plugin，視窗停在平鋪幾何、`tiled-edges=15`**，`get-layout` 變成 `No such method found!`；此時對每個視窗送 `configure-view {"tiled-edges":0,"geometry":…}` 可回到浮動幾何。⑥ 重新載入後樹是空的，已存在的視窗不會自動回到樹中 | `artifacts/g1-dev/compositor-probe/c15-2026-09-27T09:30:54Z-54ef.json` | 布局切換可以做成受控交接（D-33 提案），但 Wayfire 不會替既有視窗完成交接：浮動→平鋪要以 `set-layout` 放入既有視窗，平鋪→浮動要先清空樹、再以 `configure-view` 還原呼叫端記下的浮動幾何。另見下方「對現有轉接的影響」 |
+| C-16 全域快捷鍵綁定 | `command/register-binding`／`unregister-binding`；`command/bindings`（經 `set-config-options`） | **執行期可新增、觸發、移除，兩條路徑都成立。** ① IPC 綁定 `<super> KEY_F9` 帶 `command`：`stipc` 觸發後命令執行；註冊的連線關閉後仍會觸發（持久）；`unregister-binding` 後不再觸發。② 不帶 `command` 的綁定只把 `{"event":"command-binding","binding-id":…}` 送給註冊的連線。③ **同一組合鍵註冊兩次，兩個命令都執行**：合成器不維持單一擁有者。④ 經 `set-config-options` 寫入 `command/bindings` 後觸發成立，`get-config-option` 可回讀整份清單；寫入空物件後不再觸發、回讀為 `[]`。⑤ **沒有列舉 IPC 綁定的方法**（`command/list-bindings` 回 `No such method found!`）；`binding-id` 是合成器程序內的位址值，重啟後不沿用 | `artifacts/g1-dev/compositor-probe/c16-2026-09-27T09:30:54Z-54ef.json` | G1-R4 的快捷鍵部分不成立：不需要 layer-shell 鍵盤獨占。可回讀的路徑是 `command/bindings` 選項，單一擁有者須由 Core 的預檢保證（合成器不擋重複）。「連線關閉後綁定仍在、被移除」的行為是讀原始碼（`command.cpp` 的 `on_client_disconnect`），本探測沒有觀察臨時綁定在斷線後的移除 |
+| C-17 輸出縮放與排列變更 | `wayfire/set-config-options` 改 `output:<name>/scale`、`output:<name>/position` | **執行期可變更並回讀。** scale 1.0→1.25：`list-outputs` 的邏輯幾何由 1920×1080 變為 1536×864；`xdg_output` 同樣回報 1536×864；`wl_output` 的整數 scale 由 1 變 2；`output-layout-changed` 事件帶 `"scale": 1.25`。position 改為 100,50：`list-outputs` 與 `xdg_output` 都回讀 100,50；`wl_output` 的 x／y 仍為 0,0。還原後三處都回到初值。`zwlr_output_manager_v1` v4 有公告，但本機沒有 `wlr-randr`，**該協定路徑沒有測** | `artifacts/g1-dev/compositor-probe/c17-2026-09-27T09:30:54Z-54ef.json` | C-06「scale 只能讀啟動設定」有了執行期的讀取來源：`output-layout-changed` 事件的 `configuration[].scale`，或 `get-config-option output:<name>/scale`。限時回復可用同一個 `set-config-options` 寫回舊值。headless 的 1.25 在實體螢幕上的呈現未驗 |
+| C-18 輸出熱插拔事件 | `window-rules/events/watch`；`wayfire/create-headless-output`／`destroy-headless-output` | **headless 模擬成立，實體拔插未測。** 以 IPC 新增 1280×720 的 `HEADLESS-2`：watch 連線收到 `output-layout-changed`（兩個輸出），**沒有收到 `output-added`**。把視窗移到 `HEADLESS-2` 後刪除該輸出：收到 `view-set-output`、`output-removed`、`output-layout-changed`；**視窗被合成器移回 `HEADLESS-1`**（幾何約 100,100）。啟動時的 `HEADLESS-1` 不能以此方法刪除（`Output is not a headless output created from an IPC command!`） | `artifacts/g1-dev/compositor-probe/c18-2026-09-27T09:30:54Z-54ef.json` | Core 應以 `output-layout-changed`＋`output-removed` 觸發重讀，不能只等 `output-added`。視窗搬移在這個情境下由 Wayfire 自己完成，Core 的工作是回讀並處理無法搬移的（平鋪中）視窗。EX1-13 ⑤ 仍需第二台實體螢幕 |
+| C-19 鎖定客戶端死亡 | `ext_session_lock_v1` | **headless 下仍維持鎖定，桌面內容未暴露。** 鎖定客戶端以不透明洋紅色 lock surface 鎖定：截圖 100% 洋紅，按鍵不進入 foot 視窗，一般 `command` 綁定不觸發。`SIGKILL` 鎖定客戶端後：截圖為黑底加 Wayfire 的 💥 圖案（黑色約 66%），**基準畫面的桌面顏色占比 0%**；按鍵仍不進入視窗；`focus-view` 回 `ok` 但輸入沒有送達。之後啟動第二個鎖定客戶端，**可以接手鎖定並解鎖**，解鎖後輸入恢復；鎖定期間送出的按鍵事後也沒有出現在視窗中。`exec-always` 的綁定在三種鎖定狀態下**都會執行** | `artifacts/g1-dev/compositor-probe/c19-2026-09-27T09:30:54Z-54ef.json` 與同名的四張 `.png` | G1-R6 在 headless 下沒有出現。但：① 殭屍鎖定畫面沒有解鎖介面，**使用者只能等 Core 重啟 `ditto-lock`**；② 任何能連上 `ext_session_lock_manager_v1` 的客戶端都能接手並解鎖，這個 global 的存取必須受限；③ 截圖經 screencopy 取得，代表合成器的輸出內容，不代表實體螢幕；EX1-12 ④ 仍須在實體登入工作階段以錄影確認，且本探測只終止了鎖定客戶端，沒有同時終止 Shell |
+
+### 7.1 對現有轉接的影響
+
+- `crates/ditto-compositor/src/wayfire.rs` 目前把 `tiled-edges == 15` 當成「最大化」。`simple-tile` 載入後，平鋪視窗同樣回報 `tiled-edges=15`（C-15），兩者在 `list-views` 裡**無法區分**。要分辨，須另以 `simple-tile/get-layout` 查該視窗是否在樹中。
+- `command/bindings` 與 `core/plugins` 經 `set-config-options` 寫入後會被**鎖定**（`opt->set_locked(true)`，讀自 `ipc-utility-methods.hpp`），之後重新讀取 `wayfire.ini` 不會覆寫它們。它們也不會寫回檔案，合成器重啟後回到 `wayfire.ini` 的值；權威仍在 Profile，由 Core 每次啟動後重新套用。
+- 具體的 IPC 呼叫與回讀方式見 [D-33 提案](../../.agents/notes/decisions/2026-09-27-d33-layout-strategy-path.md)。
+
+### 7.2 本節不能支持什麼
+
+- 不能代表 EX1-01 ③、EX1-12 ④、EX1-13 ⑤ 任一項通過。三者都要求實體參考機工作階段（④ 另需錄影，⑤ 需第二台實體螢幕）。
+- headless 的 pixman 算繪路徑與參考機的 GPU／DRM 路徑不同；C-19 的「未暴露」只對 screencopy 看到的內容成立。
+- `zwlr_output_manager_v1` 路徑（C-17）與臨時綁定在斷線後的移除（C-16）沒有觀察，只讀了原始碼或只確認 global 存在。

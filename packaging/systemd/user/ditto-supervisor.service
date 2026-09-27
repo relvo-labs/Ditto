@@ -1,0 +1,21 @@
+# Shell responsiveness watcher (crates/ditto-supervisor). It must outlive what
+# it watches, so it has no dependency on ditto-core.service: a Core restart
+# storm must not take the supervisor with it.
+[Unit]
+Description=Ditto Shell supervisor
+Documentation=file://@DITTO_WORKSPACE@/crates/ditto-supervisor/README.md
+PartOf=ditto-session.target
+# Never give up: RestartSec bounds the cost of a crash loop to one start a second.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+ExecStart=@DITTO_WORKSPACE@/target/release/ditto-supervisor
+# Small and idle between pings; keep it out of the way of the desktop.
+Nice=5
+MemoryMax=32M
+
+[Install]
+WantedBy=ditto-session.target
