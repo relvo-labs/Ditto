@@ -370,10 +370,25 @@ G0 出口前允許的工作見 [01 §2.2](01-scope-and-exit-criteria.md#22-預�
 
 ### 8.2 工作包狀態
 
-全部 54 個工作包：**未開始**。預備期項目：**未開始**。
+依 [D-37](../../.agents/notes/decisions/2026-09-27-d37-g1-start-before-g0-exit.md)，G1 在 G0 出口前開工，8.1 的缺口帶進 G1、G1 的門檻不變。下表是實作方在 `feat/g1-foundation`（未提交）上的自評，**不是出口判定**；「開發環境已完成」的判準見本節開頭。
+
+| 工作流 | 開發環境已完成 | 進行中 | 未開始 |
+| --- | --- | --- | --- |
+| CORE | 01、02、03、04、05、06、07、08、09、10、11、12、13、15、16 | 14（配額：hostd 用 D-06b 的短工具配額，見下）、17（`ditto-system`：通知與 logind 在 `DITTO_SYSTEM=none` 以外未於工作階段中驗證） | —— |
+| HOST | 01、02、03、04、05、06（服務端；面板屬 SHELL）、07、08、09、10、11 | 12（守門在 CI，「實際擋下一次」的紀錄未留） | —— |
+| SHELL | 01、03、04、06、07、08、09、10、12、13 | 02（Profile 尚無角色位置欄位，雙螢幕跟隨主輸出未做）、05（音量與網路只驗證了不可用呈現；Super+數字沒有對應命令）、11（PAM 解鎖成功路徑與 Core 的 `--lock` 啟動未測） | —— |
+| PLAT | 02、05 | 01（需第二螢幕）、03（`dittoctl` 救援子命令已有，救援介面屬 SHELL）、04 | —— |
+| QA | 01、04 | 02（Vitest 部分完成；Rust 整合與故障注入層待補齊）、03、06、07 | 05 |
+
+G1 腳本的開發機首次執行結果在 [tests/g1/README.md](../../tests/g1/README.md)。其中 **EX1-04 ② 在夾具中未通過**：tasks 服務停用／啟用 100 次後所有計數首尾相同，但 hostd PSS 中位數增幅 13.7%、Mann-Kendall p=0.012（JS heap 穩定），交 HOST 查明，門檻不調整（原則 5）。
 
 ### 8.3 期間的其他紀錄
 
 | 日期 | 項目 | 內容 |
 | --- | --- | --- |
 | 2026-09-27 | 計畫建立 | 以 harness HEAD `477b4f4` 與 Ditto `8dc27d2` 為盤點基準 |
+| 2026-09-27 | D-37 | 使用者裁定以既有測試為足夠依據，G1 在 G0 出口前開工 |
+| 2026-09-27 | D-26～D-35 | 以提案身分寫入 `milestones/01/05`；實作暫採提案值，待評審 |
+| 2026-09-27 | F-5 的兩項解讀 | ① hostd 的程序配額暫用 D-06b 的短工具配額，服務配額由 D-06b 核定後替換；② `session_restart` 等級的變更存成 revision、`state = committed`、每項 `scheduled`，`result` 為新增的 `scheduled`（協定 0.2 §8.2），不回 `succeeded` |
+| 2026-09-27 | SHELL 回報的平台問題 | ① 在 headless 工作階段中 `desktop.launcher.launch` 回 `accepted`，但應用的 systemd scope 沒拿到該工作階段的 Wayland 環境而不出現，`app_id` 也須是 desktop 檔 id；② Quickshell 0.3.1 從設定目錄外匯入的目錄只解析第一個型別，所以 lock／rescue 以符號連結共用 `core` 等目錄（安裝須保留），套件庫中的供應者須是單一 QML 檔；③ `ditto-core.service` 的救援介面與鎖定客戶端原本誤用 kind `quickshell`，已改為 `rescue-shell`／`lock` |
+| 2026-09-27 | 測試本身的缺陷 | `ditto-store` 離線救援測試的偶發 `Locked`（其他測試 spawn `tar` 繼承鎖描述元）；fault 測試斷言失敗時留下孤兒 Core。兩者已修，產品程式碼不受影響 |

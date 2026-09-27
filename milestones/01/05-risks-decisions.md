@@ -59,6 +59,17 @@
 | D-24 | **`ditto-qml-shell` 轉 `stable` 的判定** | **2026-09-22 已決定**：生產 24 矩形遮罩雙向驗證後轉 stable（[紀錄](../../.agents/notes/decisions/2026-09-22-d24-qml-shell-stable.md)） | G0 出口 | Shell |
 | D-25 | **自動化測試的第一線環境** | **2026-09-27 已決定**：參考機上的 libvirt 開發 VM 為第一線自動化測試；結果只是開發證據，出口門檻不變（[紀錄](../../.agents/notes/decisions/2026-09-27-d25-vm-first-automation.md)） | G0 | 平台工程＋QA |
 | D-36 | **EX-09 的判定方式** | **2026-09-27 已決定（放寬）**：由連續 3 晚改為同一已進版 commit 的 3 次獨立參考機執行，可在同一天，並須先通過 3 輪 VM；只適用 G0（[紀錄](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md)） | G0 出口 | 參考機 owner；產品 owner 於出口評審確認 |
+| D-26 | **Core 的並行模型與 SQLite 函式庫**（plan/03 提案） | 待決策提案：std 執行緒＋單一協調器＋唯讀連線池；`rusqlite` bundled；WAL＋`synchronous=FULL`。G1 實作暫採此值（[plan/03/08](../../plan/03/08-decisions-and-risks.md#12-本計畫新增的待決策提案)） | G1 M0 | Core |
+| D-27 | **hostd 的連線與身分**（plan/03 提案） | 待決策提案：共用 `core.sock`；kind `hostd` 經受控啟動器；`on_behalf_of` 以已分派條目表驗證 | G1 M0 | Core＋Host |
+| D-28 | **通知伺服端的擁有者**（plan/03 提案） | 待決策提案：Core 的 `ditto-system`；策略詢問 50 ms，失敗預設顯示 | G1 W3 | Core＋Shell |
+| D-29 | **救援介面形態與離線寫入**（plan/03 提案） | 待決策提案：`shell/rescue/` 獨立設定＋`dittoctl rescue` fallback；`--offline` 持 `core.lock` 只允許兩種寫入 | G1 W9 | Runtime＋平台 |
+| D-30 | **鎖定客戶端的程序形態**（plan/03 提案） | 待決策提案：獨立程序 `ditto-lock`，由 Core 啟動；依 C-19 實測 | G1 W6 | Shell＋平台 |
+| D-31 | **G1 估算與人力修正**（plan/03 提案） | 待決策提案：124 → 140.5 人週；選項 A（11 人、18 週） | G1 M0 | 管理＋產品 |
+| D-32 | **交易層的候選策略**（plan/03 提案） | 待決策提案：預設策略 A，依預先承諾判準決定是否改 B；兩者不混用 | 判準 G1 M0；定案 W3 | Host |
+| D-33 | **布局策略在 Wayfire 上的實作路徑**（plan/03 提案） | 待決策提案：依 C-15 探測決定受控交接或工作階段重啟等級 | G1 W3 | 平台＋產品 |
+| D-34 | **10 個簡單插件的固定集合**（plan/03 提案） | 待決策提案：5 個 QML 狀態型＋5 個 Cordis 設定型，版本鎖定 | G1 W8 | QA＋Host |
+| D-35 | **協定 0.2 的凍結政策**（plan/03 提案） | 待決策提案：M3 起只允許新增選用欄位；破壞性變更升 0.3 | G1 M3 | Core＋Agent |
+| D-37 | **G0 出口評審前開始 G1 實作** | **2026-09-27 已決定（偏離 plan/03 開工條件）**：使用者判斷既有測試足以開工；G0 未通過項目帶進 G1 追蹤，G1 門檻不變（[紀錄](../../.agents/notes/decisions/2026-09-27-d37-g1-start-before-g0-exit.md)） | G1 開工 | 參考機 owner；產品 owner 於 G0 出口評審確認 |
 
 ## 3. 團隊與估算假設
 
