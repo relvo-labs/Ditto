@@ -1,0 +1,58 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.fixture.fault_candidate_claim",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "故障夾具：candidate_claim",
+    "en": "Fault fixture: candidate_claim"
+  },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "在候選模式註冊能力並強行取得獨占資源",
+  "plugin_kind": "service",
+  "host_kind": "cordis",
+  "trust_level": "trusted",
+  "runtime": {
+    "node": "^22.19.0"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [],
+  "provides": [
+    {
+      "capability": "plugin.ditto.fixture.fault_candidate_claim.get"
+    }
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "controlled_handoff",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8,
+    "cpu_percent": 1
+  },
+  "rescue": {
+    "disable_safe": true
+  },
+  "entry": "dist/index.mjs"
+}

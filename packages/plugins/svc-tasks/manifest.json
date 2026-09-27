@@ -1,0 +1,78 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.svc.tasks",
+  "version": "1.0.0",
+  "name": { "zh-TW": "待辦", "en": "Tasks" },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "讀寫使用者授權的 todo.txt 檔案與插件自己的待辦清單，外部修改後即時通知",
+  "plugin_kind": "service",
+  "host_kind": "cordis",
+  "trust_level": "trusted",
+  "runtime": { "node": "^22.19.0" },
+  "platform": ["linux-x86_64"],
+  "required_protocol_version": "^0.2",
+  "slots": ["svc.tasks"],
+  "provides": [
+    { "capability": "desktop.tasks.list" },
+    { "capability": "desktop.tasks.add" },
+    { "capability": "desktop.tasks.complete" },
+    { "capability": "desktop.tasks.subscribe" }
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "entry": "dist/index.mjs",
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["todo_txt"] },
+          "path_grant": { "type": "string" }
+        },
+        "required": ["kind", "path_grant"],
+        "additionalProperties": false
+      },
+      "demo": { "type": "boolean", "default": false }
+    },
+    "additionalProperties": false
+  },
+  "data_schema": {
+    "type": "object",
+    "properties": {
+      "next": { "type": "integer" },
+      "items": { "type": "array", "items": { "type": "object" } }
+    }
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [
+    {
+      "name": "tasks/changed",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "revision": { "type": "integer" },
+          "why": { "type": "string" },
+          "open": { "type": "integer" },
+          "done": { "type": "integer" },
+          "file_state": { "type": "string", "enum": ["not_configured", "active", "not_granted", "revoked", "unreadable"] }
+        },
+        "required": ["revision", "open", "done", "file_state"]
+      },
+      "coalesce": "latest"
+    }
+  ],
+  "permissions": ["files:*"],
+  "hot_swap": "controlled_handoff",
+  "health": { "timeout_ms": 2000 },
+  "cleanup": { "timeout_ms": 5000 },
+  "migrations": [],
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": { "memory_mib": 16, "cpu_percent": 2 },
+  "rescue": { "disable_safe": true }
+}

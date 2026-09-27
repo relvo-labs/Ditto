@@ -1,0 +1,22 @@
+{
+  "name": "@ditto/svc-notification-policy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "ditto": {
+    "source": "src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ../../host-runtime/tsconfig.vendor.json && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "build": "node ../../host-sdk/scripts/build-plugins.mjs .",
+    "pack": "../../host-sdk/bin/ditto-plugin pack ."
+  },
+  "devDependencies": {
+    "@ditto/host-sdk": "workspace:*",
+    "@standard-schema/spec": "1.1.0",
+    "@types/node": "22.18.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

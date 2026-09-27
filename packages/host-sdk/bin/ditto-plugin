@@ -1,0 +1,9 @@
+#!/bin/sh
+# ditto-plugin validate|pack. Builds the CLI bundle on first use, so a fresh
+# checkout (e.g. scripts/build-builtin-packages.sh) needs no separate step.
+here=$(dirname "$(readlink -f "$0")")
+node="${DITTO_NODE:-node}"
+if [ ! -f "$here/../dist/ditto-plugin.mjs" ]; then
+  "$node" "$here/../scripts/build.mjs" >/dev/null || exit 1
+fi
+exec "$node" "$here/../dist/ditto-plugin.mjs" "$@"

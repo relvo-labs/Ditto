@@ -1,0 +1,56 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.fixture.status_cpu",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "處理器用量",
+    "en": "CPU"
+  },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "顯示處理器使用率",
+  "plugin_kind": "qml_provider",
+  "host_kind": "qml",
+  "trust_level": "trusted",
+  "runtime": {
+    "qt": ">=6.10"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [
+    "ui.status_item"
+  ],
+  "provides": [],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 4,
+    "cpu_percent": 1
+  },
+  "rescue": {
+    "disable_safe": true
+  },
+  "qml_entry": "qml/StatusCpu.qml"
+}

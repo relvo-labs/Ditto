@@ -1,0 +1,65 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.fixture.wallpaper_dim",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "桌布暗化",
+    "en": "Wallpaper dim"
+  },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "桌布暗化設定（D-34 簡單插件）",
+  "plugin_kind": "service",
+  "host_kind": "cordis",
+  "trust_level": "trusted",
+  "runtime": {
+    "node": "^22.19.0"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [],
+  "provides": [
+    {
+      "capability": "plugin.ditto.fixture.wallpaper_dim.get"
+    }
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "percent": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 90,
+        "default": 20
+      }
+    },
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8,
+    "cpu_percent": 1
+  },
+  "rescue": {
+    "disable_safe": true
+  },
+  "entry": "dist/index.mjs"
+}

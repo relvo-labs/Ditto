@@ -1,0 +1,31 @@
+{
+  // Vendored Cordis compiles under the relaxed flags its upstream uses (the
+  // harness vendor tsconfigs). Only declarations are emitted, into
+  // vendor-types/, so Ditto's own code stays under full strict mode.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "types": ["node"],
+    "strict": true,
+    "noImplicitAny": false,
+    "noImplicitThis": false,
+    "strictFunctionTypes": false,
+    "skipLibCheck": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "vendor",
+    "outDir": "vendor-types",
+    "paths": {
+      "@deepseek-ai/cordis": ["./vendor/cordis/src/index.ts"],
+      "@deepseek-ai/cosmokit": ["./vendor/cosmokit/src/index.ts"],
+      "@deepseek-ai/schemastery": ["./vendor/schemastery/src/index.ts"],
+      "@deepseek-ai/cordis-plugin-loader": ["./vendor/loader/src/index.ts"],
+      "@deepseek-ai/cordis-plugin-timer": ["./vendor/timer/src/index.ts"]
+    }
+  },
+  "include": ["vendor/*/src/**/*.ts"]
+}

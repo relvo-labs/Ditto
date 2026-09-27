@@ -1,0 +1,24 @@
+{
+  // Shared by host-runtime, host-sdk, plugins and fixtures. Vendored Cordis is
+  // consumed as source (its package exports point at an unbuilt lib/), so the
+  // same aliases appear in vendor-alias.mjs for vitest and tsdown.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@deepseek-ai/cordis": ["./host-runtime/vendor-types/cordis/src/index.d.ts"],
+      "@deepseek-ai/cosmokit": ["./host-runtime/vendor-types/cosmokit/src/index.d.ts"],
+      "@deepseek-ai/schemastery": ["./host-runtime/vendor-types/schemastery/src/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-loader/diff": ["./host-runtime/vendor-types/loader/src/config/diff.d.ts"],
+      "@deepseek-ai/cordis-plugin-loader": ["./host-runtime/vendor-types/loader/src/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-timer": ["./host-runtime/vendor-types/timer/src/index.d.ts"]
+    }
+  }
+}

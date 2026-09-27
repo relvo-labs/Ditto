@@ -1,0 +1,1 @@
+{ "name": "ditto-example-counter", "private": true, "type": "module", "ditto": { "source": "src/index.ts" } }

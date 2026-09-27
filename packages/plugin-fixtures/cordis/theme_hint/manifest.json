@@ -1,0 +1,63 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.fixture.theme_hint",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "主題提示",
+    "en": "Theme hint"
+  },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "主題提示設定（D-34 簡單插件）",
+  "plugin_kind": "service",
+  "host_kind": "cordis",
+  "trust_level": "trusted",
+  "runtime": {
+    "node": "^22.19.0"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [],
+  "provides": [
+    {
+      "capability": "plugin.ditto.fixture.theme_hint.get"
+    }
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "hint": {
+        "type": "string",
+        "default": "soft"
+      }
+    },
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8,
+    "cpu_percent": 1
+  },
+  "rescue": {
+    "disable_safe": true
+  },
+  "entry": "dist/index.mjs"
+}

@@ -1,0 +1,12 @@
+{
+  // Bundling only: no `paths`, so the source aliases in vendor-alias.mjs decide
+  // resolution instead of the declaration files the typecheck uses.
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true
+  }
+}

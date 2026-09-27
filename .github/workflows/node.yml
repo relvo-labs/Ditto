@@ -2,14 +2,17 @@ name: node
 on:
   push:
     branches: [main]
-    paths: ['packages/**', 'schema/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.nvmrc', '.github/workflows/node.yml']
+    paths: ['packages/**', 'schema/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.nvmrc', '.github/workflows/node.yml', 'scripts/check-vendor-manifest.sh']
   pull_request:
-    paths: ['packages/**', 'schema/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.nvmrc', '.github/workflows/node.yml']
+    paths: ['packages/**', 'schema/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.nvmrc', '.github/workflows/node.yml', 'scripts/check-vendor-manifest.sh']
 jobs:
   verify:
     runs-on: [self-hosted, ditto-ci]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The vendor guard diffs against the merge base, so it needs history.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -17,6 +20,21 @@ jobs:
         with:
           version: 10.11.0
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @ditto/protocol typecheck
+      - name: vendor guard (EX1-14 ③)
+        run: |
+          scripts/check-vendor-manifest.sh --self-test
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            scripts/check-vendor-manifest.sh --base "origin/${{ github.base_ref }}"
+          elif [ -n "${{ github.event.before }}" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            scripts/check-vendor-manifest.sh --base "${{ github.event.before }}"
+          fi
+      - run: pnpm -r typecheck
       - run: cargo build --locked -p ditto-core
+      # Production hostd bundle; the build fails if fault-injection code is still in it.
+      - run: pnpm --filter @ditto/host-runtime build
+      - run: pnpm --filter @ditto/host-sdk build
+      - run: pnpm --filter @ditto/plugin-fixtures --filter @ditto/svc-tasks --filter @ditto/svc-notification-policy build
       - run: pnpm --filter @ditto/protocol test
+      # host-runtime: lifecycle L-01…L-04/L-08 (TS half), Cordis pinning, bridge, process test of the bundle.
+      - run: pnpm --filter @ditto/host-runtime test
+      - run: pnpm --filter @ditto/host-sdk --filter @ditto/plugin-fixtures --filter @ditto/svc-tasks --filter @ditto/svc-notification-policy test

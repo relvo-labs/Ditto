@@ -1,0 +1,48 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.example.counter",
+  "version": "1.0.0",
+  "name": { "zh-TW": "計數器範例", "en": "Counter example" },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "最小的 Cordis 服務插件：提供一個服務、兩項能力與一個跨程序事件",
+  "plugin_kind": "service",
+  "host_kind": "cordis",
+  "trust_level": "trusted",
+  "runtime": { "node": "^22.19.0" },
+  "platform": ["linux-x86_64"],
+  "required_protocol_version": "^0.2",
+  "slots": [],
+  "provides": [
+    { "service": "dittoExampleCounter" },
+    { "capability": "plugin.ditto.example.counter.get" },
+    { "capability": "plugin.ditto.example.counter.increment" }
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "entry": "dist/index.mjs",
+  "config_schema": {
+    "type": "object",
+    "properties": { "step": { "type": "integer", "minimum": 1, "maximum": 100, "default": 1 } },
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [
+    {
+      "name": "counter/changed",
+      "schema": { "type": "object", "properties": { "value": { "type": "integer" } }, "required": ["value"] },
+      "coalesce": "latest"
+    }
+  ],
+  "permissions": [],
+  "hot_swap": "controlled_handoff",
+  "health": { "timeout_ms": 2000 },
+  "cleanup": { "timeout_ms": 5000 },
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": { "memory_mib": 4, "cpu_percent": 1 },
+  "rescue": { "disable_safe": true }
+}
