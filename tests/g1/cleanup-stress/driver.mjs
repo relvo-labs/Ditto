@@ -7,7 +7,7 @@
 // writes everything to <work>/result.json. run.sh judges it.
 //
 //   node driver.mjs <work> tasks-toggle <cycles> <warmup>
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, sleep } from '../lib/core-client.mjs';
 
@@ -29,7 +29,18 @@ async function snapshot(cycle) {
   // Let deferred cleanup finish before counting, as a person looking would.
   await sleep(300);
   const diagnostics = await must('desktop.plugins.diagnostics', {});
-  return { cycle, at: new Date().toISOString(), counts: flatten(diagnostics), hostd_pss_kib: diagnostics.host?.process?.pss_kib ?? null, hostd_heap: diagnostics.host?.heap ?? null, hostd_pid: diagnostics.host?.process?.pid ?? null };
+  const hostdPid = diagnostics.host?.process?.pid ?? null;
+  let hostdRollup = null;
+  if (hostdPid) {
+    try {
+      hostdRollup = Object.fromEntries(readFileSync(`/proc/${hostdPid}/smaps_rollup`, 'utf8')
+        .split('\n').flatMap(line => {
+          const match = /^([A-Za-z_]+):\s+(\d+) kB$/.exec(line);
+          return match ? [[match[1], Number(match[2])]] : [];
+        }));
+    } catch { /* the process may have exited; diagnostics keeps the PID */ }
+  }
+  return { cycle, at: new Date().toISOString(), counts: flatten(diagnostics), hostd_pss_kib: diagnostics.host?.process?.pss_kib ?? null, hostd_rollup_kib: hostdRollup, hostd_heap: diagnostics.host?.heap ?? null, hostd_pid: hostdPid };
 }
 
 async function setDisabled(entry, disabled) {

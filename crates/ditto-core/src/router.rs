@@ -761,14 +761,16 @@ fn run_proposal(core: &Arc<Core>, proposal: Proposal, call: &Call<'_>) -> Handle
     let started = Instant::now();
     let change_id = match change_id.recv_timeout(remaining) {
         Ok(change_id) => change_id,
-        Err(_) => {
-            let mut error = CoreError::new(
-                ErrorName::Timeout,
-                "the change was not accepted in time; query it by operation id",
-            );
-            error.data = Some(json!({"outcome": "unknown"}));
-            return Err(error);
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            // The draft may have failed before it got a change_id (ENOSPC,
+            // SQLITE_IOERR, invalid profile). The coordinator sends its
+            // actual error on `outcome` after dropping `accepted`.
+            match outcome.recv_timeout(remaining.saturating_sub(started.elapsed())) {
+                Ok(result) => return change_outcome(result?),
+                Err(_) => return Err(unknown_acceptance()),
+            }
         }
+        Err(mpsc::RecvTimeoutError::Timeout) => return Err(unknown_acceptance()),
     };
     match outcome.recv_timeout(remaining.saturating_sub(started.elapsed())) {
         Ok(record) => change_outcome(record?),
@@ -779,6 +781,15 @@ fn run_proposal(core: &Arc<Core>, proposal: Proposal, call: &Call<'_>) -> Handle
             Ok((json!(record), false))
         }
     }
+}
+
+fn unknown_acceptance() -> CoreError {
+    let mut error = CoreError::new(
+        ErrorName::Timeout,
+        "the change was not accepted in time; query it by operation id",
+    );
+    error.data = Some(json!({"outcome": "unknown"}));
+    error
 }
 
 fn wait_for_idle_coordinator(core: &Core) {
@@ -1106,8 +1117,8 @@ fn profiles_export(core: &Core, input: ProfileIdInput) -> Handled {
     let (profile, _, document) =
         core.read(|connection| profiles::head_document(connection, &input.profile_id))?;
     let packages = package_set(core)?;
-    let export = exports::export(&profile.name, &document, &packages)
-        .map_err(|reason| CoreError::invalid(reason))?;
+    let export =
+        exports::export(&profile.name, &document, &packages).map_err(CoreError::invalid)?;
     ok(ProfilesExportOutput { export })
 }
 

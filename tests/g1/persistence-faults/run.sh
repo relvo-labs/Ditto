@@ -44,14 +44,19 @@ else
   rm -rf -- "$store"
   DITTO_DATA_DIR_OVERRIDE="$store" g1_fixture_core
   read -r head_before digest_before < <(g1_head)
+  df -B1 "$store" >"$evidence/full-filesystem-before.txt"
   # Fill what is left, keeping nothing back for SQLite.
   dd if=/dev/zero of="$store/filler" bs=64k status=none 2>/dev/null || true
   sync
-  record="$(g1_call desktop.changes.propose "{\"base_revision\":\"$head_before\",\"ops\":[{\"op\":\"set_value\",\"path\":\"/avatar/hidden\",\"after\":true}]}" 2>/dev/null || true)"
+  df -B1 "$store" >"$evidence/full-filesystem-filled.txt"
+  operation_id="g1-full-$RUN_ID"
+  record="$("$BINARIES/dittoctl" --json probe call --operation-id "$operation_id" desktop.changes.propose "{\"base_revision\":\"$head_before\",\"ops\":[{\"op\":\"set_value\",\"path\":\"/avatar/hidden\",\"after\":true}]}" 2>/dev/null || true)"
   echo "$record" >"$evidence/full-propose.json"
   rm -f -- "$store/filler"
   sync
+  g1_call desktop.changes.get "{\"operation_id\":\"$operation_id\"}" >"$evidence/full-operation-after-free.json" 2>&1 || true
   read -r head_after digest_after < <(g1_head)
+  cp "$FIXTURE_ROOT/core.log" "$evidence/full-core.log"
   verdict="$(python3 - "$record" <<'PYEOF'
 import json, sys
 try:

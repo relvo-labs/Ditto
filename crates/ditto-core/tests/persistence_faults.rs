@@ -263,6 +263,21 @@ fn head(cli: &Peer) -> (String, String, Option<String>) {
     )
 }
 
+fn wait_ready(cli: &Peer) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let answer = cli.call("desktop.profiles.get", json!({}), None);
+        if answer["result"]["profile"]["head_revision"].is_string() {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Core did not finish startup recovery: {answer}"
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
 #[test]
 fn a_crash_in_each_state_ends_in_a_decided_outcome() {
     for (state, expected) in [
@@ -413,6 +428,7 @@ fn a_failed_unpack_leaves_no_half_package() {
         .success());
     let _core = start_core(&dirs, Some("store.unpack:ioerr"));
     let cli = Peer::connect(&dirs.socket(), "dittoctl", None);
+    wait_ready(&cli);
     let job = cli.call(
         "desktop.plugins.install",
         json!({"path": archive.display().to_string(), "idempotency_key": "unpack-1"}),

@@ -47,3 +47,18 @@ G0 尚未正式出口：C-08 中文輸入、D-06a 冷登入 PSS、進版後的 n
 ## 4. 下一輪驗證順序
 
 先修 EX1-04 的 PSS 增長、補全 L-05～10 與救援／鎖定／GUI 腳本，再讓 PR 快檢與 nightly 覆蓋它們。參考機登入、第二螢幕與 D-06a 到位後執行實體情境及三次冷登入資源量測；最後累積連續五晚 nightly、非實作者簽核，逐項更新本表並舉行正式出口評審。任何未達標數字須保留原始資料與調整提案，不得自行放寬門檻。
+
+## 5. 2026-09-28 開發 VM 複核（非出口證據）
+
+來源為 `2b1e99e` 加未提交工作樹；所有結果的 `evidence_class` 為 `development-vm`。VM 每次還原 `ditto-base` 快照、同步工作樹、建置後測試，結束即關機。此輪沒有改變上表任何 EX1 門檻的「未通過」結論。
+
+| 檢查 | 結果與原始證據 | 出口限制 |
+| --- | --- | --- |
+| Rust／Node 工作區與協定向量 | 以 CI 同指令重跑，三組通過，協定向量 11 項通過；[摘要](../../../artifacts/g1-vm/2026-09-28T05:10:06Z-2b1e/summary.jsonl)、[VM 畫面](../../../artifacts/g1-vm/2026-09-28T05:10:06Z-2b1e/vm-test-status.png) | 工作樹未進版；不等於 L-01～L-10 或真機整合通過 |
+| 預檢、回復、服務獨立性、延遲、救援 | 各套件有已通過子檢查，也各有 `operator`、`environment` 或 `not_implemented`；[完整 VM 摘要](../../../artifacts/g1-vm/2026-09-28T04:49:09Z-2b1e/summary.jsonl) 與 [逐項原始結果](../../../artifacts/g1-vm/2026-09-28T04:49:09Z-2b1e/vm-artifacts/) | 缺口仍依 §1 逐項追蹤；VM 結果不能替代實體參考機 |
+| EX1-09 持久故障 | 修正啟動恢復競態及滿碟錯誤回報後，`prepared`／`applying`／`verifying` 崩潰恢復、`SQLITE_FULL`／`SQLITE_IOERR`、解壓失敗與真實 tmpfs 滿碟共 5 項通過；真滿碟回 `storage_full`，Profile head 和內容雜湊不變。[結果與原始回讀](../../../artifacts/g1-vm/2026-09-28T04:59:28Z-2b1e/vm-artifacts/) | 尚須已進版來源與參考機重跑 |
+| EX1-04 清理壓力 ② | 100 次 tasks 停用／啟用後計數首尾相同，但 hostd PSS 中位數增幅 14.6%（門檻 ≤10%），Mann-Kendall p=0.001（門檻 ≥0.05）；`Pss_Anon` 16,056→29,416 KiB，`Pss_File` 25,709→22,671 KiB。[快照與判定](../../../artifacts/g1-vm/2026-09-28T05:02:33Z-2b1e/vm-artifacts/)、[VM 畫面](../../../artifacts/g1-vm/2026-09-28T05:02:33Z-2b1e/vm-test-status.png) | **未達標**。目前只能判定成長主要在匿名記憶體；不能據此指定 V8、allocator 或物件殘留為原因。Dock、realm、Shell PSS 與真機數列亦未完成 |
+
+滿碟失敗最初是 `run_proposal` 在草稿寫入前的錯誤被誤報為 `timeout/unknown`；修正後實際滿碟回讀已通過。hostd 終態交易紀錄保留舊 fiber 參照的問題也已修正，但同條件 VM 重跑 PSS 仍未達標（14.9%）；因此不得把該修正宣稱為 EX1-04 的解決。下一步須針對匿名記憶體與 V8 heap／原生配置做分離診斷，再在參考機按原門檻重測。
+
+`vm-regression.yml` 已加上 Rust／Node 工作區及契約向量的 VM PR 快檢，但修改尚未進版，也沒有 CI 執行紀錄，EX1-15 仍未通過。參考機使用凍結工具鏈的 preflight 可通過；檢查時 seat0 停在 GDM，沒有可用的 Ditto 登入工作階段，故本輪未對使用者工作階段執行 Shell、鎖定、雙螢幕或實體資源量測。

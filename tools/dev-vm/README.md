@@ -1,4 +1,4 @@
-# G0 開發 VM
+# G0／G1 開發 VM
 
 依 [D-25](../../.agents/notes/decisions/2026-09-27-d25-vm-first-automation.md)，這是 G0 自動化測試的第一線：會中斷工作階段、重啟 GDM 或需要反覆登入的測試，都先在這台 VM 通過，才上實體參考機。
 
@@ -21,11 +21,15 @@ bash tools/dev-vm/create.sh      # 第一次：下載並驗證映像、建立 VM
 bash tools/dev-vm/provision.sh   # 凍結前綴或登入設定改變後：重新佈建並覆寫快照
 bash tools/dev-vm/run.sh         # 還原快照 → 安裝目前工作樹 → 測試 → 取回 artifacts → 關機
 bash tools/dev-vm/run.sh login   # 只跑其中一組：fixtures、login、input-method、cold-login、cold-login-full
+bash tools/dev-vm/run-g1.sh      # G1 非圖形開發檢查；完整結果含尚需真機／人工的項目
+bash tools/dev-vm/run-g1.sh persistence-faults cleanup-stress # 指定 G1 檢查
 ```
 
 預設跑 `fixtures login input-method cold-login`。`cold-login-full` 約 90 分鐘，只在要求時執行。
 
 `run.sh` 的結果寫在 `artifacts/g0-vm/<run_id>/summary.jsonl`，每一項檢查另有 log。VM 內產生的 artifacts 也會複製回同一個目錄。`.github/workflows/vm-regression.yml` 在相關 PR 與每天 00:00（台北）自動執行它。
+
+`run-g1.sh` 還原同一快照，建置 Core、hostd 與內建套件，執行 Rust／Node 工作區測試及 `tests/g1/` 可在 VM 跑的夾具。真實滿碟測試使用 VM 內 80 MiB 的 tmpfs；結束後卸載。結果在 `artifacts/g1-vm/<run_id>/`：`summary.jsonl`、逐項 log、`vm-artifacts/` 原始回讀，以及由 libvirt 擷取的 `vm-test-status.png`。即使有 `environment`、`operator` 或 `not_implemented`，報告也保留原狀並以非零結束；畫面截圖只輔助查看，判定以 JSON 和原始回讀為準。`vm-regression.yml` 在 PR／排程跑 `rust-workspace node-workspace contract-vectors` 三組可完整由 VM 判定的 G1 檢查；完整 G1 suite 仍須手動執行並保留缺口。G1 出口證據仍需實體參考機、已進版 commit、人工簽核及規定的 nightly 次數。
 
 | 組 | 檢查 |
 | --- | --- |

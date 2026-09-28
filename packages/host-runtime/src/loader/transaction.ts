@@ -464,8 +464,21 @@ export class TransactionLayer {
 
     txn.phase = 'committed'
     txn.commitMs = performance.now() - started
+    const items = txn.plans.map(plan => plan.commit!)
+    // A recent change remains addressable for state queries and rollback, but
+    // disposed candidates and old fibers must not be kept alive by that log.
+    // Rollback only needs the previous spec and exported data; a volatile
+    // update also needs its still-active instance.
+    for (const plan of txn.plans) {
+      if (plan.kind !== 'volatile') plan.before = undefined
+      plan.candidate = undefined
+      plan.after = undefined
+      plan.plugin = undefined
+      plan.target = undefined
+    }
+    if (this.current === txn) this.current = undefined
     this.options.onChange?.()
-    return { items: txn.plans.map(plan => plan.commit!) }
+    return { items }
   }
 
   /** Settle, import handed-off state, health-check, then send held registrations. Returns a failure reason or nothing. */
@@ -513,6 +526,7 @@ export class TransactionLayer {
     await this.faults('abort.before')
     await Promise.all(txn.plans.map(plan => plan.candidate && this.dispose(plan.candidate)))
     txn.phase = 'aborted'
+    txn.plans = txn.plans.map(plan => ({ kind: 'keep', entryId: plan.entryId, prepare: plan.prepare }))
     if (this.current === txn) this.current = undefined
   }
 
@@ -560,6 +574,8 @@ export class TransactionLayer {
       }
     }
     txn.phase = 'rolled_back'
+    txn.plans = []
+    if (this.current === txn) this.current = undefined
     this.options.onChange?.()
     return { items: items.reverse() }
   }
