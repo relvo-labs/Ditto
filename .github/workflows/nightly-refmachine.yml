@@ -108,6 +108,9 @@ jobs:
       - name: EX1-07 Cordis services outlive clients
         if: success() || failure()
         run: bash tests/g1/cordis-independent/run.sh
+      - name: EX1-08 lifecycle L-01…L-10
+        if: success() || failure()
+        run: bash tests/g1/lifecycle/run.sh
       - name: EX1-09 persistence faults
         if: success() || failure()
         run: bash tests/g1/persistence-faults/run.sh

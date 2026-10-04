@@ -17,7 +17,7 @@ if summary_path.exists():
             summary[record["check"]] = record["status"]
 for name in (
     "rust-workspace", "node-workspace",
-    "contract-vectors", "preflight-negative", "rollback", "persistence-faults",
+    "contract-vectors", "preflight-negative", "rollback", "persistence-faults", "lifecycle",
     "cordis-independent", "cleanup-stress", "latency", "rescue-no-node",
 ):
     if name in ("rust-workspace", "node-workspace"):
