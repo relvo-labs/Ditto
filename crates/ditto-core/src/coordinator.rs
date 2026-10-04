@@ -26,8 +26,8 @@ use ditto_protocol::{
     },
     ids,
     participant::{
-        ItemStatus, Observation, ParticipantPhase, ParticipantRole, PrepareParams, Projection,
-        ORIGIN_BOOT, ORIGIN_CHANGE,
+        ChangePhase, ItemStatus, Observation, ParticipantPhase, ParticipantRole, PrepareParams,
+        Projection, StateOutput, ORIGIN_BOOT, ORIGIN_CHANGE,
     },
     profile::{HostKind, ProfileDocument, RevisionOrigin},
     services::Grant,
@@ -934,6 +934,32 @@ impl Coordinator {
         self.snapshot_plugin_data(change_id, base_document, &validation.target);
         self.transition(change_id, ChangeState::Validated, ChangeState::Prepared)?;
         fault::hit("coordinator.after_state=prepared");
+        // A participant whose connection ended after it prepared has applied
+        // nothing yet, and its candidates died with it: the change is aborted
+        // before anything is committed, not rolled back (L-05).
+        let lost: Vec<ParticipantRole> = steps
+            .iter()
+            .filter(|step| !step.participant.connected())
+            .map(|step| step.role)
+            .collect();
+        if !lost.is_empty() {
+            for role in lost {
+                items.push(outcome(
+                    0,
+                    role,
+                    role_name(role),
+                    OutcomeStatus::Failed,
+                    Some(ParticipantError::Disconnected.key()),
+                ));
+            }
+            return self.abort_from(
+                change_id,
+                ChangeState::Prepared,
+                &mut steps,
+                items,
+                "change.participant_lost",
+            );
+        }
         self.transition(change_id, ChangeState::Prepared, ChangeState::Applying)?;
         fault::hit("coordinator.after_state=applying");
         // commit
@@ -1067,6 +1093,22 @@ impl Coordinator {
         loop {
             let operation = self.operation(change_id, role, "readback", &json!({}));
             let observed = participant.state(Some(change_id), STATE_TIMEOUT);
+            if let Ok(StateOutput {
+                change:
+                    Some(ChangePhase {
+                        phase: ParticipantPhase::Unknown,
+                        ..
+                    }),
+                ..
+            }) = &observed
+            {
+                // A restarted participant does not remember the change; only
+                // what it observes now counts.
+                crate::log::event(
+                    "participant.change_unknown",
+                    &[("change_id", change_id), ("role", role_name(role))],
+                );
+            }
             let verdicts = match (&observed, target) {
                 (Ok(state), _) => self.judge(&state.observed, target),
                 (Err(error), _) => vec![Verdict {
@@ -1132,6 +1174,19 @@ impl Coordinator {
         items: Vec<OutcomeItem>,
         key: &str,
     ) -> Result<ChangeRecord, CoreError> {
+        self.abort_from(change_id, ChangeState::Validated, steps, items, key)
+    }
+
+    /// Abort from `from` (validated, or prepared when a participant was lost
+    /// before commit): every prepared participant drops its candidates.
+    fn abort_from(
+        &mut self,
+        change_id: &str,
+        from: ChangeState,
+        steps: &mut [Step],
+        items: Vec<OutcomeItem>,
+        key: &str,
+    ) -> Result<ChangeRecord, CoreError> {
         for step in steps.iter_mut() {
             if step.role == ParticipantRole::Hostd {
                 self.core.hosts.discard(change_id);
@@ -1159,7 +1214,7 @@ impl Coordinator {
         self.store.write(|tx| {
             changes::set_items(tx, change_id, &items)?;
             changes::set_failure(tx, change_id, key)?;
-            changes::transition(tx, change_id, ChangeState::Validated, ChangeState::Aborted)
+            changes::transition(tx, change_id, from, ChangeState::Aborted)
         })?;
         let record = self.record(change_id)?;
         self.audit(Some(change_id), "core", "change.abort", "aborted", key);
@@ -1208,6 +1263,18 @@ impl Coordinator {
                 },
                 report.as_ref().ok().map(|r| json!(r)).as_ref(),
             );
+            if !step.participant.connected() && step.role == ParticipantRole::Hostd {
+                // hostd went away during the change. A restarted hostd keeps
+                // nothing on disk and remembers no change, so the committed
+                // head (still the base) is pushed to it the way any reconnect
+                // is, and the readback below asks it about this change: it
+                // answers that it does not know it, and what it runs decides
+                // (L-06). Nothing it ran before is replayed.
+                if let Ok(replacement) = self.participant(step.role) {
+                    self.sync_participant(step.role);
+                    step.participant = replacement;
+                }
+            }
             if let Ok(report) = &report {
                 for item in &report.items {
                     if item.status == ItemStatus::NotRestored {
