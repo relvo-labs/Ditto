@@ -10,10 +10,10 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
 suites=("$@")
-(( ${#suites[@]} )) || suites=(rust-workspace node-workspace contract-vectors preflight-negative rollback persistence-faults cordis-independent cleanup-stress latency rescue-no-node)
+(( ${#suites[@]} )) || suites=(rust-workspace node-workspace contract-vectors preflight-negative rollback persistence-faults cordis-independent cleanup-stress latency rescue-no-node manual-switch)
 for suite in "${suites[@]}"; do
   case "$suite" in
-    rust-workspace | node-workspace | contract-vectors | preflight-negative | rollback | persistence-faults | cordis-independent | cleanup-stress | latency | rescue-no-node) ;;
+    rust-workspace | node-workspace | contract-vectors | preflight-negative | rollback | persistence-faults | cordis-independent | cleanup-stress | latency | rescue-no-node | manual-switch) ;;
     *) echo "unknown G1 suite: $suite" >&2; exit 2 ;;
   esac
 done
