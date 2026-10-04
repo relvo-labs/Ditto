@@ -16,6 +16,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 
 | 腳本 | 門檻 | 在哪裡能判定 |
 | --- | --- | --- |
+| `manual-switch/run.sh` | EX1-01 | headless 桌面夾具：正常模式 Core 監督的真實 Shell、回讀 relay、foot 與 Kate（參考機另加 Firefox）。七步全部以合成按鍵經 Wayfire 操作組合中心與個人化設定（`lib/gui.py`：以無障礙名稱 Tab 到控制項、Enter／空白鍵、Ctrl+V 貼上中文名稱），每一步經 relay 回讀 Core（變更狀態、Profile 綁定、Shell 掛載、合成器的布局策略），每步一行寫入 `manual-switch-<run_id>.jsonl`；另檢查快捷鍵與命令沒有重複擁有者、參考應用未終止、Kate 未儲存緩衝雜湊不變。設定視窗以 Shell 控制 socket 的 `command composition.open` 開啟（與面板選單同一個 Shell 命令）。非實作者的人工錄影永遠是 `operator`；nightly 以 `DITTO_G1_PENDING_OK=operator` 只讓結束碼放行這一項，文件仍記 `incomplete` |
 | `rescue-supervision/run.sh` | EX1-12 ①②③ | 登入的「Ditto (Wayfire)」工作階段。其他環境改跑 headless 夾具，只量 supervisor 從 `SIGSTOP` 到終止 Shell 的時間（開發證據，不含救援介面）。③ 會真的終止 Core，需另設 `DITTO_ALLOW_CORE_STORM=1` |
 | `lock/run.sh` | EX1-12 ④⑤ | 登入的 Ditto 工作階段。合成器本身的行為是差異表 C-19（`tools/compositor-probe/g1`，headless 開發證據）；以密碼解鎖與錄影由操作者完成 |
 | `output-hotplug/run.sh --automated` | EX1-13 ⑤ | 接第二螢幕的登入工作階段，以 `wlr-randr --off` 停用第二輸出。沒有工作階段時跑 headless 替代版：以 Wayfire IPC 建立再刪除一個 headless 輸出（C-18），並在旁邊啟動 Shell。兩者都先以 ChangeSet 把角色放到第二輸出（工作階段中結束時撤銷），再判定 `windows-visible`（Core 的視窗回讀，每個視窗帶所在輸出）與 `avatar-visible`（Shell 經 `desktop.panels.list` 回報的角色位置） |
