@@ -75,6 +75,17 @@ pub trait SystemServices: Send + Sync {
     /// Whether this process owns `org.freedesktop.Notifications`.
     fn notification_server_owned(&self) -> bool;
     fn set_notification_hooks(&self, hooks: std::sync::Arc<dyn NotificationHooks>);
+    /// A notification from Ditto itself (app name `Ditto`), stored and
+    /// published like any other so the notification area shows it. The
+    /// default has nowhere to put it and says so.
+    fn post_notification(
+        &self,
+        _summary: &str,
+        _body: &str,
+        _urgency: Urgency,
+    ) -> SystemResult<NotificationItem> {
+        unavailable()
+    }
 
     fn session_state(&self) -> SystemResult<SessionState>;
     fn lock_session(&self) -> SystemResult<()>;

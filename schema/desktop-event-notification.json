@@ -818,6 +818,13 @@
         "id": {
           "$ref": "#/$defs/WindowSessionId"
         },
+        "output": {
+          "description": "The output the window is on, by the name `desktop.outputs.list`\nreports. `x`/`y` are relative to that output (and to its current\nworkspace), not to the global layout, so a position is only meaningful\ntogether with this name. Absent when the compositor does not say.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "state": {
           "$ref": "#/$defs/WindowState"
         },

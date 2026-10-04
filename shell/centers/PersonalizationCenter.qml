@@ -22,6 +22,8 @@ Flickable {
 
     property var appearance: null
     property var avatar: null
+    property var outputs: []          // desktop.outputs.list
+    property var placement: null      // where the Shell reports the character
     property var shortcuts: []        // the Profile's own bindings
     property var shortcutInfo: []     // desktop.shortcuts.list
     property var commands: []
@@ -74,6 +76,67 @@ Flickable {
         client.capability("desktop.commands.list", {}, function (result) {
             page.commands = result.commands;
         });
+        client.capability("desktop.outputs.list", {}, function (result) {
+            page.outputs = result.outputs.filter(output => output.enabled !== false);
+        });
+        client.capability("desktop.panels.list", {}, function (result) {
+            page.placement = result.avatar || null;
+        });
+    }
+
+    function cornerName(corner) {
+        switch (corner) {
+        case "top_left":
+            return t(qsTr("左上"));
+        case "top_right":
+            return t(qsTr("右上"));
+        case "bottom_left":
+            return t(qsTr("左下"));
+        }
+        return t(qsTr("右下"));
+    }
+
+    /// The character's screen as options: the primary one, or one by name.
+    /// A named screen that is unplugged stays listed, so the choice reads
+    /// true while the character waits on the primary screen.
+    function screenOptions() {
+        const options = [{ value: "", label: t(qsTr("主螢幕")) }];
+        for (const output of outputs) {
+            options.push({ value: output.name, label: output.name });
+        }
+        const named = avatar && avatar.output ? avatar.output : "";
+        if (named.length > 0 && !outputs.some(output => output.name === named)) {
+            options.push({ value: named, label: t(qsTr("%1（未連接）")).arg(named) });
+        }
+        return options;
+    }
+
+    /// Where the character is now, in words, from the Shell's report.
+    function placementText() {
+        if (!placement || !placement.output) {
+            return t(qsTr("目前沒有顯示角色。"));
+        }
+        const where = t(qsTr("角色目前在 %1 的%2。")).arg(placement.output).arg(cornerName(placement.corner));
+        if (avatar && avatar.output && placement.follows_primary) {
+            return where + " " + t(qsTr("指定的螢幕 %1 沒有連接，所以先放在主螢幕。")).arg(avatar.output);
+        }
+        return where;
+    }
+
+    /// `output` absent means the primary screen; the key is left out rather
+    /// than set to null, as Core writes it.
+    function setAvatarScreen(name) {
+        if (!avatar) {
+            return;
+        }
+        const after = Object.assign({}, avatar);
+        if (name && name.length > 0) {
+            after.output = name;
+        } else {
+            delete after.output;
+        }
+        busy = true;
+        client.propose([{ op: "set_value", path: "/avatar", before: avatar, after: after }], { surface: "personalization" }, done, fail);
     }
 
     function setAppearance(fields) {
@@ -429,10 +492,60 @@ Flickable {
                 }
             }
 
+            Row {
+                spacing: page.tokens.space
+                Text {
+                    width: 140
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: page.t(qsTr("螢幕"))
+                    color: page.tokens.foreground
+                    font.pixelSize: page.tokens.fontBody
+                }
+                Choice {
+                    tokens: page.tokens
+                    enabled: !page.busy && !!page.avatar
+                    maxWidth: column.width - 140 - page.tokens.space
+                    value: page.avatar && page.avatar.output ? page.avatar.output : ""
+                    accessibleName: page.t(qsTr("角色所在螢幕"))
+                    options: page.screenOptions()
+                    onChosen: value => page.setAvatarScreen(value)
+                }
+            }
+
+            Row {
+                spacing: page.tokens.space
+                Text {
+                    width: 140
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: page.t(qsTr("位置"))
+                    color: page.tokens.foreground
+                    font.pixelSize: page.tokens.fontBody
+                }
+                Choice {
+                    tokens: page.tokens
+                    enabled: !page.busy && !!page.avatar
+                    maxWidth: column.width - 140 - page.tokens.space
+                    value: page.avatar && page.avatar.corner ? page.avatar.corner : "bottom_right"
+                    accessibleName: page.t(qsTr("角色位置"))
+                    options: ["top_left", "top_right", "bottom_left", "bottom_right"].map(corner => ({ value: corner, label: page.cornerName(corner) }))
+                    onChosen: value => page.setAvatar("corner", value)
+                }
+            }
+
             Text {
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: page.t(qsTr("角色目前固定在畫面右下角；組合中還沒有位置設定。被視窗蓋住時可以用喚回快捷鍵叫出來。"))
+                text: page.placementText()
+                color: page.tokens.foreground
+                font.pixelSize: page.tokens.fontBody
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
+
+            Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.t(qsTr("主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。"))
                 color: page.tokens.foregroundMuted
                 font.pixelSize: page.tokens.fontSmall
             }

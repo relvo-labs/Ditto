@@ -69,6 +69,25 @@ fn set_pointer(root: &mut Value, pointer: &str, value: Value) -> Result<(), Stri
     }
 }
 
+/// An output is named by its connector (`HDMI-A-1`, `HEADLESS-2`). The name
+/// need not be connected now: a Profile may name the monitor that is
+/// unplugged, and the character follows the primary output until it is back.
+fn valid_avatar_output(output: Option<&str>) -> Result<(), String> {
+    match output {
+        None => Ok(()),
+        Some(name)
+            if !name.is_empty()
+                && name.len() <= 64
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':')) =>
+        {
+            Ok(())
+        }
+        Some(_) => Err("avatar_output_not_a_connector_name".into()),
+    }
+}
+
 /// Apply every op in order to `base`, collecting every problem instead of
 /// stopping at the first, so the caller sees all of them at once.
 pub fn apply(base: &ProfileDocument, ops: &[ChangeOp]) -> Applied {
@@ -112,9 +131,13 @@ pub fn apply(base: &ProfileDocument, ops: &[ChangeOp]) -> Applied {
                         json!({"path": path}),
                     ));
                 }
-                match set_pointer(&mut value, path, after.clone()).and_then(|()| {
-                    serde_json::from_value::<ProfileDocument>(value).map_err(|e| e.to_string())
-                }) {
+                match set_pointer(&mut value, path, after.clone())
+                    .and_then(|()| {
+                        serde_json::from_value::<ProfileDocument>(value).map_err(|e| e.to_string())
+                    })
+                    .and_then(|changed| {
+                        valid_avatar_output(changed.avatar.output.as_deref()).map(|()| changed)
+                    }) {
                     Ok(changed) => document = changed,
                     Err(why) => reasons.push(reason(
                         PreflightCode::SchemaInvalid,
@@ -395,7 +418,16 @@ pub fn diff(base: &ProfileDocument, target: &ProfileDocument) -> Vec<DiffItem> {
             ));
         }
     }
-    let (before, after) = (base.to_value(), target.to_value());
+    let (mut before, mut after) = (base.to_value(), target.to_value());
+    // A default corner is left out of the document; spelled out here so a
+    // move back to the default reads as a change, not a removal.
+    for document in [&mut before, &mut after] {
+        if let Some(avatar) = document["avatar"].as_object_mut() {
+            avatar
+                .entry("corner")
+                .or_insert_with(|| json!(ditto_protocol::profile::AvatarCorner::default()));
+        }
+    }
     for section in ["appearance", "avatar", "layout"] {
         diff_values(
             &format!("/{section}"),
@@ -598,12 +630,7 @@ pub(crate) mod tests {
                 locale: "zh-TW".into(),
             },
             shortcuts: vec![],
-            avatar: AvatarSettings {
-                enabled: true,
-                hidden: false,
-                scale: 1.0,
-                animations: true,
-            },
+            avatar: AvatarSettings::default(),
         }
     }
 
@@ -650,6 +677,86 @@ pub(crate) mod tests {
             .iter()
             .all(|r| r.code == PreflightCode::SchemaInvalid));
         assert_eq!(applied.document, base, "a refused write changes nothing");
+    }
+
+    #[test]
+    fn avatar_position_is_a_set_value_with_labelled_diff_items() {
+        let base = document();
+        let mut after = serde_json::to_value(&base.avatar).unwrap();
+        after["output"] = json!("HDMI-A-1");
+        after["corner"] = json!("top_left");
+        let applied = apply(
+            &base,
+            &[ChangeOp::SetValue {
+                path: "/avatar".into(),
+                before: Some(serde_json::to_value(&base.avatar).unwrap()),
+                after,
+            }],
+        );
+        assert!(applied.reasons.is_empty(), "{:?}", applied.reasons);
+        assert_eq!(applied.document.avatar.output.as_deref(), Some("HDMI-A-1"));
+        assert_eq!(
+            applied.document.avatar.corner,
+            ditto_protocol::profile::AvatarCorner::TopLeft
+        );
+        let items = diff(&base, &applied.document);
+        let labels: Vec<&str> = items.iter().map(|item| item.label_key.as_str()).collect();
+        assert_eq!(labels, ["diff.avatar.corner", "diff.avatar.output"]);
+        assert_eq!(items[0].kind, DiffKind::Changed);
+        assert_eq!(items[0].before, Some(json!("bottom_right")));
+        assert_eq!(items[1].kind, DiffKind::Added);
+
+        // Back to the defaults: the corner reads as a change, and the
+        // document is byte-for-byte the old one again.
+        let back = apply(&applied.document, &ops_between(&applied.document, &base));
+        assert!(back.reasons.is_empty());
+        assert_eq!(back.document.digest(), base.digest());
+        let items = diff(&applied.document, &back.document);
+        assert!(items
+            .iter()
+            .any(|item| item.label_key == "diff.avatar.corner" && item.kind == DiffKind::Changed));
+    }
+
+    #[test]
+    fn default_avatar_position_leaves_the_document_and_its_digest_alone() {
+        let base = document();
+        let value = base.to_value();
+        assert!(value["avatar"].get("output").is_none());
+        assert!(value["avatar"].get("corner").is_none());
+        let old: ProfileDocument = serde_json::from_value(value).unwrap();
+        assert_eq!(old.digest(), base.digest());
+    }
+
+    #[test]
+    fn avatar_position_preflight_refuses_bad_values() {
+        let base = document();
+        for (path, after) in [
+            ("/avatar/corner", json!("middle")),
+            ("/avatar/output", json!("")),
+            ("/avatar/output", json!("HDMI 1; rm")),
+            ("/avatar/output", json!(3)),
+        ] {
+            let applied = apply(
+                &base,
+                &[ChangeOp::SetValue {
+                    path: path.into(),
+                    before: None,
+                    after,
+                }],
+            );
+            assert_eq!(applied.reasons.len(), 1, "{path}");
+            assert_eq!(applied.reasons[0].code, PreflightCode::SchemaInvalid);
+            assert_eq!(applied.document, base);
+        }
+        let named = apply(
+            &base,
+            &[ChangeOp::SetValue {
+                path: "/avatar/output".into(),
+                before: None,
+                after: json!("DP-2"),
+            }],
+        );
+        assert!(named.reasons.is_empty(), "an unplugged output may be named");
     }
 
     #[test]

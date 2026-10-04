@@ -1,5 +1,68 @@
 {
   "$defs": {
+    "AvatarCorner": {
+      "description": "Where on its output the character sits.",
+      "enum": [
+        "bottom_right",
+        "bottom_left",
+        "top_right",
+        "top_left"
+      ],
+      "type": "string"
+    },
+    "AvatarPlacement": {
+      "additionalProperties": false,
+      "description": "The character's placement as the Shell observes it after laying it out.",
+      "properties": {
+        "corner": {
+          "$ref": "#/$defs/AvatarCorner"
+        },
+        "follows_primary": {
+          "description": "True when the Profile names no output, or names one that is not\nconnected, and the character is on the primary output instead.",
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output": {
+          "description": "The output the character's surface is on; absent when it has no\nsurface (turned off, or no output connected).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "On screen: false while hidden or turned off.",
+          "type": "boolean"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "description": "The surface rectangle in logical pixels, relative to `output`.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "follows_primary",
+        "corner",
+        "x",
+        "y",
+        "width",
+        "height",
+        "visible"
+      ],
+      "type": "object"
+    },
     "PanelStatus": {
       "additionalProperties": false,
       "properties": {
@@ -42,6 +105,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "avatar": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AvatarPlacement"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Where the Shell last reported the character to be; absent when no\nShell has reported a placement. This is the character's readback."
+    },
     "panels": {
       "items": {
         "$ref": "#/$defs/PanelStatus"

@@ -262,6 +262,9 @@ fn collect_windows(node: &Value, workspace: Option<&str>, out: &mut Vec<TreeWind
                         .to_string(),
                     app_id,
                     workspace_id: workspace.map(str::to_string),
+                    // Sway support is kept only for the D-02 comparison;
+                    // its coordinates are global, so no output is named.
+                    output: None,
                     x,
                     y,
                     width,

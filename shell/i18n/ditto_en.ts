@@ -81,6 +81,10 @@
         <translation>Dock</translation>
     </message>
     <message>
+        <source>主螢幕</source>
+        <translation>Primary screen</translation>
+    </message>
+    <message>
         <source>個人化設定</source>
         <translation>Personalization</translation>
     </message>
@@ -91,6 +95,14 @@
     <message>
         <source>只有部分生效，下列項目沒有還原。</source>
         <translation>Only part of it took effect; the items below were not restored.</translation>
+    </message>
+    <message>
+        <source>右上</source>
+        <translation>Top right</translation>
+    </message>
+    <message>
+        <source>右下</source>
+        <translation>Bottom right</translation>
     </message>
     <message>
         <source>命令列</source>
@@ -127,6 +139,14 @@
     <message>
         <source>尚未生效，之後套用</source>
         <translation>Not in effect yet; applied later</translation>
+    </message>
+    <message>
+        <source>左上</source>
+        <translation>Top left</translation>
+    </message>
+    <message>
+        <source>左下</source>
+        <translation>Bottom left</translation>
     </message>
     <message>
         <source>已保存，還沒有生效：下次登入時才會套用。</source>
@@ -838,12 +858,20 @@
         <translation>Character animation</translation>
     </message>
     <message>
+        <source>diff.avatar.corner</source>
+        <translation>Character position</translation>
+    </message>
+    <message>
         <source>diff.avatar.enabled</source>
         <translation>Character</translation>
     </message>
     <message>
         <source>diff.avatar.hidden</source>
         <translation>Hide the character</translation>
+    </message>
+    <message>
+        <source>diff.avatar.output</source>
+        <translation>Character screen</translation>
     </message>
     <message>
         <source>diff.avatar.scale</source>
@@ -1522,6 +1550,22 @@
 <context>
     <name>PersonalizationCenter</name>
     <message>
+        <source>%1（未連接）</source>
+        <translation>%1 (not connected)</translation>
+    </message>
+    <message>
+        <source>主螢幕</source>
+        <translation>Primary screen</translation>
+    </message>
+    <message>
+        <source>主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。</source>
+        <translation>The primary screen is the one placed furthest to the top left. When the character's screen is unplugged, the character moves to the primary screen and goes back once the screen is plugged in again. When a window covers it, the recall shortcut brings it back.</translation>
+    </message>
+    <message>
+        <source>位置</source>
+        <translation>Position</translation>
+    </message>
+    <message>
         <source>低效能樣式（關閉模糊與陰影）</source>
         <translation>Low-power style (no blur, no shadows)</translation>
     </message>
@@ -1540,6 +1584,14 @@
     <message>
         <source>動畫</source>
         <translation>Motion</translation>
+    </message>
+    <message>
+        <source>右上</source>
+        <translation>Top right</translation>
+    </message>
+    <message>
+        <source>右下</source>
+        <translation>Bottom right</translation>
     </message>
     <message>
         <source>圓角</source>
@@ -1562,6 +1614,14 @@
         <translation>Small</translation>
     </message>
     <message>
+        <source>左上</source>
+        <translation>Top left</translation>
+    </message>
+    <message>
+        <source>左下</source>
+        <translation>Bottom left</translation>
+    </message>
+    <message>
         <source>已生效</source>
         <translation>In effect</translation>
     </message>
@@ -1580,6 +1640,10 @@
     <message>
         <source>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</source>
         <translation>Ditto binds shortcuts in the window manager. A key combination can have one use only; a conflict is stopped and explained before anything is applied.</translation>
+    </message>
+    <message>
+        <source>指定的螢幕 %1 沒有連接，所以先放在主螢幕。</source>
+        <translation>The chosen screen %1 is not connected, so it is on the primary screen for now.</translation>
     </message>
     <message>
         <source>文字大小</source>
@@ -1610,6 +1674,10 @@
         <translation>Accessibility</translation>
     </message>
     <message>
+        <source>目前沒有顯示角色。</source>
+        <translation>The character is not shown right now.</translation>
+    </message>
+    <message>
         <source>移除</source>
         <translation>Remove</translation>
     </message>
@@ -1630,12 +1698,20 @@
         <translation>繁體中文</translation>
     </message>
     <message>
+        <source>螢幕</source>
+        <translation>Screen</translation>
+    </message>
+    <message>
         <source>衝突</source>
         <translation>Conflict</translation>
     </message>
     <message>
         <source>角色</source>
         <translation>Character</translation>
+    </message>
+    <message>
+        <source>角色位置</source>
+        <translation>Character position</translation>
     </message>
     <message>
         <source>角色動畫</source>
@@ -1646,8 +1722,12 @@
         <translation>Character size</translation>
     </message>
     <message>
-        <source>角色目前固定在畫面右下角；組合中還沒有位置設定。被視窗蓋住時可以用喚回快捷鍵叫出來。</source>
-        <translation>The character stays in the bottom-right corner for now; compositions have no position setting yet. When a window covers it, the recall shortcut brings it back.</translation>
+        <source>角色所在螢幕</source>
+        <translation>Character screen</translation>
+    </message>
+    <message>
+        <source>角色目前在 %1 的%2。</source>
+        <translation>The character is on %1, %2.</translation>
     </message>
     <message>
         <source>診斷</source>

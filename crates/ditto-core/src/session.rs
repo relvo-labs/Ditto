@@ -16,7 +16,7 @@ use ditto_compositor::{AdapterError, AdapterResult, CompositorAdapter, EventSour
 use ditto_protocol::{
     catalog::Availability,
     rpc::{RpcRequest, RpcResponse},
-    DesktopEventNotification, DesktopEventPayload, DesktopSnapshot, EventTopic,
+    DesktopEventNotification, DesktopEventPayload, DesktopSnapshot, EventTopic, Window,
 };
 
 use crate::events::{Delivery, EventBroker, Registration};
@@ -39,7 +39,12 @@ pub struct Session {
     online: AtomicBool,
     offline_reason: Mutex<Option<String>>,
     shortcut_handler: Mutex<Option<ditto_compositor::ShortcutHandler>>,
+    outputs_removed: Mutex<Option<OutputsRemoved>>,
 }
+
+/// Called after outputs disappeared, with their names and the windows as
+/// they were before (Core's window rescue, plan/03/05 §7).
+pub type OutputsRemoved = std::sync::Arc<dyn Fn(Vec<String>, Vec<Window>) + Send + Sync>;
 
 impl Session {
     pub fn new(mut adapter: Box<dyn CompositorAdapter>) -> Self {
@@ -54,7 +59,13 @@ impl Session {
             online: AtomicBool::new(online),
             offline_reason: Mutex::new(reason),
             shortcut_handler: Mutex::new(None),
+            outputs_removed: Mutex::new(None),
         }
+    }
+
+    /// Who is told when an output goes away; Core sets it once at start.
+    pub fn set_outputs_removed(&self, hook: OutputsRemoved) {
+        *self.outputs_removed.lock().expect("outputs hook") = Some(hook);
     }
 
     /// Where pressed global shortcuts go; kept across compositor reconnects.
@@ -210,17 +221,32 @@ impl Session {
                 return;
             }
         };
-        {
+        let removed = {
             let mut broker = self.broker.lock().expect("broker lock");
             let changes = difference(broker.snapshot(), &observed);
             if changes.is_empty() {
                 return;
             }
+            let vanished: Vec<String> = changes
+                .iter()
+                .filter_map(|payload| match payload {
+                    DesktopEventPayload::OutputRemoved { output_name } => Some(output_name.clone()),
+                    _ => None,
+                })
+                .collect();
+            let before = (!vanished.is_empty()).then(|| broker.snapshot().windows.clone());
             for payload in changes {
                 broker.publish(payload, observed.clone());
             }
-        }
+            before.map(|windows| (vanished, windows))
+        };
         self.flush();
+        if let Some((vanished, windows)) = removed {
+            let hook = self.outputs_removed.lock().expect("outputs hook").clone();
+            if let Some(hook) = hook {
+                hook(vanished, windows);
+            }
+        }
     }
 
     pub fn mark_offline(&self, reason: &str) {

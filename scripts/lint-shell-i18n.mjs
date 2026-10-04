@@ -61,7 +61,7 @@ const REQUIRED_KEYS = [
   'diff.slot.changed', 'diff.entry.added', 'diff.entry.removed', 'diff.entry.config', 'diff.entry.disabled',
   'diff.entry.enabled', 'diff.entry.version', 'diff.shortcuts', 'diff.appearance.token',
   ...['theme', 'locale', 'reduced_motion', 'reduced_transparency', 'low_power_style'].map((field) => `diff.appearance.${field}`),
-  ...['enabled', 'hidden', 'scale', 'animations'].map((field) => `diff.avatar.${field}`),
+  ...['enabled', 'hidden', 'scale', 'animations', 'output', 'corner'].map((field) => `diff.avatar.${field}`),
   'diff.layout.workspace_grid', 'diff.layout.rules',
   // import problems (exports::problem)
   ...['schema_invalid', 'format_unsupported', 'protocol_incompatible', 'digest_mismatch', 'package_missing',

@@ -322,6 +322,22 @@ QtObject {
         if ((item.label_key === "diff.entry.added" || item.label_key === "diff.entry.removed") && typeof value === "string") {
             return packageName(value);
         }
+        if (item.label_key === "diff.avatar.output") {
+            // No output named: the character follows the primary screen.
+            return value === undefined || value === null ? t(qsTr("主螢幕")) : String(value);
+        }
+        if (item.label_key === "diff.avatar.corner") {
+            switch (value) {
+            case "top_left":
+                return t(qsTr("左上"));
+            case "top_right":
+                return t(qsTr("右上"));
+            case "bottom_left":
+                return t(qsTr("左下"));
+            case "bottom_right":
+                return t(qsTr("右下"));
+            }
+        }
         if (value === undefined || value === null) {
             return t(qsTr("（無）"));
         }

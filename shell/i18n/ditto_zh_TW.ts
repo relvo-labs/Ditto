@@ -81,6 +81,10 @@
         <translation>Dock</translation>
     </message>
     <message>
+        <source>主螢幕</source>
+        <translation>主螢幕</translation>
+    </message>
+    <message>
         <source>個人化設定</source>
         <translation>個人化設定</translation>
     </message>
@@ -91,6 +95,14 @@
     <message>
         <source>只有部分生效，下列項目沒有還原。</source>
         <translation>只有部分生效，下列項目沒有還原。</translation>
+    </message>
+    <message>
+        <source>右上</source>
+        <translation>右上</translation>
+    </message>
+    <message>
+        <source>右下</source>
+        <translation>右下</translation>
     </message>
     <message>
         <source>命令列</source>
@@ -127,6 +139,14 @@
     <message>
         <source>尚未生效，之後套用</source>
         <translation>尚未生效，之後套用</translation>
+    </message>
+    <message>
+        <source>左上</source>
+        <translation>左上</translation>
+    </message>
+    <message>
+        <source>左下</source>
+        <translation>左下</translation>
     </message>
     <message>
         <source>已保存，還沒有生效：下次登入時才會套用。</source>
@@ -838,12 +858,20 @@
         <translation>角色動畫</translation>
     </message>
     <message>
+        <source>diff.avatar.corner</source>
+        <translation>角色位置</translation>
+    </message>
+    <message>
         <source>diff.avatar.enabled</source>
         <translation>角色</translation>
     </message>
     <message>
         <source>diff.avatar.hidden</source>
         <translation>隱藏角色</translation>
+    </message>
+    <message>
+        <source>diff.avatar.output</source>
+        <translation>角色所在螢幕</translation>
     </message>
     <message>
         <source>diff.avatar.scale</source>
@@ -1522,6 +1550,22 @@
 <context>
     <name>PersonalizationCenter</name>
     <message>
+        <source>%1（未連接）</source>
+        <translation>%1（未連接）</translation>
+    </message>
+    <message>
+        <source>主螢幕</source>
+        <translation>主螢幕</translation>
+    </message>
+    <message>
+        <source>主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。</source>
+        <translation>主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。</translation>
+    </message>
+    <message>
+        <source>位置</source>
+        <translation>位置</translation>
+    </message>
+    <message>
         <source>低效能樣式（關閉模糊與陰影）</source>
         <translation>低效能樣式（關閉模糊與陰影）</translation>
     </message>
@@ -1540,6 +1584,14 @@
     <message>
         <source>動畫</source>
         <translation>動畫</translation>
+    </message>
+    <message>
+        <source>右上</source>
+        <translation>右上</translation>
+    </message>
+    <message>
+        <source>右下</source>
+        <translation>右下</translation>
     </message>
     <message>
         <source>圓角</source>
@@ -1562,6 +1614,14 @@
         <translation>小</translation>
     </message>
     <message>
+        <source>左上</source>
+        <translation>左上</translation>
+    </message>
+    <message>
+        <source>左下</source>
+        <translation>左下</translation>
+    </message>
+    <message>
         <source>已生效</source>
         <translation>已生效</translation>
     </message>
@@ -1580,6 +1640,10 @@
     <message>
         <source>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</source>
         <translation>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</translation>
+    </message>
+    <message>
+        <source>指定的螢幕 %1 沒有連接，所以先放在主螢幕。</source>
+        <translation>指定的螢幕 %1 沒有連接，所以先放在主螢幕。</translation>
     </message>
     <message>
         <source>文字大小</source>
@@ -1610,6 +1674,10 @@
         <translation>無障礙</translation>
     </message>
     <message>
+        <source>目前沒有顯示角色。</source>
+        <translation>目前沒有顯示角色。</translation>
+    </message>
+    <message>
         <source>移除</source>
         <translation>移除</translation>
     </message>
@@ -1630,12 +1698,20 @@
         <translation>繁體中文</translation>
     </message>
     <message>
+        <source>螢幕</source>
+        <translation>螢幕</translation>
+    </message>
+    <message>
         <source>衝突</source>
         <translation>衝突</translation>
     </message>
     <message>
         <source>角色</source>
         <translation>角色</translation>
+    </message>
+    <message>
+        <source>角色位置</source>
+        <translation>角色位置</translation>
     </message>
     <message>
         <source>角色動畫</source>
@@ -1646,8 +1722,12 @@
         <translation>角色大小</translation>
     </message>
     <message>
-        <source>角色目前固定在畫面右下角；組合中還沒有位置設定。被視窗蓋住時可以用喚回快捷鍵叫出來。</source>
-        <translation>角色目前固定在畫面右下角；組合中還沒有位置設定。被視窗蓋住時可以用喚回快捷鍵叫出來。</translation>
+        <source>角色所在螢幕</source>
+        <translation>角色所在螢幕</translation>
+    </message>
+    <message>
+        <source>角色目前在 %1 的%2。</source>
+        <translation>角色目前在 %1 的%2。</translation>
     </message>
     <message>
         <source>診斷</source>

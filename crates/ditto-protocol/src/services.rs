@@ -379,6 +379,10 @@ pub struct PanelsListOutput {
     pub shell_connected: bool,
     pub panels: Vec<PanelStatus>,
     pub reported_at: Option<String>,
+    /// Where the Shell last reported the character to be; absent when no
+    /// Shell has reported a placement. This is the character's readback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<crate::participant::AvatarPlacement>,
 }
 
 // ---- launcher ---------------------------------------------------------------

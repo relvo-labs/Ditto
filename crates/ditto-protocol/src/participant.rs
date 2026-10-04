@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use crate::{
     change::HotSwapLevel,
-    profile::{Appearance, AvatarSettings, LayoutIntent, ShortcutBinding},
+    profile::{Appearance, AvatarCorner, AvatarSettings, LayoutIntent, ShortcutBinding},
 };
 
 pub const PREPARE: &str = "participant.prepare";
@@ -206,6 +206,31 @@ pub struct ShellObservation {
     pub mounts: Vec<PanelMount>,
     pub appearance: Option<Appearance>,
     pub avatar: Option<AvatarSettings>,
+    /// Where the character actually is, as the Shell laid it out. `avatar`
+    /// above echoes the settings; this is the readback of their effect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar_placement: Option<AvatarPlacement>,
+}
+
+/// The character's placement as the Shell observes it after laying it out.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct AvatarPlacement {
+    /// The output the character's surface is on; absent when it has no
+    /// surface (turned off, or no output connected).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    /// True when the Profile names no output, or names one that is not
+    /// connected, and the character is on the primary output instead.
+    pub follows_primary: bool,
+    pub corner: AvatarCorner,
+    /// The surface rectangle in logical pixels, relative to `output`.
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    /// On screen: false while hidden or turned off.
+    pub visible: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

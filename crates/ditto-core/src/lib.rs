@@ -19,6 +19,7 @@ pub mod hosts;
 pub mod identity;
 pub mod launcher;
 pub mod log;
+pub mod outputs;
 pub mod participants;
 pub mod peers;
 pub mod preflight;

@@ -66,6 +66,12 @@ pub struct Window {
     pub title: String,
     pub app_id: String,
     pub workspace_id: Option<String>,
+    /// The output the window is on, by the name `desktop.outputs.list`
+    /// reports. `x`/`y` are relative to that output (and to its current
+    /// workspace), not to the global layout, so a position is only meaningful
+    /// together with this name. Absent when the compositor does not say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
     pub x: Option<i32>,
     pub y: Option<i32>,
     pub width: Option<u32>,

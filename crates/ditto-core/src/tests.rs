@@ -9,12 +9,12 @@ use crate::{
     session::Session,
 };
 use ditto_compositor::fixture::FixtureCompositor;
-use ditto_protocol::ids;
 use ditto_protocol::{
     catalog,
     change::{ChangeRecord, ChangeState, ResultKind},
     participant::{Projection, ShellProjection},
 };
+use ditto_protocol::{ids, WindowSessionId};
 use ditto_store::Paths;
 use serde_json::json;
 use std::{
@@ -341,16 +341,42 @@ struct ShellState {
     /// is gone, as a window closed in the meantime would be).
     cannot_restore: Option<String>,
     prepares: u32,
+    /// Report where the character is, as the real Shell does.
+    report_placement: bool,
+    /// ...but always in the bottom-right corner, whatever the Profile says.
+    stuck_avatar: bool,
 }
 
-fn shell_observation(projection: &Option<ShellProjection>) -> Value {
-    match projection {
-        Some(projection) => json!({
-            "role": "shell",
-            "mounts": projection.slots.iter().map(|slot| json!({"slot": slot.slot, "entry_id": slot.entry_id, "mounted": true, "visible": true})).collect::<Vec<_>>(),
-            "appearance": projection.appearance,
-            "avatar": projection.avatar,
-        }),
+fn shell_observation(shell: &ShellState) -> Value {
+    match &shell.committed {
+        Some(projection) => {
+            let mut observed = json!({
+                "role": "shell",
+                "mounts": projection.slots.iter().map(|slot| json!({"slot": slot.slot, "entry_id": slot.entry_id, "mounted": true, "visible": true})).collect::<Vec<_>>(),
+                "appearance": projection.appearance,
+                "avatar": projection.avatar,
+            });
+            if shell.report_placement {
+                // The fixture compositor has FIXTURE-1, plus whatever a test
+                // plugged in; a named output that is not FIXTURE-1 is
+                // treated as unplugged here, so the character follows it.
+                let avatar = &projection.avatar;
+                let on_named = avatar.output.as_deref() == Some("FIXTURE-1");
+                let corner = if shell.stuck_avatar {
+                    json!("bottom_right")
+                } else {
+                    json!(avatar.corner)
+                };
+                observed["avatar_placement"] = json!({
+                    "output": "FIXTURE-1",
+                    "follows_primary": !on_named,
+                    "corner": corner,
+                    "x": 1668, "y": 766, "width": 220, "height": 250,
+                    "visible": avatar.enabled && !avatar.hidden,
+                });
+            }
+            observed
+        }
         None => json!({"role": "shell", "mounts": [], "appearance": null, "avatar": null}),
     }
 }
@@ -429,7 +455,7 @@ fn fake_shell(core: &Arc<Core>, state: Arc<Mutex<ShellState>>) -> Arc<TestPeer> 
                 }
             }
             "participant.state" => {
-                Ok(json!({"change": null, "observed": shell_observation(&shell.committed)}))
+                Ok(json!({"change": null, "observed": shell_observation(&shell)}))
             }
             _ => Err((ErrorName::Unsupported, method.to_string())),
         }
@@ -588,6 +614,7 @@ fn start_at(root: &Path, rescue: bool) -> Arc<Core> {
     config.recovery_wait_host = Duration::from_millis(300);
     config.observation_period = Duration::from_millis(300);
     config.confirmation_window = Duration::from_millis(600);
+    config.output_settle = Duration::from_millis(0);
     if rescue {
         config.mode = ditto_protocol::rpc::CoreMode::Rescue;
     }
@@ -810,6 +837,153 @@ fn a_readback_that_disagrees_rolls_the_change_back() {
         Some("change.readback_mismatch")
     );
     assert_eq!(head(&cli), before);
+}
+
+fn avatar_change(peer: &TestPeer, path: &str, after: Value) -> ChangeRecord {
+    record(
+        &peer.call(
+            catalog::CHANGES_PROPOSE,
+            json!({"base_revision": head(peer), "ops": [{"op": "set_value", "path": path, "after": after}]}),
+        )["result"],
+    )
+}
+
+/// The character's position is a Profile value like its size, and the
+/// Shell's report of where it actually is decides whether the change took.
+#[test]
+fn the_character_position_is_read_back_from_where_the_shell_placed_it() {
+    let harness = harness("avatar-position");
+    let state = Arc::new(Mutex::new(ShellState {
+        report_placement: true,
+        ..ShellState::default()
+    }));
+    let shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    // The real Shell sends this after every commit; panels.list answers from it.
+    let report = || {
+        let mut observed = shell_observation(&state.lock().unwrap());
+        observed.as_object_mut().unwrap().remove("role");
+        shell.result(ditto_protocol::participant::SHELL_REPORT, observed);
+    };
+
+    let change = avatar_change(&cli, "/avatar/corner", json!("top_left"));
+    assert_eq!(change.state, ChangeState::Committed);
+    assert_eq!(change.result, Some(ResultKind::Succeeded));
+    assert_eq!(document(&cli)["avatar"]["corner"], "top_left");
+    report();
+    let panels = cli.result(catalog::PANELS_LIST, json!({}));
+    assert_eq!(panels["avatar"]["corner"], "top_left");
+    assert_eq!(panels["avatar"]["output"], "FIXTURE-1");
+    assert_eq!(panels["avatar"]["follows_primary"], true);
+
+    // A connected output named in the Profile must hold the character.
+    let change = avatar_change(&cli, "/avatar/output", json!("FIXTURE-1"));
+    assert_eq!(change.result, Some(ResultKind::Succeeded));
+    report();
+    assert_eq!(
+        cli.result(catalog::PANELS_LIST, json!({}))["avatar"]["follows_primary"],
+        false
+    );
+    // An unplugged one is followed by the primary output instead.
+    let change = avatar_change(&cli, "/avatar/output", json!("HDMI-A-9"));
+    assert_eq!(change.result, Some(ResultKind::Succeeded));
+
+    // A Shell that leaves the character where it was (bottom right) fails
+    // the readback, and the rollback to bottom right reads back fine.
+    let change = avatar_change(&cli, "/avatar/corner", json!("bottom_right"));
+    assert_eq!(change.result, Some(ResultKind::Succeeded));
+    let before = head(&cli);
+    state.lock().unwrap().stuck_avatar = true;
+    let change = avatar_change(&cli, "/avatar/corner", json!("bottom_left"));
+    assert_eq!(change.state, ChangeState::RolledBack);
+    assert_eq!(
+        change.failure_key.as_deref(),
+        Some("change.readback_mismatch")
+    );
+    assert_eq!(head(&cli), before);
+}
+
+/// plan/03/05 §7: an output that goes away takes no window with it. Core
+/// moves what the compositor left behind, reads it back, and says in a
+/// notification which windows it could not move.
+#[test]
+fn an_unplugged_output_brings_its_windows_back_or_says_why_not() {
+    let harness = harness("output-unplug");
+    let core = &harness.core;
+    let floating = WindowSessionId("fixture-window-2".into());
+    let tiled = WindowSessionId("fixture-window-1".into());
+    core.session
+        .with_adapter(|adapter| {
+            let fixture = adapter
+                .fixture()
+                .expect("the test Core runs on the fixture");
+            fixture.add_output("FIXTURE-2", 1280, 720);
+            ditto_compositor::CompositorAdapter::move_window_to_output(
+                fixture,
+                &floating,
+                "FIXTURE-2",
+                900,
+                500,
+            )?;
+            fixture.place(&tiled, "FIXTURE-2", 0, 0);
+            Ok(())
+        })
+        .unwrap();
+    core.session.publish_changes();
+    let cli = TestPeer::connect(core, "dittoctl", None);
+    let windows = cli.result(catalog::WINDOWS_LIST, json!({}));
+    assert!(windows["windows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|window| window["output"] == "FIXTURE-2"));
+
+    core.session
+        .with_adapter(|adapter| {
+            adapter.fixture().unwrap().remove_output("FIXTURE-2", false);
+            Ok(())
+        })
+        .unwrap();
+    core.session.publish_changes();
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let moved = loop {
+        let window = core
+            .session
+            .with_adapter(|adapter| adapter.window(&floating))
+            .unwrap();
+        if window.output.as_deref() == Some("FIXTURE-1") || Instant::now() > deadline {
+            break window;
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(moved.output.as_deref(), Some("FIXTURE-1"));
+    assert_eq!((moved.x, moved.y), (Some(900), Some(500)));
+    // The tiled window has no coordinate path: left where it was, and said.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let notice = loop {
+        let posted = core.system.notifications(10).unwrap();
+        if let Some(item) = posted.into_iter().find(|item| item.app_name == "Ditto") {
+            break Some(item);
+        }
+        if Instant::now() > deadline {
+            break None;
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    let notice = notice.expect("a notification about the stranded window");
+    assert_eq!(notice.summary, "有視窗沒辦法移回畫面");
+    assert!(notice.body.contains("FIXTURE-2") && notice.body.contains("terminal"));
+    let readback = cli.result(catalog::WINDOWS_LIST, json!({}));
+    let floating_row = readback["windows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|window| window["id"] == json!(floating.0))
+        .cloned()
+        .unwrap();
+    assert_eq!(floating_row["output"], "FIXTURE-1");
 }
 
 /// EX1-03 ①: one ChangeSet swaps the Dock and the launcher; undoing it
@@ -1434,6 +1608,7 @@ fn start_without_waiting(root: &Path, rescue: bool) -> Arc<Core> {
     config.recovery_wait_host = Duration::from_millis(300);
     config.observation_period = Duration::from_millis(300);
     config.confirmation_window = Duration::from_millis(600);
+    config.output_settle = Duration::from_millis(0);
     if rescue {
         config.mode = ditto_protocol::rpc::CoreMode::Rescue;
     }

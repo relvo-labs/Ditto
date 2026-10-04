@@ -94,12 +94,7 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
             chord: "Super+Space".into(),
             command: "launcher.toggle".into(),
         }],
-        avatar: AvatarSettings {
-            enabled: true,
-            hidden: false,
-            scale: 1.0,
-            animations: true,
-        },
+        avatar: AvatarSettings::default(),
     }
 }
 
@@ -114,11 +109,6 @@ pub fn empty_document() -> ProfileDocument {
         },
         appearance: appearance(),
         shortcuts: vec![],
-        avatar: AvatarSettings {
-            enabled: true,
-            hidden: false,
-            scale: 1.0,
-            animations: true,
-        },
+        avatar: AvatarSettings::default(),
     }
 }

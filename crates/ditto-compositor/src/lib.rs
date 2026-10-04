@@ -92,6 +92,22 @@ pub trait CompositorAdapter: Send {
     fn activate_workspace(&mut self, workspace_id: &str) -> AdapterResult<()>;
     fn focus_window(&mut self, window_id: &WindowSessionId) -> AdapterResult<()>;
     fn move_window(&mut self, window_id: &WindowSessionId, x: i32, y: i32) -> AdapterResult<()>;
+    /// Move a window onto another output, at `x`/`y` relative to that
+    /// output. `move_window` keeps the window's output; this is the path for
+    /// a window whose output went away (plan/03/05 §7). The default has no
+    /// compositor path and says so.
+    fn move_window_to_output(
+        &mut self,
+        window_id: &WindowSessionId,
+        output: &str,
+        _x: i32,
+        _y: i32,
+    ) -> AdapterResult<()> {
+        Err(AdapterError::Unsupported(format!(
+            "no path to move {} onto output {output}",
+            window_id.0
+        )))
+    }
     fn resize_window(
         &mut self,
         window_id: &WindowSessionId,
@@ -160,6 +176,12 @@ pub trait CompositorAdapter: Send {
     /// Workspace grid per output, when the compositor has one (Wayfire C-05).
     fn workspace_grid(&mut self) -> AdapterResult<Option<[u32; 2]>> {
         Ok(None)
+    }
+
+    /// The in-memory fixture behind this adapter, so a test can plug and
+    /// unplug outputs on a running Core. Every real adapter answers `None`.
+    fn fixture(&mut self) -> Option<&mut fixture::FixtureCompositor> {
+        None
     }
 
     fn snapshot(&mut self) -> AdapterResult<DesktopSnapshot> {
