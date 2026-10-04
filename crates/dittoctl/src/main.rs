@@ -618,9 +618,10 @@ fn restart(output: &Output, what: &str) -> io::Result<i32> {
     let (verb, unit) = match what {
         "core" => ("restart", "ditto-core.service"),
         // Core supervises both and starts them again; stopping the scope is
-        // the restart.
+        // the restart. Scopes are `ditto-<launch kind>.scope`, and the
+        // Shell's launch kind is `quickshell` (packaging/systemd/user).
         "hostd" => ("stop", "ditto-hostd.scope"),
-        "shell" => ("stop", "ditto-shell.scope"),
+        "shell" => ("stop", "ditto-quickshell.scope"),
         _ => return Err(usage()),
     };
     let status = std::process::Command::new("systemctl")

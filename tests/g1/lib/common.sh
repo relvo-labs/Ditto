@@ -67,7 +67,7 @@ PYEOF
 #   <capability_id> <available|unavailable>
 # Empty when Core is unreachable, which callers treat as not implemented.
 g1_capabilities() {
-  "$BINARIES/dittoctl" --json probe capabilities 2>/dev/null | python3 -c '
+  { if g1_relay; then g1_call desktop.capabilities.list '{}'; else "$BINARIES/dittoctl" --json probe capabilities; fi; } 2>/dev/null | python3 -c '
 import json, sys
 try:
     record = json.loads(sys.stdin.read() or "{}")
@@ -146,11 +146,30 @@ PYEOF
 # G1 runners need `dittoctl probe call <capability_id> <params-json>` (printing
 # the same JSON record as the other probe commands with --json). Until it
 # exists, every step that calls a capability is not_implemented.
+#
+# In a logged-in session a terminal dittoctl has no launcher token. A session
+# installed with `install-session.sh --verification-relay` has Core launch
+# tests/g1/lib/relay.mjs as dittoctl instead; when its socket is there (or
+# DITTO_G1_RELAY names one), calls go through it with the same JSON shape.
+g1_relay() {
+  local socket="${DITTO_G1_RELAY:-${DITTO_RUNTIME_DIR:-${XDG_RUNTIME_DIR:-/nonexistent}/ditto}/verify-relay.sock}"
+  [[ -S "$socket" ]] || return 1
+  export DITTO_G1_RELAY="$socket"
+}
+
 g1_can_call() {
+  if g1_relay; then
+    python3 "$WORKSPACE/tests/g1/lib/gui.py" relay desktop.capabilities.list '{}' | grep -q '"result"'
+    return
+  fi
   "$BINARIES/dittoctl" --json probe call desktop.capabilities.list '{}' >/dev/null 2>&1
 }
 
 g1_call() {
+  if g1_relay; then
+    python3 "$WORKSPACE/tests/g1/lib/gui.py" relay "$1" "${2:-{\}}"
+    return
+  fi
   "$BINARIES/dittoctl" --json probe call "$1" "${2:-{\}}"
 }
 
@@ -182,7 +201,25 @@ scope_pids() {
 }
 
 in_ditto_session() {
-  systemctl --user is-active --quiet ditto-session.target 2>/dev/null
+  systemctl --user is-active --quiet ditto-session.target 2>/dev/null || return 1
+  g1_session_env
+}
+
+# A runner started outside the login (over SSH, from the nightly runner) takes
+# the session's display and compositor socket from where the login put them:
+# the user manager's environment and $XDG_RUNTIME_DIR/ditto/session.env.
+g1_session_env() {
+  local line
+  if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    line="$(systemctl --user show-environment 2>/dev/null | grep '^WAYLAND_DISPLAY=' || true)"
+    [[ -n "$line" ]] && export "${line?}"
+  fi
+  if [[ -z "${WAYFIRE_SOCKET:-}" && -r "$XDG_RUNTIME_DIR/ditto/session.env" ]]; then
+    line="$(grep '^WAYFIRE_SOCKET=' "$XDG_RUNTIME_DIR/ditto/session.env" || true)"
+    [[ -n "$line" ]] && export "${line?}" "_${line?}"
+  fi
+  export DITTO_RUNTIME_DIR="${DITTO_RUNTIME_DIR:-$XDG_RUNTIME_DIR/ditto}"
+  return 0
 }
 
 # g1_evidence_dir: one directory of raw evidence per run, beside the result.

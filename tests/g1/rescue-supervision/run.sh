@@ -16,6 +16,7 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/common.sh"
+source "$WORKSPACE/tests/g0/lib/reference-apps.sh"
 
 WINDOW_PIDS=()
 SHELL_PID=""
@@ -39,7 +40,7 @@ print(values[max(0, math.ceil(0.95 * len(values)) - 1)] if values else "null")' 
 # unit is not loaded) must never become /sys/fs/cgroup/cgroup.procs.
 shell_scope_pids() {
   local scope group
-  for scope in ditto-shell.scope ditto-quickshell.scope; do
+  for scope in ditto-quickshell.scope ditto-shell.scope; do
     group="$(systemctl --user show -p ControlGroup --value "$scope" 2>/dev/null || true)"
     if [[ "$group" == /*.scope && -r "/sys/fs/cgroup$group/cgroup.procs" ]]; then
       cat "/sys/fs/cgroup$group/cgroup.procs"
@@ -48,9 +49,81 @@ shell_scope_pids() {
   done
 }
 
-if systemctl --user is-active --quiet ditto-session.target 2>/dev/null; then
+# ②: the crashes_host fault fixture takes hostd down 1.5 s after each enable.
+# Core counts hostd deaths that follow an enable (hosts.rs, limit 2 within
+# 30 s of the enable) and disables the entry through a Supervisor ChangeSet.
+# Read back: the entry is supervisor_disabled with its reason, the plugin
+# list (plugin center and dittoctl read the same capability) shows it, and
+# afterwards hostd keeps one PID for 20 s: nothing restarts the entry.
+plugin_crash_disabled() {
+  local work package answer profile head ops entry state hostd_pids evidence deadline
+  work="$(g1_evidence_dir)"
+  package="$work/crashes_host-1.0.0.dittopkg"
+  "$WORKSPACE/packages/host-sdk/bin/ditto-plugin" pack "$WORKSPACE/packages/plugin-fixtures/faults/crashes_host" \
+    --out "$package" --no-handlers >"$work/pack.log" 2>&1 || true
+  [[ -s "$package" ]] || package=""
+  if [[ -z "$package" ]]; then
+    check plugin-crash-disabled fail "the crashes_host fixture could not be packed (log: $work/pack.log)"
+    return
+  fi
+  answer="$(g1_call desktop.plugins.install "$(jq -cn --arg path "$package" --arg key "g1-crash-$RUN_ID" '{path: $path, idempotency_key: $key}')")"
+  echo "$answer" >"$work/install.json"
+  for _ in $(seq 1 100); do
+    g1_call desktop.plugins.get '{"package_id":"ditto.fixture.fault_crashes_host"}' | grep -q '"result"' && break
+    sleep 0.2
+  done
+  profile="$(g1_call desktop.profiles.get '{}')"
+  head="$(jq -r .result.profile.head_revision <<<"$profile")"
+  ops='[{"op":"add_entry","entry":{"package":"ditto.fixture.fault_crashes_host","version":"1.0.0","host":"cordis"}}]'
+  g1_call desktop.changes.propose "$(jq -cn --arg base "$head" --argjson ops "$ops" '{base_revision: $base, ops: $ops}')" >"$work/enable.json"
+  deadline=$(( $(date +%s) + 90 ))
+  state=""
+  while (( $(date +%s) < deadline )); do
+    entry="$(g1_call desktop.plugins.list '{}' | jq -c '[.result.entries[] | select(.package == "ditto.fixture.fault_crashes_host")][0]')"
+    state="$(jq -r '.state.kind // .state // empty' <<<"$entry" 2>/dev/null || true)"
+    [[ "$state" == supervisor_disabled ]] && break
+    sleep 1
+  done
+  hostd_pids=()
+  for _ in $(seq 1 20); do
+    hostd_pids+=("$(scope_pids ditto-hostd.scope | head -1)")
+    sleep 1
+  done
+  evidence="$(jq -cn --argjson entry "${entry:-null}" --arg pids "${hostd_pids[*]}" --slurpfile enable "$work/enable.json" \
+    '{entry: $entry, enable: $enable[0], hostd_pid_each_second_after: ($pids | split(" "))}')"
+  if [[ "$state" != supervisor_disabled ]]; then
+    check plugin-crash-disabled fail "the crashing entry was not disabled by supervision within 90 s (state: ${state:-none})" "$evidence"
+  elif [[ "$(printf '%s\n' "${hostd_pids[@]}" | sort -u | wc -l)" != 1 || -z "${hostd_pids[0]}" ]]; then
+    check plugin-crash-disabled fail "disabled, but hostd was restarted again afterwards (or is not running)" "$evidence"
+  else
+    check plugin-crash-disabled pass "disabled by supervision ($(jq -r '.state.reason // empty' <<<"$entry")), listed with its reason for the plugin center and dittoctl, and hostd kept one PID for 20 s" "$evidence"
+  fi
+  # Leave the session as it was: the entry out of the Profile.
+  profile="$(g1_call desktop.profiles.get '{}')"
+  entry_id="$(jq -r '[.result.document.entries[] | select(.package == "ditto.fixture.fault_crashes_host") | .entry_id][0] // empty' <<<"$profile")"
+  if [[ -n "$entry_id" ]]; then
+    g1_call desktop.changes.propose "$(jq -cn --arg base "$(jq -r .result.profile.head_revision <<<"$profile")" --arg id "$entry_id" \
+      '{base_revision: $base, ops: [{op: "remove_entry", entry_id: $id}]}')" >/dev/null || true
+  fi
+}
+
+if in_ditto_session; then
   g1_note "environment: logged-in Ditto session; the real units are exercised"
-  export DITTO_RUNTIME_DIR="${DITTO_RUNTIME_DIR:-$XDG_RUNTIME_DIR/ditto}"
+  RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ditto-g1-rescue.XXXXXX")"
+  # Applications whose survival ① checks: foot and Kate with an unsaved
+  # buffer (Firefox joins on the reference machine).
+  REFERENCE_APP_ROLES=() REFERENCE_APP_IDS=() REFERENCE_APP_PIDS=()
+  apps_ready=""
+  if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
+    start_all_reference_apps && apps_ready=1
+  else
+    start_reference_app terminal && start_reference_app editor && apps_ready=1
+  fi
+  kate_before=""
+  if [[ -n "$apps_ready" ]] && kate_open_unsaved "Ditto EX1-12 未儲存 $RUN_ID"; then
+    sleep 1
+    kate_before="$(kate_unsaved_hash || true)"
+  fi
   listing="$(g1_capabilities)"
 
   # ① needs: the supervisor unit, a Shell that answers ping, and a rescue UI
@@ -65,10 +138,6 @@ if systemctl --user is-active --quiet ditto-session.target 2>/dev/null; then
     check shell-sigstop-rescue not_implemented "Core does not serve: $missing"
   elif [[ ! -f "$WORKSPACE/shell/rescue/shell.qml" ]]; then
     check shell-sigstop-rescue not_implemented "no rescue UI at shell/rescue/shell.qml"
-  elif ! "$BINARIES/dittoctl" rescue restart shell --help >/dev/null 2>&1; then
-    # Each run ends with the main Shell back; without a restart path the
-    # second run would start from the rescue UI.
-    check shell-sigstop-rescue not_implemented "dittoctl rescue restart shell is not available, so a run cannot restore the main Shell"
   else
     durations=()
     failures=0
@@ -103,20 +172,30 @@ if systemctl --user is-active --quiet ditto-session.target 2>/dev/null; then
     else
       check shell-sigstop-rescue fail "p95 ${worst} ms, $failures runs without a rescue UI" "$evidence"
     fi
-    # Survival of reference applications and unsaved content across these
-    # runs reuses the EX-03 method (tests/g0/shell-restart-survival); it is not
-    # wired in yet, so the criterion is not claimed.
-    check shell-sigstop-apps-survive not_implemented "application and unsaved-content survival is not checked by this runner yet"
+    # Survival across all runs, by the EX-03 method: the same PIDs, and
+    # Kate's unsaved buffer hash read back from Kate itself.
+    alive=1
+    for pid in "${REFERENCE_APP_PIDS[@]}"; do kill -0 "$pid" 2>/dev/null || alive=""; done
+    kate_after="$(kate_unsaved_hash 2>/dev/null || true)"
+    survival="$(jq -cn --arg apps "${REFERENCE_APP_IDS[*]}" --arg before "$kate_before" --arg after "$kate_after" --arg alive "${alive:-0}" \
+      '{apps: ($apps | split(" ")), all_alive: ($alive == "1"), kate_unsaved_sha256: {before: $before, after: $after}}')"
+    if [[ -z "$apps_ready" || -z "$kate_before" ]]; then
+      check shell-sigstop-apps-survive environment "the reference applications or Kate's buffer could not be set up in this session" "$survival"
+    elif [[ -n "$alive" && "$kate_before" == "$kate_after" ]]; then
+      check shell-sigstop-apps-survive pass "after $RUNS runs every reference application is alive and Kate's unsaved buffer hash is unchanged" "$survival"
+    else
+      check shell-sigstop-apps-survive fail "a reference application ended or Kate's unsaved buffer changed" "$survival"
+    fi
   fi
 
   # ② needs a crashing fixture plugin and the plugin center's disable record.
   missing="$(missing_capabilities "$listing" desktop.plugins.list desktop.plugins.diagnostics desktop.changes.propose)"
   if [[ -n "$missing" ]]; then
     check plugin-crash-disabled not_implemented "Core does not serve: $missing"
-  elif [[ ! -d "$WORKSPACE/tests/g1/fixtures/crashing-plugin" ]]; then
-    check plugin-crash-disabled not_implemented "no crashing fixture plugin at tests/g1/fixtures/crashing-plugin"
+  elif ! g1_can_call; then
+    check plugin-crash-disabled environment "no verification relay in this session (install-session.sh --verification-relay)"
   else
-    check plugin-crash-disabled not_implemented "install → crash loop → disabled-state readback is not written yet"
+    plugin_crash_disabled
   fi
 
   # ③ kills Core until systemd stops restarting it, then waits for the rescue
@@ -150,15 +229,38 @@ if systemctl --user is-active --quiet ditto-session.target 2>/dev/null; then
     request="$(cat "$DITTO_RUNTIME_DIR/rescue-request.json" 2>/dev/null || echo null)"
     evidence="$(python3 -c 'import json, sys; print(json.dumps({"kills": int(sys.argv[1]), "core_state": sys.argv[2], "rescue_active": sys.argv[3] == "true", "rescue_request": json.loads(sys.argv[4])}))' "$kills" "$state" "$rescue_active" "$request")"
     if [[ "$state" == failed && "$rescue_active" == true ]]; then
-      if "$BINARIES/dittoctl" --offline rescue restore-last-good --help >/dev/null 2>&1; then
-        check core-storm-onfailure not_implemented "OnFailure= reached the rescue unit; the offline restore is not exercised yet" "$evidence"
+      # What the rescue UI's 「恢復最近可用的組合」 runs: the offline restore
+      # while Core is down, then Core again, which must mount that revision.
+      rescue_ready=false
+      for _ in $(seq 1 200); do
+        journalctl --user -u ditto-rescue.service -o cat 2>/dev/null | grep -q 'ditto-rescue ready' && { rescue_ready=true; break; }
+        sleep 0.1
+      done
+      restored="$("$BINARIES/dittoctl" --json --offline rescue restore-last-good 2>&1 || true)"
+      revision="$(jq -r '.revision // .result.revision // empty' <<<"$restored" 2>/dev/null || true)"
+      systemctl --user stop ditto-rescue.service >/dev/null 2>&1 || true
+      systemctl --user reset-failed ditto-core.service >/dev/null 2>&1 || true
+      systemctl --user start ditto-core.service >/dev/null 2>&1 || true
+      head=""
+      for _ in $(seq 1 150); do
+        if systemctl --user is-active --quiet ditto-core.service && g1_can_call; then
+          head="$(g1_call desktop.profiles.get '{}' | jq -r '.result.profile.head_revision // empty')"
+          [[ -n "$head" ]] && break
+        fi
+        sleep 0.2
+      done
+      evidence="$(jq -c --arg ready "$rescue_ready" --argjson restored "$(jq -c . <<<"$restored" 2>/dev/null || echo null)" --arg head "$head" \
+        '. + {rescue_ui_ready: ($ready == "true"), offline_restore: $restored, head_after_core_restart: $head}' <<<"$evidence")"
+      if [[ "$rescue_ready" == true && -n "$revision" && "$head" == "$revision" ]]; then
+        check core-storm-onfailure pass "after $kills kills OnFailure= started an operable rescue UI; the offline restore set $revision and the restarted Core mounted it" "$evidence"
       else
-        check core-storm-onfailure not_implemented "OnFailure= reached the rescue unit, but dittoctl --offline rescue does not exist, so the rescue UI cannot restore" "$evidence"
+        check core-storm-onfailure fail "rescue UI ready=$rescue_ready, restored revision '${revision:-none}', head after Core restart '${head:-none}'" "$evidence"
       fi
     else
       check core-storm-onfailure fail "after $kills kills Core is '$state' and the rescue unit active=$rescue_active" "$evidence"
     fi
     systemctl --user reset-failed ditto-core.service >/dev/null 2>&1 || true
+    systemctl --user is-active --quiet ditto-core.service || systemctl --user start ditto-core.service >/dev/null 2>&1 || true
   fi
 else
   g1_note "environment: headless fixture; ① is measured only up to the supervisor killing the Shell, ② and ③ need the session"

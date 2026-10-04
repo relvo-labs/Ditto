@@ -28,7 +28,24 @@ done
 # `--development` installs the same session on a development machine or VM.
 # It skips the reference-machine preflight, so nothing measured there can enter
 # an exit review; the session itself is identical.
-if [[ "${1:-}" == --development ]]; then
+#
+# `--verification-relay` is for verification runs only: Core also launches
+# tests/g1/lib/relay.mjs as `dittoctl`, listening on
+# $XDG_RUNTIME_DIR/ditto/verify-relay.sock (0700 directory), so the G1 runners
+# can read a logged-in session back through Core. It lets any process of the
+# user that reaches that socket act with dittoctl's rights, which a terminal
+# `dittoctl` deliberately does not have. Without the flag, an earlier relay
+# drop-in is removed.
+development=""
+verification_relay=""
+for argument in "$@"; do
+  case "$argument" in
+    --development) development=1 ;;
+    --verification-relay) verification_relay=1 ;;
+    *) echo "unknown option: $argument" >&2; exit 2 ;;
+  esac
+done
+if [[ -n "$development" ]]; then
   echo 'development install: reference-machine preflight skipped' >&2
 else
   bash "$here/preflight.sh"
@@ -73,6 +90,32 @@ for unit in "$units_source"/*; do
   substitute "$unit" "$temporary/$name"
   sudo install -D -m 0644 "$temporary/$name" "$units_target/$name"
 done
+relay_dropin="$units_target/ditto-core.service.d/verification-relay.conf"
+if [[ -n "$verification_relay" ]]; then
+  # The drop-in repeats Core's ExecStart and adds one --launch.
+  python3 - "$temporary/ditto-core.service" "$node" "$workspace" >"$temporary/verification-relay.conf" <<'PYEOF'
+import sys
+unit, node, workspace = sys.argv[1:]
+lines, collecting = [], False
+for line in open(unit, encoding="utf-8"):
+    if line.startswith("ExecStart="):
+        collecting = True
+    if collecting:
+        lines.append(line.rstrip("\n"))
+        if not line.rstrip("\n").endswith("\\"):
+            break
+lines[-1] += " \\"
+lines.append(f'    --launch "dittoctl 0.2.0 {node} {workspace}/tests/g1/lib/relay.mjs %t/ditto/verify-relay.sock"')
+print("# Verification runs only (install-session.sh --verification-relay).")
+print("[Service]")
+print("ExecStart=")
+print("\n".join(lines))
+PYEOF
+  sudo install -D -m 0644 "$temporary/verification-relay.conf" "$relay_dropin"
+  echo "installed the verification relay drop-in: $relay_dropin" >&2
+else
+  sudo rm -f -- "$relay_dropin"
+fi
 sudo systemctl daemon-reload
 # The running user manager (if any) reads the new units now; a later login
 # would read them anyway.

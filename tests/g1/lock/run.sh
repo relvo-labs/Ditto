@@ -48,6 +48,45 @@ state = record.get("result") or {}
 print("locked" if state.get("locked") else "unlocked", "client" if state.get("lock_client_running") else "no-client")'
 }
 
+# ⑤: a ChangeSet replacing the Dock while locked. Preflight refuses it
+# (`session_locked`); the head, its content hash and the lock surface stay.
+propose_dock_swap_while_locked() {
+  local profile before_head before_hash ops answer after after_hash surface_before surface_after evidence
+  profile="$(g1_call desktop.profiles.get '{}')"
+  before_head="$(jq -r .result.profile.head_revision <<<"$profile")"
+  before_hash="$(jq -r .result.revision.document_sha256 <<<"$profile")"
+  ops="$(jq -c '.result.document as $d | ($d.slots["ui.dock"]) as $dock
+    | ([$d.entries[] | select(.entry_id == $dock) | .package][0]) as $current
+    | (if $current == "ditto.dock.pill" then "ditto.dock.bottom" else "ditto.dock.pill" end) as $other
+    | [{op: "add_entry", entry: {package: $other, version: "1.0.0", host: "qml"}, slot: "ui.dock"},
+       {op: "remove_entry", entry_id: $dock}]' <<<"$profile")"
+  surface_before="$(grim -t ppm - 2>/dev/null | sha256sum | cut -c1-16 || true)"
+  answer="$(g1_call desktop.changes.propose "$(jq -cn --arg base "$before_head" --argjson ops "$ops" '{base_revision: $base, ops: $ops}')")"
+  sleep 2
+  surface_after="$(grim -t ppm - 2>/dev/null | sha256sum | cut -c1-16 || true)"
+  after="$(g1_call desktop.profiles.get '{}')"
+  after_hash="$(jq -r .result.revision.document_sha256 <<<"$after")"
+  evidence="$(jq -cn --argjson answer "$answer" --arg before "$before_head" --arg after "$(jq -r .result.profile.head_revision <<<"$after")" \
+    --arg hash_before "$before_hash" --arg hash_after "$after_hash" --arg surface_before "$surface_before" --arg surface_after "$surface_after" \
+    '{answer: $answer, head: {before: $before, after: $after}, document_sha256: {before: $hash_before, after: $hash_after},
+      lock_surface_sha256: {before: $surface_before, after: $surface_after}}')"
+  if jq -e '.answer.error.name == "preflight_rejected"
+      and ([.answer.error.data.reasons[]? | .detail.why] | index("session_locked")) != null
+      and .head.before == .head.after and .document_sha256.before == .document_sha256.after' <<<"$evidence" >/dev/null; then
+    if [[ -n "$surface_before" && "$surface_before" == "$surface_after" ]]; then
+      check lock-changeset-refused pass "the Dock swap was refused before validation (session_locked); head, content hash and lock surface unchanged" "$evidence"
+    elif [[ -z "$surface_before" ]]; then
+      check lock-changeset-refused environment "refused as required, but no screenshot could be taken to compare the lock surface" "$evidence"
+    else
+      check lock-changeset-refused fail "refused, but the lock surface changed" "$evidence"
+    fi
+  else
+    check lock-changeset-refused fail "the Dock swap was not refused for session_locked, or the profile moved" "$evidence"
+  fi
+  LOCK_CHANGESET_CHECKED=1
+}
+LOCK_CHANGESET_CHECKED=""
+
 if [[ -n "$missing" ]]; then
   check lock-client-killed not_implemented "Core does not serve: $missing"
 elif ! g1_can_call; then
@@ -67,6 +106,11 @@ else
     sleep 0.1
   done
   locked="$(screen_fraction "$MARKER" "$shots-locked.png")"
+  # ⑤ while locked, before anything is killed: the Dock swap is refused and
+  # the lock surface does not change.
+  if [[ "$state" == "locked client" ]]; then
+    propose_dock_swap_while_locked
+  fi
   mapfile -t lock_pids < <(scope_pids ditto-lock.scope)
   mapfile -t shell_pids < <(scope_pids ditto-shell.scope; scope_pids ditto-quickshell.scope)
   killed=("${lock_pids[@]}" "${shell_pids[@]}")
@@ -94,14 +138,8 @@ print(json.dumps({"marker_fraction": {"before": before, "locked": locked, "after
   fi
 fi
 
-missing="$(missing_capabilities "$listing" desktop.changes.propose desktop.changes.get desktop.session.state)"
-if [[ -n "$missing" ]]; then
-  check lock-changeset-refused not_implemented "Core does not serve: $missing"
-elif [[ -z "${DITTO_G1_DOCK_REPLACEMENT:-}" ]]; then
-  # The body names the G1 Dock packages, which do not exist yet.
-  check lock-changeset-refused not_implemented "no Dock-replacement proposal defined (set DITTO_G1_DOCK_REPLACEMENT to its JSON once the G1 Dock packages exist)"
-else
-  check lock-changeset-refused not_implemented "propose-while-locked readback (precondition session_unlocked) is not written yet"
+if [[ -z "$LOCK_CHANGESET_CHECKED" ]]; then
+  check lock-changeset-refused fail "the session never reached 'locked', so ⑤ could not be tried"
 fi
 
 check lock-password-unlock operator "unlock with the password and record it once (EX1-12 ④)"
