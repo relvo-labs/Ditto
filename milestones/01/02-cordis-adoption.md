@@ -8,9 +8,9 @@ PRD 15.6 要求實作來源必須列出「直接沿用 Cordis」「新增 Ditto 
 
 | 項目 | 值 |
 | --- | --- |
-| 套件 | `@deepseek-ai/cordis` 4.0.2（上游 `cordis` 4.0.0-rc.7） |
+| 套件 | `@deepseek-ai/cordis` 4.0.4（上游 `cordis` 4.0.0-rc.7；2026-10-04 依實際取用的 harness `477b4f4` release 更正，原寫 4.0.2） |
 | 上游 commit | `56b3d4f725681cf4556c1a8695a709cc3b6eed74`（`cordiverse/cordis`，`packages/core`） |
-| 配套 | `cordis-plugin-{loader,include,group,timer,hmr,logger-console}`、`cosmokit` 1.8.1、`schemastery` 3.18.0 |
+| 配套 | `cordis-plugin-{loader,include,group,timer,hmr,logger-console}`（G1 實際取用 loader 1.0.5 與 timer 1.1.6）、`cosmokit` 1.8.5（上游 1.8.1）、`schemastery` 3.18.4（上游 3.18.0）；harness 修改集為 22 項，逐條見 `packages/host-runtime/vendor/README.md` 與 [docs/upstream/cordis-port.md](../../docs/upstream/cordis-port.md) |
 | 授權 | MIT，各套件目錄保留上游 LICENSE |
 
 理由：
@@ -28,33 +28,33 @@ PRD 15.6 要求實作來源必須列出「直接沿用 Cordis」「新增 Ditto 
 
 ### 2.1 直接沿用 Cordis
 
-| 機制 | Ditto 用途 | 約束 |
-| --- | --- | --- |
-| 函式／物件／`Service` 三種插件形態 | 桌面服務插件的作者介面 | 服務名稱共用扁平命名空間，Ditto 服務一律加 `ditto` 前綴或命名空間 |
-| `Context` 與 `ctx.<key>` 服務查找 | 宿主內能力消費，不 import 實作 | Context **不跨程序傳送**，也不等於安全權限（C11） |
-| `inject` 依賴宣告與載入後追蹤 | 宿主內的依賴就緒與供應者替換 | 跨宿主依賴由 Rust 預檢，不由 `inject` 表達 |
-| `ctx.effect()` 與可逆註冊 | 插件撤除時釋放所屬監聽與註冊 | 釋放註冊 ≠ 撤銷已發生的外部副作用 |
-| Fiber 狀態機與 `ctx.registry` 列舉 | 插件中心的宿主狀態、啟動原因與診斷（MOD-01、REC-07） | 同程序插件不得冒充精確獨立 RSS（RUN-08） |
-| 五種事件分發模式 | 宿主內事件契約 | 跨程序事件另定非同步、順序、背壓與斷線語意，不假裝遠端呼叫是同步本地方法 |
-| `waterfall` 環繞中介軟體 | 權限應答、策略攔截、變更裝飾 | 僅觀察或標註的監聽器**必須呼叫 `next()`**；不呼叫即為有意短路 |
-| `ctx.isolate` 服務隔離 realm | 同一宿主內不同 Profile 區段看到不同供應者實例 | **不是安全邊界**；未信任程式仍需程序隔離 |
-| schemastery config schema | 插件設定驗證與預設值補齊 | 能力契約的權威 schema 仍在 Rust（見 [01 §2.2](01-architecture.md#22-型別單一事實來源)） |
-| `id`-keyed 條目差異語意 | ChangeSet 對插件樹的差異表達 | 每個條目必須有穩定 `id`，否則任何編輯都變成刪除再新增 |
+| 機制 | Ditto 用途 | 約束 | G1 實作位置（2026-10-04） |
+| --- | --- | --- | --- |
+| 函式／物件／`Service` 三種插件形態 | 桌面服務插件的作者介面 | 服務名稱共用扁平命名空間，Ditto 服務一律加 `ditto` 前綴或命名空間 | `packages/host-sdk/src/index.ts`（`defineDittoPlugin`）；`ditto` 根服務是 `Service`（`packages/host-runtime/src/ditto-service.ts`） |
+| `Context` 與 `ctx.<key>` 服務查找 | 宿主內能力消費，不 import 實作 | Context **不跨程序傳送**，也不等於安全權限（C11） | 插件經 `ctx.ditto` 取用能力（`ditto-service.ts`、`src/api.ts`）；Context 不出 hostd |
+| `inject` 依賴宣告與載入後追蹤 | 宿主內的依賴就緒與供應者替換 | 跨宿主依賴由 Rust 預檢，不由 `inject` 表達 | L-01／L-02（`packages/host-runtime/tests/lifecycle/`）；跨宿主依賴由 `crates/ditto-core/src/preflight.rs` 判定 |
+| `ctx.effect()` 與可逆註冊 | 插件撤除時釋放所屬監聽與註冊 | 釋放註冊 ≠ 撤銷已發生的外部副作用 | 能力註冊、訂閱、生命週期鉤子全為 effect（`ditto-service.ts`）；`packages/plugins/svc-tasks/src/index.ts` 的計時器與 `fs.watch` |
+| Fiber 狀態機與 `ctx.registry` 列舉 | 插件中心的宿主狀態、啟動原因與診斷（MOD-01、REC-07） | 同程序插件不得冒充精確獨立 RSS（RUN-08） | `src/resources.ts`、`src/fiber-state.ts`（`host.entry_state`）；插件中心只顯示 hostd 程序層級資源 |
+| 五種事件分發模式 | 宿主內事件契約 | 跨程序事件另定非同步、順序、背壓與斷線語意，不假裝遠端呼叫是同步本地方法 | 宿主內沿用；跨程序走 `src/events.ts` 的事件橋（每條目佇列、`latest` 合併、溢位 resync） |
+| `waterfall` 環繞中介軟體 | 權限應答、策略攔截、變更裝飾 | 僅觀察或標註的監聽器**必須呼叫 `next()`**；不呼叫即為有意短路 | G1 未使用（權限應答屬 G2-CORE-02） |
+| `ctx.isolate` 服務隔離 realm | 同一宿主內不同 Profile 區段看到不同供應者實例 | **不是安全邊界**；未信任程式仍需程序隔離 | D-32 策略 A 的候選 realm（`src/loader/transaction.ts`、`src/runtime.ts`）；明示非安全邊界 |
+| schemastery config schema | 插件設定驗證與預設值補齊 | 能力契約的權威 schema 仍在 Rust（見 [01 §2.2](01-architecture.md#22-型別單一事實來源)） | `packages/plugins/svc-notification-policy/src/index.ts` 的設定 schema；volatile 欄位就地提交 |
+| `id`-keyed 條目差異語意 | ChangeSet 對插件樹的差異表達 | 每個條目必須有穩定 `id`，否則任何編輯都變成刪除再新增 | 條目 id 由 Core 的 `entry_id` 衍生（`src/loader/projection.ts`） |
 
 ### 2.2 新增 Ditto 橋接
 
-| 橋接 | 解決的缺口 | 對應需求 |
-| --- | --- | --- |
-| `ditto-host-loader` | 以 Core 推送的條目列表取代 file-based Include；補上交易式套用 | CHG-02、CHG-04、RUN-11 |
-| 能力註冊代理（`ctx.ditto.capabilities`） | 把宿主內註冊發布為跨宿主能力，附擁有者與租約 | RUN-11、15.6 |
-| 租約與撤銷協定 | 宿主故障後跨宿主註冊失效並可重建 | RUN-11、RUN-12 |
-| 事件橋（seq／快照／背壓） | Cordis 型別化事件 ↔ RPC 事件流 | 15.2、RUN-07 |
-| 健康檢查契約 | 候選插件取得正式獨占資源前的就緒判定 | CHG-02 |
-| 交接協定（drain／cancel／handoff） | 受控交接等級的熱換 | CHG-03、14.2 |
-| Core-backed `SessionPersistence` 提供方 | 會話儲存與 Agent 程序分離 | 第 13 節、RUN-04 |
-| Core-backed settings 提供方 | 使用者設定寫入即產生 revision | CFG-05 |
-| Keyring credentials 提供方 | 秘密以引用存取，不進 Profile | SEC-07 |
-| 資源回報適配 | 宿主與插件的 PSS／CPU／程序數上報 | RUN-08、NFR-15 |
+| 橋接 | 解決的缺口 | 對應需求 | G1 實作位置（2026-10-04） |
+| --- | --- | --- | --- |
+| `ditto-host-loader` | 以 Core 推送的條目列表取代 file-based Include；補上交易式套用 | CHG-02、CHG-04、RUN-11 | `packages/host-runtime/src/loader/transaction.ts`（prepare／commit／abort／rollback／state，以 `change_id` 為鍵） |
+| 能力註冊代理（`ctx.ditto.capabilities`） | 把宿主內註冊發布為跨宿主能力，附擁有者與租約 | RUN-11、15.6 | `src/ditto-service.ts`、`src/api.ts`；Core 側 `crates/ditto-core/src/hosts.rs` |
+| 租約與撤銷協定 | 宿主故障後跨宿主註冊失效並可重建 | RUN-11、RUN-12 | `src/leases.ts`；Core 側 `hosts.rs`（L-05～L-07，`crates/ditto-core/tests/lifecycle.rs`） |
+| 事件橋（seq／快照／背壓） | Cordis 型別化事件 ↔ RPC 事件流 | 15.2、RUN-07 | `src/events.ts`；Core 的 `crates/ditto-core/src/events.rs` |
+| 健康檢查契約 | 候選插件取得正式獨占資源前的就緒判定 | CHG-02 | `src/loader/transaction.ts`（`health`） |
+| 交接協定（drain／cancel／handoff） | 受控交接等級的熱換 | CHG-03、14.2 | `src/loader/transaction.ts`（`handOff`、`bringUp`）；svc-tasks 的受控交接測試；L-06 |
+| Core-backed `SessionPersistence` 提供方 | 會話儲存與 Agent 程序分離 | 第 13 節、RUN-04 | G2 範圍，G1 未實作 |
+| Core-backed settings 提供方 | 使用者設定寫入即產生 revision | CFG-05 | G2 範圍，G1 未實作（G1 的插件設定經 ChangeSet 寫入 Profile 條目） |
+| Keyring credentials 提供方 | 秘密以引用存取，不進 Profile | SEC-07 | G2-CORE-04，G1 未實作 |
+| 資源回報適配 | 宿主與插件的 PSS／CPU／程序數上報 | RUN-08、NFR-15 | `src/resources.ts`（`heap_used`／`external`／`array_buffers` 分列，無每插件記憶體）、`src/reclaim.ts`（卸載後回收） |
 
 ### 2.3 Rust 原生能力（不經 Cordis）
 

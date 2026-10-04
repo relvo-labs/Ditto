@@ -135,6 +135,14 @@ counts = {status: sum(1 for c in checks if c["status"] == status) for status in 
 print(f"{gate}: {overall} {counts} -> {output}")
 if record["evidence_class"] != "reference-machine":
     print("development evidence only; the gate is decided on the reference machine")
+# The document always says what happened. Only the exit code may treat the
+# statuses named in DITTO_G1_PENDING_OK (the nightly passes `operator`: a
+# person's recorded run cannot happen at night) as not blocking the job.
+import os
+pending_ok = {status for status in os.environ.get("DITTO_G1_PENDING_OK", "").split(",") if status in ("operator",)}
+if overall == "incomplete" and checks and statuses - {"pass"} <= pending_ok:
+    print(f"exit 0: only {sorted(statuses - {'pass'})} pending (DITTO_G1_PENDING_OK); the document stays incomplete")
+    raise SystemExit(0)
 raise SystemExit({"pass": 0, "fail": 1}.get(overall, 3))
 PYEOF
   local status=$?

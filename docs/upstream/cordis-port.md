@@ -24,13 +24,13 @@
 | `@deepseek-ai/cosmokit` | `cosmokit` 1.8.1（1.8.5） | deepseek-harness/cosmokit `16f6fc058ade66e8ac5da0033d35a8d0f279f544` | 第 2、17、22 項；Ditto：無 | 經 cordis／loader 的測試間接覆蓋；volatile 參照跨 bundle 以 `Symbol.for` 辨識（通知策略服務的 bundle 帶自己的副本仍能熱更新，已測） |
 | `@deepseek-ai/schemastery` | `schemastery` 3.18.0（3.18.4） | deepseek-harness/schemastery `e67cee00ad725bd1534aee930a979ea3eec6f698` | 第 2、10、17、22 項；Ditto：無 | 釘選第 22 項；通知策略服務的設定 schema |
 
-`milestones/01/02 §1` 的版本數字（cordis 4.0.2、cosmokit 1.8.1、schemastery 3.18.0）是較早的盤點；harness `477b4f4` 的實際 release 是上表的 4.0.4／1.8.5／3.18.4（cosmokit 與 schemastery 的 1.8.1／3.18.0 是**上游**版本）。本文與 vendor/README.md 以重新核對後的值為準，`milestones/` 的更正留給該文件的 owner。
+`milestones/01/02 §1` 的版本數字（cordis 4.0.2、cosmokit 1.8.1、schemastery 3.18.0）是較早的盤點；harness `477b4f4` 的實際 release 是上表的 4.0.4／1.8.5／3.18.4（cosmokit 與 schemastery 的 1.8.1／3.18.0 是**上游**版本）。本文與 vendor/README.md 以重新核對後的值為準，`milestones/01/02 §1` 已於 2026-10-04 依此更正。
 
 **沒有取用**：`cordis-plugin-include`（檔案回寫，配置權威在 Core）、`cordis-plugin-hmr`（chokidar／esbuild，不進產品）、`cordis-plugin-logger-console`（hostd 自己輸出 JSON 到 stderr）、`cordis-plugin-group`（D-32 策略 A 不需要）。
 
 ## 2. 沿用對照表的更新（對應 milestones/01/02 §2）
 
-下列是以實際實作對照 `milestones/01/02 §2` 四欄的更新內容，附檔案位置。`milestones/` 由該文件 owner 回寫，本文不代改。
+下列是以實際實作對照 `milestones/01/02 §2` 的更新內容，附檔案位置；2026-10-04 已把位置回寫為該表的「G1 實作位置」欄。
 
 ### 2.1 直接沿用 Cordis
 
