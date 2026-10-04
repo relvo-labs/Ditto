@@ -1,4 +1,4 @@
-import { faultPoint as enabledFaultPoint } from './fault-enabled.ts'
+import { faultPoint as enabledFaultPoint, presentedLeaseIds as enabledPresentedLeaseIds } from './fault-enabled.ts'
 
 /**
  * Fault points for Rust integration tests (plan/03/06 §4). `__DITTO_FAULT__` is
@@ -30,3 +30,5 @@ const noop = async (_point: FaultPoint): Promise<void> => {}
 
 export const faultPoint: (point: FaultPoint) => Promise<void> = __DITTO_FAULT__ ? enabledFaultPoint : noop
 export const faultsCompiledIn: boolean = __DITTO_FAULT__
+/** Test build only: lease ids from an earlier connection to present on renewal (L-07). */
+export const presentedLeaseIds: () => string[] = __DITTO_FAULT__ ? enabledPresentedLeaseIds : () => []

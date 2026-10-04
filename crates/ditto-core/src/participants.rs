@@ -73,6 +73,11 @@ pub trait Participant: Send + Sync {
     fn abort(&self, change_id: &str, timeout: Duration) -> ParticipantResult<()>;
     fn rollback(&self, change_id: &str, timeout: Duration) -> ParticipantResult<StepReport>;
     fn state(&self, change_id: Option<&str>, timeout: Duration) -> ParticipantResult<StateOutput>;
+    /// Whether the connection the participant answers on is still the one it
+    /// prepared on. An in-process participant is always connected.
+    fn connected(&self) -> bool {
+        true
+    }
 }
 
 /// A participant on the other end of a connection.
@@ -127,6 +132,10 @@ impl Participant for RemoteParticipant {
             None => json!({}),
         };
         self.call(STATE, params, timeout)
+    }
+
+    fn connected(&self) -> bool {
+        !self.peer.is_closed()
     }
 }
 

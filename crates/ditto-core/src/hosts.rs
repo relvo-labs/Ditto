@@ -120,6 +120,16 @@ struct Inner {
     idle_since: Option<Instant>,
 }
 
+impl Inner {
+    /// Whether `generation` is the connection Core currently serves. A
+    /// connection Core dropped (heartbeat lapsed, or replaced) keeps its
+    /// generation number until the next hostd attaches, but nothing it sends
+    /// counts any more: not a heartbeat, not a lease (L-07 negative).
+    fn live(&self, generation: u64) -> bool {
+        self.generation == generation && self.peer.is_some()
+    }
+}
+
 /// What a package declares that hostd may use: capabilities and events.
 type Declared = (Vec<String>, Vec<EventDecl>);
 
@@ -310,7 +320,7 @@ impl HostManager {
     pub fn hello(&self, generation: u64, hello: HelloInput) -> Result<(), HostError> {
         {
             let mut inner = self.inner.lock().expect("host state");
-            if inner.generation != generation {
+            if !inner.live(generation) {
                 return Err(HostError::Identity);
             }
             inner.hello = Some(hello);
@@ -328,7 +338,7 @@ impl HostManager {
     pub fn detach(&self, generation: u64, reason: &str) {
         let (was_running, early_crash) = {
             let mut inner = self.inner.lock().expect("host state");
-            if inner.generation != generation {
+            if !inner.live(generation) {
                 return;
             }
             if let Some(peer) = inner.peer.take() {
@@ -610,12 +620,12 @@ impl HostManager {
     /// connection's generation (EX1-06 ⑤).
     pub fn validate(&self, generation: u64, entry_id: &str) -> bool {
         let inner = self.inner.lock().expect("host state");
-        inner.generation == generation && inner.entries.contains_key(entry_id)
+        inner.live(generation) && inner.entries.contains_key(entry_id)
     }
 
     pub fn heartbeat(&self, generation: u64) -> Result<(), HostError> {
         let mut inner = self.inner.lock().expect("host state");
-        if inner.generation != generation {
+        if !inner.live(generation) {
             return Err(HostError::Identity);
         }
         inner.last_heartbeat = Instant::now();
@@ -630,7 +640,7 @@ impl HostManager {
     ) -> Result<RegisterOutput, HostError> {
         let output = {
             let mut inner = self.inner.lock().expect("host state");
-            if inner.generation != generation {
+            if !inner.live(generation) {
                 return Err(HostError::Identity);
             }
             let Some(assigned) = inner.entries.get(entry_id) else {
@@ -689,6 +699,18 @@ impl HostManager {
                 generation,
             }
         };
+        // Which lease a capability was bound under, per generation: a lease
+        // id routes only on the connection that took it, so it is not a
+        // secret, and diagnostics can tie a stale id to its generation.
+        crate::log::event(
+            "host.lease_registered",
+            &[
+                ("lease_id", &output.lease_id),
+                ("capability_id", &input.capability_id),
+                ("entry_id", entry_id),
+                ("generation", &generation.to_string()),
+            ],
+        );
         if let Some(events) = self.events() {
             events.capabilities_changed("registered");
         }
@@ -698,7 +720,7 @@ impl HostManager {
     pub fn revoke(&self, generation: u64, entry_id: &str, lease_id: &str) -> Result<(), HostError> {
         let removed = {
             let mut inner = self.inner.lock().expect("host state");
-            if inner.generation != generation {
+            if !inner.live(generation) {
                 return Err(HostError::Identity);
             }
             match inner.leases.get(lease_id) {
@@ -720,7 +742,7 @@ impl HostManager {
     /// Batch renewal. A lease from an older generation is never renewed.
     pub fn renew(&self, generation: u64, input: &RenewInput) -> Result<RenewOutput, HostError> {
         let mut inner = self.inner.lock().expect("host state");
-        if inner.generation != generation {
+        if !inner.live(generation) {
             return Err(HostError::Identity);
         }
         let now = Instant::now();
@@ -748,7 +770,7 @@ impl HostManager {
     ) -> Result<bool, HostError> {
         let declared = {
             let inner = self.inner.lock().expect("host state");
-            if inner.generation != generation {
+            if !inner.live(generation) {
                 return Err(HostError::Identity);
             }
             let Some(assigned) = inner.entries.get(entry_id) else {
@@ -791,7 +813,7 @@ impl HostManager {
         let mut newly_failed = Vec::new();
         {
             let mut inner = self.inner.lock().expect("host state");
-            if inner.generation != generation {
+            if !inner.live(generation) {
                 return Err(HostError::Identity);
             }
             for report in input.entries {
@@ -821,7 +843,7 @@ impl HostManager {
 
     pub fn resources(&self, generation: u64, input: ResourcesInput) -> Result<(), HostError> {
         let mut inner = self.inner.lock().expect("host state");
-        if inner.generation != generation {
+        if !inner.live(generation) {
             return Err(HostError::Identity);
         }
         inner.heap = Some(NodeHeap {
@@ -987,5 +1009,52 @@ pub fn read_process(pid: u32) -> ProcessResources {
             .ok()
             .map(|dir| dir.count() as u32),
         cpu_ticks,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_dropped_connection_is_fenced_until_the_next_hostd_attaches() {
+        let hosts = HostManager::new(
+            None,
+            None,
+            Arc::new(IdentityRegistry::new()),
+            "/nonexistent/core.sock".into(),
+            false,
+        );
+        hosts.set_needed(true);
+        let (sink, _outgoing) = std::sync::mpsc::channel();
+        let generation = hosts.attach(Arc::new(Peer::new(
+            "conn-1".into(),
+            "hostd".into(),
+            0,
+            sink,
+        )));
+        assert_eq!(hosts.heartbeat(generation), Ok(()));
+        // The heartbeat lapsed: Core drops the connection, then the process
+        // exits and its connection closes as well.
+        hosts.detach(generation, "heartbeat_timeout");
+        hosts.detach(generation, "connection_closed");
+        assert_eq!(
+            hosts.status().restarts_last_10_min,
+            1,
+            "one loss, counted once"
+        );
+        // Whatever the old connection still sends counts for nothing, even
+        // before another hostd attaches.
+        assert_eq!(hosts.heartbeat(generation), Err(HostError::Identity));
+        assert_eq!(
+            hosts.renew(
+                generation,
+                &RenewInput {
+                    lease_ids: vec!["lease-old".into()]
+                }
+            ),
+            Err(HostError::Identity)
+        );
+        assert!(!hosts.validate(generation, "ent-1"));
     }
 }

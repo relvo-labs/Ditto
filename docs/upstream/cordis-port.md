@@ -100,7 +100,7 @@ hostd 依賴、但由 Core 持有的：條目表與 `on_behalf_of` 驗證、租�
 
 ## 5. hostd 故障注入點（供 Rust 整合測試）
 
-`DITTO_HOST_FAULT=<point>:<action>[:<n>]`（逗號分隔多條）。`point` ∈ `prepare.before`、`prepare.after_mount`、`commit.before`、`commit.after_drain`、`commit.after_dispose`、`abort.before`、`rollback.before`、`lease.renew`、`heartbeat`、`invoke.before`；`action` ∈ `throw`、`hang`、`exit`、`kill`、`delay=<ms>`；`n` 表示只在第 n 次經過時觸發。
+`DITTO_HOST_FAULT=<point>:<action>[:<n>]`（逗號分隔多條）。`point` ∈ `prepare.before`、`prepare.after_mount`、`commit.before`、`commit.after_drain`、`commit.after_dispose`、`abort.before`、`rollback.before`、`lease.renew`、`heartbeat`、`invoke.before`；`action` ∈ `throw`、`hang`、`exit`、`kill`、`delay=<ms>`；`n` 表示只在第 n 次經過時觸發。`lease.renew` 另接受 `present=<file>`：檔案存在時，把其中列出的租約 id 加進每次續約一起送出（模擬保留了上一個連線租約的 hostd），並以 `foreign lease ids presented` 記下 Core 的答覆；L-07 負例用它證明舊 generation 的租約一律 `expired`。
 
 - 只有測試建置讀取它：`DITTO_HOST_FAULT_ENABLE=1 pnpm --filter @ditto/host-runtime build` 另外產生 `dist/ditto-hostd-fault.mjs`。
 - 正式 bundle 以 `__DITTO_FAULT__=false` 建置，讀取環境變數的模組（`src/fault-enabled.ts`）因此被 tree-shaking 移除；`scripts/build.mjs` 在正式 bundle 仍含 `DITTO_HOST_FAULT`、`DITTO_HOST_STRATEGY` 或 `fault injected` 字串時讓建置失敗。

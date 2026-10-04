@@ -178,6 +178,8 @@ struct Connection {
     subject: Subject,
     peer: Arc<Peer>,
     host_generation: Option<u64>,
+    /// Set once the connection has ended (read by queued proposals).
+    gone: Arc<AtomicBool>,
 }
 
 // An error here is a complete JSON-RPC response sent once per connection;
@@ -284,6 +286,7 @@ fn handshake(
             subject,
             peer,
             host_generation,
+            gone: Arc::new(AtomicBool::new(false)),
         },
     ))
 }
@@ -540,6 +543,7 @@ fn dispatch(
         kind: connection.kind.clone(),
         connection_id: connection.connection_id.clone(),
         sink: sink.clone(),
+        gone: Arc::clone(&connection.gone),
     };
     match router::dispatch(core, &caller, call) {
         Ok((mut result, readback_verified)) => {
@@ -746,6 +750,7 @@ fn serve_connection_with_auth(
                 subject: current.subject.clone(),
                 peer: Arc::clone(&current.peer),
                 host_generation: current.host_generation,
+                gone: Arc::clone(&current.gone),
             };
             workers.push(thread::spawn(move || {
                 let response = dispatch(&worker_core, &snapshot, &worker_sink, request, &control);
@@ -757,6 +762,7 @@ fn serve_connection_with_auth(
         Ok(())
     })();
     if let Some(connection) = &connection {
+        connection.gone.store(true, Ordering::SeqCst);
         connection.peer.close();
         match connection.kind.as_str() {
             "hostd" => {
