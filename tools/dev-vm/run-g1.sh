@@ -5,7 +5,16 @@
 #   tools/dev-vm/run-g1.sh [rust-workspace] [node-workspace]
 #       [contract-vectors] [preflight-negative] [rollback]
 #       [persistence-faults] [lifecycle] [cordis-independent] [cleanup-stress]
-#       [latency] [rescue-no-node]
+#       [latency] [rescue-no-node] [manual-switch]
+#       [session-rescue-supervision] [session-lock]
+#
+# The session-* suites run inside a logged-in "Ditto (Wayfire)" session: the
+# VM installs the G1 session from the synced tree with
+# `install-session.sh --development --verification-relay`, GDM logs in to it
+# automatically, and the runners read Core back through the verification
+# relay. session-rescue-supervision kills Core on purpose
+# (DITTO_ALLOW_CORE_STORM=1); session-lock leaves the session locked, so it
+# runs last. Neither is in the default list.
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -14,6 +23,7 @@ suites=("$@")
 for suite in "${suites[@]}"; do
   case "$suite" in
     rust-workspace | node-workspace | contract-vectors | preflight-negative | rollback | persistence-faults | lifecycle | cordis-independent | cleanup-stress | latency | rescue-no-node | manual-switch) ;;
+    session-rescue-supervision | session-lock) ;;
     *) echo "unknown G1 suite: $suite" >&2; exit 2 ;;
   esac
 done
@@ -68,12 +78,32 @@ if ! vm_sync_workspace >"$out/sync.log" 2>&1; then
 fi
 record sync pass
 
-if vm_ssh "$VM_ENV"' pnpm install --frozen-lockfile && cargo build --locked --workspace --bins && pnpm --filter @ditto/host-runtime build && bash scripts/build-builtin-packages.sh' >"$out/build.log" 2>&1; then
+if vm_ssh "$VM_ENV"' pnpm install --frozen-lockfile && cargo build --locked --workspace --bins && pnpm -r build && bash scripts/build-builtin-packages.sh' >"$out/build.log" 2>&1; then
   record build pass
 else
   record build fail
   exit 1
 fi
+
+# The session suites need the G1 session logged in, not the snapshot's G0 one.
+session_ready=""
+start_session() {
+  [[ -n "$session_ready" ]] && return 0
+  vm_ssh "$VM_ENV"' bash packaging/reference-image/install-session.sh --development --verification-relay' >"$out/session-install.log" 2>&1 || return 1
+  vm_ssh 'printf "[User]\nSession=ditto\nSystemAccount=false\n" | sudo tee /var/lib/AccountsService/users/neil >/dev/null && sudo systemctl restart accounts-daemon && sudo systemctl restart gdm' >>"$out/session-install.log" 2>&1 || return 1
+  local _
+  for _ in $(seq 1 100); do
+    if vm_ssh 'XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active --quiet ditto-session.target && test -S /run/user/1000/ditto/verify-relay.sock' 2>/dev/null; then
+      session_ready=1
+      # Let the Shell, hostd and the boot sync settle before anything is killed.
+      sleep 20
+      return 0
+    fi
+    sleep 3
+  done
+  vm_ssh 'XDG_RUNTIME_DIR=/run/user/1000 journalctl --user -u ditto-core -n 200 --no-pager' >>"$out/session-install.log" 2>&1 || true
+  return 1
+}
 
 for suite in "${suites[@]}"; do
   log="$out/$suite.log"
@@ -83,6 +113,23 @@ for suite in "${suites[@]}"; do
   fi
   if [[ "$suite" == node-workspace ]]; then
     if vm_ssh "$VM_ENV"' pnpm -r test && pnpm -r typecheck' >"$log" 2>&1; then record "$suite" pass; else record "$suite" fail; fi
+    continue
+  fi
+  if [[ "$suite" == session-* ]]; then
+    if ! start_session; then
+      record "$suite" fail
+      echo "the G1 session did not come up; see $out/session-install.log" >&2
+      continue
+    fi
+    runner="${suite#session-}"
+    extra=''
+    [[ "$runner" == rescue-supervision ]] && extra='DITTO_ALLOW_CORE_STORM=1 '
+    if vm_ssh "$VM_ENV""export DITTO_ENVIRONMENT_LABEL=development-vm DITTO_COMPOSITOR=wayfire DITTO_ARTIFACTS=\$PWD/artifacts/g1; ${extra}timeout -k 15 1800 bash tests/g1/$runner/run.sh" >"$log" 2>&1; then
+      record "$suite" pass
+    else
+      code=$?
+      [[ "$code" == 3 ]] && record "$suite" incomplete || record "$suite" fail
+    fi
     continue
   fi
   small_fs=''
