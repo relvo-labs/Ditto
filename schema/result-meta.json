@@ -2,6 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "handled_us": {
+      "description": "Core's monotonic time, in microseconds, from reading the request to\nwriting this result. For a write with `readback_verified`, it spans\nacceptance to the completed readback (the NFR-03 measure); it is\nCore's own clock, not the caller's round trip.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
     "not_cancellable": {
       "description": "Set when a cancellation arrived for a capability declared\nnon-cancellable: the request ran to completion and was not cancelled.",
       "type": [

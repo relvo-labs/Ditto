@@ -51,8 +51,10 @@
 
 ```jsonc
 "_meta": { "observed_seq": 412, "profile_revision": "rev-01J9...",
-           "readback_verified": true, "not_cancellable": true }
+           "readback_verified": true, "not_cancellable": true, "handled_us": 8423 }
 ```
+
+`handled_us` 是 Core 以單調時鐘量的處理時間（微秒）：從讀到請求到寫出這個結果。`readback_verified` 為 `true` 的寫入，它涵蓋受理到回讀完成，是 NFR-03 的量測值；它不含呼叫端的往返，呼叫端不得拿自己的時鐘取代它。
 
 0.1 的 `ResultMeta.revision` 拆成兩個欄位：`observed_seq` 是觀測事件的序號（G0 的語意），`profile_revision` 是作用中 Profile 的 head revision（Core 尚未載入 Profile 時為 `null`）。
 
