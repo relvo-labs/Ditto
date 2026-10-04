@@ -25,9 +25,9 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | `rollback/run.sh` | EX1-03 | Rust 情境測試；另寫 `rollback-<run_id>.jsonl`，每個情境一行結果類別。③ 由合成器參與者負責：切換布局策略時記下切換前的視窗位置（工作階段狀態，只在記憶體，不進 Profile），撤銷時放回；已關閉的視窗列為 `not_restored`、原因 `window_closed`，變更仍提交但結果為 `partial`。Core 重啟後的撤銷沒有位置可放回，也不會列出視窗 |
 | `persistence-faults/run.sh` | EX1-09 | `fault-injection` build 的真實二進位（`crates/ditto-core/tests/persistence_faults.rs`）。真正寫滿的檔案系統需要 root 先掛好：設 `DITTO_G1_SMALL_FS=<已掛載、可寫的小 tmpfs>`，否則該項記為 `environment` |
 | `contract-vectors/run.sh` | EX1-06 | Rust 與 TS 兩側共享向量、0.1 拒絕、缺口重訂、`operation_id` 重連、`on_behalf_of` 偽造、目錄 gate；加上 Agent 替身的身分路徑（經啟動器以 `agent` 受理；同一程式拿偽造 token 被 Core 拒絕） |
-| `cordis-independent/run.sh` | EX1-07 | 夾具：Core（fixture 合成器）＋真實 hostd＋Agent 替身＋觀察用 driver，全部由 Core 的啟動器啟動。① 的 tasks 半邊與 ③ 在此判定（「面板」以讀 `desktop.tasks.list` 的訂閱者代替，屬開發證據）；通知策略與 ② 需要工作階段 |
+| `cordis-independent/run.sh` | EX1-07 | headless 桌面夾具（`lib/shell-fixture.sh`）：Wayfire 與夾具自己的工作階段匯流排，正常模式 Core 監督的真實 Shell、hostd、Agent 替身與回讀 relay；Core 以 `DITTO_SYSTEM=no-logind` 在夾具的匯流排上擁有通知伺服器。① 面板內容取自 Shell 的 `tasks` 控制行，2 秒以用戶端單調時鐘量「檔案寫入 → 面板顯示」（每 20 ms 輪詢，QML 面板沒有 Core 時間戳）；通知以 `gdbus` 送出，決定經 Core 讀回（規則：專注模式、允許清單為空；緊急通知是對照）。② Shell 不在時（socket 拒絕且 Core 回報無 Shell 連線）改檔並送通知，重啟後的面板內容與策略紀錄經回讀判定。③ hostd PID 三個時點相同 |
 | `cleanup-stress/run.sh` | EX1-04 | 夾具中 ② tasks 服務停用／啟用真的跑 100 次，每 10 次以 `desktop.plugins.diagnostics` 取快照，`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall。① 需要 Shell，③ 需要 HOST 的 realm 夾具 |
-| `latency/run.sh` | EX1-11 | 時間取 Core 寫入各狀態時的 `updated_at`（經 `change_updated` 事件）。夾具量 ② 另列的 Cordis 服務數字；①②③ 本體需要工作階段。樣本寫到 `latency-<run_id>.jsonl` |
+| `latency/run.sh` | EX1-11 | 兩個夾具。② 另列的 Cordis 服務數字：fixture 合成器＋hostd，`change_updated` 的 `updated_at`。①②③：headless 桌面夾具（真實 Shell、hostd、foot 與 Kate；參考機另加 Firefox），由 Core 啟動的 driver 執行。① 工作區與聚焦取 Core 回應的 `_meta.handled_us`（Core 單調時鐘，從讀到請求到回讀確認後寫出結果）；外觀 token 是 ChangeSet，取 `created_at` 到最後一次 readback 操作的 `ended_at`（皆為 Core 寫入，毫秒）；每種先暖機 5 次，保留但不判定。② 取 `prepared`／`committed` 的 `updated_at`，每次切換後另以 `desktop.panels.list` 確認 Shell 掛上對的 Dock。③ 合成器對應的 PID 每 0.5 秒檢查，Kate 未儲存緩衝雜湊前後比對。driver 的往返時間只並列參考。樣本寫到 `latency-<run_id>.jsonl` |
 
 ## 共用函式（`lib/common.sh`）
 
@@ -38,6 +38,10 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 - `screen_fraction`：以 `grim` 截圖並計算某個顏色占畫面的比例，用來判斷鎖定時是否露出桌面。
 - `g1_cargo`／`g1_run`：把一個 Rust 測試（或任一測試命令）記成一項子檢查，完整輸出存到 `<name>-<run_id>.d/`；篩選沒有跑到任何測試時是 `fail`，不是 `pass`。
 - `g1_fixture_core`／`g1_fixture_stop`／`g1_head`：開發模式 Core（fixture 合成器、自己的 runtime 與 store，路徑夠短以符合 `sun_path`）；`g1_head` 回 head revision 與內容雜湊。
+
+### 有真實 Shell 的 headless 桌面（`lib/shell-fixture.sh`）
+
+`manual-switch` 的夾具抽成共用：`start_compositor` 之後以 `shell_fixture_start [--hostd] [serve 參數…]` 啟動正常模式 Core、受 Core 監督的 Shell、（選用）hostd 與回讀 relay；`relay` 經 relay 呼叫 Core，`shell_line` 寫一行到 Shell 的控制 socket，`core_child` 找 Core 底下的程序，`fixture_reference_apps` 起參考應用，`shell_fixture_stop` 收掉一切並刪除 runtime 目錄。Core 以 `DITTO_SYSTEM=no-logind` 執行：通知伺服器是真的、在夾具自己的匯流排上，logind 不連，所以不碰旁邊的登入工作階段。
 
 ### 由 Core 啟動的驗證 driver
 

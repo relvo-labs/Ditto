@@ -115,6 +115,8 @@ switch (command) {
     break;
   case 'hold':
     print({ connected: true, pid: process.pid });
+    // Held until killed, or until the Core that launched it ends.
+    link.socket.on('close', () => process.exit(0));
     setInterval(() => {}, 1 << 30);
     break;
   default:
