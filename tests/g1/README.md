@@ -18,7 +18,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | --- | --- | --- |
 | `rescue-supervision/run.sh` | EX1-12 ①②③ | 登入的「Ditto (Wayfire)」工作階段。其他環境改跑 headless 夾具，只量 supervisor 從 `SIGSTOP` 到終止 Shell 的時間（開發證據，不含救援介面）。③ 會真的終止 Core，需另設 `DITTO_ALLOW_CORE_STORM=1` |
 | `lock/run.sh` | EX1-12 ④⑤ | 登入的 Ditto 工作階段。合成器本身的行為是差異表 C-19（`tools/compositor-probe/g1`，headless 開發證據）；以密碼解鎖與錄影由操作者完成 |
-| `output-hotplug/run.sh --automated` | EX1-13 ⑤ | 接第二螢幕的登入工作階段，以 `wlr-randr --off` 停用第二輸出。沒有工作階段時跑 headless 替代版：以 Wayfire IPC 建立再刪除一個 headless 輸出（C-18） |
+| `output-hotplug/run.sh --automated` | EX1-13 ⑤ | 接第二螢幕的登入工作階段，以 `wlr-randr --off` 停用第二輸出。沒有工作階段時跑 headless 替代版：以 Wayfire IPC 建立再刪除一個 headless 輸出（C-18），並在旁邊啟動 Shell。兩者都先以 ChangeSet 把角色放到第二輸出（工作階段中結束時撤銷），再判定 `windows-visible`（Core 的視窗回讀，每個視窗帶所在輸出）與 `avatar-visible`（Shell 經 `desktop.panels.list` 回報的角色位置） |
 | `output-hotplug/run.sh --physical` | EX1-13 ⑤ | 同上，由腳本引導操作者實際拔線。plan/03/05 §7 要求兩個變體都通過 |
 | `rescue-no-node/run.sh` | EX1-05 | 隔離的 headless 夾具；救援 Core 以 `--mode rescue --development` 啟動，⑥ 另以受控的正常模式 Core／hostd 驗證；④ 的 Shell 文字仍需登入工作階段 |
 | `preflight-negative/run.sh` | EX1-02 | ①②③ 由 Rust 契約測試判定（也在 `rust.yml` 阻擋合併），另以真實 `ditto-core` 對內建套件能表達的負例（缺套件、單一供應者衝突）回讀 head、內容雜湊與已存變更；④ 的產品文字由人在參考機的插件中心確認（`operator`） |
@@ -53,7 +53,7 @@ Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模
 | Shell | 救援介面 `shell/rescue/shell.qml`，表面可操作時在 stdout 印一行 `ditto-rescue ready` | rescue-supervision ① 的計時終點 |
 | Shell | 鎖定客戶端 `shell/lock/shell.qml`，由 Core 以 `--lock` 啟動，scope 為 `ditto-lock.scope` | lock ④ |
 | Core／dittoctl | `dittoctl probe call`；`dittoctl rescue restart shell`；`dittoctl --offline rescue restore-last-good` | lock、rescue-supervision ①③、rescue-no-node ②③ |
-| Core | 熱插拔後把視窗移回剩餘輸出的可見範圍（plan/03/05 §7）；角色位置的回讀 | output-hotplug |
+| Core | 熱插拔後把視窗移回剩餘輸出的可見範圍（plan/03/05 §7）；角色位置的回讀（2026-10-04 已提供，見下方紀錄） | output-hotplug |
 | HOST | 會連續崩潰的測試插件 `tests/g1/fixtures/crashing-plugin` | rescue-supervision ② |
 
 ## 開發機上的第一次執行（2026-09-27，headless，開發證據）
@@ -79,3 +79,11 @@ Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模
 ## 救援夾具更新（2026-09-27，開發證據）
 
 `rescue-no-node/run.sh` 先前只隔離 socket，沒有指定專用 `DITTO_DATA_DIR`，因此在本機曾開啟預設 Ditto store。三次舊執行不作出口證據；沒有執行資料回滾。現在使用專用暫存 store 並在結束後清理。`artifacts/g1/rescue-no-node-2026-09-27T13:05:42Z-effb.json` 的隔離重跑：啟動、原生視窗操作、歷史讀取、恢復受保護文件（head 與雜湊回讀）、Cordis 能力標為 `rescue_mode`、無 Ditto Node 程序、正常模式重建 tasks 並讀回救援前的待辦，七項通過。Shell 產品文字仍需登入工作階段，因此 EX1-05 仍未通過。
+
+## 熱插拔與角色位置（2026-10-04，headless，開發證據）
+
+- 協定 0.2 加了三個選用欄位（不升版）：視窗回讀的 `output`（Wayfire 由 view 所在輸出填入，fixture 由自身狀態填入）；Profile `avatar` 的 `output`（未指定＝跟隨主輸出）與 `corner`（預設右下）；Shell `shell.report` 的 `avatar_placement`，由 `desktop.panels.list` 的 `avatar` 回傳。主輸出定義為排列在最左上的輸出，Core 與 Shell 用同一條規則。預設值不寫進文件，所以既有 Profile 與匯出檔的雜湊不變。
+- Core 在輸出消失後等 0.5 秒讓 Wayfire 先搬，再回讀：只搬仍在已消失輸出上、或中心點落在輸出外的視窗，搬完再回讀；搬不動的（平鋪中，`unsupported`）寫 log 並發一則產品語言的通知。Rust 測試以 fixture 合成器涵蓋三種情況（合成器沒搬、已搬入可見範圍、搬到範圍外）與平鋪視窗的通知。
+- `output-hotplug --automated`（headless 替代版）`artifacts/g1/output-hotplug-2026-10-04T08:34:24Z-e3ba.json`：`windows-visible` 與 `avatar-visible` 皆 `pass`。視窗在拔除前由 Core 回讀確認在 `HEADLESS-2`，之後在 `HEADLESS-1` 的目前工作區；Core 的 log 記錄 `checked=1 already_visible=1 moved=0`，也就是 Wayfire 已自行搬好、Core 沒有重複搬。角色先經 ChangeSet 放到 `HEADLESS-2`，拔除後 Shell 回報它在 `HEADLESS-1` 右下、`follows_primary: true`、整個表面在輸出內。
+- 同一次開發也找到一個 Shell 問題並修正：輸出消失會連帶關掉角色的 layer surface，換到新輸出後它保持隱藏（`visible` 的綁定值沒變，所以不會重算）。現在 Shell 在應顯示卻未顯示時重新顯示一次，log 為 `ditto-shell avatar shown again on <輸出>`。
+- 限制：角色位置是 Shell 依自己的表面（所在 screen、錨定角、邊距、尺寸）回報，不是合成器的回讀；Wayfire IPC 沒有列出 layer surface 的位置。這兩項 `pass` 不是 EX1-13 ⑤ 的證據：出口仍需參考機接上第二台實體螢幕，跑 `--automated`（`wlr-randr`）與 `--physical`（操作者拔線）兩個變體。
