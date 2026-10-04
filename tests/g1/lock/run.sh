@@ -60,23 +60,47 @@ propose_dock_swap_while_locked() {
     | (if $current == "ditto.dock.pill" then "ditto.dock.bottom" else "ditto.dock.pill" end) as $other
     | [{op: "add_entry", entry: {package: $other, version: "1.0.0", host: "qml"}, slot: "ui.dock"},
        {op: "remove_entry", entry_id: $dock}]' <<<"$profile")"
-  surface_before="$(grim -t ppm - 2>/dev/null | sha256sum | cut -c1-16 || true)"
+  local work lock_pid_before lock_pid_after changed
+  work="$(g1_evidence_dir)"
+  lock_pid_before="$(scope_pids ditto-lock.scope | head -1)"
+  grim -t ppm "$work/lock-surface-before.ppm" 2>/dev/null || true
   answer="$(g1_call desktop.changes.propose "$(jq -cn --arg base "$before_head" --argjson ops "$ops" '{base_revision: $base, ops: $ops}')")"
   sleep 2
-  surface_after="$(grim -t ppm - 2>/dev/null | sha256sum | cut -c1-16 || true)"
+  grim -t ppm "$work/lock-surface-after.ppm" 2>/dev/null || true
+  lock_pid_after="$(scope_pids ditto-lock.scope | head -1)"
+  # The password field's cursor blinks and the clock may turn over: the
+  # surface "does not change" when under 1 % of pixels differ and the same
+  # lock client still holds it.
+  changed="$(python3 - "$work/lock-surface-before.ppm" "$work/lock-surface-after.ppm" <<'PYEOF' 2>/dev/null || true
+import re, sys
+def load(path):
+    data = open(path, "rb").read()
+    header = re.match(rb"P6\s+(\d+)\s+(\d+)\s+\d+\s", data)
+    return (int(header[1]), int(header[2])), data[header.end():]
+(a_size, a), (b_size, b) = load(sys.argv[1]), load(sys.argv[2])
+if a_size != b_size:
+    print(1.0); raise SystemExit
+pixels = len(a) // 3
+diff = sum(1 for i in range(0, len(a), 3 * 4) if a[i:i + 3] != b[i:i + 3])
+print(round(diff / max(1, pixels // 4), 5))
+PYEOF
+)"
+  surface_before="${lock_pid_before:-none}"
+  surface_after="${lock_pid_after:-none}"
   after="$(g1_call desktop.profiles.get '{}')"
   after_hash="$(jq -r .result.revision.document_sha256 <<<"$after")"
   evidence="$(jq -cn --argjson answer "$answer" --arg before "$before_head" --arg after "$(jq -r .result.profile.head_revision <<<"$after")" \
-    --arg hash_before "$before_hash" --arg hash_after "$after_hash" --arg surface_before "$surface_before" --arg surface_after "$surface_after" \
+    --arg hash_before "$before_hash" --arg hash_after "$after_hash" --arg surface_before "$surface_before" --arg surface_after "$surface_after" --arg changed "$changed" \
     '{answer: $answer, head: {before: $before, after: $after}, document_sha256: {before: $hash_before, after: $hash_after},
-      lock_surface_sha256: {before: $surface_before, after: $surface_after}}')"
+      lock_client_pid: {before: $surface_before, after: $surface_after}, lock_surface_changed_fraction: $changed}')"
   if jq -e '.answer.error.name == "preflight_rejected"
       and ([.answer.error.data.reasons[]? | .detail.why] | index("session_locked")) != null
       and .head.before == .head.after and .document_sha256.before == .document_sha256.after' <<<"$evidence" >/dev/null; then
-    if [[ -n "$surface_before" && "$surface_before" == "$surface_after" ]]; then
-      check lock-changeset-refused pass "the Dock swap was refused before validation (session_locked); head, content hash and lock surface unchanged" "$evidence"
-    elif [[ -z "$surface_before" ]]; then
+    if [[ -z "$changed" ]]; then
       check lock-changeset-refused environment "refused as required, but no screenshot could be taken to compare the lock surface" "$evidence"
+    elif [[ "$surface_before" != none && "$surface_before" == "$surface_after" ]] \
+      && python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) < 0.01 else 1)' "$changed"; then
+      check lock-changeset-refused pass "the Dock swap was refused before validation (session_locked); head, content hash and lock surface unchanged" "$evidence"
     else
       check lock-changeset-refused fail "refused, but the lock surface changed" "$evidence"
     fi
@@ -105,6 +129,18 @@ else
     [[ "$state" == "locked client" ]] && break
     sleep 0.1
   done
+  # Core's state says the lock was requested and its client runs; the lock
+  # client says `ditto-lock locked` once the compositor confirms
+  # ext_session_lock. Only then is the screen expected to hide the desktop.
+  secured_ms=""
+  for step in $(seq 1 100); do
+    if journalctl --user -u ditto-core.service --since "-60s" -o cat 2>/dev/null | grep -q 'ditto-lock locked'; then
+      fraction="$(screen_fraction "$MARKER")"
+      python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) == 0 else 1)' "$fraction" 2>/dev/null && { secured_ms=$((step * 100)); break; }
+    fi
+    sleep 0.1
+  done
+  g1_note "lock confirmed by the compositor and no desktop pixel on screen after ${secured_ms:-more than 10000} ms"
   locked="$(screen_fraction "$MARKER" "$shots-locked.png")"
   # ⑤ while locked, before anything is killed: the Dock swap is refused and
   # the lock surface does not change.

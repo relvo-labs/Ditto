@@ -82,4 +82,5 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     catalog::RESCUE_STATUS,
     catalog::RESCUE_DISABLE,
     catalog::RESCUE_RESTORE_LAST_GOOD,
+    catalog::RESCUE_RESUME_SHELL,
 ];

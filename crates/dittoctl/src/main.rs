@@ -28,7 +28,7 @@ const USAGE: &str = "usage: dittoctl [--json] <command>
   jobs list | get ID | cancel ID
   tasks list | add TEXT | complete ID | watch SECONDS
   events --for SECONDS [--topics desktop,changes,plugins,notifications,tasks,session]
-  rescue status | history [--limit N] | disable ENTRY|PACKAGE | restore-last-good | diag [--change ID]
+  rescue status | history [--limit N] | disable ENTRY|PACKAGE | restore-last-good | resume-shell | diag [--change ID]
          | restart core|hostd|shell   [--offline]";
 
 fn usage() -> io::Error {
@@ -296,6 +296,7 @@ fn translate(group: &str, rest: &mut Vec<String>) -> io::Result<(String, Value)>
             json!({ "task_id": arg(&tail, 0)? }),
         ),
         ("rescue", "status") => pair(catalog::RESCUE_STATUS, json!({})),
+        ("rescue", "resume-shell") => pair(catalog::RESCUE_RESUME_SHELL, json!({})),
         ("rescue", "disable") => pair(
             catalog::RESCUE_DISABLE,
             json!({ "target": arg(&tail, 0)?, "idempotency_key": key("rescue") }),

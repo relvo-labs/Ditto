@@ -29,7 +29,8 @@ done
 # It skips the reference-machine preflight, so nothing measured there can enter
 # an exit review; the session itself is identical.
 #
-# `--verification-relay` is for verification runs only: Core also launches
+# `--verification-relay` is for verification runs only: Core uses built-ins
+# that add the G1 fault fixtures (target/ditto-packages-verification) and also launches
 # tests/g1/lib/relay.mjs as `dittoctl`, listening on
 # $XDG_RUNTIME_DIR/ditto/verify-relay.sock (0700 directory), so the G1 runners
 # can read a logged-in session back through Core. It lets any process of the
@@ -95,7 +96,17 @@ for unit in "$units_source"/*; do
 done
 relay_dropin="$units_target/ditto-core.service.d/verification-relay.conf"
 if [[ -n "$verification_relay" ]]; then
-  # The drop-in repeats Core's ExecStart and adds one --launch.
+  # Verification built-ins: the product's, plus the fault fixtures the G1
+  # session runners enable (G1 enables built-in packages only, and a fixture
+  # must never be among the product's).
+  verification_packages="$workspace/target/ditto-packages-verification"
+  rm -rf -- "$verification_packages"
+  install -d "$verification_packages"
+  cp "$workspace"/target/ditto-packages/*.dittopkg "$verification_packages/"
+  (cd "$workspace" && pnpm --filter @ditto/plugin-fixtures build >/dev/null)
+  "$workspace/packages/host-sdk/bin/ditto-plugin" pack "$workspace/packages/plugin-fixtures/faults/crashes_host" \
+    --out "$verification_packages/ditto.fixture.fault_crashes_host-1.0.0.dittopkg" --no-handlers >/dev/null
+  # The drop-in repeats Core's ExecStart with those built-ins and one more --launch.
   python3 - "$temporary/ditto-core.service" "$node" "$workspace" >"$temporary/verification-relay.conf" <<'PYEOF'
 import sys
 unit, node, workspace = sys.argv[1:]
@@ -104,7 +115,7 @@ for line in open(unit, encoding="utf-8"):
     if line.startswith("ExecStart="):
         collecting = True
     if collecting:
-        lines.append(line.rstrip("\n"))
+        lines.append(line.rstrip("\n").replace(f"{workspace}/target/ditto-packages ", f"{workspace}/target/ditto-packages-verification "))
         if not line.rstrip("\n").endswith("\\"):
             break
 lines[-1] += " \\"

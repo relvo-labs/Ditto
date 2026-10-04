@@ -112,7 +112,7 @@ pub struct CapabilitiesListOutput {
     pub capabilities: Vec<CapabilityDescriptor>,
 }
 
-pub const CATALOG_REVISION: u64 = 3;
+pub const CATALOG_REVISION: u64 = 4;
 
 // G0
 pub const CAPABILITIES_LIST: &str = "desktop.capabilities.list";
@@ -195,6 +195,7 @@ pub const TASKS_SUBSCRIBE: &str = "desktop.tasks.subscribe";
 pub const RESCUE_STATUS: &str = "desktop.rescue.status";
 pub const RESCUE_DISABLE: &str = "desktop.rescue.disable";
 pub const RESCUE_RESTORE_LAST_GOOD: &str = "desktop.rescue.restore_last_good";
+pub const RESCUE_RESUME_SHELL: &str = "desktop.rescue.resume_shell";
 
 pub mod scope {
     pub const READ: &str = "desktop.read";
@@ -904,6 +905,16 @@ fn definitions() -> Vec<Definition> {
             &[s::RESCUE],
         )
         .change(KeyBased, CHANGES_GET),
+        // Leave the rescue UI for the normal Shell: what it reads back is
+        // the new Shell's connection.
+        def(
+            RESCUE_RESUME_SHELL,
+            schema::<Empty>,
+            schema::<RescueResumeShellOutput>,
+            &[s::RESCUE],
+        )
+        .write(Natural, RESCUE_STATUS, false)
+        .timeout(15_000, 30_000),
     ]
 }
 

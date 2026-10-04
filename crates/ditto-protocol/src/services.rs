@@ -776,6 +776,17 @@ pub struct RescueStatusOutput {
     pub recovered_changes: Vec<String>,
 }
 
+/// `desktop.rescue.resume_shell`: the rescue UI is left and the normal Shell
+/// started again. Success is the new Shell's connection, read back by Core.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RescueResumeShellOutput {
+    /// The rescue UI was showing when the request came.
+    pub was_in_rescue_ui: bool,
+    /// The new Shell connected within the capability's deadline.
+    pub shell_connected: bool,
+}
+
 /// Rescue actions work on the Profile only; they need no plugin code.
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

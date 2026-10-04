@@ -56,22 +56,14 @@ shell_scope_pids() {
 # list (plugin center and dittoctl read the same capability) shows it, and
 # afterwards hostd keeps one PID for 20 s: nothing restarts the entry.
 plugin_crash_disabled() {
-  local work package answer profile head ops entry state hostd_pids evidence deadline
+  local work profile head ops entry state hostd_pids evidence deadline
   work="$(g1_evidence_dir)"
-  package="$work/crashes_host-1.0.0.dittopkg"
-  "$WORKSPACE/packages/host-sdk/bin/ditto-plugin" pack "$WORKSPACE/packages/plugin-fixtures/faults/crashes_host" \
-    --out "$package" --no-handlers >"$work/pack.log" 2>&1 || true
-  [[ -s "$package" ]] || package=""
-  if [[ -z "$package" ]]; then
-    check plugin-crash-disabled fail "the crashes_host fixture could not be packed (log: $work/pack.log)"
+  # The fixture is a verification built-in (install-session.sh
+  # --verification-relay): G1 enables built-in packages only.
+  if ! g1_call desktop.plugins.get '{"package_id":"ditto.fixture.fault_crashes_host"}' | grep -q '"result"'; then
+    check plugin-crash-disabled environment "the crashes_host fixture is not a built-in of this session (install with --verification-relay)"
     return
   fi
-  answer="$(g1_call desktop.plugins.install "$(jq -cn --arg path "$package" --arg key "g1-crash-$RUN_ID" '{path: $path, idempotency_key: $key}')")"
-  echo "$answer" >"$work/install.json"
-  for _ in $(seq 1 100); do
-    g1_call desktop.plugins.get '{"package_id":"ditto.fixture.fault_crashes_host"}' | grep -q '"result"' && break
-    sleep 0.2
-  done
   profile="$(g1_call desktop.profiles.get '{}')"
   head="$(jq -r .result.profile.head_revision <<<"$profile")"
   ops='[{"op":"add_entry","entry":{"package":"ditto.fixture.fault_crashes_host","version":"1.0.0","host":"cordis"}}]'
@@ -161,8 +153,11 @@ if in_ditto_session; then
       else
         durations+=("$(( ready - started ))")
       fi
-      systemctl --user stop ditto-rescue.service >/dev/null 2>&1 || true
-      "$BINARIES/dittoctl" rescue restart shell >/dev/null 2>&1 || true
+      # Back to the normal Shell the way the rescue UI's 「回到一般桌面」 does.
+      resumed="$(g1_call desktop.rescue.resume_shell '{}' 2>/dev/null || true)"
+      if ! jq -e '.result.shell_connected == true' <<<"$resumed" >/dev/null 2>&1; then
+        echo "run $run: the normal Shell did not come back: $resumed" >&2
+      fi
       sleep 3
     done
     worst="$(p95 "${durations[@]}")"
@@ -205,6 +200,16 @@ if in_ditto_session; then
   elif ! systemctl --user is-active --quiet ditto-core.service; then
     check core-storm-onfailure fail "ditto-core.service is not active before the storm"
   else
+    # The rescue restores the protected last-known-good revision, which a
+    # revision becomes after 60 s without instability; ① and ② just caused
+    # some. Wait for one, as a user's desktop would have.
+    protected=""
+    for _ in $(seq 1 240); do
+      protected="$(g1_call desktop.rescue.status '{}' | jq -r '.result.last_known_good // empty' 2>/dev/null || true)"
+      [[ -n "$protected" ]] && break
+      sleep 1
+    done
+    g1_note "③ protected revision before the storm: ${protected:-none after 240 s}"
     kills=0
     for _ in $(seq 1 8); do
       state="$(systemctl --user show -p ActiveState --value ditto-core.service)"
@@ -237,6 +242,7 @@ if in_ditto_session; then
         sleep 0.1
       done
       restored="$("$BINARIES/dittoctl" --json --offline rescue restore-last-good 2>&1 || true)"
+      printf '%s\n' "$restored" >"$(g1_evidence_dir)/offline-restore.txt"
       revision="$(jq -r '.revision // .result.revision // empty' <<<"$restored" 2>/dev/null || true)"
       systemctl --user stop ditto-rescue.service >/dev/null 2>&1 || true
       systemctl --user reset-failed ditto-core.service >/dev/null 2>&1 || true
@@ -249,8 +255,9 @@ if in_ditto_session; then
         fi
         sleep 0.2
       done
-      evidence="$(jq -c --arg ready "$rescue_ready" --argjson restored "$(jq -c . <<<"$restored" 2>/dev/null || echo null)" --arg head "$head" \
-        '. + {rescue_ui_ready: ($ready == "true"), offline_restore: $restored, head_after_core_restart: $head}' <<<"$evidence")"
+      evidence="$(jq -c --arg ready "$rescue_ready" --argjson restored "$(jq -c . <<<"$restored" 2>/dev/null || echo null)" --arg raw "$restored" \
+        --arg head "$head" --arg protected "$protected" \
+        '. + {rescue_ui_ready: ($ready == "true"), protected_before_storm: $protected, offline_restore: $restored, offline_restore_output: $raw, head_after_core_restart: $head}' <<<"$evidence")"
       if [[ "$rescue_ready" == true && -n "$revision" && "$head" == "$revision" ]]; then
         check core-storm-onfailure pass "after $kills kills OnFailure= started an operable rescue UI; the offline restore set $revision and the restarted Core mounted it" "$evidence"
       else

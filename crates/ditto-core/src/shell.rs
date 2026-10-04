@@ -230,6 +230,47 @@ impl ShellManager {
         }
     }
 
+    /// Leave the rescue UI for the normal Shell: the exit count starts over,
+    /// the supervisor's rescue request is cleared (or Core would treat the
+    /// next exit as another hang), the rescue UI stops and the Shell is
+    /// launched. Returns whether the rescue UI was showing.
+    pub fn resume(&self) -> bool {
+        let was_rescue = {
+            let mut inner = self.inner.lock().expect("shell state");
+            let was_rescue = inner.run == Run::RescueUi;
+            inner.exits.clear();
+            if let Some(mut child) = inner.rescue_child.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            if inner
+                .child
+                .as_mut()
+                .is_some_and(|child| child.try_wait().ok().flatten().is_none())
+            {
+                // A Shell is already running: nothing to start.
+                inner.run = Run::Running;
+                return was_rescue;
+            }
+            was_rescue
+        };
+        if let Some(path) = runtime_dir().map(|dir| dir.join("rescue-request.json")) {
+            let _ = std::fs::remove_file(path);
+        }
+        // The supervisor starts the rescue UI as a unit of its own.
+        let _ = std::process::Command::new("systemctl")
+            .args(["--user", "stop", "--no-block", "ditto-rescue.service"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        crate::log::event(
+            "shell.resume",
+            &[("from_rescue_ui", if was_rescue { "true" } else { "false" })],
+        );
+        self.launch();
+        was_rescue
+    }
+
     pub fn in_rescue_ui(&self) -> bool {
         self.inner.lock().expect("shell state").run == Run::RescueUi
     }

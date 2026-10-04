@@ -119,6 +119,19 @@ ShellRoot {
         });
     }
 
+    /// Back to the normal desktop: Core starts the Shell again and this
+    /// window closes once it is connected.
+    function resumeShell() {
+        notice = t(qsTr("正在回到一般桌面…"));
+        client.capability("desktop.rescue.resume_shell", {}, function (result) {
+            root.notice = result.shell_connected
+                ? t(qsTr("一般桌面已啟動。"))
+                : t(qsTr("一般桌面沒有啟動，仍可在這裡修復。"));
+        }, function (error) {
+            root.notice = client.errorText(error);
+        });
+    }
+
     function loadDiagnostics() {
         showDiagnostics = !showDiagnostics;
         if (!showDiagnostics) {
@@ -318,6 +331,13 @@ ShellRoot {
                     text: root.t(qsTr("恢復最近可用組合"))
                     enabled: client.online && !!root.status && !!root.status.last_known_good
                     onClicked: root.restoreLastGood()
+                }
+
+                Button {
+                    tokens: theme
+                    text: root.t(qsTr("回到一般桌面"))
+                    enabled: client.online
+                    onClicked: root.resumeShell()
                 }
 
                 Button {

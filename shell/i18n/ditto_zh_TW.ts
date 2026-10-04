@@ -2149,6 +2149,14 @@
         <translation>Ditto 救援模式</translation>
     </message>
     <message>
+        <source>一般桌面已啟動。</source>
+        <translation>一般桌面已啟動。</translation>
+    </message>
+    <message>
+        <source>一般桌面沒有啟動，仍可在這裡修復。</source>
+        <translation>一般桌面沒有啟動，仍可在這裡修復。</translation>
+    </message>
+    <message>
         <source>修復</source>
         <translation>修復</translation>
     </message>
@@ -2163,6 +2171,10 @@
     <message>
         <source>和最近可用的組合相比，沒有新加入或變更的插件。</source>
         <translation>和最近可用的組合相比，沒有新加入或變更的插件。</translation>
+    </message>
+    <message>
+        <source>回到一般桌面</source>
+        <translation>回到一般桌面</translation>
     </message>
     <message>
         <source>密碼</source>
@@ -2207,6 +2219,10 @@
     <message>
         <source>正在停用…</source>
         <translation>正在停用…</translation>
+    </message>
+    <message>
+        <source>正在回到一般桌面…</source>
+        <translation>正在回到一般桌面…</translation>
     </message>
     <message>
         <source>正在恢復…</source>

@@ -668,6 +668,15 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
             })?;
             change_outcome(record?)
         }
+        catalog::RESCUE_RESUME_SHELL => {
+            empty(&call)?;
+            let was_in_rescue_ui = core.shell.resume();
+            let shell_connected = core.shell.wait_connected(Duration::from_secs(12));
+            ok(ditto_protocol::services::RescueResumeShellOutput {
+                was_in_rescue_ui,
+                shell_connected,
+            })
+        }
         catalog::RESCUE_RESTORE_LAST_GOOD => {
             let input: RescueRestoreInput = call.input()?;
             let subject = caller.subject.0.clone();

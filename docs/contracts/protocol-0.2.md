@@ -110,7 +110,7 @@
 | `desktop.config`（外觀、布局、面板替換等有界可逆的變更） | 允許 | 允許 | 拒絕 | 拒絕 | 需授予 | 允許 | 拒絕 |
 | `desktop.windows.read` | 允許 | 允許 | 允許 | 允許 | 需授予 | 需授予 | 拒絕 |
 | `desktop.windows.control` | 允許 | 允許 | 允許 | 允許 | 需授予 | 需授予 | 拒絕 |
-| `desktop.rescue`（停用插件、恢復最近可用組合） | 允許 | 允許 | 允許 | 允許 | 拒絕 | 拒絕 | 拒絕 |
+| `desktop.rescue`（停用插件、恢復最近可用組合、回到一般 Shell） | 允許 | 允許 | 允許 | 允許 | 拒絕 | 拒絕 | 拒絕 |
 | `plugins.manage` | 允許 | 允許 | 拒絕 | 拒絕 | 拒絕 | 需授予 | 拒絕 |
 | `permissions.manage` | 允許 | 允許 | 拒絕 | 拒絕 | 拒絕 | 拒絕 | 拒絕 |
 | `session.power` | 允許 | 允許 | 允許 | 拒絕 | 拒絕 | 拒絕 | 拒絕 |
@@ -304,7 +304,7 @@ Shell 在每次掛載變化後主動呼叫 `shell.report`（與 `observed` 同�
 | session | `state` `lock` `logout` `suspend` `poweroff` | 是（`claimable` 依能力） | `session.state` |
 | jobs | `get` `list` `cancel` | `cancel` | `jobs.get` |
 | tasks | `list` `add` `complete` `subscribe` | `add`／`complete` | `tasks.list` |
-| rescue | `status` `disable` `restore_last_good` | `disable`／`restore_last_good`（各自產生一筆 ChangeSet，來源 `rescue`） | `rescue.status` |
+| rescue | `status` `disable` `restore_last_good` `resume_shell` | `disable`／`restore_last_good`（各自產生一筆 ChangeSet，來源 `rescue`）；`resume_shell` 不改 Profile：離開救援介面、清除監督者的救援請求並重新啟動一般 Shell，回讀為新 Shell 的連線（`shell_connected`） | `rescue.status` |
 
 `desktop.plugins.install` 與「啟用」是兩件事：安裝只寫套件庫，啟用是另一筆 ChangeSet（`add_entry`），歷史分別記錄。
 

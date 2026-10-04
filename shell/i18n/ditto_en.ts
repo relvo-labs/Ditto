@@ -1559,7 +1559,7 @@
     </message>
     <message>
         <source>主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。</source>
-        <translation>The primary screen is the one placed furthest to the top left. When the character's screen is unplugged, the character moves to the primary screen and goes back once the screen is plugged in again. When a window covers it, the recall shortcut brings it back.</translation>
+        <translation>The primary screen is the one placed furthest to the top left. When the character&apos;s screen is unplugged, the character moves to the primary screen and goes back once the screen is plugged in again. When a window covers it, the recall shortcut brings it back.</translation>
     </message>
     <message>
         <source>位置</source>
@@ -2149,6 +2149,14 @@
         <translation>Ditto rescue mode</translation>
     </message>
     <message>
+        <source>一般桌面已啟動。</source>
+        <translation>The normal desktop is running.</translation>
+    </message>
+    <message>
+        <source>一般桌面沒有啟動，仍可在這裡修復。</source>
+        <translation>The normal desktop did not start; you can keep repairing here.</translation>
+    </message>
+    <message>
         <source>修復</source>
         <translation>Repair</translation>
     </message>
@@ -2163,6 +2171,10 @@
     <message>
         <source>和最近可用的組合相比，沒有新加入或變更的插件。</source>
         <translation>Compared with the last composition known to work, no plugin was added or changed.</translation>
+    </message>
+    <message>
+        <source>回到一般桌面</source>
+        <translation>Back to the normal desktop</translation>
     </message>
     <message>
         <source>密碼</source>
@@ -2207,6 +2219,10 @@
     <message>
         <source>正在停用…</source>
         <translation>Disabling…</translation>
+    </message>
+    <message>
+        <source>正在回到一般桌面…</source>
+        <translation>Returning to the normal desktop…</translation>
     </message>
     <message>
         <source>正在恢復…</source>

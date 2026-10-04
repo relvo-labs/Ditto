@@ -16005,7 +16005,66 @@
         "max_ms": 30000
       },
       "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.rescue.resume_shell",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "`desktop.rescue.resume_shell`: the rescue UI is left and the normal Shell\nstarted again. Success is the new Shell's connection, read back by Core.",
+        "properties": {
+          "shell_connected": {
+            "description": "The new Shell connected within the capability's deadline.",
+            "type": "boolean"
+          },
+          "was_in_rescue_ui": {
+            "description": "The rescue UI was showing when the request came.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "was_in_rescue_ui",
+          "shell_connected"
+        ],
+        "title": "RescueResumeShellOutput",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.rescue.status",
+      "resource_scope": [
+        "desktop.rescue"
+      ],
+      "timeout_ms": {
+        "default_ms": 15000,
+        "max_ms": 30000
+      },
+      "version": "1.0.0"
     }
   ],
-  "catalog_revision": 3
+  "catalog_revision": 4
 }
