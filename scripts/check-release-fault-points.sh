@@ -15,6 +15,7 @@ patterns=(
   'store.unpack'
   'injected SQLITE_IOERR'
   'fault.abort_process'
+  'fault.hold'
 )
 status=0
 for binary in "$@"; do

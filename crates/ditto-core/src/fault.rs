@@ -88,12 +88,31 @@ mod enabled {
 
     /// `abort_process` ends Core the way a crash does (SIGKILL semantics:
     /// no destructors, no final writes).
+    ///
+    /// `hold=<path>` stops the calling thread at the point until `<path>`
+    /// exists (at most 60 s), so a test can act on the other processes while
+    /// Core is known to be there. The same path with the extension `.held`
+    /// exists while it waits; both
+    /// files are removed when it goes on, so a second hit waits again.
     pub fn hit(point: &str) {
         if let Some(action) = take(point) {
             if action == "abort_process" {
                 crate::log::event("fault.abort_process", &[("point", point)]);
                 // SAFETY: raising SIGKILL on ourselves has no preconditions.
                 unsafe { libc::kill(libc::getpid(), libc::SIGKILL) };
+            }
+            if let Some(release) = action.strip_prefix("hold=") {
+                let release = std::path::Path::new(release);
+                let held = release.with_extension("held");
+                crate::log::event("fault.hold", &[("point", point)]);
+                let _ = std::fs::write(&held, point);
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+                while !release.exists() && std::time::Instant::now() < deadline {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                let _ = std::fs::remove_file(release);
+                let _ = std::fs::remove_file(&held);
+                crate::log::event("fault.released", &[("point", point)]);
             }
         }
     }

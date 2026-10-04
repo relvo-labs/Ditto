@@ -9,10 +9,15 @@
 //   get <operation>                 look up the real outcome by operation id
 //   hold                            connect, then wait to be killed (EX1-07 ①)
 //
+// Options before the command (L-10, crates/ditto-core/tests/lifecycle.rs):
+//   --gate <file>   connect at once (the launcher token is short-lived), then
+//                   wait until <file> exists before running the command
+//   --out <file>    also write every printed line to <file>
+//
 // It exists to check that services and changes do not depend on the Agent's
 // lifetime (AT-30, L-10) before there is an Agent. Reports call it
 // 「Agent 替身」, never Agent. G2 decides whether it is deleted.
-import { readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { Socket } from 'node:net';
 
 const PROTOCOL = '0.2.0';
@@ -87,9 +92,23 @@ async function connect() {
   return link;
 }
 
-const [command, ...rest] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const options = {};
+while (args[0] === '--gate' || args[0] === '--out') {
+  const [flag, value] = args.splice(0, 2);
+  options[flag.slice(2)] = value;
+}
+const [command, ...rest] = args;
 const link = await connect();
-const print = value => process.stdout.write(JSON.stringify(value) + '\n');
+const print = value => {
+  const line = JSON.stringify(value) + '\n';
+  process.stdout.write(line);
+  if (options.out) appendFileSync(options.out, line);
+};
+if (options.gate) {
+  print({ connected: true, pid: process.pid, waiting: options.gate });
+  while (!existsSync(options.gate)) await new Promise(resolve => setTimeout(resolve, 10));
+}
 switch (command) {
   case 'subscribe': {
     const seconds = Number(rest[0] ?? 30);
@@ -105,7 +124,9 @@ switch (command) {
       const head = await link.call('desktop.profiles.get');
       body.base_revision = head.result?.profile?.head_revision;
     }
-    print(await link.call('desktop.changes.propose', body, operationId));
+    const answer = link.call('desktop.changes.propose', body, operationId);
+    print({ sent: 'desktop.changes.propose', operation_id: operationId ?? null });
+    print(await answer);
     process.exit(0);
     break;
   }

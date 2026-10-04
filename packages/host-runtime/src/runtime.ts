@@ -6,7 +6,7 @@ import type { CoreChannel, HelloResult } from './bridge/core-link.ts'
 import { DittoService } from './ditto-service.ts'
 import { DittoError, describe } from './errors.ts'
 import { EventBridge } from './events.ts'
-import { faultPoint, type FaultPoint } from './fault.ts'
+import { faultPoint, presentedLeaseIds, type FaultPoint } from './fault.ts'
 import { LeaseTable } from './leases.ts'
 import type { Subscription } from './loader/instance.ts'
 import type { ModulePolicy } from './loader/module-policy.ts'
@@ -124,7 +124,7 @@ export class HostRuntime {
     })
     every(intervals.renewMs ?? 3_000, async () => {
       await this.faults('lease.renew')
-      await this.leases.renew()
+      await this.leases.renew(presentedLeaseIds())
     })
     every(intervals.resourcesMs ?? 10_000, () => this.options.core.request('host.resources', { ...nodeResources() }))
   }

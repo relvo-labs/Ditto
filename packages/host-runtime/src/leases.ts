@@ -51,11 +51,23 @@ export class LeaseTable {
     }
   }
 
-  /** One batched renew. Expired leases are dropped and, if still wanted, registered again. */
-  async renew(): Promise<RenewResult> {
+  /**
+   * One batched renew. Expired leases are dropped and, if still wanted, registered again.
+   * `foreign` is only ever non-empty in the fault-injection build: ids this table does not
+   * hold, presented to show that Core refuses them (L-07 negative).
+   */
+  async renew(foreign: string[] = []): Promise<RenewResult> {
     const leaseIds = this.ids()
-    if (!leaseIds.length) return { renewed: [], expired: [] }
-    const result = await this.core.request<RenewResult>('host.lease.renew', { lease_ids: leaseIds })
+    const presented = foreign.filter(id => !this.byLease.has(id))
+    if (!leaseIds.length && !presented.length) return { renewed: [], expired: [] }
+    const result = await this.core.request<RenewResult>('host.lease.renew', { lease_ids: [...leaseIds, ...presented] })
+    if (presented.length) {
+      this.log.warn('foreign lease ids presented', {
+        presented,
+        renewed: result.renewed.filter(id => presented.includes(id)),
+        expired: result.expired.filter(id => presented.includes(id)),
+      })
+    }
     for (const leaseId of result.expired) {
       const registration = this.byLease.get(leaseId)
       this.byLease.delete(leaseId)
