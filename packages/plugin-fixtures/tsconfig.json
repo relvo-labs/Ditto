@@ -1,4 +1,4 @@
 {
   "extends": "../tsconfig.host-base.json",
-  "include": ["cordis/*/src/**/*.ts", "faults/*/src/**/*.ts", "tests/**/*.ts"]
+  "include": ["cordis/*/src/**/*.ts", "faults/*/src/**/*.ts", "stress/*/src/**/*.ts", "tests/**/*.ts"]
 }

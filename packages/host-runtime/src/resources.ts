@@ -18,6 +18,33 @@ export function nodeResources(): NodeResources {
   return { heap_used: usage.heapUsed, external: usage.external, array_buffers: usage.arrayBuffers }
 }
 
+/**
+ * The young generation hostd was started with. Every launch path passes the
+ * flags in packages/host-runtime/hostd.node-flags; with V8's adaptive default
+ * the young generation grows under transaction churn and is not given back
+ * (EX1-04, 2026-10-04), so hostd says at start which one it got.
+ */
+export interface YoungGeneration {
+  /** `--min-semi-space-size` / `--max-semi-space-size` in MiB, or null when V8's default applies. */
+  min_semi_space_mib: number | null
+  max_semi_space_mib: number | null
+  fixed: boolean
+}
+
+export function youngGeneration(execArgv: readonly string[] = process.execArgv): YoungGeneration {
+  const flag = (name: string): number | null => {
+    let value: number | null = null
+    for (const arg of execArgv) {
+      const [key, raw] = arg.replaceAll('_', '-').split('=', 2)
+      if (key === `--${name}` && raw !== undefined && Number.isFinite(Number(raw))) value = Number(raw)
+    }
+    return value
+  }
+  const min = flag('min-semi-space-size')
+  const max = flag('max-semi-space-size')
+  return { min_semi_space_mib: min, max_semi_space_mib: max, fixed: min !== null && min > 0 && min === max }
+}
+
 export interface EntryStateReport {
   entry_id: string
   fiber_state: FiberStateName

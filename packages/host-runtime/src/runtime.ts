@@ -23,6 +23,8 @@ export interface HostRuntimeOptions {
   pendingWaitMs?: number
   drainTimeoutMs?: number
   faults?: (point: FaultPoint) => Promise<void>
+  /** Called when a disposed mount's memory may be collected (main.ts wires reclaim.ts). */
+  reclaim?: () => void
   /** Background cadence; tests shorten these. host.hello may override heartbeat. */
   intervals?: Partial<{ heartbeatMs: number; renewMs: number; resourcesMs: number; entryStateMs: number }>
 }
@@ -71,6 +73,7 @@ export class HostRuntime {
       log: options.log.child({ part: 'loader' }),
       faults: this.faults,
       onChange: () => this.scheduleEntryState(),
+      ...(options.reclaim ? { reclaim: options.reclaim } : {}),
       ...(options.pendingWaitMs !== undefined ? { pendingWaitMs: options.pendingWaitMs } : {}),
       ...(options.drainTimeoutMs !== undefined ? { drainTimeoutMs: options.drainTimeoutMs } : {}),
     })

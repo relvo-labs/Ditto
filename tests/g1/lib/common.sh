@@ -229,6 +229,15 @@ g1_evidence_dir() {
   echo "$directory"
 }
 
+# g1_hostd_spec <node> <bundle>: Core's --hostd launch spec, with the same
+# Node/V8 flags the systemd unit passes (packages/host-runtime/hostd.node-flags),
+# so a runner measures the hostd that ships.
+g1_hostd_spec() {
+  local flags
+  flags="$(sed -e 's/#.*//' "$WORKSPACE/packages/host-runtime/hostd.node-flags" | xargs)"
+  echo "hostd 0.2.0 $1 $flags $2"
+}
+
 # g1_cargo <check-id> <criterion> <cargo test args...>
 # One Rust test (or filter) as one sub-check, its full log kept as evidence.
 # A filter that runs no test is a fail, never a pass.

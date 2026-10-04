@@ -36,13 +36,14 @@ Environment=LD_LIBRARY_PATH=@DITTO_WAYFIRE_PREFIX@/lib
 Environment=DITTO_LAUNCH_SCOPE_PREFIX=ditto
 # hostd's spec names node itself, by its canonical path: the launcher binds
 # identity to that path and compares it with /proc/<pid>/exe, so a wrapper
-# script would be refused (packages/host-runtime/bin/ditto-hostd). The rescue
-# UI and the lock client are only started when Core needs them.
+# script would be refused (packages/host-runtime/bin/ditto-hostd). Its Node
+# flags sit between node and the bundle (packages/host-runtime/hostd.node-flags).
+# The rescue UI and the lock client are only started when Core needs them.
 # `--mode rescue` is never set here; it is only for tests/g1/rescue-no-node.
 ExecStart=@DITTO_WORKSPACE@/target/release/ditto-core serve --compositor wayfire \
     --builtin-packages @DITTO_WORKSPACE@/target/ditto-packages \
     --shell "quickshell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/shell.qml" \
-    --hostd "hostd 0.2.0 @DITTO_NODE@ @DITTO_WORKSPACE@/packages/host-runtime/dist/ditto-hostd.mjs" \
+    --hostd "hostd 0.2.0 @DITTO_NODE@ @DITTO_HOSTD_NODE_FLAGS@ @DITTO_WORKSPACE@/packages/host-runtime/dist/ditto-hostd.mjs" \
     --rescue-ui "rescue-shell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/rescue/shell.qml" \
     --lock "lock 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/lock/shell.qml"
 

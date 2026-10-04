@@ -52,7 +52,7 @@ if [[ -n "$node" && -f "$hostd" && -d "$builtin_packages" ]]; then
   node="$(readlink -f "$node")"
   unset DITTO_DEV_TOKEN
   "$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" \
-    --builtin-packages "$builtin_packages" --hostd "hostd 0.2.0 $node $hostd" \
+    --builtin-packages "$builtin_packages" --hostd "$(g1_hostd_spec "$node" "$hostd")" \
     --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/rescue-no-node/normal-driver.mjs $work before $tasks_marker" \
     >"$evidence_dir/normal-before.log" 2>&1 &
   CORE_PID=$!
@@ -281,7 +281,7 @@ else
   CORE_PID=""
   unset DITTO_DEV_TOKEN
   "$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" \
-    --builtin-packages "$builtin_packages" --hostd "hostd 0.2.0 $node $hostd" \
+    --builtin-packages "$builtin_packages" --hostd "$(g1_hostd_spec "$node" "$hostd")" \
     --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/rescue-no-node/normal-driver.mjs $work after $tasks_marker" \
     >"$evidence_dir/normal-after.log" 2>&1 &
   CORE_PID=$!

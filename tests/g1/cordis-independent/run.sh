@@ -45,7 +45,7 @@ mkdir -p "$work"
 export DITTO_RUNTIME_DIR="$FIXTURE_ROOT/run" DITTO_DATA_DIR="$FIXTURE_ROOT/store" DITTO_SYSTEM=none WAYFIRE_SOCKET='' SWAYSOCK=''
 unset DITTO_DEV_TOKEN
 "$BINARIES/ditto-core" serve --compositor fixture --builtin-packages "$packages" \
-  --hostd "hostd 0.2.0 $node $hostd" \
+  --hostd "$(g1_hostd_spec "$node" "$hostd")" \
   --launch "agent 0.2.0 $node $WORKSPACE/tests/g1/fixtures/agent-standin/standin.mjs hold" \
   --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/cordis-independent/driver.mjs $work" \
   >"$FIXTURE_ROOT/core.log" 2>&1 &

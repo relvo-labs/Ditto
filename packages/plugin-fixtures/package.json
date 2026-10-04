@@ -6,8 +6,8 @@
   "scripts": {
     "typecheck": "tsc -p ../host-runtime/tsconfig.vendor.json && tsc -p tsconfig.json",
     "test": "vitest run",
-    "build": "node ../host-sdk/scripts/build-plugins.mjs cordis/* faults/*",
-    "pack": "node ../host-sdk/scripts/pack-each.mjs cordis/* qml/* faults/*"
+    "build": "node ../host-sdk/scripts/build-plugins.mjs cordis/* faults/* stress/*",
+    "pack": "node ../host-sdk/scripts/pack-each.mjs cordis/* qml/* faults/* stress/*"
   },
   "devDependencies": {
     "@ditto/host-sdk": "workspace:*",

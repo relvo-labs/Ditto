@@ -65,6 +65,9 @@ describe('ditto-hostd process', () => {
     expect(hello).toMatchObject({ hostd_version: '0.2.0', cordis_version: '4.0.4', strategy: 'isolate_rebuild', vendor_fingerprint: vendorFingerprint(join(root, 'vendor')) })
     // The launcher's PID is the PID that connected: the wrapper execs node.
     expect(child.pid).toBeGreaterThan(0)
+    // The wrapper passes hostd.node-flags, so this hostd runs with the shipped heap settings.
+    expect(stderr).toContain('heap settings applied')
+    expect(stderr).not.toContain('heap settings missing')
   })
 
   it('loads nothing until Core pushes, then serves the pushed entry through its lease', async () => {

@@ -15,7 +15,7 @@ describe('D-34 simple plugins and fault fixtures', () => {
   it('has five QML status providers and five Cordis settings plugins, all with valid manifests', () => {
     expect(group('qml')).toHaveLength(5)
     expect(group('cordis')).toHaveLength(5)
-    for (const dir of [...group('qml'), ...group('cordis'), ...group('faults')]) {
+    for (const dir of [...group('qml'), ...group('cordis'), ...group('faults'), ...group('stress')]) {
       const m = manifest(dir)
       expect({ dir, errors: validateManifest(m).errors }).toEqual({ dir, errors: [] })
       if (m.host_kind === 'qml') expect(existsSync(join(dir, m.qml_entry))).toBe(true)
@@ -33,5 +33,23 @@ describe('D-34 simple plugins and fault fixtures', () => {
     expect(await h.core.invoke('plugin.ditto.fixture.greeting.get')).toEqual({ text: '早安' })
     expect(await h.core.invoke('plugin.ditto.fixture.focus_minutes.get')).toEqual({ minutes: 25 })
     expect(h.core.bindings.size).toBe(5)
+  })
+
+  it('realm_cycle: mounted in an isolate realm and taken down again, leaving nothing behind (EX1-04 ③)', async () => {
+    h = await createTestHost({ packageRoots: [root], pendingWaitMs: 1_000 })
+    const dir = join(root, 'stress', 'realm_cycle')
+    const entry = h.entry({
+      entry_id: 'ent-realm', package: manifest(dir).id, module_path: join(dir, 'src', 'index.ts'),
+      config: { refuse_as_candidate: true, timers: 2 }, provides: ['plugin.ditto.fixture.realm_cycle.get'],
+    })
+    for (let i = 0; i < 20; i++) {
+      const { prepared, committed } = await h.core.apply(`chg-realm-${i}`, [entry])
+      expect(prepared.items[0]).toMatchObject({ status: 'failed', reason: expect.stringContaining('unhealthy') })
+      expect(committed).toBeUndefined()
+      expect(h.runtime.tx.instances.size).toBe(0)
+      expect(h.runtime.tx.liveMounts('ent-realm', 'candidate')).toBe(0)
+    }
+    expect(h.core.bindings.size).toBe(0)
+    expect(h.runtime.leases.size).toBe(0)
   })
 })

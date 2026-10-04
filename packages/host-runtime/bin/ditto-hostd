@@ -5,7 +5,9 @@
 # the executable its spec names and compares it with /proc/<pid>/exe. For this
 # script that is the script, while the running process is node, so the handshake
 # is refused (identity_rejected). The launch spec must name node itself:
-#   --hostd "hostd 0.2.0 <canonical node 22.23.2 path> <abs>/dist/ditto-hostd.mjs"
+#   --hostd "hostd 0.2.0 <canonical node 22.23.2 path> <node flags> <abs>/dist/ditto-hostd.mjs"
+# where <node flags> are the ones in ../hostd.node-flags, which this script also passes.
 # `exec` here only keeps the PID the same for supervisors that do not check it.
 here=$(dirname "$(readlink -f "$0")")
-exec "${DITTO_NODE:-node}" "$here/../dist/ditto-hostd.mjs" "$@"
+# shellcheck disable=SC2046 # the flags are words by design
+exec "${DITTO_NODE:-node}" $(sed -e 's/#.*//' "$here/../hostd.node-flags") "$here/../dist/ditto-hostd.mjs" "$@"

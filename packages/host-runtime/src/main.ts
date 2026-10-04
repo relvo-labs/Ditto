@@ -6,6 +6,8 @@ import { faultsCompiledIn } from './fault.ts'
 import type { Strategy } from './loader/transaction.ts'
 import { ModulePolicy } from './loader/module-policy.ts'
 import { HostLog, stderrSink } from './log.ts'
+import { Reclaimer, takeCollector } from './reclaim.ts'
+import { youngGeneration } from './resources.ts'
 import { HostRuntime } from './runtime.ts'
 import { hostdVersion } from './version.ts'
 
@@ -42,11 +44,16 @@ function socketPath(env: NodeJS.ProcessEnv): string {
 
 async function main(): Promise<void> {
   const env = process.env
+  // Before any plugin module loads: plugins never see `gc`.
+  const reclaimer = new Reclaimer(takeCollector())
+  const young = youngGeneration()
+  if (young.fixed && reclaimer.available) log.info('heap settings applied', { ...young, reclaim: true })
+  else log.warn('heap settings missing: start hostd with the flags in packages/host-runtime/hostd.node-flags', { ...young, reclaim: reclaimer.available })
   const token = readToken(env)
   const link = await CoreLink.connectSocket(socketPath(env))
   // One transaction semantics per hostd build (D-32 rule 4); only the test build may be told otherwise, for the trial.
   const trialStrategy = faultsCompiledIn ? env['DITTO_HOST_STRATEGY'] as Strategy | undefined : undefined
-  const runtime = new HostRuntime({ core: link, policy: ModulePolicy.fromEnvironment(env), log, ...(trialStrategy ? { strategy: trialStrategy } : {}) })
+  const runtime = new HostRuntime({ core: link, policy: ModulePolicy.fromEnvironment(env), log, reclaim: () => reclaimer.request(), ...(trialStrategy ? { strategy: trialStrategy } : {}) })
   let stopping = false
   const stop = async (code: number, why: string) => {
     if (stopping) return
@@ -56,6 +63,7 @@ async function main(): Promise<void> {
     const deadline = setTimeout(() => process.exit(code), 8_000)
     deadline.unref()
     try { await runtime.stop() } catch (error) { log.error('stop failed', { error: describe(error) }) }
+    reclaimer.stop()
     process.exit(code)
   }
 

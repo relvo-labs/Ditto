@@ -8,8 +8,10 @@
 # hostd's fibers, effects and registrations, and the Shell's mounted
 # providers. First and last counts must be identical; hostd and Shell PSS
 # medians may grow ≤10%, with no monotonic trend at the ten points
-# (Mann-Kendall p ≥ 0.05). Shell PSS and ① need a Shell; ③ needs the realm
-# fixture from HOST. In this fixture ② runs for real.
+# (Mann-Kendall p ≥ 0.05). Shell PSS and ① need a Shell. In this fixture ②
+# and ③ run for real, each against its own Core and hostd (hostd started with
+# the same Node flags as the systemd unit); ③ uses the realm_cycle fixture
+# (packages/plugin-fixtures/stress/realm_cycle), see driver.mjs.
 #
 #   DITTO_STRESS_CYCLES (default 100), DITTO_STRESS_WARMUP (default 10)
 set -euo pipefail
@@ -27,18 +29,31 @@ warmup="${DITTO_STRESS_WARMUP:-10}"
 node="$(command -v node || true)"
 hostd="$WORKSPACE/packages/host-runtime/dist/ditto-hostd.mjs"
 packages="${DITTO_BUILTIN_PACKAGES:-$WORKSPACE/target/ditto-packages}"
-if [[ -z "$node" || ! -f "$hostd" || ! -f "$packages/ditto.svc.tasks-1.0.0.dittopkg" ]]; then
-  check tasks-toggle fail "needs node, $hostd (pnpm --filter @ditto/host-runtime build) and $packages (scripts/build-builtin-packages.sh)"
-else
-  node="$(readlink -f "$node")"
+realm_fixture="$WORKSPACE/packages/plugin-fixtures/stress/realm_cycle"
+
+# stress_group <check-id> <criterion> <packages dir | realm>: one fresh Core
+# and hostd, the driver repeating <check-id>'s cycle, judge.py on its
+# snapshots. `realm` adds the packed realm_cycle fixture to the built-ins.
+stress_group() {
+  local id="$1" criterion="$2" builtin="$3" work judged status detail
   FIXTURE_ROOT="$(mktemp -d /tmp/ditto-g1.XXXXXX)"
   work="$FIXTURE_ROOT/work"
   mkdir -p "$work"
+  if [[ "$builtin" == realm ]]; then
+    builtin="$FIXTURE_ROOT/packages"
+    mkdir -p "$builtin"
+    cp "$packages"/*.dittopkg "$builtin/"
+    if ! (cd "$WORKSPACE/packages/plugin-fixtures" && "$node" ../host-sdk/scripts/pack-each.mjs "$realm_fixture" --out "$builtin") >"$evidence/pack-$id.log" 2>&1; then
+      check "$id" fail "$criterion: packing the realm_cycle fixture failed" "{\"log\": \"$evidence/pack-$id.log\"}"
+      g1_fixture_stop
+      return
+    fi
+  fi
   export DITTO_RUNTIME_DIR="$FIXTURE_ROOT/run" DITTO_DATA_DIR="$FIXTURE_ROOT/store" DITTO_SYSTEM=none WAYFIRE_SOCKET='' SWAYSOCK=''
   unset DITTO_DEV_TOKEN
-  "$BINARIES/ditto-core" serve --compositor fixture --builtin-packages "$packages" \
-    --hostd "hostd 0.2.0 $node $hostd" \
-    --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/cleanup-stress/driver.mjs $work tasks-toggle $cycles $warmup" \
+  "$BINARIES/ditto-core" serve --compositor fixture --builtin-packages "$builtin" \
+    --hostd "$(g1_hostd_spec "$node" "$hostd")" \
+    --launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/cleanup-stress/driver.mjs $work $id $cycles $warmup" \
     >"$FIXTURE_ROOT/core.log" 2>&1 &
   CORE_PID=$!
   for _ in $(seq 1 $((cycles * 20 + 600))); do
@@ -46,22 +61,31 @@ else
     kill -0 "$CORE_PID" 2>/dev/null || break
     sleep 0.1
   done
-  cp "$FIXTURE_ROOT/core.log" "$evidence/core-tasks-toggle.log"
-  cp "$work/result.json" "$evidence/tasks-toggle.json" 2>/dev/null || echo '{"ok":false,"error":"the driver wrote no result"}' >"$evidence/tasks-toggle.json"
-  judged="$(python3 "$WORKSPACE/tests/g1/cleanup-stress/judge.py" "$evidence/tasks-toggle.json")"
+  cp "$FIXTURE_ROOT/core.log" "$evidence/core-$id.log"
+  cp "$work/result.json" "$evidence/$id.json" 2>/dev/null || echo '{"ok":false,"error":"the driver wrote no result"}' >"$evidence/$id.json"
+  judged="$(python3 "$WORKSPACE/tests/g1/cleanup-stress/judge.py" "$evidence/$id.json")"
   status="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$judged")"
   detail="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["detail"])' "$judged")"
-  check tasks-toggle "$status" "② tasks service disabled/enabled: $detail" \
-    "$(python3 -c 'import json,sys; e=json.loads(sys.argv[1]).get("evidence") or {}; e["snapshots"]=sys.argv[2]; print(json.dumps(e))' "$judged" "$evidence/tasks-toggle.json")"
+  check "$id" "$status" "$criterion: $detail" \
+    "$(python3 -c 'import json,sys; e=json.loads(sys.argv[1]).get("evidence") or {}; e["snapshots"]=sys.argv[2]; print(json.dumps(e))' "$judged" "$evidence/$id.json")"
   g1_fixture_stop
+}
+
+if [[ -z "$node" || ! -f "$hostd" || ! -f "$packages/ditto.svc.tasks-1.0.0.dittopkg" ]]; then
+  needs="needs node, $hostd (pnpm --filter @ditto/host-runtime build) and $packages (scripts/build-builtin-packages.sh)"
+  check tasks-toggle fail "$needs"
+  check realm-cycle fail "$needs"
+else
+  node="$(readlink -f "$node")"
+  stress_group tasks-toggle "② tasks service disabled/enabled" "$packages"
+  if [[ -f "$realm_fixture/dist/index.mjs" ]]; then
+    stress_group realm-cycle "③ realm_cycle candidate mounted in an isolate realm and taken down" realm
+  else
+    check realm-cycle fail "③ needs $realm_fixture/dist (pnpm --filter @ditto/plugin-fixtures build)"
+  fi
 fi
 
 check dock-swap environment "① Dock A/B swaps need a Shell participant and its mounted-provider count (logged-in Ditto session)"
 check shell-pss environment "Shell PSS needs a running Shell (logged-in Ditto session)"
-if [[ -d "$WORKSPACE/packages/plugin-fixtures/realm-cycle" ]]; then
-  check realm-cycle not_implemented "the realm fixture exists but this runner does not drive it yet"
-else
-  check realm-cycle not_implemented "③ needs a fixture plugin that mounts and unmounts one isolate realm (HOST, L-04)"
-fi
 
 g1_finish
