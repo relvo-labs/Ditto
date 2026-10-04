@@ -35,7 +35,40 @@ FloatingWindow {
     visible: true
     onClosed: window.closeRequested()
 
+    /// The control that has keyboard focus, for the `focus` line on the
+    /// Shell's control socket (a keyboard-driven verification run asks it
+    /// where Tab has taken it, the way a screen reader would).
+    readonly property Item focusedItem: centersRoot.Window.activeFocusItem
+
+    /// A control that disappears while it has focus (「套用」 once applied,
+    /// a confirm row once confirmed, 「使用這個組合」 once in use) would
+    /// leave a keyboard user with no focus at all. Focus moves instead to the
+    /// nearest earlier control that is still there.
+    property Item lastFocused: null
+    onFocusedItemChanged: {
+        if (focusedItem && focusedItem !== centersRoot) {
+            lastFocused = focusedItem;
+        } else {
+            Qt.callLater(recoverFocus);
+        }
+    }
+    function recoverFocus() {
+        if (focusedItem && focusedItem !== centersRoot) {
+            return;
+        }
+        let target = lastFocused;
+        for (let step = 0; target && step < 500; step++) {
+            target = target.nextItemInFocusChain(false);
+            if (target && target.visible && target.enabled && target !== lastFocused) {
+                target.forceActiveFocus(Qt.OtherFocusReason);
+                return;
+            }
+        }
+        centersRoot.forceActiveFocus(Qt.OtherFocusReason);
+    }
+
     Item {
+        id: centersRoot
         anchors.fill: parent
         focus: true
         Keys.onEscapePressed: window.closeRequested()

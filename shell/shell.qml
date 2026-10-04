@@ -50,6 +50,39 @@ ShellRoot {
 
     /// Commands the Shell owns, from `shell.command` (Core decides who owns a
     /// command; a shortcut Core bound arrives here the same way).
+    /// What the `focus` control line answers: the centers' focused control
+    /// by its accessible name and role, with the accessible names of the
+    /// groups it sits in, innermost first. Only names are read; nothing is
+    /// pressed and nothing is sent to Core.
+    function focusReport() {
+        const window = centersLoader.item;
+        if (!centers.open || !window) {
+            return { open: false };
+        }
+        const item = window.focusedItem;
+        if (!item) {
+            return { open: true, page: centers.page, focused: null };
+        }
+        const groups = [];
+        for (let parent = item.parent; parent; parent = parent.parent) {
+            const name = parent.Accessible ? parent.Accessible.name : "";
+            if (name && name.length > 0) {
+                groups.push(name);
+            }
+        }
+        return {
+            open: true,
+            page: centers.page,
+            focused: {
+                name: item.Accessible ? item.Accessible.name : "",
+                role: item.Accessible ? item.Accessible.role : -1,
+                checked: item.Accessible ? item.Accessible.checked : false,
+                enabled: item.enabled,
+                groups: groups
+            }
+        };
+    }
+
     function runCommand(commandId, args) {
         switch (commandId) {
         case "launcher.toggle": {
@@ -243,6 +276,10 @@ ShellRoot {
     ///   workspace <id>  the same capability call as a click on the panel
     ///   command <id>    run a Shell-owned command locally (development and
     ///                     verification; the product path is `shell.command`)
+    ///   focus           → one JSON line: the accessible name and role of the
+    ///                     control with keyboard focus in the centers, and the
+    ///                     names of the groups around it. Read-only; a keyboard
+    ///                     verification run uses it to know where Tab went
     SocketServer {
         active: true
         path: (Quickshell.env("DITTO_RUNTIME_DIR")
@@ -266,6 +303,9 @@ ShellRoot {
                         client.activateWorkspace(command[1]);
                     } else if (command[0] === "command" && command.length === 2) {
                         root.runCommand(command[1], {});
+                    } else if (command[0] === "focus") {
+                        connection.write(JSON.stringify(root.focusReport()) + "\n");
+                        connection.flush();
                     } else {
                         console.log("ditto-shell ignored control line");
                     }

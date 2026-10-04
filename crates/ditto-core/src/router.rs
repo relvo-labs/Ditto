@@ -1322,16 +1322,12 @@ fn shortcuts_list(core: &Core) -> Handled {
             reserved: false,
         })
         .collect();
-    for chord in crate::preflight::RESERVED_CHORDS {
+    for binding in crate::participants::reserved_bindings() {
         shortcuts.push(ShortcutInfo {
-            chord: (*chord).into(),
-            command: if chord.ends_with('L') {
-                "session.lock".into()
-            } else {
-                "rescue.open".into()
-            },
+            bound: bound.as_ref().is_some_and(|bound| bound.contains(&binding)),
+            chord: binding.chord,
+            command: binding.command,
             owner: "core".into(),
-            bound: false,
             conflict: false,
             reserved: true,
         });

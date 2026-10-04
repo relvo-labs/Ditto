@@ -38,7 +38,7 @@ Item {
                 opacity: choice.enabled ? 1 : 0.45
                 activeFocusOnTab: choice.enabled
                 Accessible.role: Accessible.RadioButton
-                Accessible.name: optionLabel.text
+                Accessible.name: modelData.label
                 Accessible.checked: selected
                 Keys.onSpacePressed: choice.chosen(modelData.value)
                 Keys.onReturnPressed: choice.chosen(modelData.value)

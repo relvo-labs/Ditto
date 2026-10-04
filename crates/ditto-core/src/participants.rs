@@ -16,6 +16,7 @@ use ditto_protocol::{
         Observation, ParticipantPhase, ParticipantRole, PrepareParams, Projection, StateOutput,
         StepReport, ABORT, COMMIT, PREPARE, ROLLBACK, STATE,
     },
+    profile::ShortcutBinding,
     Window,
 };
 use serde_json::{json, Value};
@@ -159,6 +160,26 @@ struct Candidate {
     undoes: Option<String>,
 }
 
+/// Core's own chords (rescue, lock): bound whatever the profile says, and
+/// refused to any profile or plugin by preflight.
+pub fn reserved_bindings() -> Vec<ShortcutBinding> {
+    crate::preflight::RESERVED_CHORDS
+        .iter()
+        .map(|chord| ShortcutBinding {
+            chord: (*chord).into(),
+            command: reserved_command(chord).into(),
+        })
+        .collect()
+}
+
+pub fn reserved_command(chord: &str) -> &'static str {
+    if chord.ends_with('L') {
+        "session.lock"
+    } else {
+        "rescue.open"
+    }
+}
+
 pub fn strategy_name(package: &str) -> Option<&'static str> {
     match package {
         "ditto.layout.floating" => Some("floating"),
@@ -182,16 +203,22 @@ impl CompositorParticipant {
         self.inner.lock().expect("compositor participant").committed = None;
     }
 
+    /// The profile's bindings as the compositor holds them: Core's reserved
+    /// chords are bound beside them but are not profile state.
     fn observe(&self) -> CompositorObservation {
         let strategy = self
             .session
             .with_adapter(|adapter| adapter.layout_strategy())
             .ok()
             .flatten();
+        let reserved = reserved_bindings();
         let shortcuts = self
             .session
             .with_adapter(|adapter| adapter.shortcuts())
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|binding| !reserved.contains(binding))
+            .collect();
         let workspace_grid = self
             .session
             .with_adapter(|adapter| adapter.workspace_grid())
@@ -219,11 +246,17 @@ impl CompositorParticipant {
                 items.push(report("layout", outcome));
             }
         }
-        let shortcuts_changed = previous.is_none_or(|old| old.shortcuts != projection.shortcuts);
+        // Bound again when the compositor's table is not what was committed
+        // (a binding that failed at boot, a compositor that lost them), so a
+        // change never fails its readback on bindings it did not touch.
+        let shortcuts_changed = previous.is_none_or(|old| old.shortcuts != projection.shortcuts)
+            || self.observe().shortcuts != projection.shortcuts;
         if shortcuts_changed {
+            let mut bindings = projection.shortcuts.clone();
+            bindings.extend(reserved_bindings());
             let outcome = self
                 .session
-                .with_adapter(|adapter| adapter.bind_shortcuts(&projection.shortcuts));
+                .with_adapter(|adapter| adapter.bind_shortcuts(&bindings));
             items.push(report("shortcuts", outcome));
         }
         items

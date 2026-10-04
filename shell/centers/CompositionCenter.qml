@@ -333,6 +333,10 @@ Flickable {
                     property string chosen: ""
                     width: parent.width
                     spacing: page.tokens.spaceTight
+                    // The row names the slot, so its 試看／套用 buttons are
+                    // told apart by assistive technology.
+                    Accessible.role: Accessible.Grouping
+                    Accessible.name: page.client.tr.slotName(slot)
 
                     Row {
                         spacing: page.tokens.space
@@ -415,6 +419,8 @@ Flickable {
                     id: profileRow
                     required property var modelData
                     property string mode: ""     // "" | rename | duplicate | confirmDelete
+                    Accessible.role: Accessible.Grouping
+                    Accessible.name: modelData.name
                     width: parent.width
                     height: profileColumn.implicitHeight + page.tokens.space * 2
                     radius: page.tokens.radiusSmall

@@ -75,7 +75,17 @@ Scope {
         implicitHeight: 34
         exclusiveZone: provider.shown ? 34 : 0
         color: "transparent"
-        focusable: true
+        // Mapped without keyboard interactivity, then on demand: a surface
+        // that maps on demand is given the keyboard focus by the compositor,
+        // so swapping a Dock would take focus from the window in use.
+        property bool mapped: false
+        onVisibleChanged: if (!visible) mapped = false
+        Timer {
+            interval: 250
+            running: panel.visible && !panel.mapped
+            onTriggered: panel.mapped = true
+        }
+        WlrLayershell.keyboardFocus: mapped ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
         WlrLayershell.namespace: "ditto-panel-top"
 
         Rectangle {
