@@ -15,7 +15,9 @@ target/debug/ditto-core serve --compositor sway \
 target/debug/ditto-core serve --compositor fixture --development
 ```
 
-`--development` 使用單一共用 token、接受客戶端自稱的 kind，只用於測協定；**不是 EX-07 的身分證據**，日誌也會這樣說。沒有 `--development` 時，只有這個 Core 啟動的程序能連上來。
+`--development` 使用單一共用 token、接受客戶端自稱的 kind，只用於測協定；**不是 EX-07 的身分證據**，日誌也會這樣說。沒有 `--development` 時，只有這個 Core 啟動的程序能連上來。以 `--launch` 啟動、不受監督的客戶端結束時，Core 會回收它並記一行 `launch.exited`。
+
+`DITTO_SYSTEM` 選擇系統整合（`ditto-system`）：未設定時是真實實作（通知伺服器在工作階段匯流排上，logind 在系統匯流排上）；`none` 給測試夾具，所有系統動作一律回報不可用；`no-logind` 給有自己工作階段匯流排的 headless 夾具：通知伺服器是真的，但不連 logind，所以夾具不會收到旁邊登入工作階段的鎖定或睡眠訊號，也不會對它下鎖定指令。
 
 ## 這個服務目前保證什麼
 
@@ -25,7 +27,7 @@ target/debug/ditto-core serve --compositor fixture --development
 | 身分 | 一次性 token 經已開啟的描述子交付，先綁 PID 與執行檔再釋放；訊息中自填的 `plugin_id`／`client_id` 一律拒絕 |
 | 寫操作 | 執行後以 `readback` 能力回讀；不一致回 `conflict`，回應的 `_meta.readback_verified` 說明是否已確認 |
 | 不支援 | 合成器做不到的操作回 `unsupported`，能力目錄的 `availability` 事前就標明 |
-| 事件 | 訂閱先給快照再給事件，`seq` 單調遞增；佇列滿或合成器斷線送 `resync_required`，不靜默丟棄 |
+| 事件 | 訂閱先給快照再給事件，`seq` 單調遞增；佇列滿或合成器斷線送 `resync_required`，不靜默丟棄。合成器的事件流在自己的執行緒持續讀取，不等重讀；一次重讀涵蓋已收到的全部變更（合成器會切斷 socket 塞滿的 IPC 客戶端） |
 | 取消與逾時 | `$/cancel` 對不可取消的能力**不假裝取消成功**，回應標記未取消；逾時且可能已生效者標記 `outcome: "unknown"` |
 | 持久化 | 沒有。G0 不寫任何配置 |
 

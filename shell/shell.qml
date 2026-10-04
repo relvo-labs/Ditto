@@ -84,6 +84,25 @@ ShellRoot {
         };
     }
 
+    /// What the `tasks` control line answers: what the mounted tasks panel
+    /// (`ui.tasks_panel`) holds to show, read from the provider itself, so a
+    /// verification run can tell what the panel reflects without asking Core.
+    /// Read-only and on demand; nothing is sent to Core.
+    function tasksReport() {
+        const panel = providers.item("ui.tasks_panel");
+        if (!panel) {
+            return { mounted: false };
+        }
+        const open = panel.openTasks || [];
+        return {
+            mounted: true,
+            shown: panel.shown === true,
+            unavailable: panel.unavailable === true,
+            loaded: !!panel.snapshot,
+            open: open.map(task => task.text)
+        };
+    }
+
     function runCommand(commandId, args) {
         switch (commandId) {
         case "launcher.toggle": {
@@ -379,6 +398,8 @@ ShellRoot {
     ///                     control with keyboard focus in the centers, and the
     ///                     names of the groups around it. Read-only; a keyboard
     ///                     verification run uses it to know where Tab went
+    ///   tasks           → one JSON line: whether a tasks panel is mounted and
+    ///                     the open tasks it holds to show. Read-only
     SocketServer {
         active: true
         path: (Quickshell.env("DITTO_RUNTIME_DIR")
@@ -404,6 +425,9 @@ ShellRoot {
                         root.runCommand(command[1], {});
                     } else if (command[0] === "focus") {
                         connection.write(JSON.stringify(root.focusReport()) + "\n");
+                        connection.flush();
+                    } else if (command[0] === "tasks") {
+                        connection.write(JSON.stringify(root.tasksReport()) + "\n");
                         connection.flush();
                     } else {
                         console.log("ditto-shell ignored control line");

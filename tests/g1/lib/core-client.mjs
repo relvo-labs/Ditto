@@ -24,6 +24,9 @@ export async function connect() {
   let next = 0;
   const waiting = new Map();
   const events = [];
+  // A driver lives only as long as the Core that launched it: when Core ends,
+  // so does the driver (a relay would otherwise keep listening forever).
+  socket.on('close', () => process.exit(0));
   socket.on('data', chunk => {
     buffer += chunk.toString('utf8');
     let newline;

@@ -26,9 +26,9 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | `persistence-faults/run.sh` | EX1-09 | `fault-injection` build 的真實二進位（`crates/ditto-core/tests/persistence_faults.rs`）。真正寫滿的檔案系統需要 root 先掛好：設 `DITTO_G1_SMALL_FS=<已掛載、可寫的小 tmpfs>`，否則該項記為 `environment` |
 | `lifecycle/run.sh` | EX1-08 | L-01～L-04、L-08 為 Vitest（`packages/host-runtime/tests/lifecycle/`，每個檔案至少要跑到正例與負例兩項、不得有略過），L-02／L-03 另有 Rust 單元測試的一半；L-05～L-07、L-09、L-10 為 `fault-injection` build 的真實二進位（`crates/ditto-core/tests/lifecycle.rs`）：正常模式 Core（fixture 合成器）＋ Core 監督的真 hostd（故障注入 bundle，腳本每次重建）＋內建 tasks 服務，L-10 加 Agent 替身，全部由 Core 的啟動器啟動；測試經 `lib/bridge.mjs` 與 Core 對話。量到的數字寫在結果的 `notes` |
 | `contract-vectors/run.sh` | EX1-06 | Rust 與 TS 兩側共享向量、0.1 拒絕、缺口重訂、`operation_id` 重連、`on_behalf_of` 偽造、目錄 gate；加上 Agent 替身的身分路徑（經啟動器以 `agent` 受理；同一程式拿偽造 token 被 Core 拒絕） |
-| `cordis-independent/run.sh` | EX1-07 | 夾具：Core（fixture 合成器）＋真實 hostd＋Agent 替身＋觀察用 driver，全部由 Core 的啟動器啟動。① 的 tasks 半邊與 ③ 在此判定（「面板」以讀 `desktop.tasks.list` 的訂閱者代替，屬開發證據）；通知策略與 ② 需要工作階段 |
+| `cordis-independent/run.sh` | EX1-07 | headless 桌面夾具（`lib/shell-fixture.sh`）：Wayfire 與夾具自己的工作階段匯流排，正常模式 Core 監督的真實 Shell、hostd、Agent 替身與回讀 relay；Core 以 `DITTO_SYSTEM=no-logind` 在夾具的匯流排上擁有通知伺服器。① 面板內容取自 Shell 的 `tasks` 控制行，2 秒以用戶端單調時鐘量「檔案寫入 → 面板顯示」（每 20 ms 輪詢，QML 面板沒有 Core 時間戳）；通知以 `gdbus` 送出，決定經 Core 讀回（規則：專注模式、允許清單為空；緊急通知是對照）。② Shell 不在時（socket 拒絕且 Core 回報無 Shell 連線）改檔並送通知，重啟後的面板內容與策略紀錄經回讀判定。③ hostd PID 三個時點相同 |
 | `cleanup-stress/run.sh` | EX1-04 | 夾具中 ② tasks 服務停用／啟用與 ③ realm 往返（`packages/plugin-fixtures/stress/realm_cycle`）各真的跑 100 次，各用一組新的 Core 與 hostd，每 10 次以 `desktop.plugins.diagnostics` 取快照，`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall。① 與 Shell PSS 需要 Shell |
-| `latency/run.sh` | EX1-11 | 時間取 Core 寫入各狀態時的 `updated_at`（經 `change_updated` 事件）。夾具量 ② 另列的 Cordis 服務數字；①②③ 本體需要工作階段。樣本寫到 `latency-<run_id>.jsonl` |
+| `latency/run.sh` | EX1-11 | 兩個夾具。② 另列的 Cordis 服務數字：fixture 合成器＋hostd，`change_updated` 的 `updated_at`。①②③：headless 桌面夾具（真實 Shell、hostd、foot 與 Kate；參考機另加 Firefox），由 Core 啟動的 driver 執行。① 工作區與聚焦取 Core 回應的 `_meta.handled_us`（Core 單調時鐘，從讀到請求到回讀確認後寫出結果）；外觀 token 是 ChangeSet，取 `created_at` 到最後一次 readback 操作的 `ended_at`（皆為 Core 寫入，毫秒）；每種先暖機 5 次，保留但不判定。② 取 `prepared`／`committed` 的 `updated_at`，每次切換後另以 `desktop.panels.list` 確認 Shell 掛上對的 Dock。③ 合成器對應的 PID 每 0.5 秒檢查，Kate 未儲存緩衝雜湊前後比對。driver 的往返時間只並列參考。樣本寫到 `latency-<run_id>.jsonl` |
 
 ## 共用函式（`lib/common.sh`）
 
@@ -40,6 +40,10 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 - `g1_cargo`／`g1_run`：把一個 Rust 測試（或任一測試命令）記成一項子檢查，完整輸出存到 `<name>-<run_id>.d/`；篩選沒有跑到任何測試時是 `fail`，不是 `pass`。
 - `g1_fixture_core`／`g1_fixture_stop`／`g1_head`：開發模式 Core（fixture 合成器、自己的 runtime 與 store，路徑夠短以符合 `sun_path`）；`g1_head` 回 head revision 與內容雜湊。
 - `g1_hostd_spec <node> <bundle>`：Core 的 `--hostd` 啟動規格，帶上 systemd unit 同一份 Node 旗標（`packages/host-runtime/hostd.node-flags`），讓腳本量到的是實際出貨的 hostd。
+
+### 有真實 Shell 的 headless 桌面（`lib/shell-fixture.sh`）
+
+`manual-switch` 的夾具抽成共用：`start_compositor` 之後以 `shell_fixture_start [--hostd] [serve 參數…]` 啟動正常模式 Core、受 Core 監督的 Shell、（選用）hostd 與回讀 relay；`relay` 經 relay 呼叫 Core，`shell_line` 寫一行到 Shell 的控制 socket，`core_child` 找 Core 底下的程序，`fixture_reference_apps` 起參考應用，`shell_fixture_stop` 收掉一切並刪除 runtime 目錄。Core 以 `DITTO_SYSTEM=no-logind` 執行：通知伺服器是真的、在夾具自己的匯流排上，logind 不連，所以不碰旁邊的登入工作階段。
 
 ### 由 Core 啟動的驗證 driver
 
@@ -136,3 +140,21 @@ Rust 整合測試不能自己連上正常模式的 Core，所以由 Core 以 `--
   - L-10：客戶端在協調器受理前斷線，排隊中的提案仍會被執行。現在連線結束時標記，提案在寫入草稿前檢查，被丟棄（`change.dropped_before_acceptance`）。
   - 心跳逾時後被放棄的 hostd 連線，在下一個 hostd 連上前仍可送心跳與 `host.hello`，而且同一次失聯會被計兩次重啟。現在所有 host 方法都要求是目前存活的連線。
 - 限制：L-07 的「舊 generation 租約」負例由新 hostd 經測試建置的 `lease.renew:present=` 把舊 id 送給 Core（舊程序已被 Core 終止，無法自己送）；L-09 的「使用者手動修改」由 CLI 身分送出，不是 Shell。L-05 的「合成器操作照常」只驗證 fixture 合成器的讀取能力在變更被卡住時仍回應。
+
+## EX1-11 與 EX1-07 移到有真實 Shell 的 headless 桌面（2026-10-04，開發機，開發證據）
+
+環境：開發機的 headless Wayfire（pixman、Qt 軟體繪製）、debug build、參考應用只有 foot 與 Kate（Firefox 只在參考機跑）。不是參考機，數字只說明腳本與被測路徑成立，不進出口評審。以下是 `8ea29d8`（工作樹乾淨）上各三次的結果。
+
+- `latency` ①：200 次（工作區 66、聚焦 67、外觀 token 67，另各暖機 5 次不判定）受理到回讀完成 p95 為 10／12／12 ms，最大 12～15 ms。分項 p95：工作區約 2.2 ms、聚焦約 3.2 ms（`_meta.handled_us`），外觀 token 11～13 ms（`created_at` 到最後一次 readback 的 `ended_at`，毫秒解析度）。UI 首幀時間沒有記錄。
+- `latency` ②：Dock A↔B 100 次 `prepared`→`committed` p95 為 11／12／10 ms，最大 13 ms，每次切換後 Shell 都掛上了對的 Dock。另列的 Cordis 服務替換 p95 為 7～10 ms。plan/03/06 §6 另要求的啟動器替換 30 次還沒做。
+- `latency` ③：300 次操作期間 foot 與 Kate 的 PID 不變，Kate 未儲存緩衝雜湊相同。
+- `cordis-independent`：以 `SIGKILL` 終止 Agent 替身後，外部寫入 todo.txt 到 QML 面板顯示 63～64 ms（含 svc-tasks 的 50 ms 去抖；用戶端時鐘、20 ms 輪詢）；專注模式在終止前後都靜默一般通知、顯示緊急通知，決定都在策略紀錄裡、沒有退回顯示；Shell 被終止期間的檔案變更與通知，在重啟後的面板與策略紀錄都讀得到；hostd PID 三個時點相同。
+
+這兩支腳本跑出四個產品缺陷，都已修正，沒有放寬任何判準：
+
+1. 第一次完整的 `latency` 執行中，Wayfire 以「Error sending json to client!」切斷 Core 的事件連線：Core 每收到一個事件就在讀取執行緒上重讀整份快照，連續操作時 socket 塞滿。72 次聚焦（含 5 次暖機）裡 34 次回 `unavailable`，所有訂閱者被要求重新同步，Dock 的時間戳也因此遺失。事件流改在自己的執行緒讀取，一次重讀涵蓋已收到的全部變更（`session::tests::the_event_stream_is_drained_while_a_re_read_waits`，舊實作會失敗）。
+2. svc-tasks 換設定（例如授權 todo.txt）後重新啟動，卻沒有通知訂閱者，所以 QML 面板要等檔案下次被改才會更新。現在新實例成為使用中的實例時送一次 `tasks/changed`（`why: started`）。
+3. 以 `--launch` 啟動的客戶端結束後沒有被回收，變成殭屍程序，`kill -0` 仍然成功。Core 現在會回收它，並記一行 `launch.exited`。
+4. 測試本身的問題：回讀 relay 與 Agent 替身的 `hold` 模式在 Core 結束後仍然留著。現在它們會跟著 Core 結束；headless 夾具的 runtime 目錄也會清掉。
+
+還沒成立的：參考機上的執行（含 Firefox、release build）；EX1-11 的 UI 首幀參考值與啟動器替換 30 次；EX1-07 的面板時間是用戶端時鐘，QML 面板沒有 Core 時間戳可用。

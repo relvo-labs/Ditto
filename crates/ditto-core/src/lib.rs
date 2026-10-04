@@ -558,6 +558,9 @@ fn dispatch(
                             .refused_cancel
                             .load(Ordering::SeqCst)
                             .then_some(true),
+                        handled_us: Some(
+                            u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX),
+                        ),
                     }),
                 );
             }

@@ -97,6 +97,18 @@ describe('svc-tasks in the test host', () => {
     expect(((await h.core.invoke('desktop.tasks.list')) as List).tasks.map(task => task.text)).toContain('寫報告 +工作')
   })
 
+  it('announces its list once it is the active instance, so a panel reads the new source (EX1-07)', async () => {
+    // Without a grant first: the panel has read an empty file part.
+    await h.core.apply(change(), [tasks({ source: { kind: 'todo_txt', path_grant: 'grant-todo' } }, {})])
+    await h.runtime.events.flush('ent-tasks')
+    const before = h.core.hostEvents.length
+    // The source changes (granted now): a new instance serves the file.
+    await h.core.apply(change(), [tasks()])
+    await h.runtime.events.flush('ent-tasks')
+    const { value } = await until(() => h.core.hostEvents.slice(before).find(event => event.name === 'tasks/changed'))
+    expect(value.payload).toMatchObject({ why: 'started', open: 1, done: 1, file_state: 'active' })
+  })
+
   it('adds and completes in the file and in its own list (data area), and survives a restart of the plugin', async () => {
     await h.core.apply(change(), [tasks()])
     const added = await h.core.invoke('desktop.tasks.add', { text: '買牛奶' }) as { task_id: string; source: string; done: boolean }

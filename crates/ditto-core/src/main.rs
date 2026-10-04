@@ -257,10 +257,19 @@ fn main() -> io::Result<()> {
     // The system integration lives in ditto-system. `DITTO_SYSTEM=none` (test
     // fixtures) gets a stand-in that reports every action unavailable rather
     // than pretending; the real one reports its own missing parts.
-    let real = (env::var("DITTO_SYSTEM").as_deref() != Ok("none")).then(|| {
-        Arc::new(ditto_system::RealSystem::new(
+    // `DITTO_SYSTEM=no-logind` (headless fixtures with their own session bus)
+    // is the real one without logind: the notification server runs on the
+    // fixture's bus, and nothing reaches the login session the fixture runs
+    // beside (no Lock or PrepareForSleep from it, no LockSession on it).
+    let system_mode = env::var("DITTO_SYSTEM").unwrap_or_default();
+    let real = (system_mode != "none").then(|| {
+        let mut config = ditto_system::RealSystemConfig::from_env(
             ditto_system::RealSystemConfig::default_cache_path(),
-        ))
+        );
+        if system_mode == "no-logind" {
+            config.logind = false;
+        }
+        Arc::new(ditto_system::RealSystem::with_config(config))
     });
     if let Some(real) = &real {
         for (component, problem) in real.problems() {
@@ -344,11 +353,28 @@ fn main() -> io::Result<()> {
         thread::spawn(move || follow_compositor(session, options.compositor, events, core));
     }
     for specification in &options.launches {
-        if let Err(error) = launcher::launch(&registry, specification, &path) {
-            ditto_core::log::event(
-                "launch.failed",
-                &[("spec", specification), ("reason", &error.to_string())],
-            );
+        match launcher::launch(&registry, specification, &path) {
+            // A launched client is not supervised, but its exit is reaped
+            // (no zombie left until Core ends) and logged.
+            Ok(mut child) => {
+                let spec = specification.clone();
+                thread::spawn(move || {
+                    let status = child
+                        .wait()
+                        .map(|status| status.to_string())
+                        .unwrap_or_else(|error| error.to_string());
+                    ditto_core::log::event(
+                        "launch.exited",
+                        &[("spec", &spec), ("status", &status)],
+                    );
+                });
+            }
+            Err(error) => {
+                ditto_core::log::event(
+                    "launch.failed",
+                    &[("spec", specification), ("reason", &error.to_string())],
+                );
+            }
         }
     }
     if development_token.is_some() {

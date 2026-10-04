@@ -146,6 +146,8 @@ Quickshell 會監看設定目錄，改了 `shell/` 下的 QML 就整個重新載
 | `recall` | 角色被遮住或隱藏時喚回 |
 | `workspace <id>` | 與點擊面板同一條能力路徑 |
 | `command <id>` | 在本機執行 Shell 擁有的命令（`launcher.toggle`、`composition.open`…），供開發與驗證；產品路徑是 Core 的 `shell.command` |
+| `focus` | 唯讀，回一行 JSON：管理中心裡持有鍵盤焦點的控制項的無障礙名稱、角色與所在群組（鍵盤驗證用） |
+| `tasks` | 唯讀，回一行 JSON：待辦面板是否已掛載，以及它手上要顯示的未完成待辦文字（EX1-07 用；不問 Core） |
 
 鎖定客戶端與救援介面各自是一個設定：`quickshell -p shell/lock`、`quickshell -p shell/rescue/shell.qml`。兩者的 `core`、`jelly`、`ui`、`i18n` 是指向 Shell 目錄的符號連結（同一個 Quickshell 限制），安裝時要保留符號連結。
 

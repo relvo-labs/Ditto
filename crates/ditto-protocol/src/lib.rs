@@ -332,6 +332,12 @@ pub struct ResultMeta {
     /// non-cancellable: the request ran to completion and was not cancelled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_cancellable: Option<bool>,
+    /// Core's monotonic time, in microseconds, from reading the request to
+    /// writing this result. For a write with `readback_verified`, it spans
+    /// acceptance to the completed readback (the NFR-03 measure); it is
+    /// Core's own clock, not the caller's round trip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handled_us: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
