@@ -24,6 +24,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | `preflight-negative/run.sh` | EX1-02 | ①②③ 由 Rust 契約測試判定（也在 `rust.yml` 阻擋合併），另以真實 `ditto-core` 對內建套件能表達的負例（缺套件、單一供應者衝突）回讀 head、內容雜湊與已存變更；④ 的產品文字由人在參考機的插件中心確認（`operator`） |
 | `rollback/run.sh` | EX1-03 | Rust 情境測試；另寫 `rollback-<run_id>.jsonl`，每個情境一行結果類別。③ 所寫的「版面撤銷時視窗已關」在 G1 不存在（逐視窗位置不是 Profile 狀態），記為 `not_implemented`，機制本身以無法還原的參與者測試 |
 | `persistence-faults/run.sh` | EX1-09 | `fault-injection` build 的真實二進位（`crates/ditto-core/tests/persistence_faults.rs`）。真正寫滿的檔案系統需要 root 先掛好：設 `DITTO_G1_SMALL_FS=<已掛載、可寫的小 tmpfs>`，否則該項記為 `environment` |
+| `lifecycle/run.sh` | EX1-08 | L-01～L-04、L-08 為 Vitest（`packages/host-runtime/tests/lifecycle/`，每個檔案至少要跑到正例與負例兩項、不得有略過），L-02／L-03 另有 Rust 單元測試的一半；L-05～L-07、L-09、L-10 為 `fault-injection` build 的真實二進位（`crates/ditto-core/tests/lifecycle.rs`）：正常模式 Core（fixture 合成器）＋ Core 監督的真 hostd（故障注入 bundle，腳本每次重建）＋內建 tasks 服務，L-10 加 Agent 替身，全部由 Core 的啟動器啟動；測試經 `lib/bridge.mjs` 與 Core 對話。量到的數字寫在結果的 `notes` |
 | `contract-vectors/run.sh` | EX1-06 | Rust 與 TS 兩側共享向量、0.1 拒絕、缺口重訂、`operation_id` 重連、`on_behalf_of` 偽造、目錄 gate；加上 Agent 替身的身分路徑（經啟動器以 `agent` 受理；同一程式拿偽造 token 被 Core 拒絕） |
 | `cordis-independent/run.sh` | EX1-07 | 夾具：Core（fixture 合成器）＋真實 hostd＋Agent 替身＋觀察用 driver，全部由 Core 的啟動器啟動。① 的 tasks 半邊與 ③ 在此判定（「面板」以讀 `desktop.tasks.list` 的訂閱者代替，屬開發證據）；通知策略與 ② 需要工作階段 |
 | `cleanup-stress/run.sh` | EX1-04 | 夾具中 ② tasks 服務停用／啟用真的跑 100 次，每 10 次以 `desktop.plugins.diagnostics` 取快照，`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall。① 需要 Shell，③ 需要 HOST 的 realm 夾具 |
@@ -43,7 +44,9 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 
 帶 hostd 或 Agent 替身的夾具必須以非開發模式啟動 Core（開發模式的共用 token 不能與受控啟動的客戶端並用），所以外面的 `dittoctl` 連不上。這些腳本改讓 Core 以 `--launch "dittoctl 0.2.0 <node> <driver.mjs> …"` 啟動一支觀察用 driver（`lib/core-client.mjs`），它只呼叫能力並記錄；**終止程序一律由 `run.sh` 在外面做**，兩邊以工作目錄中的檔案交接。
 
-Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模型或模型 SDK，只做三件事：訂閱 tasks 事件、送出 ChangeSet、以 `operation_id` 查詢結果（外加 `hold`，連上後等著被終止）。報告中一律稱「Agent 替身」。
+Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模型或模型 SDK，只做三件事：訂閱 tasks 事件、送出 ChangeSet、以 `operation_id` 查詢結果（外加 `hold`，連上後等著被終止）。`--gate <檔案>` 讓它啟動後先連上（啟動器的 token 只有 30 秒效期），等檔案出現才執行指令；`--out <檔案>` 另把每一行輸出寫進檔案。報告中一律稱「Agent 替身」。
+
+Rust 整合測試不能自己連上正常模式的 Core，所以由 Core 以 `--launch "dittoctl 0.2.0 <node> lib/bridge.mjs <socket>"` 啟動一支轉接程式：它用自己的啟動器 token 完成握手，再把測試連到 `<socket>` 的位元組原樣轉給 Core。它不判斷任何事，身分仍是 Core 綁定給這個程序的 `cli`。
 
 ## 各工作流要提供什麼，腳本才能往下跑
 
@@ -79,3 +82,16 @@ Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模
 ## 救援夾具更新（2026-09-27，開發證據）
 
 `rescue-no-node/run.sh` 先前只隔離 socket，沒有指定專用 `DITTO_DATA_DIR`，因此在本機曾開啟預設 Ditto store。三次舊執行不作出口證據；沒有執行資料回滾。現在使用專用暫存 store 並在結束後清理。`artifacts/g1/rescue-no-node-2026-09-27T13:05:42Z-effb.json` 的隔離重跑：啟動、原生視窗操作、歷史讀取、恢復受保護文件（head 與雜湊回讀）、Cordis 能力標為 `rescue_mode`、無 Ditto Node 程序、正常模式重建 tasks 並讀回救援前的待辦，七項通過。Shell 產品文字仍需登入工作階段，因此 EX1-05 仍未通過。
+
+## 生命週期契約 L-01～L-10（2026-10-04，開發機，fixture 合成器，開發證據）
+
+`lifecycle/run.sh` 在 commit `3c61e47` 的乾淨工作樹上連跑三次，三次都是 12 項子檢查全部 `pass`（`artifacts/g1/lifecycle-2026-10-04T08:39:51Z-3c61.json` 等三份）。這是開發機與 fixture 合成器上的開發證據，不是 EX1-08 的出口通過：出口仍要參考機的 PR 快檢與 nightly 紀錄。
+
+- 量到的值：L-05 在 `SIGKILL` hostd 後 29～44 ms 內，`desktop.tasks.list` 的可用性轉為 `host_unavailable`（門檻 500 ms，計時含觀察端的輪詢）；L-07 在 `SIGSTOP` 後約 6.1 秒撤銷綁定，靠的是 6 秒心跳逾時，不是 10 秒的租約效期；L-06 的變更以 `rolled_back` 結束並列出 3 項。
+- 測試本身另外連跑：`cargo test --test lifecycle` 連續 10 次，及三份測試程式同時執行一次，都沒有失敗。
+- 寫測試時找到並修正了四個產品問題，修正前對應的斷言都會失敗：
+  - L-05：prepare 後 hostd 死掉的變更會被送去 commit 再回復，結果是 `partially_applied`。現在在 commit 前發現參與者連線已斷就從 `prepared` 中止（`change.participant_lost`）。
+  - L-06：交接中 hostd 死掉時，回復的回讀仍送往已斷的連線，變更一律 `partially_applied`。現在等重啟的 hostd 上線、推送 head（仍是基底），再經新連線回讀；新 hostd 回答不記得這個變更（`participant.change_unknown`），由回讀判定。
+  - L-10：客戶端在協調器受理前斷線，排隊中的提案仍會被執行。現在連線結束時標記，提案在寫入草稿前檢查，被丟棄（`change.dropped_before_acceptance`）。
+  - 心跳逾時後被放棄的 hostd 連線，在下一個 hostd 連上前仍可送心跳與 `host.hello`，而且同一次失聯會被計兩次重啟。現在所有 host 方法都要求是目前存活的連線。
+- 限制：L-07 的「舊 generation 租約」負例由新 hostd 經測試建置的 `lease.renew:present=` 把舊 id 送給 Core（舊程序已被 Core 終止，無法自己送）；L-09 的「使用者手動修改」由 CLI 身分送出，不是 Shell。L-05 的「合成器操作照常」只驗證 fixture 合成器的讀取能力在變更被卡住時仍回應。
