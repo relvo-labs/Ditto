@@ -43,6 +43,8 @@ wanted="v$(tr -d '[:space:]' <"$workspace/.nvmrc")"
 command -v pnpm >/dev/null || { echo "missing installer dependency: pnpm" >&2; exit 1; }
 (cd "$workspace" && pnpm install --frozen-lockfile && pnpm --filter @ditto/host-runtime build)
 bash "$workspace/scripts/build-builtin-packages.sh" "$workspace/target/ditto-packages" >/dev/null
+# hostd's Node/V8 flags have one source; every launch path reads the same file.
+hostd_node_flags="$(sed -e 's/#.*//' "$workspace/packages/host-runtime/hostd.node-flags" | xargs)"
 
 substitute() {
   sed -e "s|@DITTO_WORKSPACE@|$workspace|g" \
@@ -50,6 +52,7 @@ substitute() {
     -e "s|@DITTO_WAYFIRE_PREFIX@|$wayfire_prefix|g" \
     -e "s|@DITTO_LIBEXEC@|$libexec|g" \
     -e "s|@DITTO_NODE@|$node|g" \
+    -e "s|@DITTO_HOSTD_NODE_FLAGS@|$hostd_node_flags|g" \
     -e "s|@DITTO_SESSION_EXEC@|$libexec/ditto-session|g" "$1" >"$2"
   if grep -q '@DITTO_[A-Z_]*@' "$2"; then
     echo "unsubstituted placeholder in $1" >&2

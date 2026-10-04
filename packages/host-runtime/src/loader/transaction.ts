@@ -93,6 +93,8 @@ export interface TransactionOptions {
   faults?: (point: FaultPoint) => Promise<void>
   /** Called when observable entry state may have changed. */
   onChange?: () => void
+  /** Called when a mount's disposers have all finished, so its memory can be collected (reclaim.ts). */
+  reclaim?: () => void
 }
 
 export interface TransactionStats {
@@ -700,6 +702,7 @@ export class TransactionLayer {
         this.log.info('late cleanup finished; entry may be mounted again', { entry_id: instance.entryId })
       }
       this.options.onChange?.()
+      this.options.reclaim?.()
     })
     if (instance.realm === 'main') this.disposing.set(instance.entryId, finished)
     instance.disposal = withTimeout(finished, instance.spec.cleanup_timeout_ms).then(result => {

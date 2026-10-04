@@ -1,0 +1,23 @@
+# Node/V8 flags for every ditto-hostd start. Each launch path puts them between
+# node and dist/ditto-hostd.mjs: the systemd unit (@DITTO_HOSTD_NODE_FLAGS@,
+# filled in by packaging/reference-image/install-session.sh), bin/ditto-hostd
+# and the G1 runners (tests/g1/lib/common.sh g1_hostd_spec). hostd logs at
+# start whether it got them. Lines starting with # are comments.
+#
+# Why (EX1-04, measured 2026-10-04 on a development machine, tests/g1/README.md):
+# every plugin mount leaves short-lived Cordis contexts, closures and hidden
+# classes behind. Heap snapshots show no growth in live objects, but with V8's
+# defaults hostd's PSS kept climbing for hundreds of mount/unmount cycles:
+#   --min/max-semi-space-size=4  fixed 4 MiB semi-spaces (8 MiB young
+#                                generation). By default the young generation
+#                                doubled under transaction churn and was not
+#                                given back (new space 4 → 14 MiB after 100
+#                                tasks disable/enable cycles, 27 MiB after 400).
+#                                2 MiB promoted more garbage; 8 MiB took longer
+#                                to touch.
+#   --expose-gc                  lets hostd collect the old generation after a
+#                                mount's disposers finished (src/reclaim.ts:
+#                                coalesced, at most once a second). main.ts
+#                                takes `gc` off the global object before any
+#                                plugin loads.
+--expose-gc --min-semi-space-size=4 --max-semi-space-size=4
