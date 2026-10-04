@@ -46,6 +46,9 @@ pub struct Caller {
     pub kind: String,
     pub connection_id: String,
     pub sink: mpsc::Sender<Outgoing>,
+    /// Set when the connection has ended. A proposal whose caller is gone
+    /// before the coordinator accepted it is not executed (L-10).
+    pub gone: Arc<std::sync::atomic::AtomicBool>,
 }
 
 pub struct Call<'a> {
@@ -298,7 +301,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
                 subject: caller.subject.0.clone(),
                 target: None,
             };
-            run_proposal(core, proposal, &call)
+            run_proposal(core, caller, proposal, &call)
         }
         catalog::CHANGES_GET => changes_get(core, call.input()?),
         catalog::CHANGES_LIST => changes_list(core, call.input()?),
@@ -365,7 +368,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
                 subject: caller.subject.0.clone(),
                 target: None,
             };
-            run_proposal(core, proposal, &call)
+            run_proposal(core, caller, proposal, &call)
         }
         catalog::PANELS_LIST => {
             empty(&call)?;
@@ -751,10 +754,28 @@ fn origin_for(caller: &Caller, surface: Option<String>) -> ChangeOrigin {
 /// known), then for the outcome within the caller's deadline. Running over the
 /// deadline returns the record as it is now; the change continues and the
 /// caller follows it with `changes.get`, never by resending.
-fn run_proposal(core: &Arc<Core>, proposal: Proposal, call: &Call<'_>) -> Handled {
+fn run_proposal(core: &Arc<Core>, caller: &Caller, proposal: Proposal, call: &Call<'_>) -> Handled {
     let (accepted, change_id) = mpsc::channel();
     let (reply, outcome) = mpsc::channel();
+    let gone = Arc::clone(&caller.gone);
     core.submit(move |coordinator| {
+        // Acceptance is the draft being written. A caller that disappeared
+        // while the proposal waited in the queue never learns a change id,
+        // so nothing runs on its behalf; it finds nothing by its operation
+        // id and may send again (L-10, before acceptance).
+        if gone.load(std::sync::atomic::Ordering::SeqCst) {
+            crate::log::event(
+                "change.dropped_before_acceptance",
+                &[
+                    ("subject", &proposal.subject),
+                    (
+                        "operation_id",
+                        proposal.request_operation_id.as_deref().unwrap_or(""),
+                    ),
+                ],
+            );
+            return;
+        }
         let _ = reply.send(coordinator.propose(proposal, Some(accepted)));
     });
     let remaining = call.remaining().max(Duration::from_millis(500));
