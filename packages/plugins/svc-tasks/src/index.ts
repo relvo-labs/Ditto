@@ -261,5 +261,9 @@ export default defineDittoPlugin<TasksConfig>({
     })
     // No custom health check: a missing or unreadable file is a source state the panel shows,
     // not a reason to refuse the service (the plugin's own list still works).
+
+    // A new instance (a changed source, a restart) may serve a different list from the one the
+    // panel last read; say so once. The runtime holds it until this instance is the active one.
+    changed('started')
   },
 })
