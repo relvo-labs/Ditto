@@ -26,7 +26,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | `persistence-faults/run.sh` | EX1-09 | `fault-injection` build 的真實二進位（`crates/ditto-core/tests/persistence_faults.rs`）。真正寫滿的檔案系統需要 root 先掛好：設 `DITTO_G1_SMALL_FS=<已掛載、可寫的小 tmpfs>`，否則該項記為 `environment` |
 | `contract-vectors/run.sh` | EX1-06 | Rust 與 TS 兩側共享向量、0.1 拒絕、缺口重訂、`operation_id` 重連、`on_behalf_of` 偽造、目錄 gate；加上 Agent 替身的身分路徑（經啟動器以 `agent` 受理；同一程式拿偽造 token 被 Core 拒絕） |
 | `cordis-independent/run.sh` | EX1-07 | 夾具：Core（fixture 合成器）＋真實 hostd＋Agent 替身＋觀察用 driver，全部由 Core 的啟動器啟動。① 的 tasks 半邊與 ③ 在此判定（「面板」以讀 `desktop.tasks.list` 的訂閱者代替，屬開發證據）；通知策略與 ② 需要工作階段 |
-| `cleanup-stress/run.sh` | EX1-04 | 夾具中 ② tasks 服務停用／啟用真的跑 100 次，每 10 次以 `desktop.plugins.diagnostics` 取快照，`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall。① 需要 Shell，③ 需要 HOST 的 realm 夾具 |
+| `cleanup-stress/run.sh` | EX1-04 | 夾具中 ② tasks 服務停用／啟用與 ③ realm 往返（`packages/plugin-fixtures/stress/realm_cycle`）各真的跑 100 次，各用一組新的 Core 與 hostd，每 10 次以 `desktop.plugins.diagnostics` 取快照，`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall。① 與 Shell PSS 需要 Shell |
 | `latency/run.sh` | EX1-11 | 時間取 Core 寫入各狀態時的 `updated_at`（經 `change_updated` 事件）。夾具量 ② 另列的 Cordis 服務數字；①②③ 本體需要工作階段。樣本寫到 `latency-<run_id>.jsonl` |
 
 ## 共用函式（`lib/common.sh`）
@@ -38,6 +38,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 - `screen_fraction`：以 `grim` 截圖並計算某個顏色占畫面的比例，用來判斷鎖定時是否露出桌面。
 - `g1_cargo`／`g1_run`：把一個 Rust 測試（或任一測試命令）記成一項子檢查，完整輸出存到 `<name>-<run_id>.d/`；篩選沒有跑到任何測試時是 `fail`，不是 `pass`。
 - `g1_fixture_core`／`g1_fixture_stop`／`g1_head`：開發模式 Core（fixture 合成器、自己的 runtime 與 store，路徑夠短以符合 `sun_path`）；`g1_head` 回 head revision 與內容雜湊。
+- `g1_hostd_spec <node> <bundle>`：Core 的 `--hostd` 啟動規格，帶上 systemd unit 同一份 Node 旗標（`packages/host-runtime/hostd.node-flags`），讓腳本量到的是實際出貨的 hostd。
 
 ### 由 Core 啟動的驗證 driver
 
@@ -74,8 +75,41 @@ Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模
 - `contract-vectors`：11 項全部通過，包含 Agent 替身經啟動器以 `agent` 受理、偽造 token 被 Core 以 `identity_rejected` 拒絕。
 - `cordis-independent`：以 `SIGKILL` 終止 Agent 替身後，外部改寫 todo.txt 的 tasks 事件在 51 ms 內到達、`desktop.tasks.list` 列出新行；hostd PID 不變。
 - `latency`：Cordis 服務（tasks 停用／啟用各 100 次）`prepared`→`committed` p95 為 9／8 ms。
-- `cleanup-stress` ②：**未通過。** 100 次（另試 400 次）停用／啟用後，Core 與 hostd 的所有計數首尾完全相同，但 hostd PSS 由約 41 MB 升到 52 MB（400 次時 65 MB，中途一次回落到 36 MB），中位數增幅 13.7%，Mann-Kendall p=0.012。同期 hostd 回報的 JS heap 穩定在約 12 MB、external 2.1 MB，所以增長在 JS heap 之外（模組／realm 的程式碼與原生配置是候選）。依原則 5 不調整門檻；交 HOST 查明，查明前 EX1-04 ② 記為未通過。
+- `cleanup-stress` ②：**未通過。** 100 次（另試 400 次）停用／啟用後，Core 與 hostd 的所有計數首尾完全相同，但 hostd PSS 由約 41 MB 升到 52 MB（400 次時 65 MB，中途一次回落到 36 MB），中位數增幅 13.7%，Mann-Kendall p=0.012。同期 hostd 回報的 JS heap 穩定在約 12 MB、external 2.1 MB，所以增長在 JS heap 之外（模組／realm 的程式碼與原生配置是候選）。依原則 5 不調整門檻；交 HOST 查明，查明前 EX1-04 ② 記為未通過。（2026-10-04 已查明，「JS heap 之外」的判斷有誤，見文末一節。）
 
 ## 救援夾具更新（2026-09-27，開發證據）
 
 `rescue-no-node/run.sh` 先前只隔離 socket，沒有指定專用 `DITTO_DATA_DIR`，因此在本機曾開啟預設 Ditto store。三次舊執行不作出口證據；沒有執行資料回滾。現在使用專用暫存 store 並在結束後清理。`artifacts/g1/rescue-no-node-2026-09-27T13:05:42Z-effb.json` 的隔離重跑：啟動、原生視窗操作、歷史讀取、恢復受保護文件（head 與雜湊回讀）、Cordis 能力標為 `rescue_mode`、無 Ditto Node 程序、正常模式重建 tasks 並讀回救援前的待辦，七項通過。Shell 產品文字仍需登入工作階段，因此 EX1-05 仍未通過。
+
+## EX1-04 hostd PSS 成長查明與修正（2026-10-04，開發機，fixture 合成器，開發證據）
+
+本節的數字都來自開發機上的 fixture 夾具（未經參考機 preflight，表中八次執行時工作樹尚未提交），只是開發證據，不是出口證據；EX1-04 仍要在參考機的工作階段判定，① 與 Shell PSS 也還沒有數字。
+
+**原因。** 不是洩漏，也不在 JS heap 之外。9 月 27 日引用的「JS heap 約 12 MB」是 `heapUsed`（存活物件），成長的是 V8 已占用的堆積容量（`heapTotal` 12→28 MB，與 `Pss_Anon` 的增量一致）。查到的證據：
+
+- 兩份相隔約 280 次的 heap snapshot，存活物件只多 386 KB，全是 JIT 程式碼；任何時刻都只有 6～7 個 fiber、2～3 個 instance，沒有已撤除的插件被留住。`external`、`arrayBuffers` 與 V8 的 malloc 計數都持平；模組記錄數不變（`import()` 用的是同一個檔案 URL，沒有每次重新載入）。
+- 每次掛載都會留下 Cordis 的 context、閉包、隱藏類別與診斷用的呼叫堆疊（V8 物件統計中最多的是 function context、CallSiteInfo、未編譯函式與 map）。這些都會死，但：① V8 預設讓新生代在交易負載下倍增且不歸還（新生代 4→14 MB／100 次，400 次時 27 MB）；② 每次 scavenge 約有 200 KB 晉升到老生代，老生代要到上限才做完整回收，在 100 次內通常一次都沒做。
+- 只固定新生代（4 MiB semi-space）時，② 十一次中四次、③ 八次中兩次通過；再調老生代初始上限、`--optimize-for-size` 等都只是改變回收落在量測窗哪裡，結果仍時過時不過，所以不採用。
+
+**修正（產品端，門檻、暖機與取樣都沒改）。**
+
+- `packages/host-runtime/hostd.node-flags`：所有 hostd 啟動路徑（systemd unit、`bin/ditto-hostd`、G1 腳本）共用一份旗標：`--min/max-semi-space-size=4` 固定新生代，`--expose-gc` 供下一項使用。hostd 啟動時在日誌寫明是否拿到這些設定。
+- `src/reclaim.ts`：某次掛載的 disposer 全部結束後，hostd 要求一次完整回收；合併處理，最多每秒一次。`gc` 在任何插件載入前就從全域物件拿走，插件呼叫不到。
+
+**新數字**（以下 run id 都在 `artifacts/g1/cleanup-stress-<run_id>.d/`）：
+
+| | 修正前（`2026-10-04T08:10:47Z-d30c`） | 修正後，八次（`09:23:37Z`～`09:28:52Z`，`-d30c`） |
+| --- | --- | --- |
+| ② PSS 中位數增幅 | +14.2% | −1.4%～+0.7% |
+| ② Mann-Kendall p | 0.001 | 0.032～1.0；7／8 通過 |
+| ② `Pss_Anon` 首→尾 | 16.4→29.6 MB | 19.0～19.4 → 19.7～20.2 MB |
+| ③ PSS 中位數增幅 | （當時沒有 ③） | −2.5%～+1.3% |
+| ③ Mann-Kendall p | | 0.107～1.0；8／8 通過 |
+| ③ `Pss_Anon` 首→尾 | | 17.8～18.1 → 18.6～19.3 MB |
+
+提交後（`75279cc`）再跑三次（`2026-10-04T09:37:51Z-7527`、`09:38:10Z-7527`、`09:38:28Z-7527`）：② 增幅 −1.7%～−0.6%、p=0.15～0.72，③ 增幅 +0.2%～+1.2%、p=0.11～0.32，六項都通過。首尾計數在每一次都完全相同。tasks 停用／啟用 100 次的耗時沒有變（約 9.4 秒）。400 次的補充執行：`Pss_Anon` 19.4→21.3 MB（修正前同樣 400 次是 16→43 MB），此時 V8 堆積持平，增加的是 JIT 程式碼與原生記憶體。
+
+**還不能主張的事。**
+
+- 這台開發機上，每一次執行在第 40 次左右 hostd 的 `Pss_File` 都會固定下降約 1.27 MB（與其他 Node 程序共用的檔案頁面），總 PSS 因此被拉低。那一次 ② 的失敗就是這個下降造成的「遞減」趨勢（p=0.032）。反過來，若只看 `Pss_Anon`，十六次中有十二次仍有 1～5% 的單調上升（JIT 與原生記憶體的暖機），通過有一部分是靠這個下降抵消。判定照 `judge.py` 用總 PSS，沒有改；參考機上剛啟動的 hostd 是否也這樣，要以參考機數列為準。
+- ③ 每次 prepare 由 hostd 命名自己的 realm（`ditto-candidate-<n>`），所以「同一 realm」指的是同一個 entry、套件與設定反覆掛進 isolate realm 再撤除；夾具以候選健康檢查拒絕讓變更中止，主 realm 不受影響。
