@@ -144,6 +144,14 @@ impl Effects for RealEffects<'_> {
         );
         shell::write_rescue_request(&self.options.runtime_dir, "shell_unresponsive", &killed);
         if let Some(unit) = &self.options.rescue_unit {
+            // A running Core starts the rescue UI itself, through its launcher,
+            // so the rescue UI can reach Core (window list, restore, back to
+            // the desktop). The unit, which has no launcher token, is only for
+            // a Core that is not running.
+            if shell::unit_active("ditto-core.service") {
+                log("rescue_left_to_core", &[]);
+                return;
+            }
             match shell::start_unit(unit) {
                 Ok(()) => log("rescue_started", &[("unit", unit)]),
                 Err(error) => log("rescue_failed", &[("unit", unit), ("error", &error)]),

@@ -121,9 +121,29 @@ fn scoped_command(kind: &str, executable: &Path, quota: Option<&Quota>) -> io::R
     let unit = format!("{prefix}-{kind}");
     // A client from an earlier Core (whose token is spent) must not survive
     // next to the one started now: stop the old scope of the same name.
+    // A scope whose processes were killed can stay loaded as `failed`
+    // (seen after the supervisor's SIGKILL): stopping it is not enough, and
+    // systemd-run then refuses the name. Reset it and wait until it is gone.
+    let scope = format!("{unit}.scope");
     let _ = Command::new("/usr/bin/systemctl")
-        .args(["--user", "stop", &format!("{unit}.scope")])
+        .args(["--user", "stop", &scope])
+        .stderr(std::process::Stdio::null())
         .status();
+    let _ = Command::new("/usr/bin/systemctl")
+        .args(["--user", "reset-failed", &scope])
+        .stderr(std::process::Stdio::null())
+        .status();
+    for _ in 0..40 {
+        let loaded = Command::new("/usr/bin/systemctl")
+            .args(["--user", "show", "-p", "LoadState", "--value", &scope])
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim() == "loaded")
+            .unwrap_or(false);
+        if !loaded {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
     let mut command = Command::new("/usr/bin/systemd-run");
     command
         .args(["--user", "--scope", "--quiet", "--collect"])
@@ -167,6 +187,11 @@ pub fn launch_parsed(
     command
         .args(&parsed.arguments)
         .env_remove("DITTO_DEV_TOKEN")
+        // Core's own service-manager channel: a client that inherits it
+        // would send notifications systemd refuses (only Core is MainPID).
+        .env_remove("NOTIFY_SOCKET")
+        .env_remove("WATCHDOG_PID")
+        .env_remove("WATCHDOG_USEC")
         // Scopes are Core's to create; a Core the client itself starts (a
         // test fixture, say) must not reuse the session's scope names.
         .env_remove("DITTO_LAUNCH_SCOPE_PREFIX")

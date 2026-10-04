@@ -180,8 +180,12 @@ impl ShellManager {
                         inner.exits.pop_front();
                     }
                     if supervisor_requested_rescue() {
-                        // The supervisor already started the rescue UI.
+                        // The supervisor killed a hung Shell: restarting it
+                        // would hang on the same provider again. Core starts
+                        // the rescue UI, which (unlike the supervisor's unit)
+                        // is connected to Core.
                         inner.run = Run::RescueUi;
+                        rescue = true;
                     } else if inner.exits.len() >= SHELL_FAILURE_LIMIT {
                         inner.run = Run::RescueUi;
                         rescue = true;

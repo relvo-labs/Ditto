@@ -141,7 +141,9 @@ if in_ditto_session; then
       kill -STOP "${shell_pids[@]}"
       ready=""
       for _ in $(seq 1 300); do
-        if journalctl --user -u ditto-rescue.service --since "$since" -o cat 2>/dev/null | grep -q 'ditto-rescue ready'; then
+        # Core launches the rescue UI while it runs (its output is in Core's
+        # journal); the unit is only used when Core itself is down.
+        if journalctl --user -u ditto-rescue.service -u ditto-core.service --since "$since" -o cat 2>/dev/null | grep -q 'ditto-rescue ready'; then
           ready="$(date +%s%3N)"
           break
         fi
@@ -226,6 +228,9 @@ if in_ditto_session; then
         sleep 0.1
       done
     done
+    storm_journal="$(g1_evidence_dir)/core-storm-journal.txt"
+    systemctl --user show ditto-core.service -p NRestarts -p StartLimitBurst -p StartLimitIntervalUSec -p Result -p ActiveState >"$storm_journal" 2>&1 || true
+    journalctl --user -u ditto-core.service -u ditto-rescue.service --since "-5min" -o short-monotonic 2>/dev/null | grep -v 'ditto-rpc\|lease_registered' | tail -120 >>"$storm_journal" || true
     rescue_active=false
     for _ in $(seq 1 100); do
       systemctl --user is-active --quiet ditto-rescue.service && { rescue_active=true; break; }

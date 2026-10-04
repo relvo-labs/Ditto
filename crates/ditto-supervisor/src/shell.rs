@@ -306,6 +306,13 @@ pub fn recent_rescue_request(runtime_dir: &Path, within: Duration) -> Option<Str
         .flatten()
 }
 
+pub fn unit_active(unit: &str) -> bool {
+    Command::new("systemctl")
+        .args(["--user", "is-active", "--quiet", unit])
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
 /// `--no-block`: the supervisor must keep watching while the unit starts.
 pub fn start_unit(unit: &str) -> Result<(), String> {
     let output = Command::new("systemctl")
