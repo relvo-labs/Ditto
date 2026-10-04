@@ -10,10 +10,13 @@ use std::{
 };
 
 use ditto_compositor::AdapterError;
-use ditto_protocol::participant::{
-    ChangePhase, CompositorObservation, CompositorProjection, ItemReport, ItemStatus, Observation,
-    ParticipantPhase, ParticipantRole, PrepareParams, Projection, StateOutput, StepReport, ABORT,
-    COMMIT, PREPARE, ROLLBACK, STATE,
+use ditto_protocol::{
+    participant::{
+        ChangePhase, CompositorObservation, CompositorProjection, ItemReport, ItemStatus,
+        Observation, ParticipantPhase, ParticipantRole, PrepareParams, Projection, StateOutput,
+        StepReport, ABORT, COMMIT, PREPARE, ROLLBACK, STATE,
+    },
+    Window,
 };
 use serde_json::{json, Value};
 
@@ -134,11 +137,26 @@ pub struct CompositorParticipant {
     inner: Mutex<CompositorState>,
 }
 
+/// How many strategy switches keep the window placement they replaced.
+/// Placement is session state, not profile state: it is held in memory only,
+/// so an undo after a Core restart has nothing to put back and says nothing.
+const PLACEMENTS_KEPT: usize = 16;
+
 #[derive(Default)]
 struct CompositorState {
     committed: Option<CompositorProjection>,
-    candidates: HashMap<String, (CompositorProjection, Option<CompositorProjection>)>,
+    candidates: HashMap<String, Candidate>,
     phases: HashMap<String, ParticipantPhase>,
+    /// Window placement just before a committed strategy switch, by the
+    /// change that switched; oldest first.
+    placements: Vec<(String, Vec<Window>)>,
+}
+
+#[derive(Clone)]
+struct Candidate {
+    target: CompositorProjection,
+    previous: Option<CompositorProjection>,
+    undoes: Option<String>,
 }
 
 pub fn strategy_name(package: &str) -> Option<&'static str> {
@@ -209,6 +227,72 @@ impl CompositorParticipant {
             items.push(report("shortcuts", outcome));
         }
         items
+    }
+
+    fn strategy_changes(
+        projection: &CompositorProjection,
+        previous: Option<&CompositorProjection>,
+    ) -> bool {
+        projection.strategy.is_some()
+            && previous.is_none_or(|old| old.strategy != projection.strategy)
+    }
+
+    /// Where every window is. A compositor that cannot list windows gives
+    /// nothing to keep, and an undo then has nothing to report.
+    fn placement(&self) -> Vec<Window> {
+        self.session
+            .with_adapter(|adapter| adapter.windows())
+            .unwrap_or_default()
+    }
+
+    /// Put windows back where they were before the change being undone.
+    /// A window closed since then cannot be: it is listed with its reason.
+    fn restore_placement(&self, saved: &[Window]) -> Vec<ItemReport> {
+        let present = self.placement();
+        saved
+            .iter()
+            .map(|before| {
+                let key = format!("window:{}", before.id.0);
+                let Some(now) = present.iter().find(|window| window.id == before.id) else {
+                    return ItemReport {
+                        key,
+                        status: ItemStatus::NotRestored,
+                        reason: Some("window_closed".into()),
+                        missing: vec![],
+                    };
+                };
+                let mut outcome = Ok(());
+                if let (Some(x), Some(y)) = (before.x, before.y) {
+                    if (now.x, now.y) != (before.x, before.y) {
+                        outcome = self
+                            .session
+                            .with_adapter(|adapter| adapter.move_window(&before.id, x, y));
+                    }
+                }
+                if let (Ok(()), Some(width), Some(height)) = (&outcome, before.width, before.height)
+                {
+                    if (now.width, now.height) != (before.width, before.height) {
+                        outcome = self.session.with_adapter(|adapter| {
+                            adapter.resize_window(&before.id, width, height)
+                        });
+                    }
+                }
+                match outcome {
+                    Ok(()) => ItemReport {
+                        key,
+                        status: ItemStatus::Restored,
+                        reason: None,
+                        missing: vec![],
+                    },
+                    Err(error) => ItemReport {
+                        key,
+                        status: ItemStatus::NotRestored,
+                        reason: Some(format!("{error:?}")),
+                        missing: vec![],
+                    },
+                }
+            })
+            .collect()
     }
 }
 
@@ -287,9 +371,14 @@ impl Participant for CompositorParticipant {
                 missing: vec![],
             });
         }
-        inner
-            .candidates
-            .insert(params.change_id.clone(), (target.clone(), previous));
+        inner.candidates.insert(
+            params.change_id.clone(),
+            Candidate {
+                target: target.clone(),
+                previous,
+                undoes: params.undoes.clone(),
+            },
+        );
         inner
             .phases
             .insert(params.change_id.clone(), ParticipantPhase::Prepared);
@@ -297,7 +386,7 @@ impl Participant for CompositorParticipant {
     }
 
     fn commit(&self, change_id: &str, _timeout: Duration) -> ParticipantResult<StepReport> {
-        let (target, previous) = {
+        let candidate = {
             let inner = self.inner.lock().expect("compositor participant");
             inner
                 .candidates
@@ -305,9 +394,31 @@ impl Participant for CompositorParticipant {
                 .cloned()
                 .ok_or_else(|| ParticipantError::Refused("unknown change".into()))?
         };
-        let items = self.apply(&target, previous.as_ref());
+        let switches = Self::strategy_changes(&candidate.target, candidate.previous.as_ref());
+        let before = switches.then(|| self.placement());
+        let mut items = self.apply(&candidate.target, candidate.previous.as_ref());
+        let saved = match (&candidate.undoes, switches) {
+            (Some(undone), true) => {
+                let inner = self.inner.lock().expect("compositor participant");
+                inner
+                    .placements
+                    .iter()
+                    .find(|(id, _)| id == undone)
+                    .map(|(_, windows)| windows.clone())
+            }
+            _ => None,
+        };
+        if let Some(saved) = saved {
+            items.extend(self.restore_placement(&saved));
+        }
         let mut inner = self.inner.lock().expect("compositor participant");
-        inner.committed = Some(target);
+        if let Some(before) = before {
+            inner.placements.push((change_id.into(), before));
+            if inner.placements.len() > PLACEMENTS_KEPT {
+                inner.placements.remove(0);
+            }
+        }
+        inner.committed = Some(candidate.target);
         inner
             .phases
             .insert(change_id.into(), ParticipantPhase::Committed);
@@ -324,7 +435,9 @@ impl Participant for CompositorParticipant {
     }
 
     fn rollback(&self, change_id: &str, _timeout: Duration) -> ParticipantResult<StepReport> {
-        let (target, previous) = {
+        let Candidate {
+            target, previous, ..
+        } = {
             let inner = self.inner.lock().expect("compositor participant");
             inner
                 .candidates
@@ -346,6 +459,7 @@ impl Participant for CompositorParticipant {
             }
         }
         let mut inner = self.inner.lock().expect("compositor participant");
+        inner.placements.retain(|(id, _)| id != change_id);
         inner.committed = previous;
         inner
             .phases

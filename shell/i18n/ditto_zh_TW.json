@@ -138,6 +138,7 @@
   "reason.host_not_running": "插件服務沒有執行，不需要停止任何東西",
   "reason.next_login": "下次登入時套用",
   "reason.rescue_mode": "回到一般模式後套用",
+  "reason.window_closed": "視窗已經關閉",
   "recovery.decided": "上次中斷的變更已依實際狀態處理。",
   "recovery.head_moved": "上次中斷後組合已經改變，這筆變更無法確認。",
   "recovery.interrupted": "上次在套用途中中斷。",

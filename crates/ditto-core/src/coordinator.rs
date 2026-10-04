@@ -504,6 +504,7 @@ impl Coordinator {
         let params = PrepareParams {
             change_id: change_id.clone(),
             origin: ORIGIN_BOOT.into(),
+            undoes: None,
             target: target.clone(),
         };
         let prepared = participant.prepare(&params, PREPARE_TIMEOUT);
@@ -870,6 +871,11 @@ impl Coordinator {
                 }
             }
         }
+        let undoes = match &stored.record.origin {
+            ChangeOrigin::Undo { undoes } => Some(undoes.clone()),
+            ChangeOrigin::TimedRevert { reverts } => Some(reverts.clone()),
+            _ => None,
+        };
         // prepare
         for step in steps.iter_mut() {
             if let Projection::Hostd(host) = &step.target {
@@ -879,6 +885,7 @@ impl Coordinator {
                 change_id: change_id.into(),
                 origin: ORIGIN_CHANGE.into(),
                 target: step.target.clone(),
+                undoes: undoes.clone(),
             };
             let operation = self.operation(change_id, step.role, "prepare", &json!(params));
             sdnotify::watchdog();
@@ -977,6 +984,22 @@ impl Coordinator {
                             step.role,
                             &item.key,
                             OutcomeStatus::Failed,
+                            item.reason.as_deref(),
+                        ));
+                    }
+                    // What an undo could not put back (a window closed since
+                    // the change) is listed; the change still commits, and
+                    // its result is partial (protocol 0.2 §8.2).
+                    for item in report
+                        .items
+                        .iter()
+                        .filter(|item| item.status == ItemStatus::NotRestored)
+                    {
+                        items.push(outcome(
+                            0,
+                            step.role,
+                            &item.key,
+                            OutcomeStatus::NotRestored,
                             item.reason.as_deref(),
                         ));
                     }
@@ -1324,7 +1347,7 @@ impl Coordinator {
                 ChangeState::Verifying,
                 ChangeState::Committed,
             )?;
-            changes::mark_scheduled_if_deferred(tx, change_id)?;
+            changes::settle_committed_result(tx, change_id)?;
             Ok(revision_id)
         });
         let revision_id = match written {

@@ -27,6 +27,12 @@ export interface PrepareParams {
   change_id: string;
   origin: string;
   target: Projection;
+  /**
+   * Set when this change undoes an earlier one: a participant that kept
+   * state outside the profile for that change (window placement before a
+   * layout strategy switch) restores it and reports what it could not.
+   */
+  undoes?: string | null;
 }
 export interface Appearance {
   locale: string;

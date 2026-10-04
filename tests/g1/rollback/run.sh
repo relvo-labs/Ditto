@@ -30,11 +30,8 @@ g1_cargo partially-applied "③ a rollback that cannot restore an item ends part
   "${lib[@]}" tests::a_rollback_that_cannot_restore_an_item_is_partially_applied
 g1_cargo undo-policy "undoing an older change that a newer one touched is refused; an unrelated newer change does not block" \
   "${lib[@]}" tests::undoing_an_older_change_that_a_newer_one_touched_is_refused
-# ③ as written names window placement. In G1 the layout a profile holds is
-# the strategy (floating / simple-tile); per-window placement is not profile
-# state, so there is no layout undo that could find a window missing. The
-# mechanism is covered above; the scenario itself waits for placement state.
-check layout-window-closed not_implemented "per-window placement is not profile state in G1, so a layout undo cannot meet a closed window; partially_applied is tested through a participant that cannot restore"
+g1_cargo layout-window-closed "③ a layout change undone after one of its windows closed: committed with result partial, the closed window listed as window_closed, the open one back where it floated" \
+  "${lib[@]}" tests::undoing_a_layout_change_after_a_window_closed_is_partial
 
 python3 - "$G1_CHECKS" "$ARTIFACTS/rollback-$RUN_ID.jsonl" <<'PYEOF'
 import json, sys
@@ -44,7 +41,7 @@ classes = {
     "readback-mismatch": "rolled_back",
     "partially-applied": "partially_applied",
     "undo-policy": "refused: undo_blocked_by_newer_change",
-    "layout-window-closed": None,
+    "layout-window-closed": "committed, result partial (window_closed listed)",
 }
 with open(sys.argv[2], "w", encoding="utf-8") as out:
     for line in open(sys.argv[1], encoding="utf-8"):

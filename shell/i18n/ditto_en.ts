@@ -265,12 +265,20 @@
         <translation>see diagnostics</translation>
     </message>
     <message>
+        <source>視窗的位置</source>
+        <translation>Window position</translation>
+    </message>
+    <message>
         <source>視窗管理</source>
         <translation>Window management</translation>
     </message>
     <message>
         <source>角色</source>
         <translation>Character</translation>
+    </message>
+    <message>
+        <source>設定已改回，但下列項目無法還原。</source>
+        <translation>The settings are back, but the items below could not be restored.</translation>
     </message>
     <message>
         <source>試看中，等待保留</source>
@@ -1144,6 +1152,10 @@
     <message>
         <source>reason.rescue_mode</source>
         <translation>applied once back in normal mode</translation>
+    </message>
+    <message>
+        <source>reason.window_closed</source>
+        <translation>the window was closed</translation>
     </message>
     <message>
         <source>recovery.decided</source>

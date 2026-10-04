@@ -123,6 +123,11 @@ pub struct PrepareParams {
     pub change_id: String,
     pub origin: String,
     pub target: Projection,
+    /// Set when this change undoes an earlier one: a participant that kept
+    /// state outside the profile for that change (window placement before a
+    /// layout strategy switch) restores it and reports what it could not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undoes: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

@@ -53,6 +53,9 @@ QtObject {
             if (record.result === "scheduled") {
                 return scheduledReason(record) === "rescue_mode" ? t(qsTr("回到一般模式後套用")) : t(qsTr("待下次登入套用"));
             }
+            if (record.result === "partial") {
+                return t(qsTr("部分完成"));
+            }
             if (pendingConfirmation(record)) {
                 return t(qsTr("試看中，等待保留"));
             }
@@ -86,6 +89,9 @@ QtObject {
             if (record.result === "scheduled") {
                 return "info";
             }
+            if (record.result === "partial") {
+                return "warn";
+            }
             return pendingConfirmation(record) ? "info" : (record.confirmation && record.confirmation.state === "reverted" ? "neutral" : "good");
         case "rejected":
         case "aborted":
@@ -113,6 +119,9 @@ QtObject {
                 return scheduledReason(record) === "rescue_mode"
                     ? t(qsTr("已保存，還沒有生效：回到一般模式後才會套用。"))
                     : t(qsTr("已保存，還沒有生效：下次登入時才會套用。"));
+            }
+            if (record.result === "partial") {
+                return t(qsTr("設定已改回，但下列項目無法還原。"));
             }
             if (pendingConfirmation(record)) {
                 return t(qsTr("已套用，正在試看。按「保留」才會留下；取消或逾時會自動回復。"));
@@ -237,6 +246,9 @@ QtObject {
     function itemKeyName(itemKey) {
         if (!itemKey) {
             return "";
+        }
+        if (itemKey.indexOf("window:") === 0) {
+            return t(qsTr("視窗的位置"));
         }
         if (itemKey.indexOf("ui.") === 0 || itemKey.indexOf("svc.") === 0 || itemKey === "layout.strategy") {
             return client && client.tr ? client.tr.slotName(itemKey) : itemKey;

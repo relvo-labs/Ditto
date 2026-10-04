@@ -341,6 +341,13 @@
     },
     "target": {
       "$ref": "#/$defs/Projection"
+    },
+    "undoes": {
+      "description": "Set when this change undoes an earlier one: a participant that kept\nstate outside the profile for that change (window placement before a\nlayout strategy switch) restores it and reports what it could not.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [

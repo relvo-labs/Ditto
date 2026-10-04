@@ -157,7 +157,8 @@ Column {
     /// was restored, what was not, and why.
     Column {
         visible: !!card.record && (card.record.state === "partially_applied" || card.record.state === "unknown"
-            || card.record.state === "rolled_back" || card.record.state === "aborted" || card.record.result === "scheduled")
+            || card.record.state === "rolled_back" || card.record.state === "aborted" || card.record.result === "scheduled"
+            || card.record.result === "partial")
             && (card.record.items || []).length > 0
         width: card.width
         spacing: 2

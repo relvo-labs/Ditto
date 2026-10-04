@@ -236,17 +236,22 @@ pub fn committed_after(
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-/// Record a committed change whose items are all scheduled as `scheduled`
-/// in the `result_kind` column too, in the same transaction as the commit, so
-/// the column never says `succeeded` for something that has not taken effect.
-pub fn mark_scheduled_if_deferred(connection: &Connection, change_id: &str) -> StoreResult<()> {
+/// Record the result class of a committed change in the `result_kind`
+/// column too, in the same transaction as the commit, so the column never
+/// says `succeeded` for something that has not taken effect (every item
+/// scheduled) or did not fully take effect (an item not restored).
+pub fn settle_committed_result(connection: &Connection, change_id: &str) -> StoreResult<()> {
+    use ditto_protocol::change::ResultKind;
     let stored = get(connection, change_id)?;
-    if stored.record.result == Some(ditto_protocol::change::ResultKind::Scheduled) {
-        connection.execute(
-            "UPDATE changesets SET result_kind = 'scheduled' WHERE change_id = ?1",
-            params![change_id],
-        )?;
-    }
+    let kind = match stored.record.result {
+        Some(ResultKind::Scheduled) => "scheduled",
+        Some(ResultKind::Partial) => "partial",
+        _ => return Ok(()),
+    };
+    connection.execute(
+        "UPDATE changesets SET result_kind = ?2 WHERE change_id = ?1",
+        params![change_id, kind],
+    )?;
     Ok(())
 }
 

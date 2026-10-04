@@ -265,12 +265,20 @@
         <translation>見診斷</translation>
     </message>
     <message>
+        <source>視窗的位置</source>
+        <translation>視窗的位置</translation>
+    </message>
+    <message>
         <source>視窗管理</source>
         <translation>視窗管理</translation>
     </message>
     <message>
         <source>角色</source>
         <translation>角色</translation>
+    </message>
+    <message>
+        <source>設定已改回，但下列項目無法還原。</source>
+        <translation>設定已改回，但下列項目無法還原。</translation>
     </message>
     <message>
         <source>試看中，等待保留</source>
@@ -1144,6 +1152,10 @@
     <message>
         <source>reason.rescue_mode</source>
         <translation>回到一般模式後套用</translation>
+    </message>
+    <message>
+        <source>reason.window_closed</source>
+        <translation>視窗已經關閉</translation>
     </message>
     <message>
         <source>recovery.decided</source>

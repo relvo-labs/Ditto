@@ -179,7 +179,9 @@ pub enum ResultKind {
 }
 
 /// The result class of a change: the state's, except that a committed change
-/// whose every item is scheduled has not taken effect and says so.
+/// whose every item is scheduled has not taken effect and says so, and a
+/// committed change that lists an item it could not restore (an undo that
+/// met a closed window) is partial, never "succeeded".
 pub fn result_of(state: ChangeState, items: &[OutcomeItem]) -> Option<ResultKind> {
     if state == ChangeState::Committed
         && !items.is_empty()
@@ -188,6 +190,13 @@ pub fn result_of(state: ChangeState, items: &[OutcomeItem]) -> Option<ResultKind
             .all(|item| item.status == OutcomeStatus::Scheduled)
     {
         return Some(ResultKind::Scheduled);
+    }
+    if state == ChangeState::Committed
+        && items
+            .iter()
+            .any(|item| item.status == OutcomeStatus::NotRestored)
+    {
+        return Some(ResultKind::Partial);
     }
     state.result()
 }

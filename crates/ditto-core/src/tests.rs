@@ -926,6 +926,84 @@ fn a_rollback_that_cannot_restore_an_item_is_partially_applied() {
     assert_eq!(head(&cli), before);
 }
 
+/// EX1-03 ③ as written: a layout change is undone after one of its windows
+/// closed. The strategy goes back, the window still open goes back to where
+/// it floated, and the closed one is listed as not restored with its reason;
+/// the result is partial, never "succeeded".
+#[test]
+fn undoing_a_layout_change_after_a_window_closed_is_partial() {
+    let harness = harness("undo-layout");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let window = |id: &str| cli.result(catalog::WINDOWS_GET, json!({"window_id": id}));
+    let floating_before = window("fixture-window-2");
+    let base = cli.result(catalog::PROFILES_GET, json!({}));
+    let floating = base["document"]["slots"]["layout.strategy"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let tile = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(&cli), "ops": [
+            {"op": "add_entry", "entry": {"package": "ditto.layout.simple-tile", "version": "1.0.0", "host": "core_builtin"}, "slot": "layout.strategy"},
+            {"op": "remove_entry", "entry_id": floating}
+        ]}),
+    ));
+    assert_eq!(tile.state, ChangeState::Committed, "{tile:?}");
+    let tiled = window("fixture-window-2");
+    assert_ne!(
+        (tiled["x"].clone(), tiled["width"].clone()),
+        (
+            floating_before["x"].clone(),
+            floating_before["width"].clone()
+        ),
+        "the fixture tiler must move the window, or the undo proves nothing"
+    );
+    cli.result(
+        catalog::WINDOWS_CLOSE_REQUEST,
+        json!({"window_id": "fixture-window-1"}),
+    );
+    let undo = record(&cli.result(catalog::CHANGES_UNDO, json!({"change_id": tile.change_id})));
+    assert_eq!(undo.state, ChangeState::Committed, "{undo:?}");
+    assert_eq!(
+        undo.result,
+        Some(ditto_protocol::change::ResultKind::Partial),
+        "{undo:?}"
+    );
+    let item = |key: &str| {
+        undo.items
+            .iter()
+            .find(|item| item.key == key)
+            .unwrap_or_else(|| panic!("no item {key} in {:?}", undo.items))
+            .clone()
+    };
+    let closed = item("window:fixture-window-1");
+    assert_eq!(
+        closed.status,
+        ditto_protocol::change::OutcomeStatus::NotRestored
+    );
+    assert_eq!(closed.reason.as_deref(), Some("window_closed"));
+    let open = window("fixture-window-2");
+    for field in ["x", "y", "width", "height"] {
+        assert_eq!(
+            open[field], floating_before[field],
+            "{field} was not put back"
+        );
+    }
+    // The profile content is the base again; the strategy reads back.
+    let after = cli.result(catalog::PROFILES_GET, json!({}));
+    assert_eq!(
+        after["revision"]["document_sha256"],
+        base["revision"]["document_sha256"]
+    );
+    // The stored column agrees with the record: a reader of the history
+    // never sees "succeeded" for it.
+    let listed = cli.result(catalog::CHANGES_GET, json!({"change_id": undo.change_id}));
+    assert_eq!(listed["result"], json!("partial"), "{listed}");
+}
+
 #[test]
 fn preflight_refuses_every_problem_at_once_and_changes_nothing() {
     let harness = harness("preflight");

@@ -54,6 +54,7 @@ const REQUIRED_KEYS = [
   'participant.unavailable', 'participant.disconnected', 'participant.timeout', 'participant.refused',
   // outcome item reasons that are codes, not diagnostic text
   'reason.next_login', 'reason.rescue_mode', 'reason.host_not_running', 'reason.dependency_not_ready',
+  'reason.window_closed',
   // why an entry runs (plugins.list started_reason)
   'started.profile',
   // diff labels (docops::diff)

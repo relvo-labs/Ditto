@@ -276,7 +276,44 @@ impl CompositorAdapter for FixtureCompositor {
                 "unknown strategy {strategy}"
             )));
         }
+        if self.strategy == strategy {
+            return Ok(());
+        }
         self.strategy = strategy.into();
+        // Like a tiling layout: switching to simple-tile takes every window
+        // on the active workspace into equal columns, and the geometry it
+        // had while floating is gone. Switching back leaves windows where the
+        // tiler put them, now floating; putting them back is Core's job.
+        let active = self
+            .workspaces
+            .iter()
+            .find(|workspace| workspace.active)
+            .map(|workspace| workspace.id.clone());
+        if strategy == "simple-tile" {
+            let output = self.outputs.first().cloned();
+            let tiled: Vec<usize> = (0..self.windows.len())
+                .filter(|index| self.windows[*index].workspace_id == active)
+                .collect();
+            if let (Some(output), false) = (output, tiled.is_empty()) {
+                let width = output.width / tiled.len() as u32;
+                for (column, index) in tiled.into_iter().enumerate() {
+                    let window = &mut self.windows[index];
+                    window.x = Some(output.x + (column as u32 * width) as i32);
+                    window.y = Some(output.y);
+                    window.width = Some(width);
+                    window.height = Some(output.height);
+                    let id = window.id.clone();
+                    self.floating.retain(|floating| *floating != id);
+                }
+            }
+        } else {
+            self.floating = self
+                .windows
+                .iter()
+                .map(|window| window.id.clone())
+                .collect();
+        }
+        self.announce(CompositorChange::Windows);
         Ok(())
     }
 
