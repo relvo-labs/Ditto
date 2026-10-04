@@ -98,6 +98,49 @@ pub struct AvatarSettings {
     pub scale: f64,
     #[serde(default = "yes")]
     pub animations: bool,
+    /// The output the character stays on, by connector name. Absent means
+    /// it follows the primary output; so does a named output that is not
+    /// connected (unplugged), until it comes back. Absent fields are left out
+    /// of the document, so a Profile written before they existed keeps its
+    /// digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    /// Which corner of that output the character sits in. A corner is always
+    /// inside the visible area, whatever size the output has.
+    #[serde(default, skip_serializing_if = "AvatarCorner::is_default")]
+    pub corner: AvatarCorner,
+}
+
+/// The character as a new Profile has it: shown, standard size, animated,
+/// bottom right of the primary output.
+impl Default for AvatarSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            hidden: false,
+            scale: 1.0,
+            animations: true,
+            output: None,
+            corner: AvatarCorner::default(),
+        }
+    }
+}
+
+/// Where on its output the character sits.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum AvatarCorner {
+    #[default]
+    BottomRight,
+    BottomLeft,
+    TopRight,
+    TopLeft,
+}
+
+impl AvatarCorner {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 fn yes() -> bool {

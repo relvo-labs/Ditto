@@ -550,6 +550,15 @@ fn to_window(view: &Value, outputs: &[Value], tiling: bool) -> Option<Window> {
             .unwrap_or("unknown")
             .to_string(),
         workspace_id: output.and_then(|output| workspace_of(view, output)),
+        // The same name `outputs()` reports; a view whose output is not in
+        // the list (destroyed mid-read) falls back to the view's own field.
+        output: output
+            .and_then(|output| output.get("name"))
+            .or_else(|| view.get("output-name"))
+            .and_then(Value::as_str)
+            // Wayfire writes "null" (or "") for a view with no output.
+            .filter(|name| !name.is_empty() && *name != "null")
+            .map(str::to_string),
         x: Some(x),
         y: Some(y),
         width: Some(width),
@@ -788,6 +797,34 @@ impl CompositorAdapter for WayfireAdapter {
         )
     }
 
+    /// `configure-view` with `output_id` and `geometry` together: the view
+    /// goes to that output first, then takes the geometry, which is relative
+    /// to the new output.
+    fn move_window_to_output(
+        &mut self,
+        window_id: &WindowSessionId,
+        output: &str,
+        x: i32,
+        y: i32,
+    ) -> AdapterResult<()> {
+        let (id, geometry) = self.floating_geometry(window_id)?;
+        let output_id = self
+            .output_list()?
+            .iter()
+            .find(|entry| entry.get("name").and_then(Value::as_str) == Some(output))
+            .and_then(|entry| number(entry, "id"))
+            .ok_or_else(|| AdapterError::NotFound(format!("no output {output}")))?;
+        let width = number(&geometry, "width").unwrap_or(0);
+        let height = number(&geometry, "height").unwrap_or(0);
+        self.configure(
+            id,
+            json!({
+                "output_id": output_id,
+                "geometry": {"x": x, "y": y, "width": width, "height": height}
+            }),
+        )
+    }
+
     fn resize_window(
         &mut self,
         window_id: &WindowSessionId,
@@ -930,6 +967,17 @@ mod tests {
         assert_eq!((window.x, window.y), (Some(120), Some(90)));
         assert_eq!(window.state, WindowState::Normal);
         assert_eq!(window.workspace_id.as_deref(), Some("wayfire-ws-1-0-0"));
+        assert_eq!(window.output.as_deref(), Some("HEADLESS-1"));
+    }
+
+    #[test]
+    fn a_view_on_an_unlisted_output_keeps_the_name_it_reports() {
+        let mut view = view();
+        view["output-id"] = json!(9);
+        view["output-name"] = json!("HEADLESS-2");
+        let window = to_window(&view, &[output()], false).expect("window");
+        assert_eq!(window.output.as_deref(), Some("HEADLESS-2"));
+        assert_eq!(window.workspace_id, None);
     }
 
     #[test]

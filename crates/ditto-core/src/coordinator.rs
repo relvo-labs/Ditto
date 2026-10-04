@@ -1116,7 +1116,19 @@ impl Coordinator {
     fn judge(&self, observed: &Observation, target: &Projection) -> Vec<Verdict> {
         match (observed, target) {
             (Observation::Shell(observed), Projection::Shell(target)) => {
-                projection::check_shell(target, observed)
+                let connected = self
+                    .core
+                    .session
+                    .with_adapter(|adapter| adapter.outputs())
+                    .ok()
+                    .map(|outputs| {
+                        outputs
+                            .into_iter()
+                            .filter(|output| output.enabled)
+                            .map(|output| output.name)
+                            .collect::<Vec<_>>()
+                    });
+                projection::check_shell(target, observed, connected.as_deref())
             }
             (Observation::Hostd(observed), Projection::Hostd(target)) => {
                 let hosts = Arc::clone(&self.core.hosts);

@@ -49,8 +49,21 @@ export interface Appearance {
 }
 export interface AvatarSettings {
   animations?: boolean;
+  /**
+   * Which corner of that output the character sits in. A corner is always
+   * inside the visible area, whatever size the output has.
+   */
+  corner?: 'bottom_right' | 'bottom_left' | 'top_right' | 'top_left';
   enabled: boolean;
   hidden?: boolean;
+  /**
+   * The output the character stays on, by connector name. Absent means
+   * it follows the primary output; so does a named output that is not
+   * connected (unplugged), until it comes back. Absent fields are left out
+   * of the document, so a Profile written before they existed keeps its
+   * digest.
+   */
+  output?: string | null;
   scale: number;
 }
 export interface ShortcutBinding {

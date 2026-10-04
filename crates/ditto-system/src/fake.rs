@@ -199,6 +199,25 @@ impl SystemServices for FakeSystem {
             .collect())
     }
 
+    fn post_notification(
+        &self,
+        summary: &str,
+        body: &str,
+        urgency: Urgency,
+    ) -> SystemResult<NotificationItem> {
+        let mut item = self.notify("Ditto", summary, urgency);
+        let mut state = self.state.lock().expect("fake system");
+        if let Some(stored) = state
+            .notifications
+            .iter_mut()
+            .find(|stored| stored.id == item.id)
+        {
+            stored.body = body.into();
+        }
+        item.body = body.into();
+        Ok(item)
+    }
+
     fn dismiss(&self, id: u32) -> SystemResult<bool> {
         let mut state = self.state.lock().expect("fake system");
         let before = state.notifications.len();

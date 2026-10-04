@@ -402,12 +402,7 @@ mod tests {
                 locale: "zh-TW".into(),
             },
             shortcuts: vec![],
-            avatar: AvatarSettings {
-                enabled: true,
-                hidden: false,
-                scale: 1.0,
-                animations: true,
-            },
+            avatar: AvatarSettings::default(),
         }
     }
 

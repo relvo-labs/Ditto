@@ -470,6 +470,23 @@ impl SystemServices for RealSystem {
         Ok(self.shared.store.lock().expect("notifications").list(limit))
     }
 
+    /// Into the same store and through the same policy as a D-Bus
+    /// notification, so the notification area shows it with the others.
+    fn post_notification(
+        &self,
+        summary: &str,
+        body: &str,
+        urgency: ditto_protocol::services::Urgency,
+    ) -> SystemResult<NotificationItem> {
+        Ok(self.shared.ingest(Incoming {
+            app_name: "Ditto".into(),
+            replaces_id: 0,
+            summary: summary.into(),
+            body: body.into(),
+            urgency,
+        }))
+    }
+
     fn dismiss(&self, id: u32) -> SystemResult<bool> {
         let removed = self.shared.forget(id, "dismissed");
         #[cfg(feature = "dbus")]

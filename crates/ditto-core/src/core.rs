@@ -48,6 +48,9 @@ pub struct CoreConfig {
     /// Observation period before a commit becomes last-known-good (D-15: 60 s).
     pub observation_period: Duration,
     pub confirmation_window: Duration,
+    /// How long after an output disappears Core reads the windows back
+    /// (crate::outputs::SETTLE); tests shorten it.
+    pub output_settle: Duration,
 }
 
 impl CoreConfig {
@@ -66,6 +69,7 @@ impl CoreConfig {
             recovery_wait_host: Duration::from_secs(15),
             observation_period: Duration::from_secs(60),
             confirmation_window: Duration::from_secs(15),
+            output_settle: crate::outputs::SETTLE,
         }
     }
 }
@@ -246,6 +250,7 @@ impl Core {
             lock_child: Mutex::new(None),
         });
         hosts.set_events(Arc::new(Events(Arc::downgrade(&core))));
+        crate::outputs::install(&core, config.output_settle);
         let coordinator_core = Arc::clone(&core);
         let builtin = config.builtin_packages.clone();
         thread::Builder::new()

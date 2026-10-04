@@ -25,6 +25,13 @@ export interface Window {
   focused: boolean;
   height?: number | null;
   id: WindowSessionId;
+  /**
+   * The output the window is on, by the name `desktop.outputs.list`
+   * reports. `x`/`y` are relative to that output (and to its current
+   * workspace), not to the global layout, so a position is only meaningful
+   * together with this name. Absent when the compositor does not say.
+   */
+  output?: string | null;
   state: WindowState;
   title: string;
   width?: number | null;

@@ -36,6 +36,16 @@
       ],
       "type": "object"
     },
+    "AvatarCorner": {
+      "description": "Where on its output the character sits.",
+      "enum": [
+        "bottom_right",
+        "bottom_left",
+        "top_right",
+        "top_left"
+      ],
+      "type": "string"
+    },
     "AvatarSettings": {
       "additionalProperties": false,
       "properties": {
@@ -43,12 +53,23 @@
           "default": true,
           "type": "boolean"
         },
+        "corner": {
+          "$ref": "#/$defs/AvatarCorner",
+          "description": "Which corner of that output the character sits in. A corner is always\ninside the visible area, whatever size the output has."
+        },
         "enabled": {
           "type": "boolean"
         },
         "hidden": {
           "default": false,
           "type": "boolean"
+        },
+        "output": {
+          "description": "The output the character stays on, by connector name. Absent means\nit follows the primary output; so does a named output that is not\nconnected (unplugged), until it comes back. Absent fields are left out\nof the document, so a Profile written before they existed keeps its\ndigest.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "scale": {
           "format": "double",

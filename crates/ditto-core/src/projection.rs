@@ -10,11 +10,11 @@ use ditto_protocol::{
     change::HotSwapLevel,
     manifest::Manifest,
     participant::{
-        CompositorObservation, CompositorProjection, EntryMode, FiberState, HostEntryProjection,
-        HostObservation, HostProjection, ParticipantRole, Projection, ShellObservation,
-        ShellProjection, ShellSlotBinding,
+        AvatarPlacement, CompositorObservation, CompositorProjection, EntryMode, FiberState,
+        HostEntryProjection, HostObservation, HostProjection, ParticipantRole, Projection,
+        ShellObservation, ShellProjection, ShellSlotBinding,
     },
-    profile::{EntrySpec, HostKind, ProfileDocument},
+    profile::{AvatarSettings, EntrySpec, HostKind, ProfileDocument},
     services::Grant,
 };
 use ditto_store::{packages::PackageRow, Paths};
@@ -277,7 +277,13 @@ fn verdict(key: &str, ok: bool, reason: &str) -> Verdict {
     }
 }
 
-pub fn check_shell(target: &ShellProjection, observed: &ShellObservation) -> Vec<Verdict> {
+/// `connected` lists the outputs the compositor reports, when it can be
+/// asked; it decides whether a named output should hold the character.
+pub fn check_shell(
+    target: &ShellProjection,
+    observed: &ShellObservation,
+    connected: Option<&[String]>,
+) -> Vec<Verdict> {
     let mut verdicts = Vec::new();
     for binding in &target.slots {
         let mounted = observed.mounts.iter().any(|mount| {
@@ -315,7 +321,41 @@ pub fn check_shell(target: &ShellProjection, observed: &ShellObservation) -> Vec
         observed.avatar.as_ref() == Some(&target.avatar),
         "the shell reports different avatar settings",
     ));
+    // A Shell that reports where the character is gets that read back too;
+    // one that reports no placement is judged on the settings alone.
+    if let Some(placement) = &observed.avatar_placement {
+        let (ok, reason) = check_avatar_placement(&target.avatar, placement, connected);
+        verdicts.push(verdict("avatar_placement", ok, reason));
+    }
     verdicts
+}
+
+fn check_avatar_placement(
+    avatar: &AvatarSettings,
+    placement: &AvatarPlacement,
+    connected: Option<&[String]>,
+) -> (bool, &'static str) {
+    if !avatar.enabled || avatar.hidden {
+        // A hidden character may still be on screen after a recall.
+        return (true, "");
+    }
+    if !placement.visible {
+        return (false, "the character is not on screen");
+    }
+    if placement.corner != avatar.corner {
+        return (false, "the character is in a different corner");
+    }
+    let named_is_connected = avatar
+        .output
+        .as_ref()
+        .map(|name| connected.map(|outputs| outputs.iter().any(|output| output == name)));
+    let ok = match named_is_connected {
+        None => placement.follows_primary,
+        Some(Some(true)) => !placement.follows_primary && placement.output == avatar.output,
+        Some(Some(false)) => placement.follows_primary,
+        Some(None) => placement.follows_primary || placement.output == avatar.output,
+    };
+    (ok, "the character is not on the output the profile names")
 }
 
 /// `leases_of(entry_id)` lists the capabilities with a valid lease from that

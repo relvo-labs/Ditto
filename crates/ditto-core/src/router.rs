@@ -1213,8 +1213,8 @@ fn appearance_get(core: &Core) -> Handled {
 pub fn panels(core: &Core) -> Result<PanelsListOutput, CoreError> {
     let (_, _, document) = active_document(core)?;
     let (observation, reported_at) = core.shell.observation();
-    let mounts = observation
-        .map(|observation| observation.mounts)
+    let (mounts, avatar) = observation
+        .map(|observation| (observation.mounts, observation.avatar_placement))
         .unwrap_or_default();
     let panels = SLOTS
         .iter()
@@ -1239,6 +1239,7 @@ pub fn panels(core: &Core) -> Result<PanelsListOutput, CoreError> {
         shell_connected: core.shell.is_connected(),
         panels,
         reported_at,
+        avatar,
     })
 }
 
