@@ -34,6 +34,9 @@ QtObject {
     property var appearance: null
     property var avatar: null
     property var shortcuts: []
+    /// Where the character is, as shell.qml laid it out (AvatarPlacement):
+    /// the readback of `avatar`. Null while no placement is known.
+    property var avatarPlacement: null
 
     /// slot name → SlotHost
     property var slots: ({})
@@ -123,12 +126,35 @@ QtObject {
             }
         }
         mounts.sort((left, right) => left.slot < right.slot ? -1 : 1);
-        return { mounts: mounts, appearance: appearance, avatar: avatar };
+        const observed = { mounts: mounts, appearance: appearance, avatar: avatar };
+        if (avatarPlacement) {
+            observed.avatar_placement = avatarPlacement;
+        }
+        return observed;
+    }
+
+    /// The placement last sent to Core, so a re-layout that ends where it
+    /// started sends nothing.
+    property string reportedPlacement: ""
+
+    function sendReport() {
+        const observed = observation();
+        reportedPlacement = JSON.stringify(observed.avatar_placement || null);
+        client.report(observed);
     }
 
     function reportMounts() {
         mountsChanged();
-        client.report(observation());
+        sendReport();
+    }
+
+    /// The character moved without a change (an output came or went): the
+    /// same report, so desktop.panels.list follows it. Not on the hot path:
+    /// it runs when outputs or the character's settings change, never per frame.
+    function reportPlacement() {
+        if (client.online && JSON.stringify(avatarPlacement || null) !== reportedPlacement) {
+            sendReport();
+        }
     }
 
     function phaseOf(changeId) {

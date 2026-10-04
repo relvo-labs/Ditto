@@ -46,6 +46,7 @@ ShellRoot {
         client: client
         tokens: tokens
         counter: rpcCounter
+        avatarPlacement: root.avatarPlacement
     }
 
     /// Commands the Shell owns, from `shell.command` (Core decides who owns a
@@ -89,6 +90,75 @@ ShellRoot {
     readonly property bool avatarEnabled: Quickshell.env("DITTO_AVATAR") !== "off"
         && (!avatarSettings || avatarSettings.enabled !== false)
     property bool avatarRecalled: false
+
+    /// The primary output: the one at the top left of the layout. Wayland has
+    /// no primary output; Core uses the same rule (crates/ditto-core/src/outputs.rs).
+    readonly property var primaryScreen: {
+        const screens = Quickshell.screens;
+        let best = null;
+        for (let i = 0; i < screens.length; i++) {
+            const screen = screens[i];
+            if (!best || screen.x < best.x || (screen.x === best.x && (screen.y < best.y
+                    || (screen.y === best.y && screen.name < best.name)))) {
+                best = screen;
+            }
+        }
+        return best;
+    }
+    /// The output the Profile names, while it is connected.
+    readonly property var namedScreen: {
+        const wanted = avatarSettings && avatarSettings.output ? avatarSettings.output : "";
+        if (wanted.length === 0) {
+            return null;
+        }
+        const screens = Quickshell.screens;
+        for (let i = 0; i < screens.length; i++) {
+            if (screens[i].name === wanted) {
+                return screens[i];
+            }
+        }
+        return null;
+    }
+    /// Named and connected, or else the primary output: an unplugged output
+    /// sends the character to the primary one, and it goes back when the
+    /// output returns.
+    readonly property var avatarScreen: namedScreen || primaryScreen
+    readonly property string avatarCorner: avatarSettings && avatarSettings.corner ? avatarSettings.corner : "bottom_right"
+
+    /// What the character's surface actually is: its screen, its corner and
+    /// rectangle on that screen, and whether it is shown. Reported to Core
+    /// (shell.report), which answers desktop.panels.list and reads changes
+    /// back from it. Read from the surface, not copied from the settings.
+    readonly property var avatarPlacement: {
+        const surface = avatarLoader.item;
+        if (!surface || !surface.screen) {
+            return { follows_primary: !namedScreen, corner: avatarCorner, x: 0, y: 0, width: 0, height: 0, visible: false };
+        }
+        const screen = surface.screen;
+        const left = surface.anchors.left && !surface.anchors.right;
+        const top = surface.anchors.top && !surface.anchors.bottom;
+        const width = Math.round(surface.implicitWidth);
+        const height = Math.round(surface.implicitHeight);
+        return {
+            output: screen.name,
+            follows_primary: !namedScreen || screen !== namedScreen,
+            corner: (top ? "top" : "bottom") + "_" + (left ? "left" : "right"),
+            x: Math.round(left ? surface.margins.left : screen.width - surface.margins.right - width),
+            y: Math.round(top ? surface.margins.top : screen.height - surface.margins.bottom - height),
+            width: width,
+            height: height,
+            visible: surface.visible
+        };
+    }
+    onAvatarPlacementChanged: placementReport.restart()
+
+    /// Outputs come and go in bursts (a hotplug is several events): one
+    /// report after they settle, never one per frame.
+    Timer {
+        id: placementReport
+        interval: 250
+        onTriggered: providers.reportPlacement()
+    }
 
     Variants {
         model: Quickshell.screens
@@ -160,9 +230,38 @@ ShellRoot {
             readonly property real scale: root.avatarSettings && root.avatarSettings.scale > 0
                 ? Math.max(0.5, Math.min(2.0, root.avatarSettings.scale)) : 1.0
 
-            visible: !(root.avatarSettings && root.avatarSettings.hidden === true) || root.avatarRecalled
-            anchors { bottom: true; right: true }
-            margins { bottom: 64; right: 32 }
+            /// The Profile's output, or the primary one when it names none or
+            /// names one that is unplugged. A corner is always inside its
+            /// output's visible area, whatever the output's size.
+            screen: root.avatarScreen
+            readonly property bool shown: !(root.avatarSettings && root.avatarSettings.hidden === true) || root.avatarRecalled
+            visible: shown
+            /// An output that goes away takes the layer surface with it, and
+            /// the surface stays hidden on the new output although `shown`
+            /// never changed. Showing it again is a one-off, not a loop: it
+            /// runs only while it should be shown and is not.
+            onVisibleChanged: if (!visible && shown) reshow.restart()
+            onScreenChanged: if (shown) reshow.restart()
+
+            Timer {
+                id: reshow
+                interval: 100
+                onTriggered: {
+                    if (avatarSurface.shown && !avatarSurface.visible) {
+                        avatarSurface.visible = false;
+                        avatarSurface.visible = Qt.binding(() => avatarSurface.shown);
+                        console.log("ditto-shell avatar shown again on " + (avatarSurface.screen ? avatarSurface.screen.name : "no screen"));
+                    }
+                }
+            }
+            anchors {
+                top: root.avatarCorner.indexOf("top") === 0
+                bottom: root.avatarCorner.indexOf("bottom") === 0
+                left: root.avatarCorner.indexOf("left") > 0
+                right: root.avatarCorner.indexOf("right") > 0
+            }
+            // Clear of the top panel and the dock, and of the screen edge.
+            margins { top: 64; bottom: 64; left: 32; right: 32 }
             implicitWidth: Math.round(220 * scale)
             implicitHeight: Math.round(250 * scale)
             color: "transparent"
