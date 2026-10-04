@@ -83,3 +83,21 @@ Agent 替身（`fixtures/agent-standin/standin.mjs`，G1-QA-07）不含任何模
 ## 救援夾具更新（2026-09-27，開發證據）
 
 `rescue-no-node/run.sh` 先前只隔離 socket，沒有指定專用 `DITTO_DATA_DIR`，因此在本機曾開啟預設 Ditto store。三次舊執行不作出口證據；沒有執行資料回滾。現在使用專用暫存 store 並在結束後清理。`artifacts/g1/rescue-no-node-2026-09-27T13:05:42Z-effb.json` 的隔離重跑：啟動、原生視窗操作、歷史讀取、恢復受保護文件（head 與雜湊回讀）、Cordis 能力標為 `rescue_mode`、無 Ditto Node 程序、正常模式重建 tasks 並讀回救援前的待辦，七項通過。Shell 產品文字仍需登入工作階段，因此 EX1-05 仍未通過。
+
+## EX1-11 與 EX1-07 移到有真實 Shell 的 headless 桌面（2026-10-04，開發機，開發證據）
+
+環境：開發機的 headless Wayfire（pixman、Qt 軟體繪製）、debug build、參考應用只有 foot 與 Kate（Firefox 只在參考機跑）。不是參考機，數字只說明腳本與被測路徑成立，不進出口評審。以下是 `8ea29d8`（工作樹乾淨）上各三次的結果。
+
+- `latency` ①：200 次（工作區 66、聚焦 67、外觀 token 67，另各暖機 5 次不判定）受理到回讀完成 p95 為 10／12／12 ms，最大 12～15 ms。分項 p95：工作區約 2.2 ms、聚焦約 3.2 ms（`_meta.handled_us`），外觀 token 11～13 ms（`created_at` 到最後一次 readback 的 `ended_at`，毫秒解析度）。UI 首幀時間沒有記錄。
+- `latency` ②：Dock A↔B 100 次 `prepared`→`committed` p95 為 11／12／10 ms，最大 13 ms，每次切換後 Shell 都掛上了對的 Dock。另列的 Cordis 服務替換 p95 為 7～10 ms。plan/03/06 §6 另要求的啟動器替換 30 次還沒做。
+- `latency` ③：300 次操作期間 foot 與 Kate 的 PID 不變，Kate 未儲存緩衝雜湊相同。
+- `cordis-independent`：以 `SIGKILL` 終止 Agent 替身後，外部寫入 todo.txt 到 QML 面板顯示 63～64 ms（含 svc-tasks 的 50 ms 去抖；用戶端時鐘、20 ms 輪詢）；專注模式在終止前後都靜默一般通知、顯示緊急通知，決定都在策略紀錄裡、沒有退回顯示；Shell 被終止期間的檔案變更與通知，在重啟後的面板與策略紀錄都讀得到；hostd PID 三個時點相同。
+
+這兩支腳本跑出四個產品缺陷，都已修正，沒有放寬任何判準：
+
+1. 第一次完整的 `latency` 執行中，Wayfire 以「Error sending json to client!」切斷 Core 的事件連線：Core 每收到一個事件就在讀取執行緒上重讀整份快照，連續操作時 socket 塞滿。72 次聚焦（含 5 次暖機）裡 34 次回 `unavailable`，所有訂閱者被要求重新同步，Dock 的時間戳也因此遺失。事件流改在自己的執行緒讀取，一次重讀涵蓋已收到的全部變更（`session::tests::the_event_stream_is_drained_while_a_re_read_waits`，舊實作會失敗）。
+2. svc-tasks 換設定（例如授權 todo.txt）後重新啟動，卻沒有通知訂閱者，所以 QML 面板要等檔案下次被改才會更新。現在新實例成為使用中的實例時送一次 `tasks/changed`（`why: started`）。
+3. 以 `--launch` 啟動的客戶端結束後沒有被回收，變成殭屍程序，`kill -0` 仍然成功。Core 現在會回收它，並記一行 `launch.exited`。
+4. 測試本身的問題：回讀 relay 與 Agent 替身的 `hold` 模式在 Core 結束後仍然留著。現在它們會跟著 Core 結束；headless 夾具的 runtime 目錄也會清掉。
+
+還沒成立的：參考機上的執行（含 Firefox、release build）；EX1-11 的 UI 首幀參考值與啟動器替換 30 次；EX1-07 的面板時間是用戶端時鐘，QML 面板沒有 Core 時間戳可用。
