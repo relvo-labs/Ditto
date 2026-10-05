@@ -141,9 +141,9 @@ if in_ditto_session; then
       kill -STOP "${shell_pids[@]}"
       ready=""
       for _ in $(seq 1 300); do
-        # Core launches the rescue UI while it runs (its output is in Core's
-        # journal); the unit is only used when Core itself is down.
-        if journalctl --user -u ditto-rescue.service -u ditto-core.service --since "$since" -o cat 2>/dev/null | grep -q 'ditto-rescue ready'; then
+        # Core launches the rescue UI while it runs (journald files its output
+        # under ditto-rescue-shell.scope); the unit is only used when Core is down.
+        if journalctl --user -u ditto-rescue.service -u ditto-rescue-shell.scope -u ditto-core.service --since "$since" -o cat 2>/dev/null | grep -q 'ditto-rescue ready'; then
           ready="$(date +%s%3N)"
           break
         fi
@@ -248,7 +248,7 @@ if in_ditto_session; then
       done
       restored="$("$BINARIES/dittoctl" --json --offline rescue restore-last-good 2>&1 || true)"
       printf '%s\n' "$restored" >"$(g1_evidence_dir)/offline-restore.txt"
-      revision="$(jq -r '.revision // .result.revision // empty' <<<"$restored" 2>/dev/null || true)"
+      revision="$(jq -r '(.revision.revision_id // .revision // empty) | strings' <<<"$restored" 2>/dev/null || true)"
       systemctl --user stop ditto-rescue.service >/dev/null 2>&1 || true
       systemctl --user reset-failed ditto-core.service >/dev/null 2>&1 || true
       systemctl --user start ditto-core.service >/dev/null 2>&1 || true

@@ -126,15 +126,18 @@ fn scoped_command(kind: &str, executable: &Path, quota: Option<&Quota>) -> io::R
     // systemd-run then refuses the name. Reset it and wait until it is gone.
     let scope = format!("{unit}.scope");
     let _ = Command::new("/usr/bin/systemctl")
+        .env_remove("NOTIFY_SOCKET")
         .args(["--user", "stop", &scope])
         .stderr(std::process::Stdio::null())
         .status();
     let _ = Command::new("/usr/bin/systemctl")
+        .env_remove("NOTIFY_SOCKET")
         .args(["--user", "reset-failed", &scope])
         .stderr(std::process::Stdio::null())
         .status();
     for _ in 0..40 {
         let loaded = Command::new("/usr/bin/systemctl")
+            .env_remove("NOTIFY_SOCKET")
             .args(["--user", "show", "-p", "LoadState", "--value", &scope])
             .output()
             .map(|output| String::from_utf8_lossy(&output.stdout).trim() == "loaded")
