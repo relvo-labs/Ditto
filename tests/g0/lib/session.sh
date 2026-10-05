@@ -36,9 +36,9 @@ environment_label() {
 # developer's live session.
 start_session_bus() {
   command -v dbus-daemon >/dev/null || return 0
-  local address_file="$RUNTIME_DIR/dbus.address"
+  local address_file="$RUNTIME_DIR/ditto-fixture-dbus-$$.address"
   dbus-daemon --session --nofork --print-address=3 3>"$address_file" \
-    >"$RUNTIME_DIR/dbus.log" 2>&1 &
+    >"$RUNTIME_DIR/ditto-fixture-dbus-$$.log" 2>&1 &
   DBUS_PID=$!
   local _
   for _ in $(seq 1 50); do
@@ -174,6 +174,8 @@ stop_all() {
   [[ -n "${DBUS_PID:-}" ]] && kill "$DBUS_PID" 2>/dev/null || true
   wait 2>/dev/null || true
   if [[ "${DITTO_RUNTIME_DIR:-}" == */ditto-g0-fixture-* && -d "$DITTO_RUNTIME_DIR" ]]; then
+    # The package store keeps installed files read-only.
+    chmod -R u+w -- "$DITTO_RUNTIME_DIR" 2>/dev/null || true
     rm -rf -- "$DITTO_RUNTIME_DIR"
   fi
 }

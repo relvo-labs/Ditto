@@ -228,7 +228,8 @@ else
 fi
 # ④ the Shell's product text, in a rescue-mode desktop of its own: the
 # relay reads Core, the Shell's `services` line reads what is shown.
-shell_text="$(bash "$WORKSPACE/tests/g1/rescue-no-node/shell-text.sh" 2>"$evidence_dir/shell-text.log" || echo '{}')"
+shell_text="$(bash "$WORKSPACE/tests/g1/rescue-no-node/shell-text.sh" 2>"$evidence_dir/shell-text.log" | head -1 || true)"
+[[ -n "$shell_text" ]] || shell_text='{}'
 printf '%s\n' "$shell_text" >"$evidence_dir/shell-text.json"
 if jq -e '.services.tasks.unavailable == true and .services.notification_policy.unavailable == true
     and (.services.tasks.text | length) > 0 and (.services.notification_policy.text | length) > 0

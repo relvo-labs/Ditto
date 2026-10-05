@@ -52,6 +52,13 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 start_compositor
+# On the reference machine the fixtures share the user's runtime and bus (for
+# the Firefox snap), but Core's notification server must never claim the
+# logged-in desktop's org.freedesktop.Notifications: this runner always gets
+# a bus of its own. It starts no browser, so nothing needs the user's bus.
+if [[ -z "${DBUS_PID:-}" ]]; then
+  start_session_bus
+fi
 if [[ -z "${DBUS_PID:-}" ]]; then
   for id in "${all_checks[@]}"; do check "$id" fail "the fixture's own session bus did not start"; done
   g1_finish
