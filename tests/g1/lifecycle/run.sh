@@ -32,12 +32,22 @@ evidence="$(g1_evidence_dir)"
 vitest_check() {
   local id="$1" criterion="$2" file="$3" log status=0
   log="$evidence/$id.log"
-  (cd "$WORKSPACE" && pnpm --filter @ditto/host-runtime exec vitest run --reporter=verbose "$file") >"$log" 2>&1 || status=$?
+  # Counts come from Vitest's JSON report, not from its console summary,
+  # whose colouring depends on the environment (it read 0 tests on CI).
+  local report="$evidence/$id.vitest.json"
+  rm -f -- "$report"
+  (cd "$WORKSPACE" && pnpm --filter @ditto/host-runtime exec vitest run --reporter=verbose --reporter=json \
+    --outputFile.json="$report" "$file") >"$log" 2>&1 || status=$?
   local passed skipped failed
-  # Absent counts are zero; grep finding nothing is not an error here.
-  passed="$( (grep -Eo 'Tests +[0-9]+ passed' "$log" || true) | grep -Eo '[0-9]+' | tail -1 || true)"
-  skipped="$( (grep -Eo '[0-9]+ skipped' "$log" || true) | grep -Eo '[0-9]+' | tail -1 || true)"
-  failed="$( (grep -Eo '[0-9]+ failed' "$log" || true) | grep -Eo '[0-9]+' | tail -1 || true)"
+  read -r passed skipped failed < <(python3 - "$report" <<'PYEOF' 2>/dev/null || echo "0 0 0"
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    print("0 0 0"); raise SystemExit
+print(data.get("numPassedTests", 0), data.get("numPendingTests", 0) + data.get("numTodoTests", 0), data.get("numFailedTests", 0))
+PYEOF
+)
   local evidence_json
   evidence_json="$(python3 -c 'import json, sys; print(json.dumps({"log": sys.argv[1], "exit": int(sys.argv[2]), "passed": int(sys.argv[3] or 0), "skipped": int(sys.argv[4] or 0), "failed": int(sys.argv[5] or 0), "file": sys.argv[6]}))' \
     "$log" "$status" "${passed:-0}" "${skipped:-0}" "${failed:-0}" "$file")"
