@@ -96,11 +96,14 @@ relay_up() {
   [[ -S "$DITTO_G1_RELAY" ]] && relay_call desktop.capabilities.list '{}' 2>/dev/null | grep -q '"result"'
 }
 
-# The D-34 set: "<package> <version> <host>" per line, five QML, five Cordis.
+# The D-34 set: "<package> <version> <host> <place>" per line, five QML,
+# five Cordis. <place> is where the entry goes: the QML ones join the
+# `ui.status_item` area their manifest declares (several entries side by
+# side), the Cordis ones fill no slot ("-").
 d34_packages() {
   local manifest
   for manifest in "$workspace"/packages/plugin-fixtures/qml/*/manifest.json "$workspace"/packages/plugin-fixtures/cordis/*/manifest.json; do
-    jq -r '"\(.id) \(.version) \(.host_kind)"' "$manifest"
+    jq -r '"\(.id) \(.version) \(.host_kind) \(if .host_kind == "qml" then (.slots[0] // "-") else "-" end)"' "$manifest"
   done
 }
 
@@ -534,26 +537,32 @@ sample() {
     local mounted_before head ops change state_after evidence="$artifacts/plus10-enable-$run_id.json"
     mounted_before="$(relay_call desktop.plugins.diagnostics '{}' | jq -r '.result.core.shell_mounted_providers')"
     head="$(relay_call desktop.profiles.get '{}' | jq -r .result.profile.head_revision)"
-    ops="$(d34_packages | jq -Rsc 'split("\n") | map(select(length > 0) | split(" ") | {op: "add_entry", entry: {package: .[0], version: .[1], host: .[2]}})')"
+    ops="$(d34_packages | jq -Rsc 'split("\n") | map(select(length > 0) | split(" ")
+      | {op: "add_entry", entry: {package: .[0], version: .[1], host: .[2]}} + (if .[3] != "-" then {slot: .[3]} else {} end))')"
     plus10_enabled=1
     change="$(relay_call desktop.changes.propose "$(jq -cn --arg base "$head" --argjson ops "$ops" '{base_revision: $base, ops: $ops}')")"
     state_after="$(jq -r '.result.state // ("error: " + (.error.name // "unknown"))' <<<"$change")"
     [[ "$state_after" == committed ]] || { echo "enabling the D-34 set ended $state_after; the run is not recorded" >&2; echo "$change" >"$evidence"; exit 1; }
-    # Read back what really loaded: Cordis fibers active, QML mounted by the Shell.
-    local cordis_ids cordis_active=0 qml_mounted=0 diagnostics deadline=$(( $(date +%s) + 60 ))
+    # Read back what really loaded: Cordis fibers active, and each QML status
+    # item mounted and visible in the `ui.status_item` area as the Shell
+    # reported it (desktop.panels.list lists one row per member).
+    local cordis_ids qml_ids cordis_active=0 qml_mounted=0 diagnostics panels deadline=$(( $(date +%s) + 60 ))
     cordis_ids="$(d34_packages | awk '$3 == "cordis" {print $1}' | jq -Rsc 'split("\n") | map(select(length > 0))')"
+    qml_ids="$(d34_packages | awk '$3 == "qml" {print $1}' | jq -Rsc 'split("\n") | map(select(length > 0))')"
     while :; do
       diagnostics="$(relay_call desktop.plugins.diagnostics '{}')"
+      panels="$(relay_call desktop.panels.list '{}')"
       cordis_active="$(jq --argjson ids "$cordis_ids" '[.result.entries[] | select((.package as $p | $ids | index($p)) and .fiber_state == "active")] | length' <<<"$diagnostics")"
-      qml_mounted=$(( $(jq -r '.result.core.shell_mounted_providers' <<<"$diagnostics") - mounted_before ))
+      qml_mounted="$(jq --argjson ids "$qml_ids" '[.result.panels[] | select(.slot == "ui.status_item" and (.package as $p | $ids | index($p))
+        and .mounted and .visible and .mounted_entry == .bound_entry)] | length' <<<"$panels")"
       (( cordis_active == 5 && qml_mounted == 5 )) && break
       (( $(date +%s) < deadline )) || break
       sleep 1
     done
-    jq -n --argjson change "$change" --argjson diagnostics "$diagnostics" --argjson before "$mounted_before" \
-      '{change: $change, shell_mounted_before: $before, diagnostics_after: $diagnostics}' >"$evidence"
+    jq -n --argjson change "$change" --argjson diagnostics "$diagnostics" --argjson panels "$panels" --argjson before "$mounted_before" \
+      '{change: $change, shell_mounted_before: $before, diagnostics_after: $diagnostics, panels_after: $panels}' >"$evidence"
     local note=""
-    (( qml_mounted == 5 )) || note="the Shell mounted $qml_mounted of the five QML status items (shell_mounted_providers $mounted_before before)"
+    (( qml_mounted == 5 )) || note="the Shell shows $qml_mounted of the five QML status items (desktop.panels.list, ui.status_item)"
     (( cordis_active == 5 )) || note="${note:+$note; }$cordis_active of the five Cordis plugins are active"
     echo "D-34 set enabled ($(jq -r .result.change_id <<<"$change")): Cordis active $cordis_active/5, QML mounted $qml_mounted/5${note:+; $note}"
     echo "warming up for ${warmup}s after enabling"

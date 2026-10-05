@@ -14,6 +14,9 @@
 #     without logind, so nothing reaches the login session the fixture runs
 #     beside. The application-index cache stays inside the fixture.
 #
+#   The built-in packages come from target/ditto-packages, or from
+#   DITTO_FIXTURE_PACKAGES when a runner needs more (the D-34 fixtures).
+#
 #   shell_fixture_start [--hostd] [extra `ditto-core serve` args...]
 #       Sets CORE_PID, QUICKSHELL, NODE; exports DITTO_G1_RELAY. Returns 1 when
 #       the fixture did not come up (Core's log is $RUNTIME_DIR/core.log).
@@ -44,7 +47,7 @@ shell_fixture_start() {
   NODE="$(readlink -f "$(command -v node)")"
   export DITTO_G1_RELAY="$RUNTIME_DIR/relay-$$.sock"
   local serve=(serve --compositor "$DITTO_COMPOSITOR"
-    --builtin-packages "$WORKSPACE/target/ditto-packages"
+    --builtin-packages "${DITTO_FIXTURE_PACKAGES:-$WORKSPACE/target/ditto-packages}"
     --shell "quickshell 0.2.0 $QUICKSHELL -p $WORKSPACE/shell/shell.qml"
     --launch "dittoctl 0.2.0 $NODE $WORKSPACE/tests/g1/lib/relay.mjs $DITTO_G1_RELAY")
   [[ -n "$with_hostd" ]] && serve+=(--hostd "$(g1_hostd_spec "$NODE" "$WORKSPACE/packages/host-runtime/dist/ditto-hostd.mjs")")
