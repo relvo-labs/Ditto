@@ -144,3 +144,5 @@ export class Context {
     return this.extend({ [symbols.intercept]: intercept })
   }
 }
+
+// EX1-14 ③: deliberate unrecorded vendor change; the vendor guard must reject this branch.
