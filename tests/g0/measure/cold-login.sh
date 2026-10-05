@@ -186,7 +186,9 @@ manifest = {
 }
 json.dump(manifest, open(destination, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 PYEOF
-  local count=$(( duration * 1000 / interval_ms ))
+  # n samples span (n-1) intervals: one more than duration/interval, or the
+  # span is 595 s and the report rightly refuses it as shorter than 600 s.
+  local count=$(( duration * 1000 / interval_ms + 1 ))
   echo "sampling ${count} points every ${interval_ms} ms"
   "$binaries/ditto-measure" sample "$manifest" "$count" "$interval_ms" "$output"
 
