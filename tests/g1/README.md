@@ -160,3 +160,14 @@ Rust 整合測試不能自己連上正常模式的 Core，所以由 Core 以 `--
 4. 測試本身的問題：回讀 relay 與 Agent 替身的 `hold` 模式在 Core 結束後仍然留著。現在它們會跟著 Core 結束；headless 夾具的 runtime 目錄也會清掉。
 
 還沒成立的：參考機上的執行（含 Firefox、release build）；EX1-11 的 UI 首幀參考值與啟動器替換 30 次；EX1-07 的面板時間是用戶端時鐘，QML 面板沒有 Core 時間戳可用。
+
+## EX1-10 分層資源量測工具（2026-10-05，開發機，headless 夾具，開發證據）
+
+`measure/` 是 G1-QA-05 的工具，**還沒有在參考機跑過任何一次正式量測**，所以 EX1-10 沒有任何數字可以主張。
+
+- `cold-login.sh` 沿用 G0 的規則：每次 run 一次登入管理器登入、登入超過 600 秒拒絕、同一個登入不得量第二次（登入以 `<boot_id>:<logind session>` 記在 `cold-login-logins.txt`，開始採樣前就寫入）、非參考機只能 `DITTO_FORMAT_CHECK=1`，暖機 300 秒、採樣 600 秒（121 點，跨度滿 600 秒）、間隔 5 秒、登入年齡上限與三個參考應用只有在格式檢查時才能放寬。開始前回讀實際狀態：Core 的命令列有沒有 `--mode rescue`、Shell 的 `DITTO_AVATAR`、Ditto 單元中的 Node 程序（`rescue_no_node` 必須為零）、hostd 是否 `running`、Profile 中沒有 D-34 插件；每個執行中的 `ditto-*` 單元都必須能歸類到一層，否則拒絕。採樣前後單元集合或主程序有變，這次 run 不記錄。
+- `rescue_no_node` 經 `measure-conditions.json` 的 `desktop_variant: rescue-no-node` 選擇；登入 script 寫入 `DITTO_CORE_MODE_ARGS=--mode rescue`，驗證安裝的 relay 改由兩個環境變數組成，在這個變體換成第二個 `--mode rescue`，所以不啟動 Node。一般登入不設這些變數，Core 的命令列不變（以 systemd 255 的暫時單元確認：未設定或空值的 `$VAR` 展開為零個參數，`EnvironmentFile=` 覆蓋 `Environment=`）。
+- hostd 的 `heap_used`／`external`／`array_buffers` 由 `ditto-measure` 每次採樣經 relay 讀 `desktop.plugins.diagnostics`，與 PSS 分欄。回讀 relay 本身是 Node 程序，報告逐次列出它的 PSS，但不計入桌面合計，並寫明原因。
+- 夾具試跑（`dry-run.sh`，commit `ee637af`，乾淨工作樹，暖機 2 秒、採樣 3 秒、只開 foot）：四個狀態各三次「登入」都記錄成功並產生報告，報告全部標為開發試跑、不判定。`rescue_no_node` 三次 Core 都是 rescue 模式、Ditto 單元中 Node 程序 0 個；完整桌面各狀態是 2 個（hostd 與 relay）。hostd 的 V8 欄位在 B 採樣時有值；A 與 `desktop_full_no_agent` 的 2 秒暖機短於 hostd 每 10 秒一次的回報，所以全是缺值並列出原因，參考機的 300 秒暖機不受影響。一次較早的試跑在中途改了工作樹，`report-ab` 因指紋（未提交路徑數）不同而拒絕產生報告，這是預期的行為。
+- **找到的缺口：D-34 的五個 QML 插件掛不上。** 啟用的 ChangeSet 會提交，五個 Cordis 插件三次都是 `active`，但 Shell 掛上的 QML 數三次都是 0：它們宣告的 `ui.status_item` 不是 Core 認得的 slot，Profile 的 slot 一次只綁一個 entry，Shell 只載入綁在 slot 上的 QML。A/B 報告因此寫「不對 ≤50 MiB 判定」。這需要 Core 與 Shell 提供能同時掛上多個狀態項的位置（見上方「各工作流要提供什麼」），量測工具不繞過它。
+- 沒有驗證的：真正的登入管理器登入、GDM 自動登入與 `ditto-relogin` 的串接（`series.sh` 只以替身測過續跑、重試與失敗上限，`test-series.sh`）、Firefox 與 Kate 的啟動、Fcitx 層、`install-session.sh --verification-relay` 實際安裝後的單元（只在暫存目錄展開並以 `systemd-analyze verify` 檢查）。本機沒有 `shellcheck`，腳本只做了 `bash -n`。
