@@ -13,7 +13,7 @@
 # exits and clears any a previous login left behind before it starts.
 set -euo pipefail
 
-workspace="${DITTO_WORKSPACE:-/home/neil/funlab/Ditto}"
+workspace="${DITTO_WORKSPACE:-@DITTO_WORKSPACE@}"
 qt_prefix="${DITTO_QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
 wayfire_prefix="${DITTO_WAYFIRE_PREFIX:-$HOME/wayfire}"
 core="$workspace/target/release/ditto-core"
