@@ -150,7 +150,7 @@
 ```
 
 - `before` 是**意圖比對**：Core 在 `validated` 時以基底 revision 的實際值重填；呼叫方給了 `before` 且與實際值不同 → `stale_intent`。
-- `add_entry` 的 `entry_id` 由 Core 產生（`ent-<ULID>`），跨 revision 穩定；`slot` 選填，給了就在同一個 op 裡綁定。
+- `add_entry` 的 `entry_id` 由 Core 產生（`ent-<ULID>`），跨 revision 穩定；`slot` 選填，給了就在同一個 op 裡綁定。`slot` 若是多條目區域（`ui.status_item`），條目改為加入該區域（記在條目的 `area`），不綁定 `slots`；`bind_slot` 不接受區域（`schema_invalid`，`area_is_not_a_slot`）。區域語意見 [profile-document.md](profile-document.md#多條目區域uistatus_item)。
 - 主體與來源由連線決定：`shell` → `gui{surface}`、`cli` → `cli`、`agent` → `agent_standin`（G1）、救援 → `rescue`、監督 → `supervisor`、計時回復 → `timed_revert`、撤銷 → `undo`、匯入 → `import`。呼叫方不能指定來源。
 
 寫入配置的能力（`appearance.set` 等）**都是 ChangeSet 的包裝**：Core 在內部建立只有一個 op 的 ChangeSet，回傳同一種 `ChangeRecord`。
@@ -262,6 +262,8 @@ Shell、hostd 與合成器轉接在交易中扮演同一種角色，Core 對它�
 ```
 
 Shell 在每次掛載變化後主動呼叫 `shell.report`（與 `observed` 同形），Core 以最新的回報回答 `desktop.panels.list`。readback 規則：`bind_slot(ui.x → E)` 要求 `mounts` 中 `ui.x` 的 `entry_id = E` 且 `mounted = visible = true`；`/appearance/*` 要求觀測到的 `appearance` 與目標在 JSON 上相等。
+
+多條目區域：投影在單一 slot 的綁定之後，為區域的每個未停用成員各附一筆綁定（`slot` 是區域名稱，各有自己的 `entry_id`），順序即 Profile 的條目順序。Shell 把每個成員當成獨立的單元走 prepare／commit／rollback：prepare、commit、rollback 的項目 `key` 是成員的 `entry_id`（單一 slot 仍是 slot 名稱）；一個候選載入失敗只讓這次變更中止，已掛載的成員不受影響。觀測中每個成員各有一筆 `mounts`（`slot = "ui.status_item"`、各自的 `entry_id`）；`visible` 表示它已放進畫面上的狀態區（頂部面板提供的 `statusRegion`，面板沒有提供或未掛載時為 Shell 自己的狀態條），不只是 `shown`。readback 逐成員比對 `(slot, entry_id)`，判定的鍵是 `entry_id`；Profile 已移除的成員仍掛著即不一致。`desktop.panels.list` 為每個未停用成員列一列（`bound_entry` 為該成員），再列出仍掛著但已不是成員的項目（`bound_entry = null`）。狀態項目是同程序的可信 QML，沒有隔離；它們自己的計時器屬於它們，Shell 擺放它們不經任何 RPC，也不在動畫熱路徑上。
 
 ### 9.2 hostd 的投影與觀測
 

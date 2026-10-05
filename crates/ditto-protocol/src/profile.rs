@@ -11,7 +11,7 @@ use serde_json::Value;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// Slots that hold at most one provider. Every slot is single-provider in G1.
+/// Slots that hold at most one provider (the `slots` map binds one entry).
 pub const SLOTS: &[&str] = &[
     "ui.panel_top",
     "ui.dock",
@@ -22,6 +22,16 @@ pub const SLOTS: &[&str] = &[
     "svc.tasks",
     "svc.notification_policy",
 ];
+
+/// Multi-entry areas: any number of entries may be members, and every
+/// enabled member is mounted, in the order of `entries`. Membership is the
+/// entry's own `area` field, set when the entry is added (`add_entry` with
+/// `slot` naming the area); it is not part of the single-provider `slots` map.
+pub const AREAS: &[&str] = &["ui.status_item"];
+
+pub fn is_area(name: &str) -> bool {
+    AREAS.contains(&name)
+}
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
@@ -44,6 +54,11 @@ pub struct EntrySpec {
     pub config: Value,
     #[serde(default)]
     pub disabled: bool,
+    /// The multi-entry area this entry is a member of (one of `AREAS`).
+    /// Absent means none, and is left out of the document, so a Profile
+    /// written before areas existed keeps its digest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub area: Option<String>,
 }
 
 fn empty_object() -> Value {
@@ -181,6 +196,22 @@ impl ProfileDocument {
 
     pub fn slot_entry(&self, slot: &str) -> Option<&EntrySpec> {
         self.slots.get(slot).and_then(|id| self.entry(id))
+    }
+
+    /// Members of an area, in entry order, enabled or not.
+    pub fn area_members<'a>(&'a self, area: &'a str) -> impl Iterator<Item = &'a EntrySpec> + 'a {
+        self.entries
+            .iter()
+            .filter(move |entry| entry.area.as_deref() == Some(area))
+    }
+
+    /// Where an entry is placed: the slot that binds it, else its area.
+    pub fn placement_of(&self, entry_id: &str) -> Option<&str> {
+        self.slots
+            .iter()
+            .find(|(_, bound)| bound.as_str() == entry_id)
+            .map(|(slot, _)| slot.as_str())
+            .or_else(|| self.entry(entry_id).and_then(|entry| entry.area.as_deref()))
     }
 
     pub fn to_value(&self) -> Value {

@@ -4,9 +4,15 @@ import Quickshell
 /// The Shell as a transaction participant (plan/03/04 §2, protocol 0.2 §9).
 ///
 /// Core sends the full desired state — a ShellProjection: appearance, avatar,
-/// one binding per `ui.*` slot, shortcuts — never a diff. The host compares it
-/// with what it runs and changes only what differs: boot, reconnect, change and
+/// one binding per `ui.*` slot and one per member of a multi-entry area
+/// (`ui.status_item`), shortcuts — never a diff. The host compares it with
+/// what it runs and changes only what differs: boot, reconnect, change and
 /// rollback are the same path.
+///
+/// Each slot is one unit (a SlotHost) named after the slot; each area member
+/// is a unit of its own, named `<area>#<entry_id>`, reported with the area as
+/// its slot and its entry id as its item key. StatusArea places the mounted
+/// members, in Profile order.
 ///
 ///   participant.prepare   load every changed slot's candidate hidden, then
 ///                         healthy() within 2 s; answer ready | failed per slot
@@ -38,8 +44,12 @@ QtObject {
     /// the readback of `avatar`. Null while no placement is known.
     property var avatarPlacement: null
 
-    /// slot name → SlotHost
+    /// unit name (slot, or `<area>#<entry_id>`) → SlotHost
     property var slots: ({})
+    /// Multi-entry areas; every other `ui.*` name is a single-provider slot.
+    readonly property var areas: ["ui.status_item"]
+    /// area → unit names of its committed members, in Profile order.
+    property var areaOrder: ({})
     /// change id → { phase, slots: [names], appearance: previous, avatar: previous, target }
     property var changes: ({})
     /// The change being prepared: { changeId, origin, target, slots: [names],
@@ -66,10 +76,29 @@ QtObject {
         SlotHost {}
     }
 
+    property StatusArea statusArea: StatusArea {
+        providers: host
+    }
+
+    function isArea(slotName) {
+        return areas.indexOf(slotName) >= 0;
+    }
+
+    /// The unit a binding fills: its slot, or its own place in an area.
+    function unitName(binding) {
+        return isArea(binding.slot) ? binding.slot + "#" + binding.entry_id : binding.slot;
+    }
+
     function slot(name) {
         let found = slots[name];
         if (!found) {
-            found = slotComponent.createObject(host, { name: name, host: host });
+            const cut = name.indexOf("#");
+            const properties = { name: name, host: host };
+            if (cut > 0) {
+                properties.reportedSlot = name.slice(0, cut);
+                properties.itemKey = name.slice(cut + 1);
+            }
+            found = slotComponent.createObject(host, properties);
             const table = Object.assign({}, slots);
             table[name] = found;
             slots = table;
@@ -117,15 +146,26 @@ QtObject {
         return JSON.stringify(left === undefined ? null : left) === JSON.stringify(right === undefined ? null : right);
     }
 
+    /// An area member's readback: shown, and placed where the area is on screen.
+    function isPlaced(object) {
+        return statusArea.placed(object);
+    }
+
     function observation() {
         const mounts = [];
+        const rank = {};
+        for (const area in areaOrder) {
+            areaOrder[area].forEach((name, index) => rank[name] = index);
+        }
         for (const name in slots) {
             const mount = slots[name].mount();
             if (mount) {
+                mount.rank = rank[name] === undefined ? 1e6 : rank[name];
                 mounts.push(mount);
             }
         }
-        mounts.sort((left, right) => left.slot < right.slot ? -1 : 1);
+        mounts.sort((left, right) => left.slot !== right.slot ? (left.slot < right.slot ? -1 : 1) : left.rank - right.rank);
+        mounts.forEach(mount => delete mount.rank);
         const observed = { mounts: mounts, appearance: appearance, avatar: avatar };
         if (avatarPlacement) {
             observed.avatar_placement = avatarPlacement;
@@ -154,6 +194,23 @@ QtObject {
     function reportPlacement() {
         if (client.online && JSON.stringify(avatarPlacement || null) !== reportedPlacement) {
             sendReport();
+        }
+    }
+
+    /// Area units that hold nothing and are not in the target are dropped,
+    /// so removed status items do not leave empty units behind.
+    function dropIdleUnits(bindings) {
+        let table = null;
+        for (const name in slots) {
+            const unit = slots[name];
+            if (name.indexOf("#") > 0 && !bindings[name] && !unit.active && !unit.candidate && !unit.retired) {
+                table = table || Object.assign({}, slots);
+                delete table[name];
+                unit.destroy();
+            }
+        }
+        if (table) {
+            slots = table;
         }
     }
 
@@ -217,9 +274,18 @@ QtObject {
         }
         const changeId = params.change_id;
         const bindings = {};
-        for (const binding of target.slots) {
-            bindings[binding.slot] = binding;
+        const order = {};
+        for (const area of areas) {
+            order[area] = [];
         }
+        for (const binding of target.slots) {
+            const name = unitName(binding);
+            bindings[name] = binding;
+            if (isArea(binding.slot)) {
+                order[binding.slot].push(name);
+            }
+        }
+        dropIdleUnits(bindings);
         const names = Object.keys(slots).concat(Object.keys(bindings)).filter((name, index, all) => all.indexOf(name) === index);
         const changed = names.filter(name => slot(name).needsChange(bindings[name] || null));
         const record = {
@@ -227,6 +293,8 @@ QtObject {
             origin: params.origin,
             target: target,
             slots: changed,
+            areaOrder: order,
+            orderChanged: !same(areaOrder, order),
             appearanceChanged: !same(appearance, target.appearance),
             avatarChanged: !same(avatar, target.avatar)
         };
@@ -240,6 +308,10 @@ QtObject {
             items.push({ key: "avatar", status: "ready" });
         }
         let waiting = changed.length;
+        if (waiting === 0 && record.orderChanged) {
+            // Only the order of area members changed: nothing to load.
+            items.push({ key: areas[0], status: "ready" });
+        }
         if (waiting === 0) {
             reply({ items: items });
             return;
@@ -289,6 +361,9 @@ QtObject {
             }
             items.push(outcome);
         }
+        const previousOrder = areaOrder;
+        areaOrder = record.areaOrder;
+        statusArea.layout();
         const previousAppearance = appearance;
         const previousAvatar = avatar;
         if (record.appearanceChanged) {
@@ -303,6 +378,7 @@ QtObject {
         remember(changeId, {
             phase: "committed",
             slots: committedSlots,
+            areaOrder: previousOrder,
             appearanceChanged: record.appearanceChanged,
             avatarChanged: record.avatarChanged,
             appearance: previousAppearance,
@@ -337,6 +413,10 @@ QtObject {
         for (const name of record.slots) {
             items.push(slot(name).rollback(changeId));
         }
+        if (record.areaOrder) {
+            areaOrder = record.areaOrder;
+        }
+        statusArea.layout();
         if (record.appearanceChanged) {
             appearance = record.appearance;
             items.push({ key: "appearance", status: "restored" });

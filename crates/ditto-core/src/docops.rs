@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use ditto_protocol::{
     change::{ChangeCard, ChangeOp, PreflightCode, PreflightReason},
     ids,
-    profile::{DiffItem, DiffKind, EntrySpec, ProfileDocument, SLOTS},
+    profile::{is_area, DiffItem, DiffKind, EntrySpec, ProfileDocument, SLOTS},
 };
 use serde_json::{json, Value};
 
@@ -160,6 +160,12 @@ pub fn apply(base: &ProfileDocument, ops: &[ChangeOp]) -> Applied {
                         json!({"why": "config_not_object"}),
                     ));
                 }
+                // A multi-entry area is joined by the entry itself; a slot
+                // binds it in the single-provider map.
+                let area = slot
+                    .as_deref()
+                    .filter(|name| is_area(name))
+                    .map(String::from);
                 document.entries.push(EntrySpec {
                     entry_id: entry_id.clone(),
                     package: entry.package.clone(),
@@ -167,8 +173,9 @@ pub fn apply(base: &ProfileDocument, ops: &[ChangeOp]) -> Applied {
                     host: entry.host,
                     config: entry.config.clone(),
                     disabled: entry.disabled,
+                    area: area.clone(),
                 });
-                if let Some(slot) = slot {
+                if let Some(slot) = slot.as_ref().filter(|_| area.is_none()) {
                     if !SLOTS.contains(&slot.as_str()) {
                         reasons.push(reason(
                             PreflightCode::SchemaInvalid,
@@ -243,6 +250,17 @@ pub fn apply(base: &ProfileDocument, ops: &[ChangeOp]) -> Applied {
                 normalized.push(op.clone());
             }
             ChangeOp::BindSlot { slot, from, to } => {
+                if is_area(slot) {
+                    // An area has no single binding to replace: entries join
+                    // it when they are added and leave it when removed.
+                    reasons.push(reason(
+                        PreflightCode::SchemaInvalid,
+                        at,
+                        json!({"slot": slot, "why": "area_is_not_a_slot"}),
+                    ));
+                    normalized.push(op.clone());
+                    continue;
+                }
                 if !SLOTS.contains(&slot.as_str()) {
                     reasons.push(reason(
                         PreflightCode::SchemaInvalid,
@@ -360,15 +378,45 @@ pub fn diff(base: &ProfileDocument, target: &ProfileDocument) -> Vec<DiffItem> {
     }
     for entry in &target.entries {
         match base.entry(&entry.entry_id) {
-            None => items.push(item(
-                format!("/entries/{}", entry.entry_id),
-                DiffKind::Added,
-                None,
-                Some(json!(entry.package)),
-                "diff.entry.added",
-                json!({"package": entry.package, "version": entry.version}),
-            )),
+            None => items.push(match &entry.area {
+                // Joining an area is what a person sees: "show the clock in
+                // the status items", not "add a package".
+                Some(area) => item(
+                    format!("/entries/{}/area", entry.entry_id),
+                    DiffKind::Added,
+                    None,
+                    Some(json!(area)),
+                    "diff.area.joined",
+                    json!({"slot": area, "package": entry.package, "version": entry.version}),
+                ),
+                None => item(
+                    format!("/entries/{}", entry.entry_id),
+                    DiffKind::Added,
+                    None,
+                    Some(json!(entry.package)),
+                    "diff.entry.added",
+                    json!({"package": entry.package, "version": entry.version}),
+                ),
+            }),
             Some(old) => {
+                if old.area != entry.area {
+                    items.push(item(
+                        format!("/entries/{}/area", entry.entry_id),
+                        match (&old.area, &entry.area) {
+                            (None, Some(_)) => DiffKind::Added,
+                            (Some(_), None) => DiffKind::Removed,
+                            _ => DiffKind::Changed,
+                        },
+                        old.area.as_ref().map(|area| json!(area)),
+                        entry.area.as_ref().map(|area| json!(area)),
+                        if entry.area.is_some() {
+                            "diff.area.joined"
+                        } else {
+                            "diff.area.left"
+                        },
+                        json!({"slot": entry.area.as_ref().or(old.area.as_ref()), "package": entry.package, "version": entry.version}),
+                    ));
+                }
                 if old.config != entry.config {
                     items.push(item(
                         format!("/entries/{}/config", entry.entry_id),
@@ -408,14 +456,24 @@ pub fn diff(base: &ProfileDocument, target: &ProfileDocument) -> Vec<DiffItem> {
     }
     for entry in &base.entries {
         if target.entry(&entry.entry_id).is_none() {
-            items.push(item(
-                format!("/entries/{}", entry.entry_id),
-                DiffKind::Removed,
-                Some(json!(entry.package)),
-                None,
-                "diff.entry.removed",
-                json!({"package": entry.package, "version": entry.version}),
-            ));
+            items.push(match &entry.area {
+                Some(area) => item(
+                    format!("/entries/{}/area", entry.entry_id),
+                    DiffKind::Removed,
+                    Some(json!(area)),
+                    None,
+                    "diff.area.left",
+                    json!({"slot": area, "package": entry.package, "version": entry.version}),
+                ),
+                None => item(
+                    format!("/entries/{}", entry.entry_id),
+                    DiffKind::Removed,
+                    Some(json!(entry.package)),
+                    None,
+                    "diff.entry.removed",
+                    json!({"package": entry.package, "version": entry.version}),
+                ),
+            });
         }
     }
     let (mut before, mut after) = (base.to_value(), target.to_value());
@@ -511,10 +569,8 @@ pub fn card(ops: &[ChangeOp], items: Vec<DiffItem>) -> ChangeCard {
         "profile_switch"
     } else if !ops.is_empty()
         && ops.iter().all(|op| {
-            matches!(
-                op,
-                ChangeOp::BindSlot { .. } | ChangeOp::AddEntry { slot: Some(_), .. }
-            )
+            matches!(op, ChangeOp::BindSlot { .. })
+                || matches!(op, ChangeOp::AddEntry { slot: Some(slot), .. } if !is_area(slot))
         })
     {
         "provider_swap"
@@ -531,9 +587,14 @@ pub fn card(ops: &[ChangeOp], items: Vec<DiffItem>) -> ChangeCard {
     {
         "layout"
     } else if !ops.is_empty()
-        && ops
-            .iter()
-            .all(|op| matches!(op, ChangeOp::SetEntryDisabled { .. }))
+        && ops.iter().all(|op| {
+            // Turning plugins on and off: enable or disable an entry, or add
+            // one that fills no single slot (none, or an area such as the
+            // status items).
+            matches!(op, ChangeOp::SetEntryDisabled { .. })
+                || matches!(op, ChangeOp::AddEntry { slot: None, .. })
+                || matches!(op, ChangeOp::AddEntry { slot: Some(slot), .. } if is_area(slot))
+        })
     {
         "plugin_state"
     } else {
@@ -603,6 +664,7 @@ pub(crate) mod tests {
             host: HostKind::Qml,
             config: json!({}),
             disabled: false,
+            area: None,
         };
         let dock_b = EntrySpec {
             entry_id: "ent-dock-b".into(),
@@ -800,6 +862,122 @@ pub(crate) mod tests {
             applied.document.entry(&bound).unwrap().package,
             "ditto.launcher.search"
         );
+    }
+
+    fn status_item(package: &str) -> ChangeOp {
+        ChangeOp::AddEntry {
+            entry: NewEntry {
+                package: package.into(),
+                version: "1.0.0".into(),
+                host: HostKind::Qml,
+                config: json!({}),
+                disabled: false,
+            },
+            slot: Some("ui.status_item".into()),
+        }
+    }
+
+    #[test]
+    fn status_items_join_the_area_in_order_and_leave_the_slots_alone() {
+        let base = document();
+        let applied = apply(
+            &base,
+            &[
+                status_item("ditto.status.clock"),
+                status_item("ditto.status.cpu"),
+                status_item("ditto.status.battery"),
+            ],
+        );
+        assert!(applied.reasons.is_empty(), "{:?}", applied.reasons);
+        assert_eq!(applied.document.slots, base.slots);
+        let members: Vec<&str> = applied
+            .document
+            .area_members("ui.status_item")
+            .map(|entry| entry.package.as_str())
+            .collect();
+        assert_eq!(
+            members,
+            [
+                "ditto.status.clock",
+                "ditto.status.cpu",
+                "ditto.status.battery"
+            ]
+        );
+        let items = diff(&base, &applied.document);
+        assert_eq!(items.len(), 3);
+        assert!(items.iter().all(|item| item.label_key == "diff.area.joined"
+            && item.kind == DiffKind::Added
+            && item.label_args["slot"] == json!("ui.status_item")));
+        assert_eq!(card(&applied.ops, items).kind, "plugin_state");
+
+        // Removing a member is the area's "left" line.
+        let clock = applied.document.entries[2].entry_id.clone();
+        let removed = apply(
+            &applied.document,
+            &[ChangeOp::RemoveEntry { entry_id: clock }],
+        );
+        let items = diff(&applied.document, &removed.document);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label_key, "diff.area.left");
+        assert_eq!(items[0].kind, DiffKind::Removed);
+        assert_eq!(removed.document.area_members("ui.status_item").count(), 2);
+    }
+
+    #[test]
+    fn an_area_is_not_a_slot_to_bind() {
+        let base = document();
+        let applied = apply(
+            &base,
+            &[ChangeOp::BindSlot {
+                slot: "ui.status_item".into(),
+                from: None,
+                to: "ent-dock-b".into(),
+            }],
+        );
+        assert_eq!(applied.reasons.len(), 1);
+        assert_eq!(applied.reasons[0].code, PreflightCode::SchemaInvalid);
+        assert_eq!(
+            applied.reasons[0].detail["why"],
+            json!("area_is_not_a_slot")
+        );
+        assert_eq!(applied.document, base);
+    }
+
+    #[test]
+    fn a_document_without_area_members_keeps_its_bytes_and_digest() {
+        let base = document();
+        let value = base.to_value();
+        assert!(value["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|entry| entry.get("area").is_none()));
+        let old: ProfileDocument = serde_json::from_value(value).unwrap();
+        assert_eq!(old.digest(), base.digest());
+        // A member serializes its area, so the digest tells them apart.
+        let joined = apply(&base, &[status_item("ditto.status.clock")]).document;
+        assert_eq!(
+            joined.to_value()["entries"][2]["area"],
+            json!("ui.status_item")
+        );
+        assert_ne!(joined.digest(), base.digest());
+    }
+
+    #[test]
+    fn undoing_a_status_item_change_restores_the_document() {
+        let base = apply(&document(), &[status_item("ditto.status.clock")]).document;
+        let clock = base.entries[2].entry_id.clone();
+        let applied = apply(
+            &base,
+            &[ChangeOp::SetEntryDisabled {
+                entry_id: clock,
+                disabled: true,
+            }],
+        );
+        assert_eq!(applied.document.area_members("ui.status_item").count(), 1);
+        let back = apply(&applied.document, &ops_between(&applied.document, &base));
+        assert!(back.reasons.is_empty());
+        assert_eq!(back.document.digest(), base.digest());
     }
 
     #[test]

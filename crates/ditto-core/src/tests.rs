@@ -125,6 +125,20 @@ fn builtin_packages(directory: &Path) {
             }),
         ),
     );
+    // D-34 status items: any number of them share the `ui.status_item` area.
+    for id in [
+        "ditto.status.clock",
+        "ditto.status.date",
+        "ditto.status.cpu",
+        "ditto.status.memory",
+        "ditto.status.battery",
+        "ditto.status.broken",
+    ] {
+        pack(
+            directory,
+            &manifest(id, "qml_provider", "qml", &["ui.status_item"], json!({})),
+        );
+    }
     // A Dock that only a new session can load.
     pack(
         directory,
@@ -343,6 +357,9 @@ struct ShellState {
     prepares: u32,
     /// Report where the character is, as the real Shell does.
     report_placement: bool,
+    /// Report this package's mounts as not visible (a status item that
+    /// never found a place to show).
+    hidden_package: Option<String>,
     /// ...but always in the bottom-right corner, whatever the Profile says.
     stuck_avatar: bool,
 }
@@ -352,7 +369,10 @@ fn shell_observation(shell: &ShellState) -> Value {
         Some(projection) => {
             let mut observed = json!({
                 "role": "shell",
-                "mounts": projection.slots.iter().map(|slot| json!({"slot": slot.slot, "entry_id": slot.entry_id, "mounted": true, "visible": true})).collect::<Vec<_>>(),
+                "mounts": projection.slots.iter().map(|slot| json!({
+                    "slot": slot.slot, "entry_id": slot.entry_id, "mounted": true,
+                    "visible": shell.hidden_package.as_ref() != Some(&slot.package),
+                })).collect::<Vec<_>>(),
                 "appearance": projection.appearance,
                 "avatar": projection.avatar,
             });
@@ -412,10 +432,17 @@ fn fake_shell(core: &Arc<Core>, state: Arc<Mutex<ShellState>>) -> Arc<TestPeer> 
                     .slots
                     .iter()
                     .map(|slot| {
-                        if Some(&slot.package) == broken.as_ref() {
-                            json!({"key": slot.slot, "status": "failed", "reason": "qml_error"})
+                        // An area member is reported by its entry id, as the
+                        // real Shell does.
+                        let key = if ditto_protocol::profile::is_area(&slot.slot) {
+                            &slot.entry_id
                         } else {
-                            json!({"key": slot.slot, "status": "ready"})
+                            &slot.slot
+                        };
+                        if Some(&slot.package) == broken.as_ref() {
+                            json!({"key": key, "status": "failed", "reason": "qml_error"})
+                        } else {
+                            json!({"key": key, "status": "ready"})
                         }
                     })
                     .collect();
@@ -819,6 +846,269 @@ fn a_dock_swap_is_a_transaction_and_a_broken_candidate_leaves_the_active_dock() 
         .iter()
         .any(|slot| slot.slot == "ui.dock" && slot.entry_id == dock_b));
     drop(shell);
+}
+
+fn status_ops(packages: &[&str]) -> Value {
+    json!(packages
+        .iter()
+        .map(|package| json!({"op": "add_entry", "entry": {"package": package, "version": "1.0.0", "host": "qml"}, "slot": "ui.status_item"}))
+        .collect::<Vec<_>>())
+}
+
+/// What the real Shell does after every mount change: tell Core what is
+/// mounted, which `desktop.panels.list` answers from.
+fn report(shell: &TestPeer, state: &Arc<Mutex<ShellState>>) {
+    let mut observed = shell_observation(&state.lock().unwrap());
+    observed.as_object_mut().unwrap().remove("role");
+    shell.result(ditto_protocol::participant::SHELL_REPORT, observed);
+}
+
+fn status_rows(peer: &TestPeer) -> Vec<Value> {
+    peer.result(catalog::PANELS_LIST, json!({}))["panels"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["slot"] == "ui.status_item")
+        .cloned()
+        .collect()
+}
+
+fn mounted_status(state: &Arc<Mutex<ShellState>>) -> Vec<String> {
+    state
+        .lock()
+        .unwrap()
+        .committed
+        .as_ref()
+        .unwrap()
+        .slots
+        .iter()
+        .filter(|binding| binding.slot == "ui.status_item")
+        .map(|binding| binding.package.clone())
+        .collect()
+}
+
+const FIVE_STATUS_ITEMS: [&str; 5] = [
+    "ditto.status.clock",
+    "ditto.status.date",
+    "ditto.status.cpu",
+    "ditto.status.memory",
+    "ditto.status.battery",
+];
+
+#[test]
+fn five_status_items_mount_together_in_entry_order_and_each_is_read_back() {
+    let harness = harness("status-items");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let dock_before = document(&cli)["slots"]["ui.dock"].clone();
+    let response = cli.call(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(&cli), "surface": "plugin_center", "ops": status_ops(&FIVE_STATUS_ITEMS)}),
+    );
+    let change = record(&response["result"]);
+    assert_eq!(change.state, ChangeState::Committed, "{response}");
+    assert_eq!(change.card.kind, "plugin_state");
+    assert!(change
+        .card
+        .items
+        .iter()
+        .all(|item| item.label_key == "diff.area.joined"));
+    // Every readback item names its own entry, not the shared area.
+    let doc = document(&cli);
+    let ids: Vec<String> = FIVE_STATUS_ITEMS
+        .iter()
+        .map(|package| entry_of(&doc, package).unwrap())
+        .collect();
+    for id in &ids {
+        assert!(
+            change.items.iter().any(|item| &item.key == id),
+            "no readback item for {id}: {:?}",
+            change.items
+        );
+    }
+    // Membership is on the entries; the single-provider map is untouched.
+    assert!(doc["slots"].get("ui.status_item").is_none());
+    assert_eq!(doc["slots"]["ui.dock"], dock_before);
+    for id in &ids {
+        let entry = doc["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| &entry["entry_id"] == id)
+            .unwrap();
+        assert_eq!(entry["area"], "ui.status_item");
+    }
+    assert_eq!(mounted_status(&state), FIVE_STATUS_ITEMS);
+    report(&shell, &state);
+    let rows = status_rows(&cli);
+    assert_eq!(rows.len(), 5, "{rows:?}");
+    for (row, id) in rows.iter().zip(&ids) {
+        assert_eq!(&row["bound_entry"], id);
+        assert_eq!(&row["mounted_entry"], id);
+        assert_eq!(row["mounted"], true);
+        assert_eq!(row["visible"], true);
+    }
+    let plugins = cli.result(catalog::PLUGINS_LIST, json!({}));
+    for id in &ids {
+        let entry = plugins["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| &entry["entry_id"] == id)
+            .unwrap();
+        assert_eq!(entry["slot"], "ui.status_item");
+        assert_eq!(entry["state"]["kind"], "active", "{entry}");
+    }
+    // Turning one off leaves the other four mounted, in order.
+    let off = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(&cli), "ops": [{"op": "set_entry_disabled", "entry_id": ids[2], "disabled": true}]}),
+    ));
+    assert_eq!(off.state, ChangeState::Committed);
+    assert_eq!(
+        mounted_status(&state),
+        [
+            "ditto.status.clock",
+            "ditto.status.date",
+            "ditto.status.memory",
+            "ditto.status.battery"
+        ]
+    );
+    report(&shell, &state);
+    assert_eq!(status_rows(&cli).len(), 4);
+    // Undo brings it back where it was.
+    let undo = record(&cli.result(catalog::CHANGES_UNDO, json!({"change_id": off.change_id})));
+    assert_eq!(undo.state, ChangeState::Committed);
+    assert_eq!(mounted_status(&state), FIVE_STATUS_ITEMS);
+    // Removing an entry takes it out of the area.
+    let removed = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(&cli), "ops": [{"op": "remove_entry", "entry_id": ids[0]}]}),
+    ));
+    assert_eq!(removed.state, ChangeState::Committed);
+    assert_eq!(removed.card.items[0].label_key, "diff.area.left");
+    report(&shell, &state);
+    assert_eq!(status_rows(&cli).len(), 4);
+}
+
+#[test]
+fn a_status_item_that_fails_to_load_leaves_the_mounted_ones_alone() {
+    let harness = harness("status-broken");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let first = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(&cli), "ops": status_ops(&FIVE_STATUS_ITEMS[..2])}),
+    ));
+    assert_eq!(first.state, ChangeState::Committed);
+    state.lock().unwrap().broken_package = Some("ditto.status.broken".into());
+    let before = head(&cli);
+    let broken = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": before, "ops": status_ops(&["ditto.status.cpu", "ditto.status.broken"])}),
+    ));
+    assert_eq!(broken.state, ChangeState::Aborted);
+    assert!(broken
+        .items
+        .iter()
+        .any(|item| item.reason.as_deref() == Some("qml_error")));
+    assert_eq!(head(&cli), before);
+    assert_eq!(mounted_status(&state), FIVE_STATUS_ITEMS[..2]);
+    report(&shell, &state);
+    assert_eq!(status_rows(&cli).len(), 2);
+}
+
+#[test]
+fn a_status_item_that_is_not_shown_rolls_the_change_back() {
+    let harness = harness("status-hidden");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let first = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(&cli), "ops": status_ops(&FIVE_STATUS_ITEMS[..1])}),
+    ));
+    assert_eq!(first.state, ChangeState::Committed);
+    let before = head(&cli);
+    state.lock().unwrap().hidden_package = Some("ditto.status.date".into());
+    let change = record(&cli.result(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": before, "ops": status_ops(&["ditto.status.date"])}),
+    ));
+    assert_eq!(change.state, ChangeState::RolledBack, "{change:?}");
+    assert_eq!(
+        change.failure_key.as_deref(),
+        Some("change.readback_mismatch")
+    );
+    assert_eq!(head(&cli), before);
+    assert_eq!(mounted_status(&state), ["ditto.status.clock"]);
+}
+
+#[test]
+fn status_item_preflight_keeps_single_slots_single() {
+    let harness = harness("status-preflight");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let before = head(&cli);
+    let codes = |ops: Value| -> Vec<(String, String)> {
+        let response = cli.call(
+            catalog::CHANGES_PROPOSE,
+            json!({"base_revision": before, "ops": ops}),
+        );
+        let reasons = response["error"]["data"]["reasons"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        reasons
+            .iter()
+            .map(|reason| {
+                (
+                    reason["code"].as_str().unwrap_or_default().to_string(),
+                    reason["detail"]["why"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string(),
+                )
+            })
+            .collect()
+    };
+    // A status item cannot take a single slot.
+    let refused = codes(
+        json!([{"op": "add_entry", "entry": {"package": "ditto.status.clock", "version": "1.0.0", "host": "qml"}, "slot": "ui.dock"}]),
+    );
+    assert!(
+        refused.contains(&(
+            "single_provider_violation".into(),
+            "not_a_provider_for_slot".into()
+        )),
+        "{refused:?}"
+    );
+    // A Dock cannot join the status items.
+    let refused = codes(
+        json!([{"op": "add_entry", "entry": {"package": "ditto.dock.pill", "version": "1.0.0", "host": "qml"}, "slot": "ui.status_item"}]),
+    );
+    assert!(
+        refused.contains(&("schema_invalid".into(), "not_a_provider_for_area".into())),
+        "{refused:?}"
+    );
+    // The area has no single binding to replace.
+    let dock = document(&cli)["slots"]["ui.dock"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let refused = codes(json!([{"op": "bind_slot", "slot": "ui.status_item", "to": dock}]));
+    assert!(
+        refused.contains(&("schema_invalid".into(), "area_is_not_a_slot".into())),
+        "{refused:?}"
+    );
+    assert_eq!(head(&cli), before);
 }
 
 #[test]

@@ -10,7 +10,7 @@ use ditto_protocol::{
     change::{ChangeCard, ChangeOp, ChangeOrigin, HotSwapLevel, PreflightCode, PreflightReason},
     manifest::{Manifest, TrustLevel},
     participant::ParticipantRole,
-    profile::{HostKind, ProfileDocument},
+    profile::{is_area, HostKind, ProfileDocument},
     PROTOCOL_VERSION,
 };
 use serde_json::json;
@@ -139,6 +139,34 @@ fn check_all(
                 PreflightCode::SchemaInvalid,
                 None,
                 json!({"entry_id": entry.entry_id, "why": "duplicate_entry_id"}),
+            ));
+        }
+    }
+    // An area is not a slot: its members are entries that name it, so the
+    // single-provider map may not hold it, and only known areas are named.
+    for slot in target.slots.keys() {
+        if is_area(slot) {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"slot": slot, "why": "area_is_not_a_slot"}),
+            ));
+        }
+    }
+    for entry in &target.entries {
+        let Some(area) = &entry.area else { continue };
+        if !is_area(area) {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"entry_id": entry.entry_id, "area": area, "why": "unknown_area"}),
+            ));
+        }
+        if target.slots.values().any(|bound| bound == &entry.entry_id) {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"entry_id": entry.entry_id, "area": area, "why": "placed_twice"}),
             ));
         }
     }
@@ -370,6 +398,29 @@ fn check_all(
             }
         }
     }
+    // Area members: any number, but each must be able to fill the area and
+    // run in the host it needs. This is not a single-provider rule.
+    for entry in &target.entries {
+        let Some(area) = entry.area.as_deref().filter(|area| is_area(area)) else {
+            continue;
+        };
+        if projection::expected_host(area).is_some_and(|host| host != entry.host) {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"area": area, "package": entry.package, "why": "wrong_host"}),
+            ));
+        }
+        if let Some(manifest) = manifests.get(entry.entry_id.as_str()) {
+            if !manifest.slots.iter().any(|declared| declared == area) {
+                reasons.push(reason(
+                    PreflightCode::SchemaInvalid,
+                    None,
+                    json!({"area": area, "package": entry.package, "why": "not_a_provider_for_area"}),
+                ));
+            }
+        }
+    }
     for (entry_id, slots) in bound_twice {
         if slots.len() > 1 {
             reasons.push(reason(
@@ -389,8 +440,8 @@ fn check_all(
         }
     }
     // 10. shortcuts and commands have one owner after the change (AT-04).
-    // Only slot-bound and service entries own commands: an installed but
-    // unbound provider is not mounted, so it owns nothing.
+    // Only slot-bound, area and service entries own commands: an installed
+    // but unplaced provider is not mounted, so it owns nothing.
     let mut command_owner: HashMap<&str, &str> = HashMap::new();
     let mut chord_owner: HashMap<&str, (&str, &str)> = HashMap::new();
     for shortcut in &target.shortcuts {
@@ -411,6 +462,7 @@ fn check_all(
         .iter()
         .filter(|entry| {
             entry.host == HostKind::Cordis
+                || entry.area.is_some()
                 || target.slots.values().any(|bound| bound == &entry.entry_id)
         })
         .collect();

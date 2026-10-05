@@ -78,6 +78,7 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
             host: *host,
             config: json!({}),
             disabled: false,
+            area: None,
         });
         slots.insert((*slot).to_string(), entry_id);
     }

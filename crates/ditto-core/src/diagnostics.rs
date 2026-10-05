@@ -58,6 +58,9 @@ pub fn plugins(
                 providers.insert(slot.clone(), entry.package.clone());
             }
         }
+        if let Some(area) = &entry.area {
+            providers.insert(area.clone(), entry.package.clone());
+        }
         let report = core.hosts.report(&entry.entry_id);
         let leases = core.hosts.leases_of(&entry.entry_id);
         let last_rollback = audit

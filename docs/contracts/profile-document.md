@@ -9,8 +9,17 @@
 | 欄位 | 語意 |
 | --- | --- |
 | `schema_version` | 文件格式版本；G1 目前為 `1`。匯出封裝另有自己的 `format_version` 與 `protocol_version`。 |
-| `entries` | 插件條目。`entry_id` 由 Core 產生，跨 revision 保持穩定；`package`、`version`、`host`（`qml`、`cordis`、`core_builtin`）、`config`、`disabled` 指明供應者及設定。 |
-| `slots` | slot 名稱到 `entry_id` 的映射。G1 的 slot 均為單一供應者；新增或替換須經 ChangeSet 預檢。slot 清單以 Rust `SLOTS` 常數為準。 |
+| `entries` | 插件條目。`entry_id` 由 Core 產生，跨 revision 保持穩定；`package`、`version`、`host`（`qml`、`cordis`、`core_builtin`）、`config`、`disabled` 指明供應者及設定。選用的 `area` 表示條目屬於哪個多條目區域（見下）；沒有這個欄位就不屬於任何區域，且不寫進文件，所以在區域出現之前寫下的 Profile 雜湊不變。 |
+| `slots` | slot 名稱到 `entry_id` 的映射。這裡的 slot 均為單一供應者；新增或替換須經 ChangeSet 預檢。slot 清單以 Rust `SLOTS` 常數為準。多條目區域不在這張映射裡。 |
+
+### 多條目區域（`ui.status_item`）
+
+區域可以同時有任意多個成員；每個未停用的成員都會掛載，順序就是它們在 `entries` 裡的順序。區域清單以 Rust `AREAS` 常數為準，目前只有 `ui.status_item`（狀態列項目，D-34 的五個 QML 狀態型插件）。
+
+- **加入**：`add_entry` 的 `slot` 寫區域名稱，Core 把條目的 `area` 設為該區域，不動 `slots`。成員資格跟著條目走：`remove_entry` 即離開，`set_entry_disabled` 只是暫停掛載、保留位置。
+- **不可綁定**：`bind_slot` 指向區域、或 `slots` 映射出現區域名稱，預檢以 `schema_invalid`（`area_is_not_a_slot`）拒絕。區域沒有「唯一的那一個」可以替換。
+- **預檢**：成員的套件必須在 manifest 的 `slots` 宣告該區域，且宿主相符（`ui.*` → `qml`），否則 `schema_invalid`（`not_a_provider_for_area`、`wrong_host`）；未知區域為 `unknown_area`；同一條目既綁 slot 又屬區域為 `placed_twice`。真正的單一 slot 仍照舊以 `single_provider_violation` 拒絕非供應者或一條目綁兩個 slot。
+- **差異**：加入或移除成員各是一行 `diff.area.joined`／`diff.area.left`（參數 `slot`、`package`、`version`），取代該條目的 `diff.entry.added`／`removed`。只加入區域或沒有 slot 的條目、或只切換停用狀態的變更，卡片類別為 `plugin_state`。
 | `layout` | `workspace_grid` 與按 `app_id` 比對的工作區規則；布局策略由 `layout.strategy` slot 指定。規則存意圖，不存特定視窗的身分。 |
 | `appearance` | 主題、token、語系、減少動畫、降低透明度及低效能樣式。 |
 | `shortcuts` | 快捷鍵 chord 與命令的宣告；正式註冊須經交易，不能因候選裝載而先占用快捷鍵。 |

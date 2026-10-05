@@ -1,6 +1,7 @@
 import QtQuick
 
-/// One slot of the ProviderHost: the two loaders of plan/03/04 §2.2.
+/// One slot of the ProviderHost, or one member of a multi-entry area: the two
+/// loaders of plan/03/04 §2.2.
 ///
 /// `active` is the mounted provider, `candidate` the one a prepare loads. The
 /// loaders are component incubators rather than `Loader` items, because a
@@ -20,6 +21,13 @@ QtObject {
     required property string name
     /// The ProviderHost: client, tokens, screen, url resolution.
     required property var host
+    /// The slot reported in mounts: the slot itself, or the area a member
+    /// belongs to.
+    property string reportedSlot: name
+    /// The key of this unit's prepare/commit/rollback items: the slot, or the
+    /// member's entry id.
+    property string itemKey: name
+    readonly property bool inArea: reportedSlot !== name
 
     /// { object, binding } — binding is the ShellSlotBinding it was built from.
     property var active: null
@@ -103,7 +111,7 @@ QtObject {
         pendingIncubator = null;
         if (done) {
             done({
-                key: name,
+                key: itemKey,
                 status: status,
                 reason: status === "failed" ? (reason || "candidate not ready") : undefined
             });
@@ -134,7 +142,7 @@ QtObject {
             tokens: host.tokens,
             config: binding.config || {},
             screen: host.screen,
-            slotName: name,
+            slotName: reportedSlot,
             entryId: binding.entry_id,
             shown: false
         };
@@ -209,7 +217,7 @@ QtObject {
             return null;
         }
         if (candidate.status !== "ready") {
-            const failed = { key: name, status: "failed", reason: candidate.reason || "candidate not ready" };
+            const failed = { key: itemKey, status: "failed", reason: candidate.reason || "candidate not ready" };
             abort(changeId);
             return failed;
         }
@@ -225,17 +233,17 @@ QtObject {
         active = candidate.binding ? { object: candidate.object, binding: candidate.binding } : null;
         candidate = null;
         retireTimer.restart();
-        return { key: name, status: "applied" };
+        return { key: itemKey, status: "applied" };
     }
 
     /// The reverse of commit: release the new provider, show the retired one.
     function rollback(changeId) {
         if (candidate && candidate.changeId === changeId) {
             abort(changeId);
-            return { key: name, status: "restored" };
+            return { key: itemKey, status: "restored" };
         }
         if (!retired || retired.changeId !== changeId) {
-            return { key: name, status: "not_restored", reason: "the previous provider is no longer kept" };
+            return { key: itemKey, status: "not_restored", reason: "the previous provider is no longer kept" };
         }
         const current = active;
         if (current) {
@@ -249,7 +257,7 @@ QtObject {
             back.object.shown = true;
         }
         active = back.binding ? { object: back.object, binding: back.binding } : null;
-        return { key: name, status: "restored" };
+        return { key: itemKey, status: "restored" };
     }
 
     /// Drop the candidate of `changeId` (or any candidate when null); returns
@@ -274,7 +282,7 @@ QtObject {
         }
         destroyObject(dropped.object);
         if (done) {
-            done({ key: name, status: "failed", reason: "aborted" });
+            done({ key: itemKey, status: "failed", reason: "aborted" });
         }
     }
 
@@ -284,10 +292,12 @@ QtObject {
         }
         const object = active.object;
         return {
-            slot: name,
+            slot: reportedSlot,
             entry_id: active.binding.entry_id,
             mounted: !!object,
-            visible: !!object && object.shown === true
+            // An area member is visible once it is placed where the area is
+            // on screen, not merely shown.
+            visible: !!object && object.shown === true && (!inArea || host.isPlaced(object))
         };
     }
 

@@ -322,6 +322,10 @@ QtObject {
         if ((item.label_key === "diff.entry.added" || item.label_key === "diff.entry.removed") && typeof value === "string") {
             return packageName(value);
         }
+        if ((item.label_key === "diff.area.joined" || item.label_key === "diff.area.left") && typeof value === "string") {
+            // The area an item is shown in, by its product name.
+            return client && client.tr ? client.tr.slotName(value) : value;
+        }
         if (item.label_key === "diff.avatar.output") {
             // No output named: the character follows the primary screen.
             return value === undefined || value === null ? t(qsTr("主螢幕")) : String(value);

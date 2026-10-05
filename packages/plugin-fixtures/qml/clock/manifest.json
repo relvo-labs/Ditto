@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.fixture.status_clock",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": {
     "zh-TW": "時鐘",
     "en": "Clock"

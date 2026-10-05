@@ -854,6 +854,14 @@
         <translation>外觀：{token}</translation>
     </message>
     <message>
+        <source>diff.area.joined</source>
+        <translation>{slot}：顯示「{package}」</translation>
+    </message>
+    <message>
+        <source>diff.area.left</source>
+        <translation>{slot}：不再顯示「{package}」</translation>
+    </message>
+    <message>
         <source>diff.avatar.animations</source>
         <translation>角色動畫</translation>
     </message>
@@ -1258,6 +1266,10 @@
         <translation>頂部面板</translation>
     </message>
     <message>
+        <source>slot.ui.status_item</source>
+        <translation>狀態列項目</translation>
+    </message>
+    <message>
         <source>slot.ui.tasks_panel</source>
         <translation>待辦面板</translation>
     </message>
@@ -1497,6 +1509,10 @@
     <message>
         <source>沒有作用中的視窗</source>
         <translation>沒有作用中的視窗</translation>
+    </message>
+    <message>
+        <source>狀態列項目</source>
+        <translation>狀態列項目</translation>
     </message>
     <message>
         <source>登出</source>
@@ -1849,6 +1865,10 @@
         <translation>在桌面介面程序內執行（同宿主、無隔離），無法單獨計量</translation>
     </message>
     <message>
+        <source>在狀態列顯示「%1」</source>
+        <translation>在狀態列顯示「%1」</translation>
+    </message>
+    <message>
         <source>執行中</source>
         <translation>執行中</translation>
     </message>
@@ -2061,6 +2081,10 @@
         <translation>重新啟用</translation>
     </message>
     <message>
+        <source>顯示在狀態列</source>
+        <translation>顯示在狀態列</translation>
+    </message>
+    <message>
         <source>（已撤銷）</source>
         <translation>（已撤銷）</translation>
     </message>
@@ -2094,6 +2118,13 @@
     <message>
         <source>要保留這項變更嗎？</source>
         <translation>要保留這項變更嗎？</translation>
+    </message>
+</context>
+<context>
+    <name>StatusArea</name>
+    <message>
+        <source>狀態列項目</source>
+        <translation>狀態列項目</translation>
     </message>
 </context>
 <context>

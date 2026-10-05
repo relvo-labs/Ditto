@@ -854,6 +854,14 @@
         <translation>Appearance: {token}</translation>
     </message>
     <message>
+        <source>diff.area.joined</source>
+        <translation>{slot}: show “{package}”</translation>
+    </message>
+    <message>
+        <source>diff.area.left</source>
+        <translation>{slot}: stop showing “{package}”</translation>
+    </message>
+    <message>
         <source>diff.avatar.animations</source>
         <translation>Character animation</translation>
     </message>
@@ -1258,6 +1266,10 @@
         <translation>Top panel</translation>
     </message>
     <message>
+        <source>slot.ui.status_item</source>
+        <translation>Status bar items</translation>
+    </message>
+    <message>
         <source>slot.ui.tasks_panel</source>
         <translation>Tasks panel</translation>
     </message>
@@ -1497,6 +1509,10 @@
     <message>
         <source>沒有作用中的視窗</source>
         <translation>No focused window</translation>
+    </message>
+    <message>
+        <source>狀態列項目</source>
+        <translation>Status bar items</translation>
     </message>
     <message>
         <source>登出</source>
@@ -1849,6 +1865,10 @@
         <translation>Runs in the desktop-interface process (same host, no isolation); cannot be measured on its own</translation>
     </message>
     <message>
+        <source>在狀態列顯示「%1」</source>
+        <translation>Show “%1” in the status bar</translation>
+    </message>
+    <message>
         <source>執行中</source>
         <translation>Running</translation>
     </message>
@@ -2061,6 +2081,10 @@
         <translation>Enable again</translation>
     </message>
     <message>
+        <source>顯示在狀態列</source>
+        <translation>Show in the status bar</translation>
+    </message>
+    <message>
         <source>（已撤銷）</source>
         <translation> (revoked)</translation>
     </message>
@@ -2094,6 +2118,13 @@
     <message>
         <source>要保留這項變更嗎？</source>
         <translation>Keep this change?</translation>
+    </message>
+</context>
+<context>
+    <name>StatusArea</name>
+    <message>
+        <source>狀態列項目</source>
+        <translation>Status bar items</translation>
     </message>
 </context>
 <context>
