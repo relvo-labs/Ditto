@@ -1,0 +1,79 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.dock.pill",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "膠囊式 Dock",
+    "en": "Pill dock"
+  },
+  "author": "Ditto",
+  "license": "UNLICENSED",
+  "source": "builtin",
+  "description": {
+    "zh-TW": "停靠在左側或底部的膠囊，顯示釘選的應用與執行中指示。",
+    "en": "A pill on the left or bottom edge with pinned applications and running indicators."
+  },
+  "plugin_kind": "qml_provider",
+  "host_kind": "qml",
+  "trust_level": "trusted",
+  "runtime": {
+    "qt": ">=6.10"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [
+    "ui.dock"
+  ],
+  "provides": [],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "qml_entry": "qml/DockPill.qml",
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "position": {
+        "type": "string",
+        "enum": [
+          "bottom",
+          "left"
+        ],
+        "default": "bottom"
+      },
+      "pinned": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": [
+          "firefox",
+          "org.codeberg.dnkl.foot",
+          "org.kde.kate"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "migrations": [],
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8
+  },
+  "rescue": {
+    "disable_safe": true
+  }
+}

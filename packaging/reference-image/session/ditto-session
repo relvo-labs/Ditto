@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# Display-manager entry point for the G1 Ditto session (successor of G0's
+# ditto-g0-session; see packaging/reference-image/README.md for what moved).
+#
+# Wayfire and Fcitx live exactly as long as the login, so this script starts
+# them, each in a user scope of its own (ditto-wayfire.scope, ditto-fcitx.scope)
+# for per-layer cgroup accounting. Everything that must survive a crash is a
+# supervised user unit: this script starts ditto-session.target, which pulls in
+# ditto-core.service and ditto-supervisor.service (packaging/systemd/user/).
+# Core then launches the Shell, hostd and the lock client through its
+# controlled launcher. Restarting the compositor is a session restart.
+#
+# Wayfire takes the seat from this session: libseat finds it through
+# XDG_SESSION_ID. If the scoped compositor cannot start, it is started here
+# directly so the login still works, and the sampler then reports the
+# compositor unit missing instead of measuring the wrong thing. Scopes and
+# units do not end with the login session, so this script stops them when it
+# exits and clears any that a previous login left behind before it starts.
+set -euo pipefail
+
+workspace="${DITTO_WORKSPACE:-@DITTO_WORKSPACE@}"
+qt_prefix="${DITTO_QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
+wayfire_prefix="${DITTO_WAYFIRE_PREFIX:-$HOME/wayfire}"
+core="$workspace/target/release/ditto-core"
+supervisor="$workspace/target/release/ditto-supervisor"
+wayfire_pid=""
+fcitx_config_home="$XDG_RUNTIME_DIR/ditto-fcitx-config"
+session_env="$XDG_RUNTIME_DIR/ditto/session.env"
+# Units first, so Core stops before the scopes it launched and the compositor
+# it drives. `ditto-*.scope` covers every client Core launched (Shell, hostd,
+# lock) and never matches applications, which are `app-ditto-*.scope`.
+units=(ditto-session.target ditto-rescue.service ditto-supervisor.service ditto-core.service)
+scopes=('ditto-*.scope')
+
+stop_units() {
+  systemctl --user stop "${units[@]}" >/dev/null 2>&1 || true
+  systemctl --user stop "${scopes[@]}" >/dev/null 2>&1 || true
+  # A restart storm leaves ditto-core.service failed; a new login starts clean.
+  systemctl --user reset-failed ditto-core.service ditto-rescue.service >/dev/null 2>&1 || true
+}
+
+cleanup() {
+  trap - EXIT INT TERM HUP
+  stop_units
+  systemctl --user stop graphical-session.target >/dev/null 2>&1 || true
+  [[ -n "$wayfire_pid" ]] && kill "$wayfire_pid" 2>/dev/null || true
+  rm -f -- "$session_env"
+  wait 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM HUP
+
+[[ -x "$core" ]] || { echo "missing $core; run packaging/reference-image/install-session.sh" >&2; exit 1; }
+[[ -x "$supervisor" ]] || { echo "missing $supervisor; run packaging/reference-image/install-session.sh" >&2; exit 1; }
+[[ -x "$wayfire_prefix/bin/wayfire" ]] || { echo "missing frozen Wayfire" >&2; exit 1; }
+[[ -x "$qt_prefix/bin/quickshell" ]] || { echo "missing frozen Quickshell" >&2; exit 1; }
+
+export PATH="$wayfire_prefix/bin:$qt_prefix/bin:$HOME/.cargo/bin:$PATH"
+export LD_LIBRARY_PATH="$wayfire_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export XDG_CURRENT_DESKTOP=Wayfire
+export XDG_SESSION_DESKTOP=ditto
+export QT_QPA_PLATFORM=wayland
+export QT_IM_MODULES=wayland
+export QT_IM_MODULE=wayland
+export XMODIFIERS=@im=fcitx
+export _WAYFIRE_SOCKET="$XDG_RUNTIME_DIR/ditto-wayfire-ipc.sock"
+export WAYFIRE_SOCKET="$_WAYFIRE_SOCKET"
+unset DISPLAY SWAYSOCK
+# A previous login can leave the fixed IPC pathname behind after an abort.
+# Wayfire must create a fresh socket before Core starts probing it.
+rm -f -- "$WAYFIRE_SOCKET"
+# A login that ended without running cleanup (a display-manager restart, a
+# SIGKILL) leaves its Core holding the socket, and the next Core would refuse
+# to start. Nothing of an earlier Ditto session is still usable at this point.
+stop_units
+systemctl --user stop ditto-wayfire.scope ditto-fcitx.scope >/dev/null 2>&1 || true
+
+start_wayfire() {
+  local marker
+  marker="$(mktemp "$XDG_RUNTIME_DIR/ditto-start.XXXXXX")"
+  "$@" "$wayfire_prefix/bin/wayfire" --config "$workspace/packaging/reference-image/session/wayfire.ini" &
+  wayfire_pid=$!
+  socket=""
+  for _ in $(seq 1 200); do
+    socket="$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -newer "$marker" -type s -name 'wayland-*' -print -quit)"
+    [[ -n "$socket" && -S "$WAYFIRE_SOCKET" ]] && break
+    socket=""
+    kill -0 "$wayfire_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  rm -f -- "$marker"
+  [[ -n "$socket" ]]
+}
+if ! start_wayfire systemd-run --user --scope --quiet --collect --unit=ditto-wayfire --; then
+  echo 'Wayfire did not start in its own scope; starting it in the login session instead' >&2
+  kill "$wayfire_pid" 2>/dev/null || true
+  systemctl --user stop ditto-wayfire.scope >/dev/null 2>&1 || true
+  rm -f -- "$WAYFIRE_SOCKET"
+  start_wayfire || { echo 'Wayfire stopped during login' >&2; exit 1; }
+fi
+export WAYLAND_DISPLAY="${socket##*/}"
+
+# Measurement variant (EX-05 states, G1 EX1-10). G0 read
+# ~/.config/ditto-g0/measure-variant; G1 does not read XDG_CONFIG_HOME at all
+# (plan/03/02 §3.1) and takes the variant from the measurement conditions
+# document the runner leaves for the next login instead.
+conditions="${DITTO_MEASURE_CONDITIONS:-${XDG_STATE_HOME:-$HOME/.local/state}/ditto/measure-conditions.json}"
+variant="$(python3 - "$conditions" <<'PYEOF' 2>/dev/null || true
+import json, sys
+try:
+    document = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    sys.exit(0)
+variant = document.get("desktop_variant", "standard")
+print(variant if variant in ("standard", "avatar-off", "reduced-motion", "rescue-no-node") else "invalid")
+PYEOF
+)"
+install -d -m 0700 "$XDG_RUNTIME_DIR/ditto"
+{
+  echo "WAYFIRE_SOCKET=$WAYFIRE_SOCKET"
+  echo "_WAYFIRE_SOCKET=$WAYFIRE_SOCKET"
+  case "$variant" in
+    avatar-off) echo 'DITTO_AVATAR=off' ;;
+    reduced-motion) echo 'DITTO_REDUCED_MOTION=1' ;;
+    # EX1-10 rescue_no_node (tests/g1/measure/cold-login.sh): Core starts in
+    # `--mode rescue` and nothing of this login runs Node. ditto-core.service
+    # appends $DITTO_CORE_MODE_ARGS to its command line; a normal login never
+    # sets it, so its command line is unchanged. The verification relay is a
+    # Node program too: its drop-in reads its two words from the variables
+    # below, which here become a second `--mode rescue` instead of the relay.
+    rescue-no-node)
+      echo 'DITTO_CORE_MODE_ARGS=--mode rescue'
+      echo 'DITTO_VERIFY_RELAY_OPTION=--mode'
+      echo 'DITTO_VERIFY_RELAY_SPEC=rescue'
+      ;;
+    invalid) echo "unknown desktop_variant in $conditions; starting the standard desktop" >&2 ;;
+  esac
+  if [[ -n "$variant" ]]; then echo "DITTO_MEASURE_CONDITIONS=$conditions"; fi
+} >"$session_env"
+chmod 0600 "$session_env"
+
+# D-Bus-activated services (xdg-desktop-portal and its backends) and the Ditto
+# units start from the user manager, not from this script. Without the display
+# they fail, and every portal client — the Firefox snap forces GTK_USE_PORTAL=1
+# — stalls on timeouts. XDG_SESSION_ID lets Core find this logind session.
+dbus-update-activation-environment --systemd \
+  WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_ID \
+  QT_QPA_PLATFORM QT_IM_MODULE QT_IM_MODULES XMODIFIERS
+
+install -d -m 0700 "$fcitx_config_home/fcitx5"
+install -m 0600 "$workspace/tests/g0/input-method/fcitx5-profile" \
+  "$fcitx_config_home/fcitx5/profile"
+systemd-run --user --scope --quiet --collect --unit=ditto-fcitx -- \
+  env XDG_CONFIG_HOME="$fcitx_config_home" fcitx5 -d --replace
+
+if ! systemctl --user start ditto-session.target; then
+  # Core failing to start is what OnFailure= and the rescue UI are for; the
+  # session stays up so there is something to rescue into.
+  echo 'ditto-session.target did not start cleanly; see journalctl --user -u ditto-core' >&2
+fi
+# Only the compositor ends the session. Core restarts, restart storms and the
+# rescue UI all happen inside it. Waiting in the background lets a logout
+# signal reach the trap at once.
+wait "$wayfire_pid" || true

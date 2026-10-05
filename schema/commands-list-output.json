@@ -1,0 +1,40 @@
+{
+  "$defs": {
+    "CommandInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "type": "string"
+        },
+        "owner": {
+          "description": "`core`, `shell`, or an entry id.",
+          "type": "string"
+        },
+        "title_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "owner",
+        "title_key"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "commands": {
+      "items": {
+        "$ref": "#/$defs/CommandInfo"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "commands"
+  ],
+  "title": "CommandsListOutput",
+  "type": "object"
+}

@@ -1,0 +1,2 @@
+{"kind": "shape", "description": "shell.report 的觀測形狀", "type": "shell-report-input", "valid": true,
+ "value": {"mounts": [{"slot": "ui.dock", "entry_id": "ent-01M3H4J7EEWXXD01TR98PCQE7A", "mounted": true, "visible": true}], "appearance": null, "avatar": null}}

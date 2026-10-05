@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "PolicyCounters": {
+      "additionalProperties": false,
+      "properties": {
+        "merge": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "show": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "silence": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "show",
+        "merge",
+        "silence"
+      ],
+      "type": "object"
+    },
+    "PolicyDecision": {
+      "enum": [
+        "show",
+        "merge",
+        "silence"
+      ],
+      "type": "string"
+    },
+    "PolicyRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "app_name": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/PolicyDecision"
+        },
+        "rule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "app_name",
+        "decision",
+        "at"
+      ],
+      "type": "object"
+    },
+    "UnavailableReason": {
+      "description": "Why a capability or a call is unavailable. Closed: a consumer can show a\nspecific product sentence for every value.",
+      "oneOf": [
+        {
+          "enum": [
+            "compositor_offline",
+            "host_unavailable",
+            "host_crash_loop",
+            "lease_expired",
+            "not_bound",
+            "rescue_mode",
+            "recovering",
+            "system_unavailable",
+            "participant_unavailable",
+            "session_locked"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "storage_full",
+          "description": "The store refused the write for lack of space; nothing changed.",
+          "type": "string"
+        },
+        {
+          "const": "storage_error",
+          "description": "The store reported an I/O error; nothing changed.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "available": {
+      "type": "boolean"
+    },
+    "counters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PolicyCounters"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "fallback_shown": {
+      "description": "Decisions Core made itself (shown) because the policy was unreachable.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "provider_entry": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UnavailableReason"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recent": {
+      "items": {
+        "$ref": "#/$defs/PolicyRecord"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "available",
+    "recent",
+    "fallback_shown"
+  ],
+  "title": "PolicyStatusOutput",
+  "type": "object"
+}

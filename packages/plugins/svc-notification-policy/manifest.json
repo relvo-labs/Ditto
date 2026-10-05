@@ -1,0 +1,75 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.svc.notification-policy",
+  "version": "1.0.0",
+  "name": { "zh-TW": "通知規則", "en": "Notification rules" },
+  "author": "Ditto",
+  "license": "MIT",
+  "source": "builtin",
+  "description": "依專注模式、安靜時段與同一應用的連發數量，決定通知要顯示、合併或靜默；緊急通知一律顯示",
+  "plugin_kind": "service",
+  "host_kind": "cordis",
+  "trust_level": "trusted",
+  "runtime": { "node": "^22.19.0" },
+  "platform": ["linux-x86_64"],
+  "required_protocol_version": "^0.2",
+  "slots": ["svc.notification_policy"],
+  "provides": [
+    { "capability": "desktop.notifications.policy.decide" },
+    { "capability": "desktop.notifications.policy.get" }
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "entry": "dist/index.mjs",
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "rules": {
+        "type": "object",
+        "properties": {
+          "focus": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean", "default": false },
+              "allow": { "type": "array", "items": { "type": "string" }, "default": [] }
+            },
+            "additionalProperties": false
+          },
+          "merge": {
+            "type": "object",
+            "properties": {
+              "window_s": { "type": "integer", "minimum": 1, "maximum": 3600, "default": 60 },
+              "threshold": { "type": "integer", "minimum": 1, "maximum": 100, "default": 3 }
+            },
+            "additionalProperties": false
+          },
+          "quiet_hours": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean", "default": false },
+              "start": { "type": "string", "default": "22:00" },
+              "end": { "type": "string", "default": "07:00" },
+              "timezone": { "type": "string", "default": "Asia/Taipei" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": ["notifications.read"],
+  "hot_swap": "controlled_handoff",
+  "health": { "timeout_ms": 2000 },
+  "cleanup": { "timeout_ms": 5000 },
+  "migrations": [],
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": { "memory_mib": 16, "cpu_percent": 2 },
+  "rescue": { "disable_safe": true }
+}

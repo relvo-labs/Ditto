@@ -1,0 +1,91 @@
+name: lifecycle
+# EX1-08: lifecycle contract tests L-01…L-10 (plan/03/06 §3), PR quick check.
+# One runner covers both halves: Vitest (L-01…L-04, L-08) and the Rust
+# integration tests against the real Core and the real hostd (L-05…L-07,
+# L-09, L-10). It triggers on either side, so a Core change and a hostd
+# change are both held to the same table. The nightly run is the G1 job of
+# nightly-refmachine.yml.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'crates/ditto-core/**'
+      - 'crates/ditto-protocol/**'
+      - 'crates/ditto-store/**'
+      - 'crates/ditto-compositor/**'
+      - 'crates/ditto-system/**'
+      - 'packages/host-runtime/**'
+      - 'packages/host-sdk/**'
+      - 'packages/plugins/**'
+      - 'packages/plugin-fixtures/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - 'scripts/build-builtin-packages.sh'
+      - 'tests/g1/lifecycle/**'
+      - 'tests/g1/lib/**'
+      - 'tests/g1/fixtures/agent-standin/**'
+      - '.github/workflows/lifecycle.yml'
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'crates/ditto-core/**'
+      - 'crates/ditto-protocol/**'
+      - 'crates/ditto-store/**'
+      - 'crates/ditto-compositor/**'
+      - 'crates/ditto-system/**'
+      - 'packages/host-runtime/**'
+      - 'packages/host-sdk/**'
+      - 'packages/plugins/**'
+      - 'packages/plugin-fixtures/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - 'scripts/build-builtin-packages.sh'
+      - 'tests/g1/lifecycle/**'
+      - 'tests/g1/lib/**'
+      - 'tests/g1/fixtures/agent-standin/**'
+      - '.github/workflows/lifecycle.yml'
+jobs:
+  lifecycle:
+    runs-on: [self-hosted, ditto-ci]
+    timeout-minutes: 30
+    env:
+      DITTO_ARTIFACTS: ${{ github.workspace }}/artifacts/g1
+      DITTO_ENVIRONMENT_LABEL: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - run: pnpm install --frozen-lockfile
+      - name: Build Core, hostd and the built-in packages
+        run: |
+          cargo build --locked --workspace --bins
+          pnpm --filter @ditto/host-runtime build
+          bash scripts/build-builtin-packages.sh
+      # Exits 0 only when every L item passed both its positive and its
+      # negative case; the run document is kept either way.
+      - name: L-01…L-10
+        run: bash tests/g1/lifecycle/run.sh
+      - name: Pack artifacts
+        if: always()
+        run: tar -czf lifecycle-artifacts.tar.gz --ignore-failed-read artifacts/g1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lifecycle-${{ github.run_id }}
+          path: lifecycle-artifacts.tar.gz
+          retention-days: 30

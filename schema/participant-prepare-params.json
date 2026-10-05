@@ -1,0 +1,381 @@
+{
+  "$defs": {
+    "Appearance": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "type": "string"
+        },
+        "low_power_style": {
+          "default": false,
+          "description": "No blur and no shadow; NFR-05 measures it as its own style.",
+          "type": "boolean"
+        },
+        "reduced_motion": {
+          "default": false,
+          "type": "boolean"
+        },
+        "reduced_transparency": {
+          "default": false,
+          "type": "boolean"
+        },
+        "theme": {
+          "type": "string"
+        },
+        "tokens": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "theme",
+        "locale"
+      ],
+      "type": "object"
+    },
+    "AvatarCorner": {
+      "description": "Where on its output the character sits.",
+      "enum": [
+        "bottom_right",
+        "bottom_left",
+        "top_right",
+        "top_left"
+      ],
+      "type": "string"
+    },
+    "AvatarSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "animations": {
+          "default": true,
+          "type": "boolean"
+        },
+        "corner": {
+          "$ref": "#/$defs/AvatarCorner",
+          "description": "Which corner of that output the character sits in. A corner is always\ninside the visible area, whatever size the output has."
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "default": false,
+          "type": "boolean"
+        },
+        "output": {
+          "description": "The output the character stays on, by connector name. Absent means\nit follows the primary output; so does a named output that is not\nconnected (unplugged), until it comes back. Absent fields are left out\nof the document, so a Profile written before they existed keeps its\ndigest.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scale": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "enabled",
+        "scale"
+      ],
+      "type": "object"
+    },
+    "HostEntryProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "cleanup_timeout_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "config": true,
+        "data_dir": {
+          "type": "string"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "entry_id": {
+          "type": "string"
+        },
+        "file_grants": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "File grants this entry holds, id → absolute path. The path is only\never sent to the process that holds the grant, never exported.",
+          "type": "object"
+        },
+        "health_timeout_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hot_swap": {
+          "$ref": "#/$defs/HotSwapLevel"
+        },
+        "module_path": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "provides": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entry_id",
+        "package",
+        "version",
+        "module_path",
+        "data_dir",
+        "config",
+        "disabled",
+        "provides",
+        "hot_swap",
+        "health_timeout_ms",
+        "cleanup_timeout_ms"
+      ],
+      "type": "object"
+    },
+    "HotSwapLevel": {
+      "enum": [
+        "instant",
+        "controlled_handoff",
+        "host_restart",
+        "session_restart"
+      ],
+      "type": "string"
+    },
+    "LayoutIntent": {
+      "additionalProperties": false,
+      "description": "Layout intent. Which strategy applies is the `layout.strategy` slot.",
+      "properties": {
+        "rules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LayoutRule"
+          },
+          "type": "array"
+        },
+        "workspace_grid": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "workspace_grid"
+      ],
+      "type": "object"
+    },
+    "LayoutMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id"
+      ],
+      "type": "object"
+    },
+    "LayoutRule": {
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/LayoutMatch"
+        },
+        "workspace": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "match",
+        "workspace"
+      ],
+      "type": "object"
+    },
+    "Projection": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "appearance": {
+              "$ref": "#/$defs/Appearance"
+            },
+            "avatar": {
+              "$ref": "#/$defs/AvatarSettings"
+            },
+            "role": {
+              "const": "shell",
+              "type": "string"
+            },
+            "shortcuts": {
+              "items": {
+                "$ref": "#/$defs/ShortcutBinding"
+              },
+              "type": "array"
+            },
+            "slots": {
+              "items": {
+                "$ref": "#/$defs/ShellSlotBinding"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "role",
+            "appearance",
+            "avatar",
+            "slots",
+            "shortcuts"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entries": {
+              "items": {
+                "$ref": "#/$defs/HostEntryProjection"
+              },
+              "type": "array"
+            },
+            "role": {
+              "const": "hostd",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "entries"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "$ref": "#/$defs/LayoutIntent"
+            },
+            "role": {
+              "const": "compositor",
+              "type": "string"
+            },
+            "shortcuts": {
+              "items": {
+                "$ref": "#/$defs/ShortcutBinding"
+              },
+              "type": "array"
+            },
+            "strategy": {
+              "description": "Package of the `layout.strategy` provider.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "role",
+            "layout",
+            "shortcuts"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ShellSlotBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "config": true,
+        "entry_id": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "qml_url": {
+          "description": "`file://` URL of the provider's `qml_entry` inside the package store.",
+          "type": "string"
+        },
+        "slot": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "entry_id",
+        "package",
+        "version",
+        "qml_url",
+        "config"
+      ],
+      "type": "object"
+    },
+    "ShortcutBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "chord": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "chord",
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "change_id": {
+      "type": "string"
+    },
+    "origin": {
+      "type": "string"
+    },
+    "target": {
+      "$ref": "#/$defs/Projection"
+    },
+    "undoes": {
+      "description": "Set when this change undoes an earlier one: a participant that kept\nstate outside the profile for that change (window placement before a\nlayout strategy switch) restores it and reports what it could not.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "change_id",
+    "origin",
+    "target"
+  ],
+  "title": "PrepareParams",
+  "type": "object"
+}

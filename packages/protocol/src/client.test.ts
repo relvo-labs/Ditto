@@ -19,7 +19,8 @@ beforeAll(async () => {
   token = randomBytes(24).toString('hex');
   socketPath = join(runtime, 'ditto/core.sock');
   child = spawn(join(root, 'target/debug/ditto-core'), ['serve', '--development', '--compositor', 'fixture'], {
-    env: { ...process.env, XDG_RUNTIME_DIR: runtime, DITTO_DEV_TOKEN: token, SWAYSOCK: '' },
+    // G1 Core keeps an authoritative store; the test's goes in its own directory.
+    env: { ...process.env, XDG_RUNTIME_DIR: runtime, DITTO_DATA_DIR: join(runtime, 'store'), DITTO_DEV_TOKEN: token, SWAYSOCK: '' },
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -43,7 +44,9 @@ test('the TS client reads the Rust catalog with availability resolved', async ()
   const client = await connect();
   try {
     const catalog = await client.capabilities();
-    expect(catalog.capabilities).toHaveLength(13);
+    expect(catalog.capabilities.length).toBeGreaterThan(13);
+    // 0.2: no capability without a reviewed resource scope.
+    expect(catalog.capabilities.every(item => item.resource_scope.length > 0)).toBe(true);
     const list = catalog.capabilities.find(item => item.capability_id === 'desktop.capabilities.list');
     expect(list?.claimable).toBe(false);
     expect(list?.availability.kind).toBe('always');

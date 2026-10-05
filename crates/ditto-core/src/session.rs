@@ -4,7 +4,7 @@
 //! after every change and after every reconnect, never a persistent cache.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::Sender,
@@ -14,8 +14,9 @@ use std::{
 
 use ditto_compositor::{AdapterError, AdapterResult, CompositorAdapter, EventSource};
 use ditto_protocol::{
-    catalog::Availability, rpc::RpcResponse, DesktopEventNotification, DesktopEventPayload,
-    DesktopSnapshot,
+    catalog::Availability,
+    rpc::{RpcRequest, RpcResponse},
+    DesktopEventNotification, DesktopEventPayload, DesktopSnapshot, EventTopic, Window,
 };
 
 use crate::events::{Delivery, EventBroker, Registration};
@@ -26,6 +27,9 @@ pub const EVENT_QUEUE_CAPACITY: usize = 1024;
 pub enum Outgoing {
     Response(Box<RpcResponse>),
     Event(Box<DesktopEventNotification>),
+    /// A request or notification Core itself sends to the client
+    /// (`participant.*`, `host.invoke`, `shell.command`).
+    Request(Box<RpcRequest>),
 }
 
 pub struct Session {
@@ -34,7 +38,13 @@ pub struct Session {
     sinks: Mutex<HashMap<String, Sender<Outgoing>>>,
     online: AtomicBool,
     offline_reason: Mutex<Option<String>>,
+    shortcut_handler: Mutex<Option<ditto_compositor::ShortcutHandler>>,
+    outputs_removed: Mutex<Option<OutputsRemoved>>,
 }
+
+/// Called after outputs disappeared, with their names and the windows as
+/// they were before (Core's window rescue, plan/03/05 §7).
+pub type OutputsRemoved = std::sync::Arc<dyn Fn(Vec<String>, Vec<Window>) + Send + Sync>;
 
 impl Session {
     pub fn new(mut adapter: Box<dyn CompositorAdapter>) -> Self {
@@ -48,17 +58,67 @@ impl Session {
             sinks: Mutex::new(HashMap::new()),
             online: AtomicBool::new(online),
             offline_reason: Mutex::new(reason),
+            shortcut_handler: Mutex::new(None),
+            outputs_removed: Mutex::new(None),
         }
+    }
+
+    /// Who is told when an output goes away; Core sets it once at start.
+    pub fn set_outputs_removed(&self, hook: OutputsRemoved) {
+        *self.outputs_removed.lock().expect("outputs hook") = Some(hook);
+    }
+
+    /// Where pressed global shortcuts go; kept across compositor reconnects.
+    pub fn set_shortcut_handler(&self, handler: ditto_compositor::ShortcutHandler) {
+        *self.shortcut_handler.lock().expect("shortcut handler") = Some(handler.clone());
+        self.adapter
+            .lock()
+            .expect("adapter lock")
+            .set_shortcut_handler(handler);
     }
 
     pub fn compositor_label(&self) -> String {
         self.adapter.lock().expect("adapter lock").label()
     }
 
-    /// Observation sequence reported to callers. G0 has no persistent Profile,
-    /// so this is not a configuration revision.
-    pub fn observation_revision(&self) -> u64 {
-        self.broker.lock().expect("broker lock").revision()
+    /// Observation sequence reported to callers as `observed_seq`.
+    pub fn observed_seq(&self) -> u64 {
+        self.broker.lock().expect("broker lock").seq()
+    }
+
+    pub fn profile_revision(&self) -> Option<String> {
+        self.broker.lock().expect("broker lock").profile_revision()
+    }
+
+    pub fn set_profile_revision(&self, revision: Option<String>) {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .set_profile_revision(revision);
+    }
+
+    /// Publish a non-desktop event (changes, plugins, notifications, tasks).
+    pub fn publish_event(&self, payload: DesktopEventPayload) {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .publish_event(payload);
+        self.flush();
+    }
+
+    pub fn require_resync(&self, subscription_id: &str, reason: &str) {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .require_resync(subscription_id, reason);
+        self.flush();
+    }
+
+    pub fn subscription_count(&self) -> usize {
+        self.broker
+            .lock()
+            .expect("broker lock")
+            .subscription_count()
     }
 
     pub fn is_online(&self) -> bool {
@@ -113,7 +173,20 @@ impl Session {
     }
 
     pub fn subscribe(&self, after_seq: Option<u64>, sink: Sender<Outgoing>) -> Registration {
-        let registration = self.broker.lock().expect("broker lock").register(after_seq);
+        self.subscribe_topics(after_seq, [EventTopic::Desktop].into_iter().collect(), sink)
+    }
+
+    pub fn subscribe_topics(
+        &self,
+        after_seq: Option<u64>,
+        topics: BTreeSet<EventTopic>,
+        sink: Sender<Outgoing>,
+    ) -> Registration {
+        let registration = self
+            .broker
+            .lock()
+            .expect("broker lock")
+            .register_topics(after_seq, topics);
         if let Registration::Ready {
             subscription_id, ..
         } = &registration
@@ -148,17 +221,32 @@ impl Session {
                 return;
             }
         };
-        {
+        let removed = {
             let mut broker = self.broker.lock().expect("broker lock");
             let changes = difference(broker.snapshot(), &observed);
             if changes.is_empty() {
                 return;
             }
+            let vanished: Vec<String> = changes
+                .iter()
+                .filter_map(|payload| match payload {
+                    DesktopEventPayload::OutputRemoved { output_name } => Some(output_name.clone()),
+                    _ => None,
+                })
+                .collect();
+            let before = (!vanished.is_empty()).then(|| broker.snapshot().windows.clone());
             for payload in changes {
                 broker.publish(payload, observed.clone());
             }
-        }
+            before.map(|windows| (vanished, windows))
+        };
         self.flush();
+        if let Some((vanished, windows)) = removed {
+            let hook = self.outputs_removed.lock().expect("outputs hook").clone();
+            if let Some(hook) = hook {
+                hook(vanished, windows);
+            }
+        }
     }
 
     pub fn mark_offline(&self, reason: &str) {
@@ -177,6 +265,14 @@ impl Session {
     /// every subscriber is told to resync rather than being sent replayed events.
     pub fn reconnect(&self, mut adapter: Box<dyn CompositorAdapter>) -> AdapterResult<()> {
         let snapshot = adapter.snapshot()?;
+        if let Some(handler) = self
+            .shortcut_handler
+            .lock()
+            .expect("shortcut handler")
+            .clone()
+        {
+            adapter.set_shortcut_handler(handler);
+        }
         {
             let mut current = self.adapter.lock().expect("adapter lock");
             *current = adapter;
@@ -207,7 +303,7 @@ impl Session {
             };
             let (events, closed) = match delivery {
                 Delivery::Events(events) => (events, false),
-                Delivery::ResyncRequired(event) => (vec![event], true),
+                Delivery::ResyncRequired(event) => (vec![*event], true),
             };
             let mut sinks = self.sinks.lock().expect("sinks lock");
             let mut dropped = closed;
@@ -228,20 +324,41 @@ impl Session {
 
 /// Run the compositor event stream until it ends. Ending means the compositor
 /// connection died, which takes dependent capabilities offline.
+///
+/// The stream is read on its own thread and never waits for a re-read: a
+/// compositor drops an IPC client whose socket stays full (Wayfire's
+/// "Error sending json to client!"), and a burst of operations produces events
+/// faster than one full snapshot re-read each. Every change already received
+/// is covered by a single re-read, since `publish_changes` re-reads the whole
+/// snapshot and publishes the difference.
 pub fn pump(session: &Session, source: &mut dyn EventSource) {
-    loop {
-        match source.next_change() {
-            Ok(Some(_)) => session.publish_changes(),
-            Ok(None) => {
-                session.mark_offline("compositor event stream ended");
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        scope.spawn(move || loop {
+            let next = source.next_change();
+            let last = !matches!(next, Ok(Some(_)));
+            if sender.send(next).is_err() || last {
                 return;
             }
-            Err(error) => {
-                session.mark_offline(&format!("{error:?}"));
-                return;
+        });
+        while let Ok(first) = receiver.recv() {
+            let mut next = Some(first);
+            while let Some(item) = next.take() {
+                match item {
+                    Ok(Some(_)) => next = receiver.try_recv().ok(),
+                    Ok(None) => {
+                        session.mark_offline("compositor event stream ended");
+                        return;
+                    }
+                    Err(error) => {
+                        session.mark_offline(&format!("{error:?}"));
+                        return;
+                    }
+                }
             }
+            session.publish_changes();
         }
-    }
+    });
 }
 
 pub fn empty_snapshot() -> DesktopSnapshot {
@@ -313,6 +430,69 @@ mod tests {
     use ditto_compositor::fixture::FixtureCompositor;
     use ditto_protocol::WindowSessionId;
     use std::sync::mpsc;
+
+    /// A compositor drops an IPC client whose socket stays full, so the event
+    /// stream must keep being read while a re-read waits (here: for the
+    /// adapter, which the test holds). Before, one event was read per re-read.
+    #[test]
+    fn the_event_stream_is_drained_while_a_re_read_waits() {
+        use ditto_compositor::CompositorChange;
+        use std::sync::{atomic::AtomicUsize, Arc};
+        use std::time::{Duration, Instant};
+
+        struct Burst {
+            left: usize,
+            read: Arc<AtomicUsize>,
+        }
+        impl EventSource for Burst {
+            fn next_change(&mut self) -> AdapterResult<Option<CompositorChange>> {
+                if self.left == 0 {
+                    return Ok(None);
+                }
+                self.left -= 1;
+                self.read.fetch_add(1, Ordering::SeqCst);
+                Ok(Some(CompositorChange::Windows))
+            }
+        }
+
+        let (compositor, _events) = FixtureCompositor::paired();
+        let session = Arc::new(Session::new(Box::new(compositor)));
+        let (held, holding) = mpsc::channel();
+        let (release, released) = mpsc::channel::<()>();
+        let holder = {
+            let session = Arc::clone(&session);
+            std::thread::spawn(move || {
+                session.with_adapter(|_| {
+                    held.send(()).unwrap();
+                    released.recv().unwrap();
+                    Ok(())
+                })
+            })
+        };
+        holding.recv().unwrap();
+        let read = Arc::new(AtomicUsize::new(0));
+        let pumping = {
+            let session = Arc::clone(&session);
+            let read = Arc::clone(&read);
+            std::thread::spawn(move || pump(&session, &mut Burst { left: 500, read }))
+        };
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while read.load(Ordering::SeqCst) < 500 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let drained = read.load(Ordering::SeqCst);
+        release.send(()).unwrap();
+        holder.join().unwrap().unwrap();
+        pumping.join().unwrap();
+        assert_eq!(
+            drained, 500,
+            "the stream was read while the adapter was held"
+        );
+        assert!(
+            !session.is_online(),
+            "the end of the stream takes the session offline"
+        );
+    }
 
     #[test]
     fn publishes_only_what_actually_changed() {

@@ -1,4 +1,21 @@
 {
+  "$defs": {
+    "CoreMode": {
+      "oneOf": [
+        {
+          "enum": [
+            "normal"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "rescue",
+          "description": "No hostd: Cordis-backed capabilities report `rescue_mode`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -14,17 +31,39 @@
         "null"
       ]
     },
+    "connection_id": {
+      "type": "string"
+    },
+    "host_generation": {
+      "description": "Set for a hostd connection: increases with every new connection, so a\nlease from an earlier generation can be told apart and refused.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "mode": {
+      "$ref": "#/$defs/CoreMode"
+    },
     "protocol_version": {
       "type": "string"
     },
     "server": {
+      "type": "string"
+    },
+    "subject": {
+      "description": "The authorization subject this connection was bound to.",
       "type": "string"
     }
   },
   "required": [
     "protocol_version",
     "catalog_revision",
-    "server"
+    "server",
+    "mode",
+    "subject",
+    "connection_id"
   ],
   "title": "HandshakeOutput",
   "type": "object"

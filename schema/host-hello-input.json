@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "CandidateStrategy": {
+      "oneOf": [
+        {
+          "const": "isolate_rebuild",
+          "description": "D-32 strategy A: candidate in an isolate realm, rebuilt on commit.",
+          "type": "string"
+        },
+        {
+          "const": "in_place",
+          "description": "D-32 strategy B: static checks at prepare, mount in place on commit.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cordis_version": {
+      "type": "string"
+    },
+    "hostd_version": {
+      "type": "string"
+    },
+    "node_version": {
+      "type": "string"
+    },
+    "strategy": {
+      "$ref": "#/$defs/CandidateStrategy"
+    },
+    "vendor_fingerprint": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "hostd_version",
+    "node_version",
+    "cordis_version",
+    "vendor_fingerprint",
+    "strategy"
+  ],
+  "title": "HelloInput",
+  "type": "object"
+}

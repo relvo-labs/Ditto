@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "removed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "removed"
+  ],
+  "title": "PluginsRemoveOutput",
+  "type": "object"
+}

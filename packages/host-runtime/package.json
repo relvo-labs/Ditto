@@ -1,0 +1,27 @@
+{
+  "name": "@ditto/host-runtime",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ditto-hostd": "bin/ditto-hostd"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.vendor.json && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "build": "node scripts/build.mjs",
+    "vendor-types": "tsc -p tsconfig.vendor.json"
+  },
+  "devDependencies": {
+    "@standard-schema/spec": "1.1.0",
+    "@types/node": "22.18.6",
+    "tsdown": "0.22.2",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

@@ -65,3 +65,92 @@ jobs:
           name: g0-nightly-${{ github.run_id }}
           path: g0-nightly-artifacts.tar.gz
           retention-days: 90
+  # G1 gates (plan/03/06 §10, EX1-15 ②: EX1-01/03/07/09, plus EX1-08). A
+  # runner exits 0 only when every sub-check passed; `incomplete` and
+  # `not_implemented` (exit 3) are red here on purpose, so five green nights
+  # mean five nights of real passes. The one exception is EX1-01's operator
+  # item (a person's recorded run), which DITTO_G1_PENDING_OK lets through
+  # the exit code only; its document still says incomplete. EX1-12/13 need
+  # a logged-in session or the second monitor and are informational here.
+  # Every step runs even after an earlier one fails.
+  verify-g1:
+    needs: verify
+    if: always()
+    runs-on: [self-hosted, ditto-refmachine]
+    timeout-minutes: 120
+    env:
+      DITTO_REFERENCE_MACHINE: '1'
+      DITTO_ENVIRONMENT_LABEL: reference-machine
+      DITTO_WORKSPACE: ${{ github.workspace }}
+      DITTO_BINARIES: ${{ github.workspace }}/target/debug
+      DITTO_ARTIFACTS: ${{ github.workspace }}/artifacts/g1
+      DITTO_COMPOSITOR: wayfire
+      WLR_RENDERER: gles2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reference toolchain paths
+        run: |
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.nvm/versions/node/v22.23.2/bin" >> "$GITHUB_PATH"
+          echo "$HOME/Qt/6.10.2/gcc_64/bin" >> "$GITHUB_PATH"
+          echo "$HOME/wayfire/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=$HOME/wayfire/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+      - name: Reference-machine preflight
+        run: bash packaging/reference-image/preflight.sh
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - name: Build Core, hostd and the built-in packages
+        run: |
+          cargo build --locked --workspace --bins
+          pnpm install --frozen-lockfile
+          pnpm --filter @ditto/host-runtime build
+          bash scripts/build-builtin-packages.sh
+      - name: EX1-01 manual cross-plugin switch (keyboard-driven GUI)
+        if: success() || failure()
+        env:
+          # The person-run recording is an operator item; it never runs at night.
+          DITTO_G1_PENDING_OK: operator
+        run: bash tests/g1/manual-switch/run.sh
+      - name: EX1-03 rollback
+        if: success() || failure()
+        run: bash tests/g1/rollback/run.sh
+      - name: EX1-07 Cordis services outlive clients
+        if: success() || failure()
+        run: bash tests/g1/cordis-independent/run.sh
+      - name: EX1-08 lifecycle L-01…L-10
+        if: success() || failure()
+        run: bash tests/g1/lifecycle/run.sh
+      - name: EX1-09 persistence faults
+        if: success() || failure()
+        run: bash tests/g1/persistence-faults/run.sh
+      - name: EX1-12 rescue and supervision
+        if: success() || failure()
+        # Decided in a logged-in session (and, for EX1-13, with the second
+        # monitor); outside one it is recorded as environment. Not part of
+        # the EX1-15 ② count.
+        continue-on-error: true
+        run: bash tests/g1/rescue-supervision/run.sh
+      - name: EX1-12 lock
+        if: success() || failure()
+        # Decided in a logged-in session (and, for EX1-13, with the second
+        # monitor); outside one it is recorded as environment. Not part of
+        # the EX1-15 ② count.
+        continue-on-error: true
+        run: bash tests/g1/lock/run.sh
+      - name: EX1-13 output hot-plug (automated)
+        if: success() || failure()
+        # Decided in a logged-in session (and, for EX1-13, with the second
+        # monitor); outside one it is recorded as environment. Not part of
+        # the EX1-15 ② count.
+        continue-on-error: true
+        run: bash tests/g1/output-hotplug/run.sh --automated
+      - name: Pack artifacts
+        if: always()
+        run: tar -czf g1-nightly-artifacts.tar.gz --ignore-failed-read artifacts/g1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g1-nightly-${{ github.run_id }}
+          path: g1-nightly-artifacts.tar.gz
+          retention-days: 90

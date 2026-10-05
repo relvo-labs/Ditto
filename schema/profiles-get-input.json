@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "history_limit": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "profile_id": {
+      "description": "Absent means the active Profile.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "revision_id": {
+      "description": "Absent means the head revision.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "ProfilesGetInput",
+  "type": "object"
+}

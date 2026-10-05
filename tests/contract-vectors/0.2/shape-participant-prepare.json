@@ -1,0 +1,6 @@
+{"kind": "shape", "description": "Core 發起的 participant.prepare（hostd 投影，含檔案授予）", "type": "participant-prepare-params", "valid": true,
+ "value": {"change_id": "chg-01M3H4J7EEWXXD01TR98PCQE7A", "origin": "change", "target": {"role": "hostd", "entries": [
+   {"entry_id": "ent-01M3H4J7EEWXXD01TR98PCQE7A", "package": "ditto.svc.tasks", "version": "1.0.0",
+    "module_path": "/x/packages/sha256/aa/dist/index.mjs", "data_dir": "/x/plugin-data/ditto.svc.tasks", "config": {},
+    "disabled": false, "provides": ["desktop.tasks.list"], "hot_swap": "controlled_handoff", "health_timeout_ms": 2000,
+    "cleanup_timeout_ms": 5000, "file_grants": {"grant-01M3H4J7EEWXXD01TR98PCQE7A": "/home/u/todo.txt"}}]}}}

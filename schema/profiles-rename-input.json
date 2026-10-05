@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "profile_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile_id",
+    "name"
+  ],
+  "title": "ProfilesRenameInput",
+  "type": "object"
+}

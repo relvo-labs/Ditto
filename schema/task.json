@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "done": {
+      "type": "boolean"
+    },
+    "priority": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source": {
+      "description": "`own` (the plugin's list) or `file:<grant_id>`.",
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "text",
+    "done",
+    "source"
+  ],
+  "title": "Task",
+  "type": "object"
+}

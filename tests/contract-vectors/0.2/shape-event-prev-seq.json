@@ -1,0 +1,3 @@
+{"kind": "shape", "description": "事件通知帶 seq 與 prev_seq；0.1 的 revision 欄位已不存在", "type": "desktop-event-notification", "valid": true,
+ "value": {"subscription_id": "subscription-1", "seq": 7, "prev_seq": 4, "profile_revision": "rev-01M3H4J7EEWXXD01TR98PCQE7A",
+   "payload": {"type": "profile_changed", "profile_id": "prf-01M3H4J7EEWXXD01TR98PCQE7A", "head_revision": "rev-01M3H4J7EEWXXD01TR98PCQE7A", "active": true}}}

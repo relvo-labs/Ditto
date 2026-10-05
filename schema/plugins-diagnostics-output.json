@@ -1,0 +1,341 @@
+{
+  "$defs": {
+    "CoreCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_bindings": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "leases": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shell_mounted_providers": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subscriptions": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "capability_bindings",
+        "leases",
+        "subscriptions",
+        "shell_mounted_providers"
+      ],
+      "type": "object"
+    },
+    "EntryDiagnostics": {
+      "additionalProperties": false,
+      "properties": {
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "entry_id": {
+          "type": "string"
+        },
+        "fiber_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FiberState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host": {
+          "$ref": "#/$defs/HostKind"
+        },
+        "last_health": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_rollback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "package": {
+          "type": "string"
+        },
+        "providers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "registrations": {
+          "$ref": "#/$defs/RegistrationCounts"
+        },
+        "shared_host_note_key": {
+          "description": "Always set for hostd entries: in-process plugins share one host and\nhave no memory figure of their own (RUN-08).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "supervisor_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "waiting_for": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "entry_id",
+        "package",
+        "version",
+        "host",
+        "dependencies",
+        "providers",
+        "waiting_for",
+        "registrations"
+      ],
+      "type": "object"
+    },
+    "FiberState": {
+      "enum": [
+        "pending",
+        "loading",
+        "active",
+        "unloading",
+        "disposed",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "HostKind": {
+      "enum": [
+        "qml",
+        "cordis",
+        "core_builtin"
+      ],
+      "type": "string"
+    },
+    "HostStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "heap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodeHeap"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "process": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcessResources"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "restarts_last_10_min": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "description": "`running`, `starting`, `stopped`, `crash_loop`, `not_needed`, `rescue_mode`.",
+          "type": "string"
+        },
+        "strategy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "state",
+        "restarts_last_10_min",
+        "versions"
+      ],
+      "type": "object"
+    },
+    "NodeHeap": {
+      "additionalProperties": false,
+      "properties": {
+        "array_buffers": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "external": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "heap_used": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "heap_used",
+        "external",
+        "array_buffers"
+      ],
+      "type": "object"
+    },
+    "ProcessResources": {
+      "additionalProperties": false,
+      "description": "Process-level figures Core read from `/proc`; hostd's own report is only\nused for the Node heap, listed separately and never added to these.",
+      "properties": {
+        "cpu_ticks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fds": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pss_kib": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "rss_kib": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "threads": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "pid"
+      ],
+      "type": "object"
+    },
+    "RegistrationCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "effects": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "leases": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subscriptions": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "timers": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "capabilities",
+        "leases",
+        "subscriptions",
+        "effects",
+        "timers"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "core": {
+      "$ref": "#/$defs/CoreCounts"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/EntryDiagnostics"
+      },
+      "type": "array"
+    },
+    "host": {
+      "$ref": "#/$defs/HostStatus"
+    }
+  },
+  "required": [
+    "host",
+    "entries",
+    "core"
+  ],
+  "title": "PluginsDiagnosticsOutput",
+  "type": "object"
+}

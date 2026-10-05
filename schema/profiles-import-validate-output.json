@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "ImportProblem": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "description": "Blocking problems stop the import; the others are shown and kept.",
+          "type": "boolean"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "detail_key": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ImportProblemKind"
+        }
+      },
+      "required": [
+        "kind",
+        "blocking",
+        "detail_key"
+      ],
+      "type": "object"
+    },
+    "ImportProblemKind": {
+      "enum": [
+        "schema_invalid",
+        "format_unsupported",
+        "protocol_incompatible",
+        "digest_mismatch",
+        "package_missing",
+        "integrity_mismatch",
+        "grant_required",
+        "secret_detected",
+        "private_path_detected"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "importable": {
+      "type": "boolean"
+    },
+    "problems": {
+      "items": {
+        "$ref": "#/$defs/ImportProblem"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "importable",
+    "problems"
+  ],
+  "title": "ProfilesImportValidateOutput",
+  "type": "object"
+}

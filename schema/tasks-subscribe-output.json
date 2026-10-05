@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "Task": {
+      "additionalProperties": false,
+      "properties": {
+        "done": {
+          "type": "boolean"
+        },
+        "priority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "description": "`own` (the plugin's list) or `file:<grant_id>`.",
+          "type": "string"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "text",
+        "done",
+        "source"
+      ],
+      "type": "object"
+    },
+    "TaskSource": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "status": {
+          "description": "`ok`, `revoked`, `unavailable`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "status"
+      ],
+      "type": "object"
+    },
+    "TasksListOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "demo": {
+          "description": "Sample content is labelled, never presented as the user's own.",
+          "type": "boolean"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/TaskSource"
+          },
+          "type": "array"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/Task"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tasks",
+        "sources",
+        "demo"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/TasksListOutput"
+    },
+    "subscription_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "subscription_id",
+    "seq",
+    "snapshot"
+  ],
+  "title": "TasksSubscribeOutput",
+  "type": "object"
+}

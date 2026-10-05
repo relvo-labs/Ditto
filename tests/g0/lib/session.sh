@@ -74,6 +74,10 @@ start_compositor() {
   else
     export DITTO_RUNTIME_DIR="$RUNTIME_DIR/ditto"
   fi
+  # The fixture may run beside the logged-in Ditto session (including in the
+  # VM regression job). Its socket and store must both be isolated; otherwise
+  # the session's Core holds the database lock and the fixture cannot start.
+  export DITTO_DATA_DIR="$DITTO_RUNTIME_DIR/store"
   if [[ -n "${DITTO_REFERENCE_MACHINE:-}" ]]; then
     export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$RUNTIME_DIR/bus}"
   else
@@ -133,7 +137,11 @@ start_compositor() {
 
 start_core() {
   export DITTO_DEV_TOKEN="${DITTO_DEV_TOKEN:-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
-  "$BINARIES/ditto-core" serve --compositor "$DITTO_COMPOSITOR" --development >"$RUNTIME_DIR/core.log" 2>&1 &
+  local core_args=(serve --compositor "$DITTO_COMPOSITOR" --development)
+  if [[ -d "$WORKSPACE/target/ditto-packages" ]]; then
+    core_args+=(--builtin-packages "$WORKSPACE/target/ditto-packages")
+  fi
+  "$BINARIES/ditto-core" "${core_args[@]}" >"$RUNTIME_DIR/core.log" 2>&1 &
   CORE_PID=$!
   for _ in $(seq 1 100); do
     [[ -S "$DITTO_RUNTIME_DIR/core.sock" ]] && return 0

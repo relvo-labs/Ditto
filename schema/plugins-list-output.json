@@ -1,0 +1,310 @@
+{
+  "$defs": {
+    "EntryRuntimeState": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "active",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Legal and not an error: the named services are not ready yet.",
+          "properties": {
+            "kind": {
+              "const": "pending",
+              "type": "string"
+            },
+            "waiting_for": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "waiting_for"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "loading",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "failed",
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "disabled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Stopped by supervision after repeated failures.",
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "supervisor_disabled",
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason",
+            "at"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/UnavailableReason"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A Shell provider that is bound but whose slot the Shell has not\nreported yet.",
+          "properties": {
+            "kind": {
+              "const": "not_reported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EntryStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "entry_id": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/$defs/HostKind"
+        },
+        "package": {
+          "type": "string"
+        },
+        "slot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "started_reason": {
+          "description": "Why it runs: `profile` (enabled in the active Profile).",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/EntryRuntimeState"
+        },
+        "trust_note_key": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entry_id",
+        "package",
+        "version",
+        "host",
+        "disabled",
+        "state",
+        "started_reason",
+        "trust_note_key"
+      ],
+      "type": "object"
+    },
+    "HostKind": {
+      "enum": [
+        "qml",
+        "cordis",
+        "core_builtin"
+      ],
+      "type": "string"
+    },
+    "PackageSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "host_kind": {
+          "$ref": "#/$defs/HostKind"
+        },
+        "installed_at": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "name": true,
+        "package_id": {
+          "type": "string"
+        },
+        "plugin_kind": {
+          "$ref": "#/$defs/PluginKind"
+        },
+        "referenced_by": {
+          "description": "Retained revisions that pin this package; it cannot be removed while\nany exists.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "trust_level": {
+          "$ref": "#/$defs/TrustLevel"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "version",
+        "sha256",
+        "source",
+        "name",
+        "author",
+        "license",
+        "plugin_kind",
+        "host_kind",
+        "trust_level",
+        "installed_at",
+        "referenced_by"
+      ],
+      "type": "object"
+    },
+    "PluginKind": {
+      "enum": [
+        "service",
+        "qml_provider",
+        "declarative_bundle"
+      ],
+      "type": "string"
+    },
+    "TrustLevel": {
+      "enum": [
+        "trusted",
+        "community",
+        "untrusted"
+      ],
+      "type": "string"
+    },
+    "UnavailableReason": {
+      "description": "Why a capability or a call is unavailable. Closed: a consumer can show a\nspecific product sentence for every value.",
+      "oneOf": [
+        {
+          "enum": [
+            "compositor_offline",
+            "host_unavailable",
+            "host_crash_loop",
+            "lease_expired",
+            "not_bound",
+            "rescue_mode",
+            "recovering",
+            "system_unavailable",
+            "participant_unavailable",
+            "session_locked"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "storage_full",
+          "description": "The store refused the write for lack of space; nothing changed.",
+          "type": "string"
+        },
+        {
+          "const": "storage_error",
+          "description": "The store reported an I/O error; nothing changed.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/EntryStatus"
+      },
+      "type": "array"
+    },
+    "packages": {
+      "items": {
+        "$ref": "#/$defs/PackageSummary"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "packages",
+    "entries"
+  ],
+  "title": "PluginsListOutput",
+  "type": "object"
+}

@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "HotSwapLevel": {
+      "enum": [
+        "instant",
+        "controlled_handoff",
+        "host_restart",
+        "session_restart"
+      ],
+      "type": "string"
+    },
+    "LayoutMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id"
+      ],
+      "type": "object"
+    },
+    "LayoutRule": {
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/LayoutMatch"
+        },
+        "workspace": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "match",
+        "workspace"
+      ],
+      "type": "object"
+    },
+    "LayoutStrategyInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "hot_swap": {
+          "$ref": "#/$defs/HotSwapLevel"
+        },
+        "name_key": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "runtime_switchable": {
+          "description": "False when the compositor cannot switch it while running (C-15): the\nswitch is then scheduled for the next login and says so.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "package",
+        "name_key",
+        "hot_swap",
+        "runtime_switchable"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "available": {
+      "items": {
+        "$ref": "#/$defs/LayoutStrategyInfo"
+      },
+      "type": "array"
+    },
+    "observed_strategy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pending_next_login": {
+      "description": "Session-restart changes waiting for the next login.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/LayoutRule"
+      },
+      "type": "array"
+    },
+    "strategy_entry": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "strategy_package": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workspace_grid": {
+      "items": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+    }
+  },
+  "required": [
+    "available",
+    "workspace_grid",
+    "rules",
+    "pending_next_login"
+  ],
+  "title": "LayoutGetOutput",
+  "type": "object"
+}

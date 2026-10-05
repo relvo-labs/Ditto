@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "coalesce_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "payload": true
+  },
+  "required": [
+    "name",
+    "payload"
+  ],
+  "title": "EventInput",
+  "type": "object"
+}

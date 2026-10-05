@@ -3,12 +3,23 @@
 //! version; an optional field does not.
 
 pub mod catalog;
+pub mod change;
+pub mod host;
+pub mod ids;
+pub mod jcs;
+pub mod manifest;
+pub mod participant;
+pub mod profile;
 pub mod rpc;
+pub mod services;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub const PROTOCOL_VERSION: &str = "0.1.0";
+/// 0.2 is not wire-compatible with 0.1: `ResultMeta.revision` split in two,
+/// requests flow in both directions, and `preflight_rejected` joined the error
+/// set. A 0.1 client is refused at the handshake instead of being guessed at.
+pub const PROTOCOL_VERSION: &str = "0.2.0";
 
 /// How a controlled launcher hands a client its one-use token: on an inherited
 /// descriptor, so the secret never appears in the client's environment, which
@@ -55,6 +66,12 @@ pub struct Window {
     pub title: String,
     pub app_id: String,
     pub workspace_id: Option<String>,
+    /// The output the window is on, by the name `desktop.outputs.list`
+    /// reports. `x`/`y` are relative to that output (and to its current
+    /// workspace), not to the global layout, so a position is only meaningful
+    /// together with this name. Absent when the compositor does not say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
     pub x: Option<i32>,
     pub y: Option<i32>,
     pub width: Option<u32>,
@@ -138,6 +155,34 @@ pub struct CloseRequestOutput {
 #[serde(deny_unknown_fields)]
 pub struct EventsSubscribeInput {
     pub after_seq: Option<u64>,
+    /// Absent means `["desktop"]`, the G0 stream. Each topic needs its own
+    /// scope, so asking for more than the caller may read is refused whole.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topics: Option<Vec<EventTopic>>,
+}
+
+#[derive(
+    Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash, PartialOrd, Ord,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum EventTopic {
+    Desktop,
+    Changes,
+    Plugins,
+    Notifications,
+    Tasks,
+    Session,
+}
+
+impl EventTopic {
+    pub const ALL: [Self; 6] = [
+        Self::Desktop,
+        Self::Changes,
+        Self::Plugins,
+        Self::Notifications,
+        Self::Tasks,
+        Self::Session,
+    ];
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -163,22 +208,103 @@ pub struct EventsSubscribeOutput {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DesktopEventPayload {
-    WindowUpsert { window: Window },
-    WindowRemoved { window_id: WindowSessionId },
-    WorkspaceUpsert { workspace: Workspace },
-    WorkspaceRemoved { workspace_id: String },
-    OutputUpsert { output: Output },
-    OutputRemoved { output_name: String },
-    ResyncRequired { reason: String },
+    WindowUpsert {
+        window: Window,
+    },
+    WindowRemoved {
+        window_id: WindowSessionId,
+    },
+    WorkspaceUpsert {
+        workspace: Workspace,
+    },
+    WorkspaceRemoved {
+        workspace_id: String,
+    },
+    OutputUpsert {
+        output: Output,
+    },
+    OutputRemoved {
+        output_name: String,
+    },
+    ResyncRequired {
+        reason: String,
+    },
+    ProfileChanged {
+        profile_id: String,
+        head_revision: String,
+        active: bool,
+    },
+    ChangeUpdated {
+        change: Box<change::ChangeSummary>,
+    },
+    CapabilitiesChanged {
+        reason: String,
+    },
+    PanelsChanged {
+        panels: Vec<services::PanelStatus>,
+    },
+    JobsUpdated {
+        job: services::Job,
+    },
+    NotificationPosted {
+        notification: services::NotificationItem,
+    },
+    NotificationClosed {
+        id: u32,
+        reason: String,
+    },
+    /// A cross-process event a hostd entry declared in its manifest.
+    HostEvent {
+        entry_id: String,
+        name: String,
+        payload: serde_json::Value,
+    },
+    SessionChanged {
+        state: services::SessionState,
+    },
+}
+
+impl DesktopEventPayload {
+    /// Which subscription topic carries this payload. `resync_required` goes
+    /// to every subscription regardless of topic.
+    pub fn topic(&self) -> Option<EventTopic> {
+        Some(match self {
+            Self::WindowUpsert { .. }
+            | Self::WindowRemoved { .. }
+            | Self::WorkspaceUpsert { .. }
+            | Self::WorkspaceRemoved { .. }
+            | Self::OutputUpsert { .. }
+            | Self::OutputRemoved { .. } => EventTopic::Desktop,
+            Self::ResyncRequired { .. } => return None,
+            Self::ProfileChanged { .. } | Self::ChangeUpdated { .. } => EventTopic::Changes,
+            Self::CapabilitiesChanged { .. }
+            | Self::PanelsChanged { .. }
+            | Self::JobsUpdated { .. } => EventTopic::Plugins,
+            Self::NotificationPosted { .. } | Self::NotificationClosed { .. } => {
+                EventTopic::Notifications
+            }
+            Self::HostEvent { name, .. } if name.starts_with("tasks/") => EventTopic::Tasks,
+            Self::HostEvent { .. } => EventTopic::Plugins,
+            Self::SessionChanged { .. } => EventTopic::Session,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct DesktopEventNotification {
     pub subscription_id: String,
+    /// Position in Core's single event stream, shared by every topic; the
+    /// value to pass as `after_seq` when resubscribing.
     pub seq: u64,
-    /// Observation revision; no persistent Profile exists in G0.
-    pub revision: u64,
+    /// The `seq` of the previous event delivered to this subscription (or the
+    /// subscription's starting `seq`). A consumer detects a lost event when it
+    /// differs from the last `seq` it saw: topics it did not ask for leave
+    /// gaps in `seq`, never in this chain.
+    pub prev_seq: u64,
+    /// The active Profile head when the event was published; `null` before
+    /// Core has loaded a Profile. 0.1 called an observation counter `revision`.
+    pub profile_revision: Option<String>,
     pub payload: DesktopEventPayload,
 }
 
@@ -188,18 +314,30 @@ pub struct RequestMeta {
     pub protocol_version: String,
     pub operation_id: Option<String>,
     pub deadline_ms: Option<u64>,
+    /// Only a hostd connection may, and must, name the entry it calls for.
+    /// Core accepts it only for an entry it assigned to that connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_behalf_of: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ResultMeta {
-    /// Observation sequence, not a persistent Profile revision in G0.
-    pub revision: u64,
+    /// Observation sequence of the event stream (the G0 meaning of revision).
+    pub observed_seq: u64,
+    /// Head revision of the active Profile, `null` before one is loaded.
+    pub profile_revision: Option<String>,
     pub readback_verified: bool,
     /// Set when a cancellation arrived for a capability declared
     /// non-cancellable: the request ran to completion and was not cancelled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_cancellable: Option<bool>,
+    /// Core's monotonic time, in microseconds, from reading the request to
+    /// writing this result. For a write with `readback_verified`, it spans
+    /// acceptance to the completed readback (the NFR-03 measure); it is
+    /// Core's own clock, not the caller's round trip.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handled_us: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -215,11 +353,12 @@ pub enum ErrorName {
     Unavailable,
     ProtocolVersionUnsupported,
     IdentityRejected,
+    PreflightRejected,
     Internal,
 }
 
 impl ErrorName {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Unsupported,
         Self::InvalidParams,
         Self::NotFound,
@@ -230,6 +369,7 @@ impl ErrorName {
         Self::Unavailable,
         Self::ProtocolVersionUnsupported,
         Self::IdentityRejected,
+        Self::PreflightRejected,
         Self::Internal,
     ];
 
@@ -245,8 +385,80 @@ impl ErrorName {
             Self::Unavailable => -32007,
             Self::ProtocolVersionUnsupported => -32008,
             Self::IdentityRejected => -32009,
+            Self::PreflightRejected => -32010,
             Self::Internal => -32099,
         }
+    }
+}
+
+/// Why a capability or a call is unavailable. Closed: a consumer can show a
+/// specific product sentence for every value.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum UnavailableReason {
+    CompositorOffline,
+    HostUnavailable,
+    HostCrashLoop,
+    LeaseExpired,
+    NotBound,
+    RescueMode,
+    Recovering,
+    SystemUnavailable,
+    ParticipantUnavailable,
+    SessionLocked,
+    /// The store refused the write for lack of space; nothing changed.
+    StorageFull,
+    /// The store reported an I/O error; nothing changed.
+    StorageError,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ConflictReason {
+    BaseRevisionStale,
+    CandidateCannotClaim,
+    SingleProviderTaken,
+    UndoBlockedByNewerChange,
+    ProfileInUse,
+    ChangeInProgress,
+    ReadbackMismatch,
+    AlreadyTerminal,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionDeniedReason {
+    NotGranted,
+    PolicyDenied,
+    /// No approval responder exists (G1) or it failed: always a refusal.
+    ApprovalUnavailable,
+}
+
+/// The authorization subject, derived from the launcher binding and, for a
+/// hostd connection, from an entry Core assigned to it. Never from a message.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(transparent)]
+pub struct Subject(pub String);
+
+impl Subject {
+    pub const SHELL: &'static str = "shell";
+    pub const CLI: &'static str = "cli";
+    pub const CLI_RESCUE: &'static str = "cli:rescue";
+    pub const RESCUE_UI: &'static str = "rescue_ui";
+    pub const AGENT: &'static str = "agent";
+    pub const LOCK: &'static str = "lock";
+    pub const CORE: &'static str = "core";
+
+    pub fn host(entry_id: &str) -> Self {
+        Self(format!("host:{entry_id}"))
+    }
+
+    pub fn host_entry(&self) -> Option<&str> {
+        self.0.strip_prefix("host:")
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

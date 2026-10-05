@@ -1,0 +1,30 @@
+# The rescue UI (plan/03/05 §3, D-29): started by ditto-core.service's
+# OnFailure= after a restart storm, or by ditto-supervisor after it killed an
+# unresponsive Shell. Started by systemd it has no launcher token, so it can
+# only use `dittoctl`'s offline mode; a rescue UI Core itself starts (its
+# `--rescue-ui` spec) is the online path.
+[Unit]
+Description=Ditto rescue interface
+Documentation=file://@DITTO_WORKSPACE@/plan/03/05-platform-supervision-and-rescue.md
+PartOf=ditto-session.target
+# Two Shells would fight over the panels, so the main Shell's scope is stopped
+# before the rescue UI starts (ExecStartPre below), and Core stops this unit
+# when it brings the main Shell back (desktop.rescue.resume_shell). Not
+# `Conflicts=`: a dependency keeps the dead transient scope loaded, and
+# systemd-run then refuses its name, so the Shell could not start again.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=-%t/ditto/session.env
+Environment=PATH=@DITTO_WAYFIRE_PREFIX@/bin:@DITTO_QT_PREFIX@/bin:/usr/local/bin:/usr/bin:/bin
+Environment=LD_LIBRARY_PATH=@DITTO_WAYFIRE_PREFIX@/lib
+Environment=DITTO_WORKSPACE=@DITTO_WORKSPACE@
+Environment=DITTO_QT_PREFIX=@DITTO_QT_PREFIX@
+# `-`: recording why rescue started must never keep the rescue UI from starting.
+ExecStartPre=-@DITTO_WORKSPACE@/target/release/ditto-supervisor --on-core-failure
+ExecStartPre=-/usr/bin/systemctl --user stop ditto-shell.scope ditto-quickshell.scope
+ExecStart=@DITTO_LIBEXEC@/ditto-rescue-ui
+Restart=on-failure
+RestartSec=2

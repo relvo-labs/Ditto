@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Ditto (Wayfire)
+Comment=Ditto G1 desktop session
+Exec=@DITTO_SESSION_EXEC@
+Type=Application
+DesktopNames=Wayfire;Ditto;

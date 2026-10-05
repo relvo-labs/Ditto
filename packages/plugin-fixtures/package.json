@@ -1,0 +1,19 @@
+{
+  "name": "@ditto/plugin-fixtures",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p ../host-runtime/tsconfig.vendor.json && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "build": "node ../host-sdk/scripts/build-plugins.mjs cordis/* faults/* stress/*",
+    "pack": "node ../host-sdk/scripts/pack-each.mjs cordis/* qml/* faults/* stress/*"
+  },
+  "devDependencies": {
+    "@ditto/host-sdk": "workspace:*",
+    "@standard-schema/spec": "1.1.0",
+    "@types/node": "22.18.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

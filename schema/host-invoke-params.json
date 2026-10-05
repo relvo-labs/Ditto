@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "caller": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "deadline_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "entry_id": {
+      "type": "string"
+    },
+    "input": true,
+    "lease_id": {
+      "type": "string"
+    },
+    "operation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "lease_id",
+    "entry_id",
+    "capability_id",
+    "input",
+    "caller",
+    "deadline_ms"
+  ],
+  "title": "InvokeParams",
+  "type": "object"
+}

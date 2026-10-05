@@ -1,7 +1,9 @@
 import QtQuick
 
-/// Panel and dock base. Keeps the translucency decision in one place so the
-/// reduced-transparency token switch reaches every surface at once.
+/// Base of the Shell's own panels. Keeps the translucency decision in one
+/// place so the reduced-transparency switch reaches every surface at once.
+/// Providers are loaded from the package store and cannot import this; they
+/// draw with the same `tokens` object they are given.
 Rectangle {
     id: surface
 

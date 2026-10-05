@@ -1,0 +1,2 @@
+{"kind": "scenario", "description": "缺少 _meta 的請求以 invalid_params 拒絕", "client": {"kind": "dittoctl"},
+ "steps": [{"send": {"method": "desktop.windows.list", "params": {}, "no_meta": true}, "expect": {"error_name": "invalid_params"}}]}

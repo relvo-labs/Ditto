@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "Decision": {
+      "enum": [
+        "allowed",
+        "denied",
+        "needs_approval"
+      ],
+      "type": "string"
+    },
+    "PermissionDeniedReason": {
+      "oneOf": [
+        {
+          "enum": [
+            "not_granted",
+            "policy_denied"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "approval_unavailable",
+          "description": "No approval responder exists (G1) or it failed: always a refusal.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "$ref": "#/$defs/Decision"
+    },
+    "effective": {
+      "$ref": "#/$defs/Decision",
+      "description": "What a call would actually get: G1 has no approval responder, so\n`needs_approval` is refused as `approval_unavailable`."
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PermissionDeniedReason"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scopes": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "decision",
+    "effective",
+    "scopes"
+  ],
+  "title": "PermissionsCheckOutput",
+  "type": "object"
+}

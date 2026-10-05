@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "CoreMode": {
+      "oneOf": [
+        {
+          "enum": [
+            "normal"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "rescue",
+          "description": "No hostd: Cordis-backed capabilities report `rescue_mode`.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "heartbeat_interval_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "host_generation": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "lease_ttl_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "mode": {
+      "$ref": "#/$defs/CoreMode"
+    }
+  },
+  "required": [
+    "host_generation",
+    "mode",
+    "heartbeat_interval_ms",
+    "lease_ttl_ms"
+  ],
+  "title": "HelloOutput",
+  "type": "object"
+}

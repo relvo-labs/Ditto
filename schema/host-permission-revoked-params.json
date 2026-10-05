@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entry_id": {
+      "type": "string"
+    },
+    "grant_id": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "entry_id",
+    "grant_id",
+    "scope"
+  ],
+  "title": "PermissionRevokedParams",
+  "type": "object"
+}

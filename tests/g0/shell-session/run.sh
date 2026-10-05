@@ -20,9 +20,14 @@ export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software
 QUICKSHELL="${DITTO_QUICKSHELL:-$(command -v quickshell)}"
 [[ -x "$QUICKSHELL" ]] || { echo 'quickshell is not on PATH; set DITTO_QUICKSHELL' >&2; exit 1; }
 QUICKSHELL="$(readlink -f "$QUICKSHELL")"
+[[ -d "$WORKSPACE/target/ditto-packages" ]] || {
+  echo 'built-in packages are missing; run scripts/build-builtin-packages.sh first' >&2
+  exit 1
+}
 
 "$BINARIES/ditto-core" serve --compositor "${DITTO_COMPOSITOR:-wayfire}" \
-  --launch "quickshell 0.1.0 $QUICKSHELL -p $WORKSPACE/shell/shell.qml" \
+  --builtin-packages "$WORKSPACE/target/ditto-packages" \
+  --launch "quickshell 0.2.0 $QUICKSHELL -p $WORKSPACE/shell/shell.qml" \
   >"$RUNTIME_DIR/core.log" 2>&1 &
 CORE_PID=$!
 for _ in $(seq 1 150); do
@@ -30,13 +35,18 @@ for _ in $(seq 1 150); do
   sleep 0.1
 done
 grep -aq 'ditto-shell started' "$RUNTIME_DIR/core.log" || { cat "$RUNTIME_DIR/core.log"; echo 'the shell did not start' >&2; exit 1; }
+for _ in $(seq 1 150); do
+  grep -aq 'hit mask rectangles=' "$RUNTIME_DIR/core.log" && break
+  sleep 0.1
+done
 grep -aq 'hit mask rectangles=' "$RUNTIME_DIR/core.log" || { echo 'the avatar hit mask was not applied' >&2; exit 1; }
 echo "check 1: the session started and applied its hit mask ($(sed -n 's/.*hit mask rectangles=//p' "$RUNTIME_DIR/core.log" | head -1) rectangles)"
 
 for _ in $(seq 1 100); do
-  grep -aq 'desktop.events.subscribe' "$RUNTIME_DIR/core.log" && break
+  grep -aq '"role":"shell"' "$RUNTIME_DIR/core.log" && break
   sleep 0.1
 done
+grep -aq '"role":"shell"' "$RUNTIME_DIR/core.log" || { echo 'the Shell participant did not finish its boot sync' >&2; exit 1; }
 
 # Exclusive zones are observable: applications must start below the panel and
 # end above the dock.

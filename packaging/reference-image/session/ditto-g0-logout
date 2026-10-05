@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-session="${XDG_SESSION_ID:-}"
-[[ -n "$session" ]] || exit 1
-exec loginctl terminate-session "$session"

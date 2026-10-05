@@ -1,0 +1,61 @@
+# Ditto Core: the one authority for configuration, grants and capability
+# bindings (principle 1). systemd supervises it; Core supervises hostd, the
+# Shell and the lock client through its controlled launcher, which still starts
+# them with `systemd-run --scope` so they are neither in this cgroup nor
+# stopped with it.
+#
+# Restart storm: five failures in 120 s exhaust the start limit, the unit
+# enters `failed`, and only then does OnFailure= start the rescue UI (systemd
+# does not fire OnFailure= for the automatic restarts in between).
+[Unit]
+Description=Ditto Core
+Documentation=file://@DITTO_WORKSPACE@/plan/03/05-platform-supervision-and-rescue.md
+PartOf=ditto-session.target
+After=graphical-session-pre.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+OnFailure=ditto-rescue.service
+
+[Service]
+# READY=1 once the socket is bound and the Profile is mounted; WATCHDOG=1 from
+# the coordinator loop, not from a thread of its own, so a stuck coordinator
+# really times out (plan/03/05 §2). Both are Core's to send.
+Type=notify
+NotifyAccess=main
+WatchdogSec=10
+TimeoutStartSec=30
+Restart=on-failure
+RestartSec=1
+# The login script writes WAYFIRE_SOCKET and the measurement variant here
+# (including DITTO_CORE_MODE_ARGS, see ExecStart). Values from this file
+# override Environment= lines, which the verification drop-in relies on.
+EnvironmentFile=-%t/ditto/session.env
+Environment=PATH=@DITTO_WAYFIRE_PREFIX@/bin:@DITTO_QT_PREFIX@/bin:/usr/local/bin:/usr/bin:/bin
+Environment=LD_LIBRARY_PATH=@DITTO_WAYFIRE_PREFIX@/lib
+# Clients Core launches get `ditto-<kind>.scope` (the G0 session used the
+# `ditto-g0` prefix). The Shell's kind is `quickshell`, so its scope is
+# ditto-quickshell.scope until Core names it ditto-shell.scope.
+Environment=DITTO_LAUNCH_SCOPE_PREFIX=ditto
+# hostd's spec names node itself, by its canonical path: the launcher binds
+# identity to that path and compares it with /proc/<pid>/exe, so a wrapper
+# script would be refused (packages/host-runtime/bin/ditto-hostd). Its Node
+# flags sit between node and the bundle (packages/host-runtime/hostd.node-flags).
+# The rescue UI and the lock client are only started when Core needs them.
+#
+# $DITTO_CORE_MODE_ARGS (unquoted: split into words, and zero words when unset
+# or empty) is how a measurement login starts Core in rescue mode: the login
+# script writes `DITTO_CORE_MODE_ARGS=--mode rescue` to session.env only when
+# measure-conditions.json asks for `desktop_variant: rescue-no-node`
+# (EX1-10's rescue_no_node, tests/g1/measure/). Every other login leaves it
+# unset, so Core's command line is exactly the one without it. Nothing else
+# sets `--mode rescue` here.
+ExecStart=@DITTO_WORKSPACE@/target/release/ditto-core serve --compositor wayfire \
+    --builtin-packages @DITTO_WORKSPACE@/target/ditto-packages \
+    --shell "quickshell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/shell.qml" \
+    --hostd "hostd 0.2.0 @DITTO_NODE@ @DITTO_HOSTD_NODE_FLAGS@ @DITTO_WORKSPACE@/packages/host-runtime/dist/ditto-hostd.mjs" \
+    --rescue-ui "rescue-shell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/rescue/shell.qml" \
+    --lock "lock 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/lock/shell.qml" \
+    $DITTO_CORE_MODE_ARGS
+
+[Install]
+WantedBy=ditto-session.target

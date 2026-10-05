@@ -1,22 +1,37 @@
-//! In-memory observation stream. The compositor owns truth; this broker keeps a
-//! bounded replay window and per-subscriber queues, never a persistent state.
+//! In-memory event stream. The compositor owns desktop truth and Core's store
+//! owns configuration; this broker keeps a bounded replay window and
+//! per-subscriber queues, never a persistent state. Every topic shares one
+//! `seq`; each notification also names the previous `seq` delivered to its
+//! subscription, so a consumer of some topics still detects a lost event.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 
-use ditto_protocol::{DesktopEventNotification, DesktopEventPayload, DesktopSnapshot};
+use ditto_protocol::{DesktopEventNotification, DesktopEventPayload, DesktopSnapshot, EventTopic};
 
 #[derive(Clone, Debug)]
 struct Recorded {
     seq: u64,
-    revision: u64,
+    profile_revision: Option<String>,
     payload: DesktopEventPayload,
 }
 
 #[derive(Debug)]
 struct Subscriber {
-    pending: VecDeque<Recorded>,
+    /// Each queued event with the `seq` of the one before it in this
+    /// subscription, so the chain has no gaps even though `seq` does.
+    pending: VecDeque<(Recorded, u64)>,
     /// Why this subscription must restart, once it must.
     resync: Option<String>,
+    topics: BTreeSet<EventTopic>,
+    last: u64,
+}
+
+impl Subscriber {
+    fn wants(&self, payload: &DesktopEventPayload) -> bool {
+        payload
+            .topic()
+            .is_none_or(|topic| self.topics.contains(&topic))
+    }
 }
 
 pub enum Registration {
@@ -34,12 +49,12 @@ pub enum Registration {
 
 pub enum Delivery {
     Events(Vec<DesktopEventNotification>),
-    ResyncRequired(DesktopEventNotification),
+    ResyncRequired(Box<DesktopEventNotification>),
 }
 
 pub struct EventBroker {
     seq: u64,
-    revision: u64,
+    profile_revision: Option<String>,
     next_subscription: u64,
     capacity: usize,
     snapshot: DesktopSnapshot,
@@ -52,7 +67,7 @@ impl EventBroker {
         assert!(capacity > 0, "event capacity must be positive");
         Self {
             seq: 0,
-            revision: 0,
+            profile_revision: None,
             next_subscription: 0,
             capacity,
             snapshot,
@@ -62,15 +77,16 @@ impl EventBroker {
     }
 
     pub fn publish(&mut self, payload: DesktopEventPayload, observed_snapshot: DesktopSnapshot) {
-        self.seq = self.seq.checked_add(1).expect("event sequence exhausted");
-        self.revision = self
-            .revision
-            .checked_add(1)
-            .expect("observation revision exhausted");
         self.snapshot = observed_snapshot;
+        self.publish_event(payload);
+    }
+
+    /// Publish an event that does not change the desktop snapshot.
+    pub fn publish_event(&mut self, payload: DesktopEventPayload) {
+        self.seq = self.seq.checked_add(1).expect("event sequence exhausted");
         let event = Recorded {
             seq: self.seq,
-            revision: self.revision,
+            profile_revision: self.profile_revision.clone(),
             payload,
         };
         self.history.push_back(event.clone());
@@ -78,19 +94,30 @@ impl EventBroker {
             self.history.pop_front();
         }
         for subscriber in self.subscribers.values_mut() {
-            if subscriber.resync.is_some() {
+            if subscriber.resync.is_some() || !subscriber.wants(&event.payload) {
                 continue;
             }
             if subscriber.pending.len() == self.capacity {
                 subscriber.pending.clear();
                 subscriber.resync = Some("queue_overflow".into());
             } else {
-                subscriber.pending.push_back(event.clone());
+                subscriber
+                    .pending
+                    .push_back((event.clone(), subscriber.last));
+                subscriber.last = event.seq;
             }
         }
     }
 
     pub fn register(&mut self, after_seq: Option<u64>) -> Registration {
+        self.register_topics(after_seq, [EventTopic::Desktop].into_iter().collect())
+    }
+
+    pub fn register_topics(
+        &mut self,
+        after_seq: Option<u64>,
+        topics: BTreeSet<EventTopic>,
+    ) -> Registration {
         if let Some(after) = after_seq {
             if after > self.seq
                 || self
@@ -106,20 +133,28 @@ impl EventBroker {
             .checked_add(1)
             .expect("subscription IDs exhausted");
         let subscription_id = format!("subscription-{}", self.next_subscription);
+        let subscriber = Subscriber {
+            pending: VecDeque::new(),
+            resync: None,
+            topics,
+            last: self.seq,
+        };
         let replay = after_seq.map_or_else(Vec::new, |after| {
+            let mut previous = after;
             self.history
                 .iter()
-                .filter(|event| event.seq > after)
-                .map(|event| Self::notification(&subscription_id, event))
+                .filter(|event| event.seq > after && subscriber.wants(&event.payload))
+                .map(|event| {
+                    let notification = Self::notification(&subscription_id, event, previous);
+                    previous = event.seq;
+                    notification
+                })
                 .collect()
         });
-        self.subscribers.insert(
-            subscription_id.clone(),
-            Subscriber {
-                pending: VecDeque::new(),
-                resync: None,
-            },
-        );
+        // Replay covers everything this subscription's topics had up to the
+        // registration `seq`; the first live event links to that `seq`,
+        // whichever of snapshot or replay the consumer used.
+        self.subscribers.insert(subscription_id.clone(), subscriber);
         Registration::Ready {
             subscription_id,
             snapshot: self.snapshot.clone(),
@@ -131,25 +166,51 @@ impl EventBroker {
     pub fn drain(&mut self, subscription_id: &str) -> Option<Delivery> {
         let subscriber = self.subscribers.get_mut(subscription_id)?;
         if let Some(reason) = subscriber.resync.clone() {
+            let previous = subscriber.last;
             self.subscribers.remove(subscription_id);
-            return Some(Delivery::ResyncRequired(DesktopEventNotification {
-                subscription_id: subscription_id.into(),
-                seq: self.seq,
-                revision: self.revision,
-                payload: DesktopEventPayload::ResyncRequired { reason },
-            }));
+            return Some(Delivery::ResyncRequired(Box::new(
+                DesktopEventNotification {
+                    subscription_id: subscription_id.into(),
+                    seq: self.seq,
+                    prev_seq: previous,
+                    profile_revision: self.profile_revision.clone(),
+                    payload: DesktopEventPayload::ResyncRequired { reason },
+                },
+            )));
         }
         Some(Delivery::Events(
             subscriber
                 .pending
                 .drain(..)
-                .map(|event| Self::notification(subscription_id, &event))
+                .map(|(event, previous)| Self::notification(subscription_id, &event, previous))
                 .collect(),
         ))
     }
 
-    pub fn revision(&self) -> u64 {
-        self.revision
+    /// The observation sequence reported as `ResultMeta.observed_seq`.
+    pub fn seq(&self) -> u64 {
+        self.seq
+    }
+
+    pub fn profile_revision(&self) -> Option<String> {
+        self.profile_revision.clone()
+    }
+
+    pub fn set_profile_revision(&mut self, revision: Option<String>) {
+        self.profile_revision = revision;
+    }
+
+    /// End one subscription with `resync_required`, for example when the
+    /// grant it was established under is revoked.
+    pub fn require_resync(&mut self, subscription_id: &str, reason: &str) {
+        if let Some(subscriber) = self.subscribers.get_mut(subscription_id) {
+            subscriber.pending.clear();
+            subscriber.resync = Some(reason.to_string());
+        }
+    }
+
+    pub fn subscription_count(&self) -> usize {
+        self.subscribers.len()
     }
 
     pub fn snapshot(&self) -> &DesktopSnapshot {
@@ -177,11 +238,16 @@ impl EventBroker {
         self.subscribers.remove(subscription_id);
     }
 
-    fn notification(subscription_id: &str, event: &Recorded) -> DesktopEventNotification {
+    fn notification(
+        subscription_id: &str,
+        event: &Recorded,
+        prev_seq: u64,
+    ) -> DesktopEventNotification {
         DesktopEventNotification {
             subscription_id: subscription_id.into(),
             seq: event.seq,
-            revision: event.revision,
+            prev_seq,
+            profile_revision: event.profile_revision.clone(),
             payload: event.payload.clone(),
         }
     }
@@ -229,13 +295,7 @@ mod tests {
             events.iter().map(|event| event.seq).collect::<Vec<_>>(),
             vec![1, 2]
         );
-        assert_eq!(
-            events
-                .iter()
-                .map(|event| event.revision)
-                .collect::<Vec<_>>(),
-            vec![1, 2]
-        );
+        assert!(events.iter().all(|event| event.profile_revision.is_none()));
     }
 
     #[test]
@@ -282,5 +342,82 @@ mod tests {
             DesktopEventPayload::ResyncRequired { .. }
         ));
         assert!(broker.drain(&subscription_id).is_none());
+    }
+}
+
+#[cfg(test)]
+mod topic_tests {
+    use super::*;
+
+    #[test]
+    fn subscribers_only_receive_their_topics_but_share_one_sequence() {
+        let empty = DesktopSnapshot {
+            outputs: vec![],
+            workspaces: vec![],
+            windows: vec![],
+        };
+        let mut broker = EventBroker::new(8, empty.clone());
+        let Registration::Ready {
+            subscription_id: desktop,
+            ..
+        } = broker.register(None)
+        else {
+            panic!()
+        };
+        let Registration::Ready {
+            subscription_id: changes,
+            ..
+        } = broker.register_topics(None, [EventTopic::Changes].into_iter().collect())
+        else {
+            panic!()
+        };
+        broker.set_profile_revision(Some("rev-1".into()));
+        broker.publish(
+            DesktopEventPayload::WorkspaceRemoved {
+                workspace_id: "1".into(),
+            },
+            empty,
+        );
+        broker.publish_event(DesktopEventPayload::ProfileChanged {
+            profile_id: "prf".into(),
+            head_revision: "rev-1".into(),
+            active: true,
+        });
+        let Some(Delivery::Events(first)) = broker.drain(&desktop) else {
+            panic!()
+        };
+        let Some(Delivery::Events(second)) = broker.drain(&changes) else {
+            panic!()
+        };
+        assert_eq!(
+            first.iter().map(|event| event.seq).collect::<Vec<_>>(),
+            vec![1]
+        );
+        assert_eq!(
+            second.iter().map(|event| event.seq).collect::<Vec<_>>(),
+            vec![2]
+        );
+        assert_eq!(second[0].profile_revision.as_deref(), Some("rev-1"));
+        // `seq` skips what the subscription did not ask for; `prev_seq` does not.
+        assert_eq!(second[0].prev_seq, 0);
+        broker.publish_event(DesktopEventPayload::ChangeUpdated {
+            change: Box::new(ditto_protocol::change::ChangeSummary {
+                change_id: "chg".into(),
+                profile_id: "prf".into(),
+                state: ditto_protocol::change::ChangeState::Committed,
+                result: None,
+                origin: ditto_protocol::change::ChangeOrigin::Cli,
+                hot_swap_level: ditto_protocol::change::HotSwapLevel::Instant,
+                title_key: "t".into(),
+                committed_revision: None,
+                confirmation: ditto_protocol::change::Confirmation::NotRequired,
+                created_at: String::new(),
+                updated_at: String::new(),
+            }),
+        });
+        let Some(Delivery::Events(third)) = broker.drain(&changes) else {
+            panic!()
+        };
+        assert_eq!((third[0].seq, third[0].prev_seq), (3, 2));
     }
 }

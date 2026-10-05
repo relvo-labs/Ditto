@@ -1,4 +1,17 @@
 {
+  "$defs": {
+    "EventTopic": {
+      "enum": [
+        "desktop",
+        "changes",
+        "plugins",
+        "notifications",
+        "tasks",
+        "session"
+      ],
+      "type": "string"
+    }
+  },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -7,6 +20,16 @@
       "minimum": 0,
       "type": [
         "integer",
+        "null"
+      ]
+    },
+    "topics": {
+      "description": "Absent means `[\"desktop\"]`, the G0 stream. Each topic needs its own\nscope, so asking for more than the caller may read is refused whole.",
+      "items": {
+        "$ref": "#/$defs/EventTopic"
+      },
+      "type": [
+        "array",
         "null"
       ]
     }

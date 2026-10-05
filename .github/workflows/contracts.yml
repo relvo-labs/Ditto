@@ -2,9 +2,9 @@ name: contracts
 on:
   push:
     branches: [main]
-    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'schema/**', 'packages/protocol/**', 'shell/**', 'tools/avatar-mask/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/contracts.yml']
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'schema/**', 'tests/contract-vectors/**', 'packages/protocol/**', 'shell/**', 'tools/avatar-mask/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/contracts.yml']
   pull_request:
-    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'schema/**', 'packages/protocol/**', 'shell/**', 'tools/avatar-mask/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/contracts.yml']
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'schema/**', 'tests/contract-vectors/**', 'packages/protocol/**', 'shell/**', 'tools/avatar-mask/**', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.github/workflows/contracts.yml']
 jobs:
   verify:
     runs-on: [self-hosted, ditto-ci]
@@ -19,13 +19,22 @@ jobs:
       - name: Install pinned Rust
         run: rustup toolchain install 1.98.1 --profile minimal
       - run: pnpm install --frozen-lockfile
+      # Protocol 0.2: schema and generated TS types are current (D-13).
       - run: cargo run --locked -p ditto-protocol --bin export-schema -- --check
       - run: pnpm --filter @ditto/protocol check:generated
+      # D-23 gate, 0.2 edition: handler, consumer, closed errors, bounded
+      # timeout, readback behind every claim, non-empty known resource_scope.
       - name: Capability catalog consistency
         run: cargo test --locked -p ditto-core every_catalog_entry_has_a_handler_and_a_consumer
+      - name: Catalog rules (scopes, ChangeSet-only config writes)
+        run: 'cargo test --locked -p ditto-protocol catalog::'
       - name: Capability contract behaviour
         run: 'cargo test --locked -p ditto-core --lib tests::'
+      # EX1-06: the same vectors, decoded by Rust and by TS.
+      - name: Shared contract vectors (Rust)
+        run: cargo test --locked -p ditto-core contract_vectors
       - name: Avatar hit mask is current
         run: python3 tools/avatar-mask/generate.py --source apps/desktop-prototype/public/ditto-body.png --output shell/avatar/layers/hit-mask.json --check
       - run: cargo build --locked -p ditto-core
-      - run: pnpm --filter @ditto/protocol test
+      - name: Shared contract vectors and client (TS)
+        run: pnpm --filter @ditto/protocol test

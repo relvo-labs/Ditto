@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "HostKind": {
+      "enum": [
+        "qml",
+        "cordis",
+        "core_builtin"
+      ],
+      "type": "string"
+    },
+    "NewEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "default": {}
+        },
+        "disabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "host": {
+          "$ref": "#/$defs/HostKind"
+        },
+        "package": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "package",
+        "version",
+        "host"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "`before` fields are intent: Core refills them from the base revision and\nrefuses the change when a caller-supplied value disagrees, because the\ncaller planned against a state that no longer exists.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "after": true,
+        "before": true,
+        "op": {
+          "const": "set_value",
+          "type": "string"
+        },
+        "path": {
+          "description": "JSON pointer into the document, limited to `/appearance`, `/avatar`,\n`/layout` and `/shortcuts`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "path",
+        "after"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/NewEntry"
+        },
+        "op": {
+          "const": "add_entry",
+          "type": "string"
+        },
+        "slot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "entry"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": {
+          "type": "string"
+        },
+        "op": {
+          "const": "remove_entry",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "entry_id"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "after": true,
+        "before": true,
+        "entry_id": {
+          "type": "string"
+        },
+        "op": {
+          "const": "set_entry_config",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "entry_id",
+        "after"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "entry_id": {
+          "type": "string"
+        },
+        "op": {
+          "const": "set_entry_disabled",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "entry_id",
+        "disabled"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "op": {
+          "const": "bind_slot",
+          "type": "string"
+        },
+        "slot": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "slot",
+        "to"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "switch_profile",
+          "type": "string"
+        },
+        "to_profile": {
+          "type": "string"
+        },
+        "to_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "op",
+        "to_profile"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ChangeOp"
+}

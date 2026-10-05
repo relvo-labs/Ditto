@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "Appearance": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "type": "string"
+        },
+        "low_power_style": {
+          "default": false,
+          "description": "No blur and no shadow; NFR-05 measures it as its own style.",
+          "type": "boolean"
+        },
+        "reduced_motion": {
+          "default": false,
+          "type": "boolean"
+        },
+        "reduced_transparency": {
+          "default": false,
+          "type": "boolean"
+        },
+        "theme": {
+          "type": "string"
+        },
+        "tokens": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "theme",
+        "locale"
+      ],
+      "type": "object"
+    },
+    "AvatarCorner": {
+      "description": "Where on its output the character sits.",
+      "enum": [
+        "bottom_right",
+        "bottom_left",
+        "top_right",
+        "top_left"
+      ],
+      "type": "string"
+    },
+    "AvatarPlacement": {
+      "additionalProperties": false,
+      "description": "The character's placement as the Shell observes it after laying it out.",
+      "properties": {
+        "corner": {
+          "$ref": "#/$defs/AvatarCorner"
+        },
+        "follows_primary": {
+          "description": "True when the Profile names no output, or names one that is not\nconnected, and the character is on the primary output instead.",
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output": {
+          "description": "The output the character's surface is on; absent when it has no\nsurface (turned off, or no output connected).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visible": {
+          "description": "On screen: false while hidden or turned off.",
+          "type": "boolean"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "description": "The surface rectangle in logical pixels, relative to `output`.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "follows_primary",
+        "corner",
+        "x",
+        "y",
+        "width",
+        "height",
+        "visible"
+      ],
+      "type": "object"
+    },
+    "AvatarSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "animations": {
+          "default": true,
+          "type": "boolean"
+        },
+        "corner": {
+          "$ref": "#/$defs/AvatarCorner",
+          "description": "Which corner of that output the character sits in. A corner is always\ninside the visible area, whatever size the output has."
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "default": false,
+          "type": "boolean"
+        },
+        "output": {
+          "description": "The output the character stays on, by connector name. Absent means\nit follows the primary output; so does a named output that is not\nconnected (unplugged), until it comes back. Absent fields are left out\nof the document, so a Profile written before they existed keeps its\ndigest.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scale": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "enabled",
+        "scale"
+      ],
+      "type": "object"
+    },
+    "PanelMount": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": {
+          "type": "string"
+        },
+        "mounted": {
+          "type": "boolean"
+        },
+        "slot": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "slot",
+        "entry_id",
+        "mounted",
+        "visible"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "appearance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Appearance"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "avatar": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AvatarSettings"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "avatar_placement": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AvatarPlacement"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Where the character actually is, as the Shell laid it out. `avatar`\nabove echoes the settings; this is the readback of their effect."
+    },
+    "mounts": {
+      "items": {
+        "$ref": "#/$defs/PanelMount"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "mounts"
+  ],
+  "title": "ShellObservation",
+  "type": "object"
+}

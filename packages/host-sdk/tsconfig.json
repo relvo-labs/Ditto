@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.host-base.json",
+  "compilerOptions": {
+    // tsconfig `paths` replaces rather than merges, so the base map is repeated with the
+    // SDK's own name added: the example imports `@ditto/host-sdk` as an author would.
+    "paths": {
+      "@ditto/host-sdk": ["./src/index.ts"],
+      "@deepseek-ai/cordis": ["../host-runtime/vendor-types/cordis/src/index.d.ts"],
+      "@deepseek-ai/cosmokit": ["../host-runtime/vendor-types/cosmokit/src/index.d.ts"],
+      "@deepseek-ai/schemastery": ["../host-runtime/vendor-types/schemastery/src/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-loader/diff": ["../host-runtime/vendor-types/loader/src/config/diff.d.ts"],
+      "@deepseek-ai/cordis-plugin-loader": ["../host-runtime/vendor-types/loader/src/index.d.ts"],
+      "@deepseek-ai/cordis-plugin-timer": ["../host-runtime/vendor-types/timer/src/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts", "scripts/*.d.mts"]
+}

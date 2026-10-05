@@ -46,6 +46,18 @@ else
   echo 'development environment has no wp_presentation cross-check build dependencies'
 fi
 
+# Start-up is not the hot path: the boot sync, the first subscriptions and
+# the character's first placement report all happen once. Wait until the
+# Shell has issued no request for 2 s (at most 20 s), so a slow machine does
+# not move its start-up tail into the idle phase. Anything after this counts.
+quiet=0 last=-1
+for _ in $(seq 1 200); do
+  now="$(grep -ac 'ditto-rpc ' "$RUNTIME_DIR/shell.log" || true)"
+  if [[ "$now" == "$last" ]]; then quiet=$((quiet + 1)); else quiet=0; last="$now"; fi
+  (( quiet >= 20 )) && break
+  sleep 0.1
+done
+
 # The reference runtime is shared between runs, so the phase log is per run.
 PHASES="$RUNTIME_DIR/ditto-hotpath-phases-$$.log"
 : >"$PHASES"

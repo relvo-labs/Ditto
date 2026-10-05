@@ -9,13 +9,13 @@ export class ResyncRequired extends Error {
 export class DesktopProjection {
   private current: DesktopSnapshot;
   private currentSeq: number;
-  private currentRevision: number;
   private stale = false;
+  /** Active Profile head when the last event was published (0.2). */
+  profileRevision: string | null = null;
 
   constructor(readonly subscriptionId: string, snapshot: DesktopSnapshot, seq: number) {
     this.current = structuredClone(snapshot);
     this.currentSeq = seq;
-    this.currentRevision = seq;
   }
 
   get seq(): number { return this.currentSeq; }
@@ -31,9 +31,11 @@ export class DesktopProjection {
       this.stale = true;
       throw new ResyncRequired(event.payload.reason);
     }
-    if (event.seq !== this.currentSeq + 1 || event.revision < this.currentRevision) {
+    // One `seq` covers every topic, so it skips what this subscription did
+    // not ask for; `prev_seq` chains the events it did get.
+    if (event.prev_seq !== this.currentSeq || event.seq <= this.currentSeq) {
       this.stale = true;
-      throw new ResyncRequired('event sequence or revision is discontinuous');
+      throw new ResyncRequired('event sequence is discontinuous');
     }
     const payload = event.payload;
     switch (payload.type) {
@@ -57,6 +59,6 @@ export class DesktopProjection {
         break;
     }
     this.currentSeq = event.seq;
-    this.currentRevision = event.revision;
+    this.profileRevision = event.profile_revision ?? null;
   }
 }

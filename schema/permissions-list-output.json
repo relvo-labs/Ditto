@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "Grant": {
+      "additionalProperties": false,
+      "properties": {
+        "expires_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grant_id": {
+          "type": "string"
+        },
+        "granted_at": {
+          "type": "string"
+        },
+        "granted_by": {
+          "type": "string"
+        },
+        "resource": {
+          "description": "For `files:` grants the Shell shows the file name, never the path, in\nexports; the path itself only reaches the process holding the grant.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revoked_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "grant_id",
+        "subject",
+        "scope",
+        "granted_at",
+        "granted_by"
+      ],
+      "type": "object"
+    },
+    "PolicyRow": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "description": "`allowed`, `denied` or `grant_required`.",
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "subject_kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject_kind",
+        "scope",
+        "default"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "grants": {
+      "items": {
+        "$ref": "#/$defs/Grant"
+      },
+      "type": "array"
+    },
+    "policy": {
+      "items": {
+        "$ref": "#/$defs/PolicyRow"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "grants",
+    "policy"
+  ],
+  "title": "PermissionsListOutput",
+  "type": "object"
+}

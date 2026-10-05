@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Node heap figures. Three separate numbers: never summed with each other\nor with the process PSS Core reads from `/proc` (NFR-15).",
+  "properties": {
+    "array_buffers": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "external": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "heap_used": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "heap_used",
+    "external",
+    "array_buffers"
+  ],
+  "title": "ResourcesInput",
+  "type": "object"
+}

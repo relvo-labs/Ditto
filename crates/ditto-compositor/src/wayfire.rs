@@ -39,6 +39,9 @@ const BOUND_TO: &str = "wayfire-ipc";
 /// maximized toplevel.
 const TILED_ALL: u64 = 15;
 
+/// `(wset index, column, row, view ids)` of one workspace cell.
+type Cell = (i64, i64, i64, Vec<u64>);
+
 /// Events this adapter needs. Wayfire sends only what is subscribed to, and an
 /// event never carries state to consumers: it tells Core what to re-read.
 const WATCHED_EVENTS: [&str; 10] = [
@@ -117,6 +120,17 @@ fn classify(method: &str, message: &str) -> AdapterError {
 pub struct WayfireAdapter {
     connection: Connection,
     version: String,
+    socket: std::path::PathBuf,
+    /// `<plugin-path>/libsimple-tile.so` exists (C-15 prepare check).
+    tile_plugin: bool,
+    /// Tiling is on: `tiled-edges == 15` then means "in the tile tree", not
+    /// maximized.
+    tiling: bool,
+    /// Floating geometry recorded before tiling, to restore on the way back.
+    /// Runtime state of the adapter, not configuration.
+    floating_before: std::collections::HashMap<u64, Value>,
+    binder: Option<crate::wayfire_bindings::Binder>,
+    shortcut_handler: Option<crate::ShortcutHandler>,
 }
 
 impl WayfireAdapter {
@@ -129,10 +143,195 @@ impl WayfireAdapter {
             .and_then(Value::as_str)
             .unwrap_or("unknown")
             .to_string();
-        Ok(Self {
+        let tile_plugin = configuration
+            .get("plugin-path")
+            .and_then(Value::as_str)
+            .is_some_and(|path| Path::new(path).join("libsimple-tile.so").exists());
+        let mut adapter = Self {
             connection,
             version,
-        })
+            socket: socket.to_path_buf(),
+            tile_plugin,
+            tiling: false,
+            floating_before: std::collections::HashMap::new(),
+            binder: None,
+            shortcut_handler: None,
+        };
+        adapter.tiling = adapter
+            .plugins()
+            .map(|plugins| has_tile(&plugins))
+            .unwrap_or(false);
+        Ok(adapter)
+    }
+
+    fn plugins(&mut self) -> AdapterResult<String> {
+        let reply = self.connection.request(
+            "wayfire/get-config-option",
+            json!({"option": "core/plugins"}),
+        )?;
+        Ok(reply
+            .get("value")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string())
+    }
+
+    fn set_plugins(&mut self, plugins: &str) -> AdapterResult<()> {
+        self.connection
+            .request(
+                "wayfire/set-config-options",
+                json!({"core/plugins": plugins}),
+            )
+            .map(|_| ())
+    }
+
+    /// Each grid cell of each output with the views on it.
+    fn cells(&mut self) -> AdapterResult<Vec<Cell>> {
+        let outputs = self.output_list()?;
+        let views = self.view_list()?;
+        let mut cells = Vec::new();
+        for output in &outputs {
+            let (Some(output_id), Some(wset)) =
+                (number(output, "id"), number(output, "wset-index"))
+            else {
+                continue;
+            };
+            let current = output.get("workspace");
+            let grid_width = current
+                .and_then(|c| number(c, "grid_width"))
+                .unwrap_or(1)
+                .max(1);
+            let grid_height = current
+                .and_then(|c| number(c, "grid_height"))
+                .unwrap_or(1)
+                .max(1);
+            for row in 0..grid_height {
+                for column in 0..grid_width {
+                    let members: Vec<u64> = views
+                        .iter()
+                        .filter(|view| number(view, "output-id") == Some(output_id))
+                        .filter(|view| {
+                            workspace_of(view, output).as_deref()
+                                == Some(&workspace_id(output_id, column, row))
+                        })
+                        .filter(|view| view.get("minimized").and_then(Value::as_bool) != Some(true))
+                        .filter(|view| {
+                            view.get("fullscreen").and_then(Value::as_bool) != Some(true)
+                        })
+                        .filter_map(|view| number(view, "id").map(|id| id as u64))
+                        .collect();
+                    cells.push((wset, column, row, members));
+                }
+            }
+        }
+        Ok(cells)
+    }
+
+    fn set_tree(&mut self, wset: i64, column: i64, row: i64, views: &[u64]) -> AdapterResult<()> {
+        let split: Vec<Value> = views
+            .iter()
+            .map(|id| json!({"weight": 1.0, "view-id": id}))
+            .collect();
+        self.connection
+            .request(
+                "simple-tile/set-layout",
+                json!({"wset-index": wset, "workspace": {"x": column, "y": row}, "layout": {"vertical-split": split}}),
+            )
+            .map(|_| ())
+    }
+
+    /// Floating → tiling (D-33): load the plugin, wait until it answers,
+    /// then place existing windows into the tree; Wayfire tiles only new ones.
+    fn tile(&mut self) -> AdapterResult<()> {
+        let plugins = self.plugins()?;
+        for view in self.view_list()? {
+            if view.get("tiled-edges").and_then(Value::as_u64).unwrap_or(0) == 0 {
+                if let (Some(id), Some(geometry)) = (number(&view, "id"), view.get("geometry")) {
+                    self.floating_before.insert(id as u64, geometry.clone());
+                }
+            }
+        }
+        if !has_tile(&plugins) {
+            self.set_plugins(&format!("{} simple-tile", plugins.trim()))?;
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(1_500);
+        let first_wset = self
+            .output_list()?
+            .iter()
+            .find_map(|output| number(output, "wset-index"))
+            .unwrap_or(1);
+        loop {
+            let probe = self.connection.request(
+                "simple-tile/get-layout",
+                json!({"wset-index": first_wset, "workspace": {"x": 0, "y": 0}}),
+            );
+            if probe.is_ok() {
+                break;
+            }
+            if std::time::Instant::now() > deadline {
+                // Put the plugin list back: prepare promised no lasting effect.
+                let _ = self.set_plugins(&plugins);
+                return Err(AdapterError::Unavailable(
+                    "simple-tile did not load in time".into(),
+                ));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        for (wset, column, row, members) in self.cells()? {
+            if !members.is_empty() {
+                self.set_tree(wset, column, row, &members)?;
+            }
+        }
+        self.tiling = true;
+        Ok(())
+    }
+
+    /// Tiling → floating (D-33): empty every tree, restore the recorded
+    /// floating geometry, then unload. Unloading first would leave windows at
+    /// tiled geometry with no layout managing them in between.
+    fn float(&mut self) -> AdapterResult<()> {
+        let plugins = self.plugins()?;
+        if !has_tile(&plugins) {
+            self.tiling = false;
+            return Ok(());
+        }
+        let cells = self.cells()?;
+        let mut members = Vec::new();
+        for (wset, column, row, views) in cells {
+            self.set_tree(wset, column, row, &[])?;
+            members.extend(views);
+        }
+        let outputs = self.output_list()?;
+        for view in self.view_list()? {
+            let Some(id) = number(&view, "id").map(|id| id as u64) else {
+                continue;
+            };
+            if !members.contains(&id)
+                && view.get("tiled-edges").and_then(Value::as_u64) != Some(TILED_ALL)
+            {
+                continue;
+            }
+            let geometry = self.floating_before.get(&id).cloned().unwrap_or_else(|| {
+                // Opened while tiled: a default place inside the work area.
+                let area = outputs
+                    .iter()
+                    .find(|output| number(output, "id") == number(&view, "output-id"))
+                    .and_then(|output| output.get("workarea").cloned())
+                    .unwrap_or(json!({"x": 0, "y": 0, "width": 1280, "height": 720}));
+                let (x, y) = (number(&area, "x").unwrap_or(0), number(&area, "y").unwrap_or(0));
+                let (width, height) = (number(&area, "width").unwrap_or(1280), number(&area, "height").unwrap_or(720));
+                json!({"x": x + width / 8, "y": y + height / 8, "width": width * 3 / 4, "height": height * 3 / 4})
+            });
+            self.configure(id, json!({"tiled-edges": 0, "geometry": geometry}))?;
+        }
+        let remaining: Vec<&str> = plugins
+            .split_whitespace()
+            .filter(|plugin| *plugin != "simple-tile")
+            .collect();
+        self.set_plugins(&remaining.join(" "))?;
+        self.floating_before.clear();
+        self.tiling = false;
+        Ok(())
     }
 
     pub fn from_environment() -> AdapterResult<Self> {
@@ -285,12 +484,20 @@ fn geometry(node: &Value) -> Option<(i32, i32, u32, u32)> {
     ))
 }
 
-fn window_state(view: &Value) -> WindowState {
+fn has_tile(plugins: &str) -> bool {
+    plugins
+        .split_whitespace()
+        .any(|plugin| plugin == "simple-tile")
+}
+
+/// With tiling on, all four edges tiled means "in the tile tree"; it is only
+/// a maximized window while floating (D-33 note).
+fn window_state(view: &Value, tiling: bool) -> WindowState {
     if view.get("minimized").and_then(Value::as_bool) == Some(true) {
         WindowState::Minimized
     } else if view.get("fullscreen").and_then(Value::as_bool) == Some(true) {
         WindowState::Fullscreen
-    } else if view.get("tiled-edges").and_then(Value::as_u64) == Some(TILED_ALL) {
+    } else if !tiling && view.get("tiled-edges").and_then(Value::as_u64) == Some(TILED_ALL) {
         WindowState::Maximized
     } else {
         WindowState::Normal
@@ -324,7 +531,7 @@ fn workspace_of(view: &Value, output: &Value) -> Option<String> {
     Some(workspace_id(output_id, column, row))
 }
 
-fn to_window(view: &Value, outputs: &[Value]) -> Option<Window> {
+fn to_window(view: &Value, outputs: &[Value], tiling: bool) -> Option<Window> {
     let id = number(view, "id")?;
     let (x, y, width, height) = geometry(view)?;
     let output = outputs
@@ -343,12 +550,21 @@ fn to_window(view: &Value, outputs: &[Value]) -> Option<Window> {
             .unwrap_or("unknown")
             .to_string(),
         workspace_id: output.and_then(|output| workspace_of(view, output)),
+        // The same name `outputs()` reports; a view whose output is not in
+        // the list (destroyed mid-read) falls back to the view's own field.
+        output: output
+            .and_then(|output| output.get("name"))
+            .or_else(|| view.get("output-name"))
+            .and_then(Value::as_str)
+            // Wayfire writes "null" (or "") for a view with no output.
+            .filter(|name| !name.is_empty() && *name != "null")
+            .map(str::to_string),
         x: Some(x),
         y: Some(y),
         width: Some(width),
         height: Some(height),
         focused: view.get("activated").and_then(Value::as_bool) == Some(true),
-        state: window_state(view),
+        state: window_state(view, tiling),
     })
 }
 
@@ -460,11 +676,89 @@ impl CompositorAdapter for WayfireAdapter {
 
     fn windows(&mut self) -> AdapterResult<Vec<Window>> {
         let outputs = self.output_list()?;
+        let tiling = self.tiling;
         Ok(self
             .view_list()?
             .iter()
-            .filter_map(|view| to_window(view, &outputs))
+            .filter_map(|view| to_window(view, &outputs, tiling))
             .collect())
+    }
+
+    fn supports_layout_strategy(&self, strategy: &str) -> bool {
+        match strategy {
+            "floating" => true,
+            "simple-tile" => self.tile_plugin,
+            _ => false,
+        }
+    }
+
+    fn layout_strategy(&mut self) -> AdapterResult<Option<String>> {
+        let tiling = has_tile(&self.plugins()?);
+        self.tiling = tiling;
+        Ok(Some(if tiling { "simple-tile" } else { "floating" }.into()))
+    }
+
+    /// Options set over IPC are not written to `wayfire.ini` and are lost
+    /// when Wayfire restarts; Core applies the Profile again on reconnect.
+    fn set_layout_strategy(&mut self, strategy: &str) -> AdapterResult<()> {
+        match strategy {
+            "simple-tile" if self.tile_plugin => self.tile(),
+            "simple-tile" => Err(AdapterError::Unsupported(
+                "libsimple-tile.so is not installed".into(),
+            )),
+            "floating" => self.float(),
+            other => Err(AdapterError::Unsupported(format!(
+                "no layout strategy {other}"
+            ))),
+        }
+    }
+
+    fn supports_shortcut_binding(&self) -> bool {
+        true
+    }
+
+    /// Wayfire cannot list IPC bindings (C-16); what is read back is the
+    /// binder's own table of binding ids Wayfire acknowledged.
+    fn shortcuts(&mut self) -> AdapterResult<Vec<ditto_protocol::profile::ShortcutBinding>> {
+        Ok(self
+            .binder
+            .as_ref()
+            .map(|binder| binder.bound())
+            .unwrap_or_default())
+    }
+
+    fn bind_shortcuts(
+        &mut self,
+        bindings: &[ditto_protocol::profile::ShortcutBinding],
+    ) -> AdapterResult<()> {
+        if self.binder.as_ref().is_none_or(|binder| !binder.alive()) {
+            self.binder = Some(crate::wayfire_bindings::Binder::open(
+                &self.socket,
+                self.shortcut_handler.clone(),
+            )?);
+        }
+        self.binder
+            .as_mut()
+            .expect("binder opened")
+            .replace(bindings)
+    }
+
+    fn set_shortcut_handler(&mut self, handler: crate::ShortcutHandler) {
+        self.shortcut_handler = Some(handler.clone());
+        if let Some(binder) = &self.binder {
+            binder.set_handler(handler);
+        }
+    }
+
+    fn workspace_grid(&mut self) -> AdapterResult<Option<[u32; 2]>> {
+        let outputs = self.output_list()?;
+        Ok(outputs.first().and_then(|output| {
+            let current = output.get("workspace")?;
+            Some([
+                number(current, "grid_width").unwrap_or(1).max(1) as u32,
+                number(current, "grid_height").unwrap_or(1).max(1) as u32,
+            ])
+        }))
     }
 
     fn activate_workspace(&mut self, workspace_id: &str) -> AdapterResult<()> {
@@ -500,6 +794,34 @@ impl CompositorAdapter for WayfireAdapter {
         self.configure(
             id,
             json!({"geometry": {"x": x, "y": y, "width": width, "height": height}}),
+        )
+    }
+
+    /// `configure-view` with `output_id` and `geometry` together: the view
+    /// goes to that output first, then takes the geometry, which is relative
+    /// to the new output.
+    fn move_window_to_output(
+        &mut self,
+        window_id: &WindowSessionId,
+        output: &str,
+        x: i32,
+        y: i32,
+    ) -> AdapterResult<()> {
+        let (id, geometry) = self.floating_geometry(window_id)?;
+        let output_id = self
+            .output_list()?
+            .iter()
+            .find(|entry| entry.get("name").and_then(Value::as_str) == Some(output))
+            .and_then(|entry| number(entry, "id"))
+            .ok_or_else(|| AdapterError::NotFound(format!("no output {output}")))?;
+        let width = number(&geometry, "width").unwrap_or(0);
+        let height = number(&geometry, "height").unwrap_or(0);
+        self.configure(
+            id,
+            json!({
+                "output_id": output_id,
+                "geometry": {"x": x, "y": y, "width": width, "height": height}
+            }),
         )
     }
 
@@ -639,19 +961,30 @@ mod tests {
 
     #[test]
     fn reads_a_view_with_its_derived_workspace() {
-        let window = to_window(&view(), &[output()]).expect("window");
+        let window = to_window(&view(), &[output()], false).expect("window");
         assert_eq!(window.id, WindowSessionId("wayfire-view-4".into()));
         assert_eq!(window.app_id, "foot");
         assert_eq!((window.x, window.y), (Some(120), Some(90)));
         assert_eq!(window.state, WindowState::Normal);
         assert_eq!(window.workspace_id.as_deref(), Some("wayfire-ws-1-0-0"));
+        assert_eq!(window.output.as_deref(), Some("HEADLESS-1"));
+    }
+
+    #[test]
+    fn a_view_on_an_unlisted_output_keeps_the_name_it_reports() {
+        let mut view = view();
+        view["output-id"] = json!(9);
+        view["output-name"] = json!("HEADLESS-2");
+        let window = to_window(&view, &[output()], false).expect("window");
+        assert_eq!(window.output.as_deref(), Some("HEADLESS-2"));
+        assert_eq!(window.workspace_id, None);
     }
 
     #[test]
     fn a_view_one_output_width_to_the_right_is_on_the_next_workspace() {
         let mut view = view();
         view["geometry"]["x"] = json!(1400.0);
-        let window = to_window(&view, &[output()]).expect("window");
+        let window = to_window(&view, &[output()], false).expect("window");
         assert_eq!(window.workspace_id.as_deref(), Some("wayfire-ws-1-1-0"));
     }
 
@@ -662,22 +995,24 @@ mod tests {
         view["geometry"]["x"] = json!(2600.0);
         let mut output = output();
         output["workspace"]["x"] = json!(2);
-        let window = to_window(&view, &[output]).expect("window");
+        let window = to_window(&view, &[output], false).expect("window");
         assert_eq!(window.workspace_id.as_deref(), Some("wayfire-ws-1-2-0"));
     }
 
     #[test]
     fn distinguishes_all_four_window_states() {
-        assert_eq!(window_state(&view()), WindowState::Normal);
+        assert_eq!(window_state(&view(), false), WindowState::Normal);
         let mut maximized = view();
         maximized["tiled-edges"] = json!(TILED_ALL);
-        assert_eq!(window_state(&maximized), WindowState::Maximized);
+        assert_eq!(window_state(&maximized, false), WindowState::Maximized);
+        // With tiling on, all edges tiled means "in the tree", not maximized.
+        assert_eq!(window_state(&maximized, true), WindowState::Normal);
         let mut fullscreen = view();
         fullscreen["fullscreen"] = json!(true);
-        assert_eq!(window_state(&fullscreen), WindowState::Fullscreen);
+        assert_eq!(window_state(&fullscreen, false), WindowState::Fullscreen);
         let mut minimized = view();
         minimized["minimized"] = json!(true);
-        assert_eq!(window_state(&minimized), WindowState::Minimized);
+        assert_eq!(window_state(&minimized, false), WindowState::Minimized);
     }
 
     #[test]

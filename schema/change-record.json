@@ -1,0 +1,749 @@
+{
+  "$defs": {
+    "ChangeCard": {
+      "additionalProperties": false,
+      "description": "The change card: prototype contract (kind, title, items, footnote), with\ntranslation keys instead of text.",
+      "properties": {
+        "footnote_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DiffItem"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "title_args": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "title_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "title_key",
+        "items"
+      ],
+      "type": "object"
+    },
+    "ChangeOp": {
+      "description": "`before` fields are intent: Core refills them from the base revision and\nrefuses the change when a caller-supplied value disagrees, because the\ncaller planned against a state that no longer exists.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "after": true,
+            "before": true,
+            "op": {
+              "const": "set_value",
+              "type": "string"
+            },
+            "path": {
+              "description": "JSON pointer into the document, limited to `/appearance`, `/avatar`,\n`/layout` and `/shortcuts`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "path",
+            "after"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry": {
+              "$ref": "#/$defs/NewEntry"
+            },
+            "op": {
+              "const": "add_entry",
+              "type": "string"
+            },
+            "slot": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "entry"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_id": {
+              "type": "string"
+            },
+            "op": {
+              "const": "remove_entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "entry_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "after": true,
+            "before": true,
+            "entry_id": {
+              "type": "string"
+            },
+            "op": {
+              "const": "set_entry_config",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "entry_id",
+            "after"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disabled": {
+              "type": "boolean"
+            },
+            "entry_id": {
+              "type": "string"
+            },
+            "op": {
+              "const": "set_entry_disabled",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "entry_id",
+            "disabled"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "bind_slot",
+              "type": "string"
+            },
+            "slot": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "slot",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "switch_profile",
+              "type": "string"
+            },
+            "to_profile": {
+              "type": "string"
+            },
+            "to_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "to_profile"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChangeOrigin": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "gui",
+              "type": "string"
+            },
+            "surface": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "cli",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "agent_standin",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "rescue",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "supervisor",
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "timed_revert",
+              "type": "string"
+            },
+            "reverts": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reverts"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "undo",
+              "type": "string"
+            },
+            "undoes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "undoes"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "import",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChangeState": {
+      "enum": [
+        "draft",
+        "validated",
+        "rejected",
+        "prepared",
+        "aborted",
+        "applying",
+        "verifying",
+        "committed",
+        "rolling_back",
+        "rolled_back",
+        "partially_applied",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "Confirmation": {
+      "oneOf": [
+        {
+          "properties": {
+            "state": {
+              "const": "not_required",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "deadline": {
+              "type": "string"
+            },
+            "state": {
+              "const": "pending",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "deadline"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "state": {
+              "const": "confirmed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "at"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "by_change": {
+              "type": "string"
+            },
+            "state": {
+              "const": "reverted",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "by_change"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DiffItem": {
+      "additionalProperties": false,
+      "description": "One line of a change card. The label is a translation key so Core never\nemits locale-specific text; the Shell renders it in the Profile's language.",
+      "properties": {
+        "after": true,
+        "before": true,
+        "kind": {
+          "$ref": "#/$defs/DiffKind"
+        },
+        "label_args": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "label_key": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "label_key"
+      ],
+      "type": "object"
+    },
+    "DiffKind": {
+      "enum": [
+        "added",
+        "removed",
+        "changed"
+      ],
+      "type": "string"
+    },
+    "HostKind": {
+      "enum": [
+        "qml",
+        "cordis",
+        "core_builtin"
+      ],
+      "type": "string"
+    },
+    "HotSwapLevel": {
+      "enum": [
+        "instant",
+        "controlled_handoff",
+        "host_restart",
+        "session_restart"
+      ],
+      "type": "string"
+    },
+    "NewEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "default": {}
+        },
+        "disabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "host": {
+          "$ref": "#/$defs/HostKind"
+        },
+        "package": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "package",
+        "version",
+        "host"
+      ],
+      "type": "object"
+    },
+    "OperationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "ended_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "participant": {
+          "type": "string"
+        },
+        "seq": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "seq",
+        "participant",
+        "step",
+        "state",
+        "started_at"
+      ],
+      "type": "object"
+    },
+    "OutcomeItem": {
+      "additionalProperties": false,
+      "description": "What happened to one op, as read back. A partial result lists every item.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "op_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "participant": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/OutcomeStatus"
+        }
+      },
+      "required": [
+        "op_index",
+        "participant",
+        "key",
+        "status"
+      ],
+      "type": "object"
+    },
+    "OutcomeStatus": {
+      "oneOf": [
+        {
+          "enum": [
+            "applied",
+            "failed",
+            "restored",
+            "not_restored",
+            "pending"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "scheduled",
+          "description": "Session-restart level: recorded, applied at the next login.",
+          "type": "string"
+        }
+      ]
+    },
+    "PreflightCode": {
+      "enum": [
+        "base_revision_stale",
+        "schema_invalid",
+        "stale_intent",
+        "package_missing",
+        "integrity_mismatch",
+        "protocol_incompatible",
+        "dependency_missing",
+        "dependency_cycle",
+        "version_conflict",
+        "declared_conflict",
+        "single_provider_violation",
+        "shortcut_conflict",
+        "command_conflict",
+        "permission_required",
+        "precondition_failed",
+        "budget_exceeded"
+      ],
+      "type": "string"
+    },
+    "PreflightReason": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/PreflightCode"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "detail_key": {
+          "type": "string"
+        },
+        "op_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "detail_key"
+      ],
+      "type": "object"
+    },
+    "ResultKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "succeeded",
+            "failed",
+            "partial",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "scheduled",
+          "description": "Committed as a revision, but nothing took effect yet: every item is\n`scheduled` (session-restart level: at the next login; in rescue mode:\nwhen the normal mode returns). Never presented as \"applied\".",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_revision": {
+      "type": "string"
+    },
+    "card": {
+      "$ref": "#/$defs/ChangeCard"
+    },
+    "change_id": {
+      "type": "string"
+    },
+    "committed_revision": {
+      "description": "The revision this change produced, once committed.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confirmation": {
+      "$ref": "#/$defs/Confirmation"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "failure_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hot_swap_level": {
+      "$ref": "#/$defs/HotSwapLevel"
+    },
+    "idempotency_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "default": [],
+      "description": "Per-op outcomes as read back.",
+      "items": {
+        "$ref": "#/$defs/OutcomeItem"
+      },
+      "type": "array"
+    },
+    "operations": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/OperationSummary"
+      },
+      "type": "array"
+    },
+    "ops": {
+      "items": {
+        "$ref": "#/$defs/ChangeOp"
+      },
+      "type": "array"
+    },
+    "origin": {
+      "$ref": "#/$defs/ChangeOrigin"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "reasons": {
+      "default": [],
+      "description": "Every preflight failure, when rejected.",
+      "items": {
+        "$ref": "#/$defs/PreflightReason"
+      },
+      "type": "array"
+    },
+    "recovered_at": {
+      "description": "Set when boot recovery decided this change's outcome.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResultKind"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "$ref": "#/$defs/ChangeState"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "change_id",
+    "profile_id",
+    "base_revision",
+    "state",
+    "hot_swap_level",
+    "origin",
+    "ops",
+    "card",
+    "confirmation",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "ChangeRecord",
+  "type": "object"
+}

@@ -1,0 +1,10 @@
+# The Ditto desktop session. The login script (ditto-session) starts Wayfire
+# and Fcitx in scopes of their own, imports the display into the user manager,
+# then starts this target; logging out stops it. See plan/03/05 §2.
+[Unit]
+Description=Ditto desktop session
+Documentation=file://@DITTO_WORKSPACE@/plan/03/05-platform-supervision-and-rescue.md
+BindsTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+Wants=ditto-core.service ditto-supervisor.service

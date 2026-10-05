@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "expected_sha256": {
+      "description": "When given, the package's sha256 must match (the lock a Profile or an\nimport expects).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "idempotency_key"
+  ],
+  "title": "PluginsInstallInput",
+  "type": "object"
+}

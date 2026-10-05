@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ExecStart= of ditto-rescue.service. The rescue UI is its own Quickshell
+# configuration (shell/rescue/, D-29) with no character, providers or plugin
+# QML. If Quickshell itself cannot run (a broken Qt, say), the fallback is
+# `dittoctl rescue` in foot: text, and nothing of the Shell's stack.
+set -uo pipefail
+
+workspace="${DITTO_WORKSPACE:?}"
+qt_prefix="${DITTO_QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
+rescue_qml="$workspace/shell/rescue/shell.qml"
+dittoctl="$workspace/target/release/dittoctl"
+
+if [[ -f "$rescue_qml" && -x "$qt_prefix/bin/quickshell" ]]; then
+  started=$SECONDS
+  "$qt_prefix/bin/quickshell" --no-color -p "$rescue_qml"
+  status=$?
+  # A normal exit (the user closed it, or the main Shell came back and systemd
+  # stopped this unit) is not a failure to fall back from.
+  [[ $status -eq 0 ]] && exit 0
+  echo "rescue UI exited with status $status after $((SECONDS - started)) s; falling back to dittoctl rescue" >&2
+else
+  echo "no rescue UI at $rescue_qml; using dittoctl rescue" >&2
+fi
+exec foot --title 'Ditto rescue' -- "$dittoctl" rescue

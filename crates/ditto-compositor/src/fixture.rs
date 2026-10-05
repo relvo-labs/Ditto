@@ -3,10 +3,13 @@
 //! control for tiled windows, no minimize or maximize state) so a consumer that
 //! works against the fixture also meets `unsupported` on the real path. Numbers
 //! or capability claims produced against it are not compositor evidence.
+//! Window positions are relative to the window's output, as on Wayfire.
 
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use ditto_protocol::{Output, Window, WindowSessionId, WindowState, Workspace};
+use ditto_protocol::{
+    profile::ShortcutBinding, Output, Window, WindowSessionId, WindowState, Workspace,
+};
 
 use crate::{
     AdapterError, AdapterResult, CompositorAdapter, CompositorChange, EventSource, Support,
@@ -21,6 +24,8 @@ pub struct FixtureCompositor {
     floating: Vec<WindowSessionId>,
     changes: Sender<CompositorChange>,
     connected: bool,
+    strategy: String,
+    shortcuts: Vec<ShortcutBinding>,
 }
 
 pub struct FixtureEventSource {
@@ -59,6 +64,7 @@ impl FixtureCompositor {
                     title: "terminal".into(),
                     app_id: "fixture.terminal".into(),
                     workspace_id: Some("1".into()),
+                    output: Some("FIXTURE-1".into()),
                     x: Some(0),
                     y: Some(0),
                     width: Some(960),
@@ -71,6 +77,7 @@ impl FixtureCompositor {
                     title: "notes".into(),
                     app_id: "fixture.editor".into(),
                     workspace_id: Some("1".into()),
+                    output: Some("FIXTURE-1".into()),
                     x: Some(100),
                     y: Some(100),
                     width: Some(640),
@@ -82,6 +89,8 @@ impl FixtureCompositor {
             floating: vec![floating],
             changes,
             connected: true,
+            strategy: "floating".into(),
+            shortcuts: vec![],
         };
         (compositor, FixtureEventSource { changes: receiver })
     }
@@ -89,6 +98,58 @@ impl FixtureCompositor {
     /// Drop the compositor connection, as a compositor restart would.
     pub fn disconnect(&mut self) {
         self.connected = false;
+    }
+
+    /// Plug in an output, to the right of the rightmost one.
+    pub fn add_output(&mut self, name: &str, width: u32, height: u32) {
+        let x = self
+            .outputs
+            .iter()
+            .map(|output| output.x + output.width as i32)
+            .max()
+            .unwrap_or(0);
+        self.outputs.push(Output {
+            name: name.into(),
+            width,
+            height,
+            scale: 1.0,
+            x,
+            y: 0,
+            enabled: true,
+        });
+        self.announce(CompositorChange::Outputs);
+    }
+
+    /// Unplug an output. With `compositor_moves` the fixture behaves like
+    /// Wayfire (C-18): windows go to the first remaining output, keeping
+    /// their output-local position even where it is now outside the output.
+    /// Without it they keep naming the output that is gone, as a compositor
+    /// that does nothing would leave them.
+    pub fn remove_output(&mut self, name: &str, compositor_moves: bool) {
+        self.outputs.retain(|output| output.name != name);
+        if compositor_moves {
+            let remaining = self.outputs.first().map(|output| output.name.clone());
+            for window in &mut self.windows {
+                if window.output.as_deref() == Some(name) {
+                    window.output = remaining.clone();
+                }
+            }
+        }
+        self.announce(CompositorChange::Outputs);
+    }
+
+    /// Put a window anywhere, tiled or not: test setup, not a capability.
+    pub fn place(&mut self, window_id: &WindowSessionId, output: &str, x: i32, y: i32) {
+        if let Some(window) = self
+            .windows
+            .iter_mut()
+            .find(|window| window.id == *window_id)
+        {
+            window.output = Some(output.into());
+            window.x = Some(x);
+            window.y = Some(y);
+        }
+        self.announce(CompositorChange::Windows);
     }
 
     fn online(&self) -> AdapterResult<()> {
@@ -213,6 +274,29 @@ impl CompositorAdapter for FixtureCompositor {
         Ok(())
     }
 
+    fn move_window_to_output(
+        &mut self,
+        window_id: &WindowSessionId,
+        output: &str,
+        x: i32,
+        y: i32,
+    ) -> AdapterResult<()> {
+        self.coordinate_target(window_id)?;
+        if !self.outputs.iter().any(|known| known.name == output) {
+            return Err(AdapterError::NotFound(format!("no output {output}")));
+        }
+        let window = self.window_mut(window_id)?;
+        window.output = Some(output.into());
+        window.x = Some(x);
+        window.y = Some(y);
+        self.announce(CompositorChange::Windows);
+        Ok(())
+    }
+
+    fn fixture(&mut self) -> Option<&mut FixtureCompositor> {
+        Some(self)
+    }
+
     fn resize_window(
         &mut self,
         window_id: &WindowSessionId,
@@ -250,6 +334,86 @@ impl CompositorAdapter for FixtureCompositor {
         self.announce(CompositorChange::Windows);
         Ok(())
     }
+
+    /// The fixture can switch between the two G1 strategies and hold a
+    /// binding table, so Core's transaction path can be tested without a
+    /// compositor. It is not evidence that a real compositor can (C-15/C-16).
+    fn supports_layout_strategy(&self, strategy: &str) -> bool {
+        matches!(strategy, "floating" | "simple-tile")
+    }
+
+    fn layout_strategy(&mut self) -> AdapterResult<Option<String>> {
+        self.online()?;
+        Ok(Some(self.strategy.clone()))
+    }
+
+    fn set_layout_strategy(&mut self, strategy: &str) -> AdapterResult<()> {
+        self.online()?;
+        if !self.supports_layout_strategy(strategy) {
+            return Err(AdapterError::Unsupported(format!(
+                "unknown strategy {strategy}"
+            )));
+        }
+        if self.strategy == strategy {
+            return Ok(());
+        }
+        self.strategy = strategy.into();
+        // Like a tiling layout: switching to simple-tile takes every window
+        // on the active workspace into equal columns, and the geometry it
+        // had while floating is gone. Switching back leaves windows where the
+        // tiler put them, now floating; putting them back is Core's job.
+        let active = self
+            .workspaces
+            .iter()
+            .find(|workspace| workspace.active)
+            .map(|workspace| workspace.id.clone());
+        if strategy == "simple-tile" {
+            let output = self.outputs.first().cloned();
+            let tiled: Vec<usize> = (0..self.windows.len())
+                .filter(|index| self.windows[*index].workspace_id == active)
+                .collect();
+            if let (Some(output), false) = (output, tiled.is_empty()) {
+                let width = output.width / tiled.len() as u32;
+                for (column, index) in tiled.into_iter().enumerate() {
+                    let window = &mut self.windows[index];
+                    window.output = Some(output.name.clone());
+                    window.x = Some((column as u32 * width) as i32);
+                    window.y = Some(0);
+                    window.width = Some(width);
+                    window.height = Some(output.height);
+                    let id = window.id.clone();
+                    self.floating.retain(|floating| *floating != id);
+                }
+            }
+        } else {
+            self.floating = self
+                .windows
+                .iter()
+                .map(|window| window.id.clone())
+                .collect();
+        }
+        self.announce(CompositorChange::Windows);
+        Ok(())
+    }
+
+    fn supports_shortcut_binding(&self) -> bool {
+        true
+    }
+
+    fn shortcuts(&mut self) -> AdapterResult<Vec<ShortcutBinding>> {
+        self.online()?;
+        Ok(self.shortcuts.clone())
+    }
+
+    fn bind_shortcuts(&mut self, bindings: &[ShortcutBinding]) -> AdapterResult<()> {
+        self.online()?;
+        self.shortcuts = bindings.to_vec();
+        Ok(())
+    }
+
+    fn workspace_grid(&mut self) -> AdapterResult<Option<[u32; 2]>> {
+        Ok(Some([3, 3]))
+    }
 }
 
 impl EventSource for FixtureEventSource {
@@ -277,6 +441,63 @@ mod tests {
         let floating = WindowSessionId("fixture-window-2".into());
         compositor.move_window(&floating, 10, 10).unwrap();
         assert_eq!(compositor.window(&floating).unwrap().x, Some(10));
+    }
+
+    #[test]
+    fn every_window_names_its_output() {
+        let (mut compositor, _events) = FixtureCompositor::paired();
+        let outputs: Vec<String> = compositor
+            .outputs()
+            .unwrap()
+            .into_iter()
+            .map(|output| output.name)
+            .collect();
+        for window in compositor.windows().unwrap() {
+            let output = window.output.expect("the fixture names every output");
+            assert!(outputs.contains(&output), "{output} is a listed output");
+        }
+    }
+
+    #[test]
+    fn a_window_moves_onto_another_output_and_an_unplug_can_strand_it() {
+        let (mut compositor, _events) = FixtureCompositor::paired();
+        compositor.add_output("FIXTURE-2", 1280, 720);
+        let floating = WindowSessionId("fixture-window-2".into());
+        compositor
+            .move_window_to_output(&floating, "FIXTURE-2", 50, 60)
+            .unwrap();
+        let window = compositor.window(&floating).unwrap();
+        assert_eq!(window.output.as_deref(), Some("FIXTURE-2"));
+        assert_eq!((window.x, window.y), (Some(50), Some(60)));
+        assert!(matches!(
+            compositor.move_window_to_output(&floating, "FIXTURE-9", 0, 0),
+            Err(AdapterError::NotFound(_))
+        ));
+        let tiled = WindowSessionId("fixture-window-1".into());
+        assert!(matches!(
+            compositor.move_window_to_output(&tiled, "FIXTURE-2", 0, 0),
+            Err(AdapterError::Unsupported(_))
+        ));
+        compositor.remove_output("FIXTURE-2", false);
+        assert_eq!(
+            compositor.window(&floating).unwrap().output.as_deref(),
+            Some("FIXTURE-2"),
+            "without compositor_moves the window still names the lost output"
+        );
+    }
+
+    #[test]
+    fn an_unplug_like_wayfire_moves_windows_to_the_remaining_output() {
+        let (mut compositor, _events) = FixtureCompositor::paired();
+        compositor.add_output("FIXTURE-2", 2560, 1440);
+        let floating = WindowSessionId("fixture-window-2".into());
+        compositor
+            .move_window_to_output(&floating, "FIXTURE-2", 2200, 1200)
+            .unwrap();
+        compositor.remove_output("FIXTURE-2", true);
+        let window = compositor.window(&floating).unwrap();
+        assert_eq!(window.output.as_deref(), Some("FIXTURE-1"));
+        assert_eq!(window.x, Some(2200), "the position is kept, off-screen");
     }
 
     #[test]

@@ -1,0 +1,33 @@
+{
+  "$defs": {
+    "Urgency": {
+      "enum": [
+        "low",
+        "normal",
+        "critical"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "What Core asks the `svc.notification_policy` provider, with a 50 ms\ndeadline. Body text is not sent: the rules do not need it.",
+  "properties": {
+    "app_name": {
+      "type": "string"
+    },
+    "at": {
+      "type": "string"
+    },
+    "urgency": {
+      "$ref": "#/$defs/Urgency"
+    }
+  },
+  "required": [
+    "app_name",
+    "urgency",
+    "at"
+  ],
+  "title": "PolicyDecideInput",
+  "type": "object"
+}

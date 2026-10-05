@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "ShortcutInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "bound": {
+          "type": "boolean"
+        },
+        "chord": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "conflict": {
+          "type": "boolean"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "reserved": {
+          "description": "Kept by Core (rescue, lock); a plugin may not declare these.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "chord",
+        "command",
+        "owner",
+        "bound",
+        "conflict",
+        "reserved"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "binding_path": {
+      "description": "How shortcuts reach the compositor on this platform (C-16).",
+      "type": "string"
+    },
+    "shortcuts": {
+      "items": {
+        "$ref": "#/$defs/ShortcutInfo"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "shortcuts",
+    "binding_path"
+  ],
+  "title": "ShortcutsListOutput",
+  "type": "object"
+}

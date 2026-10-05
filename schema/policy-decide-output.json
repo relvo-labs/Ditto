@@ -1,0 +1,30 @@
+{
+  "$defs": {
+    "PolicyDecision": {
+      "enum": [
+        "show",
+        "merge",
+        "silence"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decision": {
+      "$ref": "#/$defs/PolicyDecision"
+    },
+    "rule": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "decision"
+  ],
+  "title": "PolicyDecideOutput",
+  "type": "object"
+}

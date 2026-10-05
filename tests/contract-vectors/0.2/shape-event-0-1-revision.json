@@ -1,0 +1,2 @@
+{"kind": "shape", "description": "0.1 形狀（revision 數字、沒有 prev_seq）不再被接受", "type": "desktop-event-notification", "valid": false,
+ "value": {"subscription_id": "subscription-1", "seq": 7, "revision": 7, "payload": {"type": "window_removed", "window_id": "w"}}}

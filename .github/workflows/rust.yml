@@ -2,9 +2,9 @@ name: rust
 on:
   push:
     branches: [main]
-    paths: ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**', '.github/workflows/rust.yml']
+    paths: ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**', 'tests/contract-vectors/**', 'scripts/check-release-fault-points.sh', '.github/workflows/rust.yml']
   pull_request:
-    paths: ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**', '.github/workflows/rust.yml']
+    paths: ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**', 'tests/contract-vectors/**', 'scripts/check-release-fault-points.sh', '.github/workflows/rust.yml']
 jobs:
   verify:
     runs-on: [self-hosted, ditto-ci]
@@ -14,4 +14,31 @@ jobs:
         run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # Store migrations, the ChangeSet state machine, preflight negatives
+      # (EX1-02), authorization, recovery and the Rust half of the contract
+      # vectors all run here and block the merge.
       - run: cargo test --workspace --locked
+  fault-injection:
+    runs-on: [self-hosted, ditto-ci]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal --component clippy
+      - run: cargo clippy -p ditto-core -p ditto-store --features ditto-core/fault-injection --all-targets --locked -- -D warnings
+      # EX1-09 with the real binary: SIGKILL in prepared/applying/verifying,
+      # SQLITE_FULL and SQLITE_IOERR at commit, a failed unpack.
+      - run: cargo test -p ditto-core --features fault-injection --locked --test persistence_faults
+      # Positive control for the release check below: a fault-injection
+      # build must be caught, or the check proves nothing.
+      - run: cargo build --locked -p ditto-core --features fault-injection
+      - run: '! scripts/check-release-fault-points.sh target/debug/ditto-core'
+  release-has-no-fault-points:
+    runs-on: [self-hosted, ditto-ci]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - run: cargo build --release --locked -p ditto-core -p dittoctl -p ditto-supervisor
+      # A release build must not contain the fault points nor read DITTO_FAULT
+      # (plan/03/01 §1.3, 06 §4).
+      - run: scripts/check-release-fault-points.sh target/release/ditto-core target/release/dittoctl target/release/ditto-supervisor

@@ -12,7 +12,7 @@ import type { Workspace } from './generated/workspace.js';
 import type { WorkspacesListOutput } from './generated/workspaces-list-output.js';
 import { DesktopProjection, ResyncRequired } from './events.js';
 
-const protocolVersion = '0.1.0';
+export const protocolVersion = '0.2.0';
 const maxLineBytes = 1_048_576;
 
 type Response = {
@@ -58,7 +58,7 @@ export class DittoClient {
   static async connect(
     socketPath: string,
     token: string,
-    client: { kind: string; version: string } = { kind: 'dittoctl', version: '0.1.0' },
+    client: { kind: string; version: string } = { kind: 'dittoctl', version: '0.2.0' },
   ): Promise<{ client: DittoClient; handshake: HandshakeOutput }> {
     const instance = new DittoClient();
     try {

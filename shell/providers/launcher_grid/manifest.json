@@ -1,0 +1,64 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.launcher.grid",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "網格式啟動器",
+    "en": "Grid launcher"
+  },
+  "author": "Ditto",
+  "license": "UNLICENSED",
+  "source": "builtin",
+  "description": {
+    "zh-TW": "全螢幕網格，依類別分頁；方向鍵選擇。",
+    "en": "Full-screen grid by category; arrow keys to choose."
+  },
+  "plugin_kind": "qml_provider",
+  "host_kind": "qml",
+  "trust_level": "trusted",
+  "runtime": {
+    "qt": ">=6.10"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.2",
+  "slots": [
+    "ui.launcher"
+  ],
+  "provides": [],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "qml_entry": "qml/LauncherGrid.qml",
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "commands": [
+    {
+      "id": "launcher.toggle",
+      "title_key": "command.launcher.toggle"
+    }
+  ],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "migrations": [],
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8
+  },
+  "rescue": {
+    "disable_safe": true
+  }
+}

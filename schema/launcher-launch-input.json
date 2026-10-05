@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "app_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "open_uri": {
+      "description": "Opens with the default application for its type (`xdg-mime`).",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "title": "LauncherLaunchInput",
+  "type": "object"
+}

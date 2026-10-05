@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "AppEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "app_id": {
+          "type": "string"
+        },
+        "categories": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "generic_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "icon": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "name",
+        "categories",
+        "keywords"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "apps": {
+      "items": {
+        "$ref": "#/$defs/AppEntry"
+      },
+      "type": "array"
+    },
+    "indexed_at": {
+      "description": "The index is a rebuildable cache, not configuration.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "apps"
+  ],
+  "title": "LauncherAppsOutput",
+  "type": "object"
+}

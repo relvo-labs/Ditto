@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Rescue actions work on the Profile only; they need no plugin code.",
+  "properties": {
+    "idempotency_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target": {
+      "description": "An entry id, or a package id (every entry of that package).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target"
+  ],
+  "title": "RescueDisableInput",
+  "type": "object"
+}
