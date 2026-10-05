@@ -38,7 +38,7 @@
 | D-03 | Qt／Quickshell／Rust／Node 版本 | **2026-09-22 已決定**：Qt 6.10.2、Quickshell 0.3.1、Rust 1.98.1、Node 22.23.2、pnpm 10.11.0（[紀錄](../../.agents/notes/decisions/2026-09-22-d03-toolchain-freeze.md)） | G0 | 全體 |
 | D-04 | **Cordis 來源**（Harness vendored fork vs 上游） | 沿用 Harness fork 的鎖定 commit；理由見 [02 §1](02-cordis-adoption.md#1-來源與版本鎖定) | G1 前 | Runtime |
 | D-05 | Harness 移植範圍（哪些具體套件） | 模型適配器、工具、會話三類；具體清單由 G0／G1 盤點決定 | G2 前 | Runtime＋Agent |
-| D-06 | 分層資源預算與工具硬上限 | **部分已決定**：D-06b 工具三類初始配額已核定（[紀錄](../../.agents/notes/decisions/2026-09-22-d06b-tool-quotas.md)）；D-06a Core／Shell PSS 等合格三次量測 | G0／G1 | 全體 |
+| D-06 | 分層資源預算與工具硬上限 | **部分已決定**：D-06b 工具三類初始配額已核定（[紀錄](../../.agents/notes/decisions/2026-09-22-d06b-tool-quotas.md)）；D-06a Core／Shell PSS：2026-10-05 已取得合格三次冷登入量測，[提案](../../.agents/notes/decisions/2026-10-05-d06a-core-shell-pss.md)待核定 | G0／G1 | 全體 |
 | D-07 | 嵌入式腳本引擎（QuickJS／Lua） | **不列入 MVP**；P1 另行選型 | P1 | Runtime |
 | D-08 | 生成執行隔離實作 | 先受限模板與隔離試載入，不直接啟用任意程式 | G1 前 | Runtime＋安全 |
 | D-09 | 模型、預算與憑證儲存 | 一供應者、可替換契約、獨立秘密引用（Secret Service 首選） | G2 前 | Agent＋產品 |

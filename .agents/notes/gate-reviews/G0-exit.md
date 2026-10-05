@@ -2,7 +2,7 @@
 
 | 欄位 | 內容 |
 | --- | --- |
-| 評審日期 | 2026-09-22（預檢；尚未達成出口） |
+| 評審日期 | 2026-09-22（預檢；尚未達成出口）；2026-10-05 更新 EX-05、EX-06 |
 | 版本指紋 | Ditto `6dfa07d` ＋未提交工作樹；Rust 1.98.1；Node 22.23.2；pnpm 10.11.0；Qt 6.10.2；Quickshell 0.3.1；Wayfire 0.11.0-d3990237／wlroots 0.20.2 |
 | 參考機 | `ditto-ref-ws-rtx4060-01`；Ubuntu 24.04.2、kernel 6.17.0-40、Ryzen 9 7945HX、RTX 4060／570.211.01、1920×1080@60 Hz、scale 1 |
 | 出席 | 產品 owner Lei-k；本紀錄為自動化預檢，尚待正式評審與工作流 owner 確認 |
@@ -17,8 +17,8 @@
 | EX-02 合成器缺口與 D-02 | 未通過 | `artifacts/g0/compositor-probe-wayfire-0.11.0-d3990237-2026-09-22T15:36:44Z-6dfa.json`；[能力差異表](../../../docs/platform/compositor-capability-matrix.md)；[D-02](../decisions/2026-09-22-d02-compositor-wayfire.md) | C-01～07 與 C-09～14 在 G0 要求範圍均有結論；阻斷列 C-08 尚未觀察到中文提交 |
 | EX-03 Shell 重啟存活 | 條件通過 | `artifacts/g0/shell-restart-2026-09-22T15:05:18Z-6dfa.json` | 10 次 TERM＋10 次 KILL 全部存活；Kate 未儲存緩衝雜湊一致；重啟中位數 115 ms。變更進版後以該 commit 重跑即可解除條件。2026-09-27 以 `7333c20` 重跑三次，每次 20／20 存活、Kate 緩衝不變、重啟中位數 63～64 ms；待出口評審確認解除 |
 | EX-04 幀時與熱路徑 | 條件通過；**2026-09-27 使用者裁定 36303881879 算通過** | `artifacts/g0/frametime-2026-09-22T15:17:18Z-6dfa.jsonl`、`...15:17:56Z...`、`...15:18:34Z...` 與同 run id 的 `hotpath-rpc-count-*`／`presentation-*` | 三次均達幀時門檻且熱路徑 RPC 為 0。2026-09-27 以已進版的 `7333c20` 在參考機重跑三次（見 EX-09）：熱路徑 RPC 都是 0，QML 各段 ≥98.5%；但第 1 次（36303881879）的 `wp_presentation` 整段只有 94.41% ≤16.7 ms、p95 16.701 ms，低於 95%，另兩次為 97.77%、96.09%。nightly 腳本不擋這一項，因此綠燈不代表 EX-04 成立。**2026-09-27 使用者（參考機 owner）裁定該次算通過**：判準是「每段 ≥95%」，QML 逐段最低為 98.5%，`wp_presentation` 是整段交叉檢查，差距為 0.59 個百分點、p95 超出 0.001 ms。本裁定不改變門檻；若之後的執行再出現整段低於 95%，須重新提出 |
-| EX-05 資源預算與配額核定 | 未通過 | `artifacts/g0/quota-baseline-2026-09-22T14:46:14Z-6dfa.json`；[D-06b](../decisions/2026-09-22-d06b-tool-quotas.md) | 配額已核定；仍缺三次真正 cold login、300 秒暖機、600 秒採樣，以及角色關閉／減少動畫兩組。`resource-report-2026-09-22T14:40:17Z-6dfa.md` 是縮短試跑，報告本身已標明不可作 EX-05 證據 |
-| EX-06 契約與目錄一致性 | 條件通過 | 本機 CI 等價檢查：Rust 41 tests、TS 9 tests、fmt、clippy、schema 新鮮度、15 個 skill lint 均通過 | GitHub 上的 workflow 尚未包含本工作樹；變更進版並由 `contracts.yml` 成功執行後解除條件 |
+| EX-05 資源預算與配額核定 | **三次冷登入已量完，待 D-06a 核定** | 分支 `g0/ex05-sample-span` `1fdbb7f` worktree 的 `artifacts/g0/resource-report-cold-login-{standard,avatar-off,reduced-motion}-2026-10-05T13:12:15Z.md`；[D-06a 提案](../decisions/2026-10-05-d06a-core-shell-pss.md) | 2026-10-05 在參考機以 GDM 冷登入各狀態三次（暖機 300 秒、採樣 600 秒、報告條件齊全）：Core 2.1 MiB、Shell 150 MiB（角色關閉 125～128、減少動畫 141～142）、合成器 151～154、Fcitx 51 MiB（中位數）。同日稍早的九次因工作階段範本寫死主倉庫路徑而量到錯的程式，已標為不可用。量測流程本身另修了取樣跨度（595→603 秒）。**解除條件：D-06a 由 owner 核定** |
+| EX-06 契約與目錄一致性 | **CI 條件已解除，待評審確認** | `main` `082aaf8` 的 `contracts`、`rust`、`node` 等 workflow 全綠 | 2026-10-05 發現 `contracts.yml` 自協定 0.2 起是無效 YAML（`catalog::` 未加引號），PR 上從未執行；修正後在 PR #10 與 `main` 通過 |
 | EX-07 身分無法自述 | 條件通過；**CI 紀錄已產生** | 參考機執行 `tests/g0/identity-negative/run.sh`：正例成功、三項負例皆 `identity_rejected` | 2026-09-27 起 `nightly-refmachine` 內含此步驟，`7333c20` 的三次參考機執行都成功，可作為 CI 執行紀錄 |
 | EX-08 中文輸入鏈路 | 未通過 | [輸入法報告](../../../docs/platform/input-method-report.md) §5；`artifacts/g0-vm/2026-09-27T05:43:05Z-45e3/` | 2026-09-27 開發 VM：在 GDM 登入工作階段中以核心 uinput 鍵盤輸入，QML／foot／Kate 都提交 `你好`，三方剪貼簿一致，候選窗截圖貼近游標。這證明 `stipc` 失敗是注入器的限制。仍缺參考機上實體鍵盤的最終 JSON 與錄影 |
 | EX-09 真機 runner nightly | 未通過 | [D-19](../decisions/2026-09-22-d19-reference-runner.md)、[D-36](../decisions/2026-09-27-d36-ex09-same-day-runs.md)；run 36269089432 | 2026-09-26 第一晚測試步驟全綠，但因上傳拒收含 `:` 的檔名而判失敗，已修正。D-36 把判準放寬為同一 commit 的 3 次獨立參考機執行。`7333c20`：VM 三輪 9／9，參考機 36303881879／36303886123／36303890347 全數成功並上傳。**依 D-36 判準成立，待出口評審確認** |
@@ -65,3 +65,13 @@ D-06b 的三項控制器案例已成立：記憶體超限只終止 scope、CPU q
 ## 5. 下一階段的估算修正
 
 D-02 選擇 Wayfire 後，Core 的 13 項 G0 能力與轉接已落地；C-04／05 的 Wayfire IPC 成本不再是未知數。D-21 的 G0 估算修正仍需產品／工作流 owner 核定；本次預檢不代替人力承諾。G1 在本評審仍有未通過項目時不得以「G0 已出口」為前提啟動依賴它們的工作。
+
+## 6. 2026-10-05 更新
+
+- EX-05：見上表；量測完成，等 D-06a 核定。
+- EX-06：見上表；`main` 上的 CI 紀錄成立。
+- EX-01／03／04／07／09：2026-09-27 以 `7333c20` 重跑的結果仍有效；出口評審確認即可。
+- **EX-02／EX-08（C-08 中文輸入）仍未通過**：需要有人在參考機的實體鍵盤上，從登入管理器進入「Ditto G0 (Wayfire)」，執行 `tests/g0/input-method/manual-session.sh` 並錄影。這一項無法自動完成（VM 的 uinput 鍵盤只證明鏈路，不是實體鍵盤證據）。
+- G0-PLAT-01 的第二人重建、工作流 owner 與估算核定，仍待人執行。
+- 參考機的 GDM 設定在量測期間暫時改為自動登入，量測後已還原（與備份逐字相同）；原本的 Ubuntu GNOME 工作階段經使用者同意後結束。舊的 Ditto store 移到 `~/.local/share/ditto.before-ref-2026-10-05`，未刪除。
+
