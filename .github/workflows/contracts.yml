@@ -27,7 +27,7 @@ jobs:
       - name: Capability catalog consistency
         run: cargo test --locked -p ditto-core every_catalog_entry_has_a_handler_and_a_consumer
       - name: Catalog rules (scopes, ChangeSet-only config writes)
-        run: cargo test --locked -p ditto-protocol catalog::
+        run: 'cargo test --locked -p ditto-protocol catalog::'
       - name: Capability contract behaviour
         run: 'cargo test --locked -p ditto-core --lib tests::'
       # EX1-06: the same vectors, decoded by Rust and by TS.
