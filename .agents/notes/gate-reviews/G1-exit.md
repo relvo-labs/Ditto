@@ -2,32 +2,33 @@
 
 | 欄位 | 內容 |
 | --- | --- |
-| 預檢日期 | 2026-09-27；**尚未進行出口評審** |
-| 來源版本 | `effbfb9` 加本工作樹未提交修改；下列本機測試只能算開發證據 |
-| 判定 | **G1 未完成，EX1-01～15 均未取得完整出口證據** |
+| 預檢日期 | 2026-10-05（前一版 2026-09-27）；**尚未進行出口評審** |
+| 來源版本 | `main` `082aaf8`（PR #10 合併；CI 全綠）與其後的 `cb97f72`（參考機夾具修正，量測後進版）；G0 量測分支 `g0/ex05-sample-span` |
+| 參考機 | `ditto-ref-ws-rtx4060-01`，每份結果都通過 preflight 並附指紋，`evidence_class: reference-machine` |
+| 判定 | **G1 尚未出口。** 十五項的自動化部分在參考機上大多已通過；仍缺的是人工簽核與錄影、第二台實體螢幕、連續五晚 nightly、EX1-10 的預算核定，以及 G0 的 C-08／D-06a |
 | 判準 | [plan/03/01 §3](../../../plan/03/01-scope-and-exit-criteria.md#3-出口門檻)、[milestones/01/04](../../../milestones/01/04-verification.md) |
 
-本紀錄是逐項缺口預檢，不是正式出口裁決。「開發環境已完成」只代表程式或腳本可執行；實體參考機、已進版 commit、規定的重複次數及人工簽核仍須分別提供。D-37 允許 G0 出口前啟動 G1，但沒有降低任何 G0／G1 門檻。
+本紀錄仍是逐項預檢，不是出口裁決。下表的「參考機自動化通過」是指：已進版 commit、在參考機上執行、每個自動子檢查都是 `pass`；表中另列的 `operator`／`environment` 項目未完成前，該門檻不算通過。D-37 允許 G0 出口前啟動 G1，但沒有降低任何 G0／G1 門檻。
 
 ## 1. 十五項門檻
 
-| 門檻 | 預檢結果與現有證據 | 尚缺 |
+| 門檻 | 現況與參考機證據（`artifacts/g1/`） | 尚缺 |
 | --- | --- | --- |
-| EX1-01 手動跨插件切換與保存 | **未通過**；Core／Shell 有交易與供應者實作，`tests/g1/manual-switch/run.sh` 不存在 | 七步 GUI 腳本、真機回讀、視窗與 Kate 緩衝檢查、非實作者人工錄影 |
-| EX1-02 安裝預檢拒絕 | **未通過**；`tests/g1/preflight-negative/run.sh` 的開發夾具與 Rust 負例已有紀錄（[測試說明](../../../tests/g1/README.md)） | 六項負例在參考機的插件中心逐項執行、產品文字檢查、已進版 CI 證據 |
-| EX1-03 回復 | **未通過**；`tests/g1/rollback/run.sh` 有機制測試 | 視窗已關時撤銷布局的指定情境尚記為 `not_implemented`；跨插件真機回讀與非最新變更衝突證據 |
-| EX1-04 清理壓力 | **未通過**；tasks 100 次夾具計數歸零，但 hostd PSS 中位數增加 **13.7%**、Mann-Kendall **p=0.012**（[測試說明](../../../tests/g1/README.md)） | 查明並修正 PSS 成長；Dock 100 次、realm 100 次、Shell PSS 與參考機完整數列 |
-| EX1-05 無 Node 救援 | **未通過**；`artifacts/g1/rescue-no-node-2026-09-27T13:05:42Z-effb.json` 的隔離開發夾具 7 項通過（含受保護版本回復及正常模式重建 tasks 後讀回救援前的資料）、1 項環境不足 | 登入工作階段的 Shell 產品文字與參考機完整重跑 |
-| EX1-06 跨語言契約 | **未通過**；共享向量與本機 Rust／TS 測試可執行（[測試說明](../../../tests/g1/README.md)） | 已進版 CI、完整 0.2 目錄一致性與跨宿主錯版／重連證據；本機通過不等於出口 |
-| EX1-07 Cordis 服務獨立存活 | **未通過**；夾具中終止 Agent 替身後 tasks 事件約 51 ms 到達、hostd PID 不變（[測試說明](../../../tests/g1/README.md)） | 真 QML 面板、通知策略、Shell 終止／重啟與 PID／快照回讀的參考機腳本 |
-| EX1-08 L-01～L-10 | **未通過**；Vitest 有 L-01～04、L-08 的檔案與正負例 | L-05～07、L-09～10 的真 Core／hostd 故障測試及各項 PR 快檢、nightly 證據 |
-| EX1-09 持久故障 | **未通過**；fault build 的開發夾具正例可執行（[測試說明](../../../tests/g1/README.md)） | 容量受限 tmpfs 的實際寫滿案例及所有指定注入點在參考機回讀；套件暫存清理證據 |
-| EX1-10 分層資源 | **未通過**；沒有 `resource-report` 三份；G0 的 D-06a 仍未核定（[G0 預檢](G0-exit.md)） | 四組狀態、三次真正冷登入、300 秒暖機與 600 秒採樣、完整程序清單與預算核定 |
-| EX1-11 延遲與應用存活 | **未通過**；tasks 服務替換開發夾具 p95 約 9／8 ms（[測試說明](../../../tests/g1/README.md)） | 真機 200 次本機操作、100 次 Dock 切換、300 次期間參考應用與 Kate 緩衝不變的證據 |
-| EX1-12 救援、監督與鎖定 | **未通過**；既有 `artifacts/g1/rescue-supervision-*` 與 `lock-*` 為不完整開發結果 | 登入工作階段的 SIGSTOP／風暴／故障插件、實體鎖定與密碼解鎖、人工錄影 |
-| EX1-13 桌面基本面 | **未通過**；`output-hotplug` headless 夾具只證明 Wayfire 搬移視窗，角色可見性記為 `not_implemented` | `desktop-basics` 完整腳本、中文輸入／i18n／音量與網路／角色位置、第二螢幕實體拔插與人工簽核 |
-| EX1-14 來源與授權 | **未通過**；`docs/upstream/cordis-port.md`、vendor 守門腳本及依賴清單存在 | 沿用對照表按現況更新、CI 實際擋下一次違規的紀錄、完整授權產物與人工審查 |
-| EX1-15 CI 與 nightly | **未通過**；`.github/workflows/nightly-refmachine.yml` 有部分 G1 步驟 | PR 快檢涵蓋 L-01～10；nightly 包含 EX1-01／03／07／09 且連續五晚綠燈；VM 與每週 G1 套件完整接入 |
+| EX1-01 手動跨插件切換與保存 | **參考機自動化通過**：`manual-switch-2026-10-05T02:52:59Z-082a.json`，11 項 pass。七步全以合成按鍵經 Wayfire 操作組合中心與個人化設定，每步經 Core 回讀；Firefox／foot／Kate 未終止，Kate 未儲存緩衝雜湊不變，快捷鍵與命令沒有重複擁有者 | 非實作者照步驟人工執行一次並錄影（`operator`） |
+| EX1-02 安裝預檢拒絕 | 參考機：`preflight-negative-2026-10-05T02:50:52Z-082a.json`，5 項 pass；PR 快檢 `rust.yml` 已在 PR #10 與 `main` 執行並通過 | ④ 每個負例在插件中心的產品文字與診斷區契約 ID（`operator`） |
+| EX1-03 回復 | **參考機通過**：`rollback-2026-10-05T02:50:54Z-082a.json`，6／6。③「撤銷布局時視窗已關」已實作：合成器參與者在切換策略時記下視窗位置，撤銷時放回，已關的視窗列為 `not_restored`／`window_closed`，結果為 `partial` | —（另見 EX1-15 的 nightly 次數） |
+| EX1-04 清理壓力 | **參考機通過**：`cleanup-stress-2026-10-05T02:56:35Z-cb97.json`。① Dock A／B 100 次（真實 Shell）：Shell PSS 中位數 +0.27%、Mann-Kendall p=0.72；② tasks 100 次：hostd −5.1%、p=0.074；③ realm 100 次：hostd −4.7%、p=1.0；三組首尾計數相同。hostd 的成長原因是 V8 新生代容量與兩次完整回收之間的舊代垃圾，不是洩漏；以 `hostd.node-flags`（固定 4 MiB semi-space）與卸載後一次完整 GC 修正 | ② 的 p=0.074 接近 0.05，建議出口評審前再跑兩次確認 |
+| EX1-05 無 Node 救援 | **參考機通過**：`rescue-no-node-2026-10-05T02:56:56Z-cb97.json`，8／8。④ 由真實 Shell 在救援模式下顯示「待辦服務暫不可用」「通知規則暫不可用，通知會全部顯示。」，經 Shell 控制 socket 的唯讀 `services` 行讀回 | — |
+| EX1-06 跨語言契約 | **參考機通過**：`contract-vectors-2026-10-05T02:50:46Z-082a.json`，11／11；`contracts.yml` 修好後（原檔案是無效 YAML，G1 期間從未執行）在 PR #10 與 `main` `082aaf8` 都通過 | — |
+| EX1-07 Cordis 服務獨立存活 | **參考機通過**：`cordis-independent-2026-10-05T02:56:31Z-cb97.json`，4／4。替身終止後外部寫入 64 ms 出現在 QML 面板；通知策略照常抑制；Shell 被 `SIGKILL` 後重啟的 Shell 從快照取得期間的變化；hostd PID 三個時點相同 | 2 秒判準取自用戶端時鐘（QML 面板沒有 Core 時間戳），已在結果中註明 |
+| EX1-08 L-01～L-10 | **參考機通過**：`lifecycle-2026-10-05T02:52:23Z-082a.json`，12／12；`lifecycle.yml` 在 PR #10 與 `main` 通過。L-05 不可用轉換 29～44 ms（開發機量測） | nightly 紀錄（見 EX1-15） |
+| EX1-09 持久故障 | **參考機通過**：`persistence-faults-2026-10-05T02:51:03Z-082a.json`，5／5，含 80 MiB tmpfs 真實寫滿回 `storage_full`、head 與內容雜湊不變 | — |
+| EX1-10 分層資源 | 工具完成（`tests/g1/measure/`）；參考機冷登入序列進行中，結果見 §6 | 三份報告；預算達標或調整提案在評審前核定；G0 的 D-06a |
+| EX1-11 延遲與應用存活 | **參考機通過**：`latency-2026-10-05T02:53:33Z-082a.json`。① 200 次本機操作 accepted→readback p95 4.1 ms（Core 時鐘）；② Dock A↔B 100 次 prepared→committed p95 5 ms；Cordis 服務替換 p95 8 ms 另列；③ 300 次期間 Firefox／foot／Kate PID 不變、Kate 緩衝不變 | UI 首幀參考值未記錄；啟動器切換 30 次（plan/03/06 §6）未做 |
+| EX1-12 救援、監督與鎖定 | **參考機登入工作階段自動化通過**：`rescue-supervision-2026-10-05T05:35:53Z-cb97.json` 4／4（`SIGSTOP` → 可操作救援介面 p95 7.0 s／30 次、應用與 Kate 緩衝保留、連續崩潰插件被停用、Core 重啟風暴 → 救援介面 → 離線恢復 → Core 掛上恢復的版本）；`lock-2026-10-05T05:42:34Z-cb97.json` ④⑤ 自動部分 pass | 以密碼解鎖並錄影一次（`operator`） |
+| EX1-13 桌面基本面 | ⑤ 的 headless 替代版在參考機 pass（`output-hotplug-…-082a.json`，視窗與角色都回到剩餘輸出）；D-34 狀態項目可同時掛上（`status-items-…-082a.json`） | 第二台實體螢幕的 `--automated` 與 `--physical`；`desktop-basics` 腳本與人工檢查清單（中文輸入、i18n、音量／網路、快捷鍵） |
+| EX1-14 來源與授權 | ① `docs/upstream/cordis-port.md` 逐套件紀錄；② `milestones/01/02 §2` 加上 G1 實作位置欄；③ **CI 實際擋下一次**：PR #11 的 `node` run 37252708548 拒絕未記錄的 vendor 修改（第一次嘗試 37247658718 沒擋下，暴露守門只比整段範圍，已改為逐 commit）；④ `licenses.yml` 在 PR #10／`main` 通過 | 授權清單的人工審查 |
+| EX1-15 CI 與 nightly | ① PR 快檢（contracts、rust 含預檢負例與 store 遷移、lifecycle、node、vm-regression）在 PR #10 全綠；② nightly 已加入 EX1-01，EX1-03／07／08／09 在 `main`；③ `vm-regression.yml` 跑 G1 非圖形套件 | **連續五晚** nightly 成功（自 2026-10-05 起計）；必要檢查的分支保護設定 |
 
 ## 2. 工作包與開工依賴
 
@@ -62,3 +63,26 @@ G0 尚未正式出口：C-08 中文輸入、D-06a 冷登入 PSS、進版後的 n
 滿碟失敗最初是 `run_proposal` 在草稿寫入前的錯誤被誤報為 `timeout/unknown`；修正後實際滿碟回讀已通過。hostd 終態交易紀錄保留舊 fiber 參照的問題也已修正，但同條件 VM 重跑 PSS 仍未達標（14.9%）；因此不得把該修正宣稱為 EX1-04 的解決。下一步須針對匿名記憶體與 V8 heap／原生配置做分離診斷，再在參考機按原門檻重測。
 
 `vm-regression.yml` 已加上 Rust／Node 工作區及契約向量的 VM PR 快檢，但修改尚未進版，也沒有 CI 執行紀錄，EX1-15 仍未通過。參考機使用凍結工具鏈的 preflight 可通過；檢查時 seat0 停在 GDM，沒有可用的 Ditto 登入工作階段，故本輪未對使用者工作階段執行 Shell、鎖定、雙螢幕或實體資源量測。
+
+## 6. EX1-10 分層資源（參考機，2026-10-05）
+
+（序列完成後填入：四組狀態各三次冷登入的報告路徑與數字。）
+
+## 7. 2026-10-04～05 這一輪找到並修正的產品缺陷
+
+每項都由上表的腳本在真實程序上發現，修正後同一腳本重跑通過；細節在各 commit 訊息。
+
+| 範圍 | 缺陷 | 修正 |
+| --- | --- | --- |
+| Shell | 換 Dock 時新 Dock 以 on-demand 鍵盤互動映射，搶走使用中視窗的鍵盤焦點 | 面板與 Dock 先以無鍵盤互動映射，映射後才改 on-demand |
+| Shell | 匯入文字區困住 Tab；按下「套用」等會消失的按鈕後焦點遺失 | Tab 離開文字區；焦點移到最近的前一個控制項 |
+| Core | 保留快捷鍵（救援、鎖定）從未綁定到合成器；開機綁定失敗後，每個合成器變更都因快捷鍵回讀不符而回復 | 保留鍵與 Profile 一起綁定；合成器表格與已提交不一致時重新綁定 |
+| Core／Shell | 監督者終止卡住的 Shell 後，Shell 在同一次登入中再也起不來（`Conflicts=` 讓死掉的 transient scope 保持載入）；救援介面無法回到一般桌面，也連不上 Core | 新能力 `desktop.rescue.resume_shell`（目錄 revision 4）；救援 unit 改以 `ExecStartPre` 停 Shell；Core 執行中時由 Core 啟動已連線的救援介面 |
+| Core | hostd 在 prepare 後死亡仍往死連線 commit；回復時讀回送到舊連線；呼叫方在受理前離線仍執行提案；舊 hostd 連線在新連線前仍可送心跳 | 見 L-05～L-10 的修正 commit |
+| Core | 合成器事件串流在突發下被 Wayfire 斷線；`--launch` 的子程序成為殭屍 | 獨立讀取執行緒並合併重讀；回收子程序 |
+| hostd | PSS 隨啟用／停用往返成長 | 固定新生代大小，卸載後一次完整 GC |
+| Profile／Shell | D-34 的 5 個 QML 狀態項目宣告的 `ui.status_item` 不存在，啟用後什麼都沒掛上 | 多條目區域 `ui.status_item`，掛在頂部面板的狀態區（無面板時用 Shell 自己的狀態列） |
+| CI | `contracts.yml` 是無效 YAML，G1 期間從未執行；vendor 守門只比整段範圍；lifecycle 在 CI 讀不到 Vitest 數字 | 修正 YAML；逐 commit 判定；改讀 JSON 報告 |
+| 量測 | G0 EX-05 的取樣只跨 595 秒；G0 工作階段範本寫死主倉庫路徑 | 多取一點；範本改用安裝時替換的路徑（`g0/ex05-sample-span`） |
+
+已知未解：內建套件內容改變但版本號不變時，已有舊版本的 store 會拒絕重新安裝，工作階段因而執行舊的供應者。參考機量測前已把舊 store 移到 `~/.local/share/ditto.before-ref-2026-10-05`（保留未刪）。正式做法應是內容變更必須升版並由 CI 檢查，尚未實作。
