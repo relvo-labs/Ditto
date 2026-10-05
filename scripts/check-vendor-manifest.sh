@@ -2,7 +2,10 @@
 # Vendor guard (plan/03/03 §12, EX1-14 ③), after the harness script of the same
 # name: a change under packages/host-runtime/vendor/*/src/ must come with a
 # change to packages/host-runtime/vendor/README.md, whose modification log is
-# the record of every divergence from upstream.
+# the record of every divergence from upstream. In commit mode the rule holds
+# per commit: a README change elsewhere in the range (an earlier vendor
+# import, say) does not excuse a later commit that changes vendored source
+# without recording it (found by the deliberate violation of EX1-14 ③).
 #
 # usage:
 #   scripts/check-vendor-manifest.sh                 commits on HEAD since the merge base with origin/main
@@ -51,7 +54,7 @@ if [[ "$mode" == "self-test" ]]; then
   fi
   echo 'self-test: blocked a vendored source change without a README change'
   echo 'D1. …' >> "$scratch/$manifest"
-  git -C "$scratch" commit -qam 'log it'
+  git -C "$scratch" commit -qa --amend -m 'vendor edit, logged in the same commit'
   "$self" --repo "$scratch" --base main >/dev/null
   echo 'self-test: passed once the README change came with it'
   echo 'export const a = 3' > "$scratch/packages/host-runtime/vendor/cordis/src/index.ts"
@@ -61,6 +64,12 @@ if [[ "$mode" == "self-test" ]]; then
     exit 1
   fi
   echo 'self-test: blocked a staged vendored source change without a README change'
+  git -C "$scratch" commit -qm 'vendor edit without log, after a logged one'
+  if "$self" --repo "$scratch" --base main >/dev/null 2>&1; then
+    echo 'self-test FAILED: an unlogged vendor commit after a logged one in the same range was not blocked' >&2
+    exit 1
+  fi
+  echo 'self-test: blocked an unlogged vendor commit that follows a logged one in the same range'
   exit 0
 fi
 
@@ -81,6 +90,25 @@ case "$mode" in
     fi
     ;;
 esac
+
+if [[ "$mode" == commits ]]; then
+  # Every commit on its own, oldest first; merges are judged by their own
+  # first-parent diff.
+  offending=()
+  while read -r commit; do
+    [[ -n "$commit" ]] || continue
+    files=$(git diff-tree --no-commit-id --name-only -r -m --first-parent "$commit")
+    if echo "$files" | grep -qE "$vendor_src" && ! echo "$files" | grep -qFx "$manifest"; then
+      offending+=("$(git log -1 --format='%h %s' "$commit")")
+    fi
+  done < <(git rev-list --reverse "$(git merge-base "$base" HEAD)..HEAD")
+  if (( ${#offending[@]} > 0 )); then
+    echo 'vendor manifest guard: commits change vendored SOURCE without updating packages/host-runtime/vendor/README.md in the same commit:'
+    printf '  %s\n' "${offending[@]}"
+    echo 'Record the change in the "Ditto 修改集" (or the lock table for a sync) in that commit.'
+    exit 1
+  fi
+fi
 
 vendor_changed=$(echo "$changed" | grep -E "$vendor_src" | sort -u || true)
 manifest_changed=$(echo "$changed" | grep -Fx "$manifest" || true)
