@@ -23,7 +23,7 @@
 | EX1-07 Cordis 服務獨立存活 | **參考機通過**：`cordis-independent-2026-10-05T02:56:31Z-cb97.json`，4／4。替身終止後外部寫入 64 ms 出現在 QML 面板；通知策略照常抑制；Shell 被 `SIGKILL` 後重啟的 Shell 從快照取得期間的變化；hostd PID 三個時點相同 | 2 秒判準取自用戶端時鐘（QML 面板沒有 Core 時間戳），已在結果中註明 |
 | EX1-08 L-01～L-10 | **參考機通過**：`lifecycle-2026-10-05T02:52:23Z-082a.json`，12／12；`lifecycle.yml` 在 PR #10 與 `main` 通過。L-05 不可用轉換 29～44 ms（開發機量測） | nightly 紀錄（見 EX1-15） |
 | EX1-09 持久故障 | **參考機通過**：`persistence-faults-2026-10-05T02:51:03Z-082a.json`，5／5，含 80 MiB tmpfs 真實寫滿回 `storage_full`、head 與內容雜湊不變 | — |
-| EX1-10 分層資源 | 工具完成（`tests/g1/measure/`）；參考機冷登入序列進行中，結果見 §6 | 三份報告；預算達標或調整提案在評審前核定；G0 的 D-06a |
+| EX1-10 分層資源 | **參考機量測完成，三組預算都在門檻內**（§6）：hostd p95 45.1～45.4 MiB（≤100）；完整桌面 p95 449～451 MiB（≤600）；10 插件 A/B 增量 p95 28.4～31.0 MiB（≤50）；四組狀態各三次冷登入（暖機 300 秒、採樣 600 秒）| 出口評審核對指紋與原始資料；plan/03/06 §7.1 要求先有 G0 的 D-06a 核定 |
 | EX1-11 延遲與應用存活 | **參考機通過**：`latency-2026-10-05T02:53:33Z-082a.json`。① 200 次本機操作 accepted→readback p95 4.1 ms（Core 時鐘）；② Dock A↔B 100 次 prepared→committed p95 5 ms；Cordis 服務替換 p95 8 ms 另列；③ 300 次期間 Firefox／foot／Kate PID 不變、Kate 緩衝不變 | UI 首幀參考值未記錄；啟動器切換 30 次（plan/03/06 §6）未做 |
 | EX1-12 救援、監督與鎖定 | **參考機登入工作階段自動化通過**：`rescue-supervision-2026-10-05T05:35:53Z-cb97.json` 4／4（`SIGSTOP` → 可操作救援介面 p95 7.0 s／30 次、應用與 Kate 緩衝保留、連續崩潰插件被停用、Core 重啟風暴 → 救援介面 → 離線恢復 → Core 掛上恢復的版本）；`lock-2026-10-05T05:42:34Z-cb97.json` ④⑤ 自動部分 pass | 以密碼解鎖並錄影一次（`operator`） |
 | EX1-13 桌面基本面 | ⑤ 的 headless 替代版在參考機 pass（`output-hotplug-…-082a.json`，視窗與角色都回到剩餘輸出）；D-34 狀態項目可同時掛上（`status-items-…-082a.json`） | 第二台實體螢幕的 `--automated` 與 `--physical`；`desktop-basics` 腳本與人工檢查清單（中文輸入、i18n、音量／網路、快捷鍵） |
@@ -45,9 +45,21 @@ G0 尚未正式出口：C-08 中文輸入、D-06a 冷登入 PSS、進版後的 n
 - 本工作樹執行 `cargo test --workspace --locked --quiet`、`pnpm -r test`、`pnpm -r typecheck` 通過；這些是本機開發檢查，不能替代真機門檻。
 - PR #10 的前一版 `vm-regression` 有五個 G0 夾具失敗：VM 的已登入 Core 持有預設 store 鎖，夾具只隔離 socket；修正為夾具 store 也獨立。身分測試同時更新到協定 0.2 的 JSON 輸出與握手版本；Shell 夾具載入內建套件並等啟動同步。本機重新執行 `window-matrix`、`identity-negative`、`shell-session`、`shell-restart-survival`、`hotpath` 通過；仍需 PR 新版 CI 重跑，且本機數字不是出口證據。
 
-## 4. 下一輪驗證順序
+## 4. 下一步：只能由人或時間完成的項目
 
-先修 EX1-04 的 PSS 增長、補全 L-05～10 與救援／鎖定／GUI 腳本，再讓 PR 快檢與 nightly 覆蓋它們。參考機登入、第二螢幕與 D-06a 到位後執行實體情境及三次冷登入資源量測；最後累積連續五晚 nightly、非實作者簽核，逐項更新本表並舉行正式出口評審。任何未達標數字須保留原始資料與調整提案，不得自行放寬門檻。
+自動化能做的已在參考機做完。剩下的每一項都需要人、硬體或日曆時間；在完成前，對應門檻不得記為通過。
+
+| 項目 | 門檻 | 誰／什麼 | 怎麼做 |
+| --- | --- | --- | --- |
+| 非實作者照七步操作並錄影 | EX1-01 | 一位沒有參與實作的人 | 依 plan/03/01 EX1-01 的七步，在「Ditto (Wayfire)」登入工作階段內只用組合中心與插件中心完成，錄影並記下每步的 `change_id`（`dittoctl` 無法從終端機連線時，從插件中心／變更紀錄讀） |
+| 插件中心的產品文字 | EX1-02 ④ | 操作者 | 在插件中心對六個負例各安裝一次，確認文字以產品語言說明、診斷區可看到契約 ID |
+| 密碼解鎖並錄影 | EX1-12 ④ | 操作者 | 登入工作階段中按 Super+L 鎖定，`bash tests/g1/lock/run.sh` 跑完後以密碼解鎖，錄影一次 |
+| 第二台實體螢幕 | EX1-13 ⑤ | 取得並接上第二螢幕 | 在登入工作階段執行 `bash tests/g1/output-hotplug/run.sh --automated` 與 `--physical`（後者在終端機前照提示拔線） |
+| 桌面基本面人工清單 | EX1-13 ①～④⑥ | 操作者 | plan/03/06 §8 的簽核表；中文輸入在管理中心欄位可用（依賴 G0 的 C-08） |
+| 連續五晚 nightly | EX1-15 ② | 日曆時間 | `nightly-refmachine` 自 2026-10-05 18:00 UTC 起在 `main` 執行；任何一晚失敗重新計數 |
+| 分支保護 | EX1-15 ① | repo 管理者 | 把 contracts、rust、node、lifecycle、vm-regression 設為 `main` 的必要檢查 |
+| 授權清單審查 | EX1-14 ④ | 發行稽核 | `licenses.yml` 產物依 `ditto-release-audit` 審查 |
+| 預算與決策核定 | EX1-10、D-04／08／10／15／16／26／27／31～35 | 產品與工作流 owner | 依 `ditto-decision-record` 核定；EX1-10 的數字見 §6 |
 
 ## 5. 2026-09-28 開發 VM 複核（非出口證據）
 
@@ -66,7 +78,16 @@ G0 尚未正式出口：C-08 中文輸入、D-06a 冷登入 PSS、進版後的 n
 
 ## 6. EX1-10 分層資源（參考機，2026-10-05）
 
-（序列完成後填入：四組狀態各三次冷登入的報告路徑與數字。）
+`main` `61ae38b`（工作樹乾淨），`install-session.sh --verification-relay`，每組三次真正的 GDM 冷登入，暖機 300 秒、採樣 600 秒（121 點、跨度 ≥600 秒）。Firefox／foot／Kate 啟動於 `ditto-ref-*.scope` 並排除；驗證 relay（約 30 MiB 的 Node）列出但不計入合計。
+
+| 狀態 | 報告（`artifacts/g1/`） | 合計 p95（三次） | 判定 |
+| --- | --- | --- | --- |
+| `rescue_no_node` | `resource-report-cold-login-rescue_no_node-2026-10-05T07:24:50Z.md` | 404.1／404.0／405.8 MiB；Ditto 單元中 Node 程序 0 | 依 §7.2 分列，不作全桌面數字 |
+| `desktop_full_no_agent` | `resource-report-cold-login-desktop_full_no_agent-2026-10-05T08:15:07Z.md` | 449.9／449.1／450.9 MiB；hostd 45.2／45.1／45.4 MiB | hostd ≤100、全桌面 ≤600：三次皆在門檻內 |
+| `desktop_full_no_avatar` | `resource-report-cold-login-desktop_full_no_avatar-2026-10-05T09:05:23Z.md` | 427.3／426.5／427.6 MiB | 只列數字（19.1 要求並列） |
+| `desktop_full_plus10` | `…-plus10-b-2026-10-05T10:40:57Z.md`、`…-plus10-ab-2026-10-05T10:40:57Z.md` | 增量 p95 31.0／28.4／30.5 MiB（每次 10 個插件全部載入：Cordis 5／5、QML 5／5） | ≤50 MiB：三次皆在門檻內 |
+
+分項（`desktop_full_no_agent`，中位數）：合成器約 152.6、Shell 約 174.1、Fcitx 約 50.6、hostd 約 44.2、Core 約 26.6、`ditto-supervisor` 0.6 MiB。同一天先前的三次 `rescue_no_node` 因量測途中我修改了工作樹（指紋不同）被報告拒收，已移到 `invalid-dirty-tree-2026-10-05/`，不引用。
 
 ## 7. 2026-10-04～05 這一輪找到並修正的產品缺陷
 

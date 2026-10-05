@@ -393,3 +393,24 @@ G1 腳本的開發機首次執行結果在 [tests/g1/README.md](../../tests/g1/R
 | 2026-09-27 | SHELL 回報的平台問題 | ① 在 headless 工作階段中 `desktop.launcher.launch` 回 `accepted`，但應用的 systemd scope 沒拿到該工作階段的 Wayland 環境而不出現，`app_id` 也須是 desktop 檔 id；② Quickshell 0.3.1 從設定目錄外匯入的目錄只解析第一個型別，所以 lock／rescue 以符號連結共用 `core` 等目錄（安裝須保留），套件庫中的供應者須是單一 QML 檔；③ `ditto-core.service` 的救援介面與鎖定客戶端原本誤用 kind `quickshell`，已改為 `rescue-shell`／`lock` |
 | 2026-09-27 | 測試本身的缺陷 | `ditto-store` 離線救援測試的偶發 `Locked`（其他測試 spawn `tar` 繼承鎖描述元）；fault 測試斷言失敗時留下孤兒 Core。兩者已修，產品程式碼不受影響 |
 | 2026-09-27 | G1 出口預檢 | [十五項門檻與缺口](../../.agents/notes/gate-reviews/G1-exit.md) 已逐項登記；本機工作樹的測試通過不構成出口證據 |
+| 2026-10-05 | 參考機一輪 | PR #10 合併（`main` `082aaf8`，CI 全綠）。參考機上 EX1-03／04／05／06／07／08／09／11 的腳本全部通過，EX1-01／02／12 只剩 `operator` 項目，EX1-10 四組狀態各三次冷登入、三項預算皆在門檻內；逐項見 [G1 出口預檢](../../.agents/notes/gate-reviews/G1-exit.md)。門檻是否通過仍由出口評審判定 |
+
+### 8.4 2026-10-05 工作包狀態更新
+
+本表只更新 8.2 中有變化的工作包；「參考機已驗證」表示對應腳本在參考機的已進版 commit 上全部自動子檢查通過，人工與 nightly 次數另計。
+
+| 工作包 | 新狀態 | 依據 |
+| --- | --- | --- |
+| SHELL-02 | 開發環境已完成 | 角色位置（輸出＋角落）進 Profile、跟隨主輸出、Shell 回報實際位置並由 Core 回讀；第二台實體螢幕未取得 |
+| SHELL-05 | 進行中 | 不變：音量與網路只驗證了不可用呈現；Super＋數字沒有對應命令 |
+| SHELL-11 | 參考機已驗證（自動部分） | `lock` ④⑤ 通過；PAM 密碼解鎖與錄影仍待操作者 |
+| PLAT-01 | 進行中 | 輸出消失時 Core 檢查並搬回視窗、無法搬移時以通知說明；需第二螢幕 |
+| PLAT-03 | 參考機已驗證 | `desktop.rescue.resume_shell`、救援介面「回到一般桌面」、`dittoctl rescue resume-shell`；EX1-12 ①③ 通過 |
+| PLAT-04 | 參考機已驗證（自動部分） | 布局策略與快捷鍵經合成器路徑，保留鍵綁定；EX1-01 ③ 通過 |
+| QA-02 | 參考機已驗證 | L-01～L-10 12／12，PR 快檢 `lifecycle.yml` 與 nightly |
+| QA-03 | 參考機已驗證 | 故障注入：persistence-faults 5／5（含真實滿碟）、L-05～L-10 |
+| QA-05 | 參考機已量測 | EX1-10 四組報告；預算核定待評審 |
+| QA-06 | 參考機已驗證 | latency 4／4 |
+| QA-07 | 參考機已驗證 | Agent 替身用於 EX1-07、L-09／L-10 |
+| HOST-12 | 參考機已驗證 | vendor 守門逐 commit 判定，PR #11 的 CI 實際擋下一次 |
+
