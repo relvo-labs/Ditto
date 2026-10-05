@@ -29,6 +29,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | `cordis-independent/run.sh` | EX1-07 | headless 桌面夾具（`lib/shell-fixture.sh`）：Wayfire 與夾具自己的工作階段匯流排，正常模式 Core 監督的真實 Shell、hostd、Agent 替身與回讀 relay；Core 以 `DITTO_SYSTEM=no-logind` 在夾具的匯流排上擁有通知伺服器。① 面板內容取自 Shell 的 `tasks` 控制行，2 秒以用戶端單調時鐘量「檔案寫入 → 面板顯示」（每 20 ms 輪詢，QML 面板沒有 Core 時間戳）；通知以 `gdbus` 送出，決定經 Core 讀回（規則：專注模式、允許清單為空；緊急通知是對照）。② Shell 不在時（socket 拒絕且 Core 回報無 Shell 連線）改檔並送通知，重啟後的面板內容與策略紀錄經回讀判定。③ hostd PID 三個時點相同 |
 | `cleanup-stress/run.sh` | EX1-04 | 夾具中 ② tasks 服務停用／啟用與 ③ realm 往返（`packages/plugin-fixtures/stress/realm_cycle`）各真的跑 100 次，各用一組新的 Core 與 hostd，每 10 次以 `desktop.plugins.diagnostics` 取快照，`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall。① 與 Shell PSS 需要 Shell |
 | `latency/run.sh` | EX1-11 | 兩個夾具。② 另列的 Cordis 服務數字：fixture 合成器＋hostd，`change_updated` 的 `updated_at`。①②③：headless 桌面夾具（真實 Shell、hostd、foot 與 Kate；參考機另加 Firefox），由 Core 啟動的 driver 執行。① 工作區與聚焦取 Core 回應的 `_meta.handled_us`（Core 單調時鐘，從讀到請求到回讀確認後寫出結果）；外觀 token 是 ChangeSet，取 `created_at` 到最後一次 readback 操作的 `ended_at`（皆為 Core 寫入，毫秒）；每種先暖機 5 次，保留但不判定。② 取 `prepared`／`committed` 的 `updated_at`，每次切換後另以 `desktop.panels.list` 確認 Shell 掛上對的 Dock。③ 合成器對應的 PID 每 0.5 秒檢查，Kate 未儲存緩衝雜湊前後比對。driver 的往返時間只並列參考。樣本寫到 `latency-<run_id>.jsonl` |
+| `measure/cold-login.sh`、`measure/series.sh` | EX1-10 | 參考機上以登入管理器登入的「Ditto (Wayfire)」，每次 run 一次登入：`prepare <狀態>` 寫 `measure-conditions.json`，重新登入後 `sample <狀態>` 檢查實際狀態（Core 模式、Shell 的角色變數、Ditto 單元中的 Node 程序、Profile 中沒有 D-34 插件）、開參考應用、暖機 300 秒、採樣 600 秒，三次不同登入後 `report <狀態>`。`series.sh` 在開啟自動登入的機器上把 prepare → `ditto-relogin` → 等新登入 → sample → report 串起來，可中斷續跑。需要 `install-session.sh --verification-relay`。`measure/dry-run.sh` 是 headless 夾具上的短時試跑、`measure/test-series.sh` 以替身測 `series.sh`，兩者都只是開發證據 |
 
 ## 共用函式（`lib/common.sh`）
 
@@ -63,6 +64,7 @@ Rust 整合測試不能自己連上正常模式的 Core，所以由 Core 以 `--
 | Core／dittoctl | `dittoctl probe call`；`dittoctl rescue restart shell`；`dittoctl --offline rescue restore-last-good` | lock、rescue-supervision ①③、rescue-no-node ②③ |
 | Core | 熱插拔後把視窗移回剩餘輸出的可見範圍（plan/03/05 §7）；角色位置的回讀（2026-10-04 已提供，見下方紀錄） | output-hotplug |
 | HOST | 會連續崩潰的測試插件 `tests/g1/fixtures/crashing-plugin` | rescue-supervision ② |
+| Core＋Shell | 能同時掛上多個 QML 狀態項的位置：D-34 的五個 QML 插件宣告 `ui.status_item`，但 Profile 的 slot 一次只綁一個 entry，Core 不認得 `ui.status_item`，Shell 也只掛綁在 slot 上的 QML，所以沒有 slot 的 entry 不會被載入（2026-10-05 夾具中 `shell_mounted_providers` 啟用前後不變） | measure 的 `desktop_full_plus10`：在此之前 A/B 報告不對 ≤50 MiB 判定 |
 
 ## 開發機上的第一次執行（2026-09-27，headless，開發證據）
 

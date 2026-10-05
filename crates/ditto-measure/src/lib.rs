@@ -1,12 +1,15 @@
-//! G0 raw process sampler. Reports and acceptance decisions require three runs
-//! on the frozen physical reference machine; this module never claims a pass.
+//! Raw process sampler for the G0 subset (EX-05) and the G1 states (EX1-10).
+//! Reports and acceptance decisions require three runs on the frozen physical
+//! reference machine; sampling never claims a pass.
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    fs, io,
+    fs,
+    io::{self, BufRead, BufReader, Write},
+    os::unix::net::UnixStream,
     path::{Component, Path, PathBuf},
     process::Command,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -21,7 +24,56 @@ pub struct Manifest {
     pub fingerprint: BTreeMap<String, String>,
     pub units: Vec<Unit>,
     pub excluded: Vec<Exclusion>,
+    /// G1: the display-manager login this run was sampled in. A/B pairs must
+    /// share it; the three runs of a state must not.
+    #[serde(default)]
+    pub login_id: Option<String>,
+    /// G1: where hostd's own V8 figures are read (desktop.plugins.diagnostics
+    /// through the verification relay). They land next to hostd's PSS and are
+    /// never added to it.
+    #[serde(default)]
+    pub node_memory: Option<NodeMemorySource>,
 }
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NodeMemorySource {
+    /// The unit whose process hostd reports itself as.
+    pub unit: String,
+    /// The verification relay socket (tests/g1/lib/relay.mjs).
+    pub relay_socket: PathBuf,
+}
+
+/// The measurement states of plan/03/06 §7.2. `desktop_full_plus10` is
+/// sampled twice in one login: `_a` before the ten plugins are enabled, `_b`
+/// after.
+pub const G1_STATES: [&str; 5] = [
+    "rescue_no_node",
+    "desktop_full_no_agent",
+    "desktop_full_plus10_a",
+    "desktop_full_plus10_b",
+    "desktop_full_no_avatar",
+];
+
+pub fn is_g1_state(state: &str) -> bool {
+    G1_STATES.contains(&state)
+}
+
+/// Layers every sample of a state must contain. In rescue mode the Shell
+/// layer may be the rescue interface instead (checked separately).
+pub fn required_layers(state: &str) -> &'static [&'static str] {
+    match state {
+        "desktop_full_no_agent_g0_subset" => &["core", "shell", "compositor"],
+        "rescue_no_node" => &["core", "compositor", "supervisor"],
+        state if is_g1_state(state) => &["core", "shell", "compositor", "supervisor", "hostd"],
+        _ => &[],
+    }
+}
+
+/// Verification tooling the session runs only under
+/// `install-session.sh --verification-relay`. It is sampled and listed, and
+/// kept out of the desktop total because the product does not ship it.
+pub const VERIFICATION_LAYER: &str = "verification-relay";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -81,6 +133,12 @@ pub struct Sample {
     pub excluded: Vec<Exclusion>,
     pub gpu: GpuStatus,
     pub errors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login_id: Option<String>,
+    /// Why hostd's V8 figures are missing from this sample, if they are. They
+    /// do not invalidate the PSS sample; the report counts them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub node_memory_errors: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,10 +160,11 @@ pub fn validate_manifest(manifest: &Manifest) -> io::Result<()> {
     if !matches!(
         manifest.state.as_str(),
         "development" | "desktop_full_no_agent_g0_subset"
-    ) {
+    ) && !is_g1_state(&manifest.state)
+    {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "unsupported G0 measurement state",
+            "unsupported measurement state",
         ));
     }
     let included: BTreeSet<_> = manifest
@@ -134,6 +193,9 @@ pub fn validate_manifest(manifest: &Manifest) -> io::Result<()> {
                 "G0 subset must include Core, Shell and compositor units",
             ));
         }
+    }
+    if is_g1_state(&manifest.state) {
+        validate_g1(manifest)?;
     }
     for exclusion in &manifest.excluded {
         if exclusion.reason.trim().is_empty() || included.contains(exclusion.unit.as_str()) {
@@ -171,6 +233,137 @@ pub fn validate_manifest(manifest: &Manifest) -> io::Result<()> {
         ));
     }
     Ok(())
+}
+
+/// The G1 rules that need no machine: required layers, no hostd, relay or
+/// Node figures in rescue mode, Node figures tied to the hostd unit, and a
+/// login id on every run.
+pub fn validate_g1(manifest: &Manifest) -> io::Result<()> {
+    let invalid = |message: String| Err(io::Error::new(io::ErrorKind::InvalidInput, message));
+    let layers: BTreeSet<_> = manifest
+        .units
+        .iter()
+        .map(|unit| unit.layer.as_str())
+        .collect();
+    let missing: Vec<_> = required_layers(&manifest.state)
+        .iter()
+        .filter(|layer| !layers.contains(*layer))
+        .collect();
+    if !missing.is_empty() {
+        return invalid(format!(
+            "{} must include the layers {missing:?}",
+            manifest.state
+        ));
+    }
+    if manifest
+        .login_id
+        .as_deref()
+        .is_none_or(|login| login.trim().is_empty())
+    {
+        return invalid(format!("{} needs the login id of the run", manifest.state));
+    }
+    if manifest.state == "rescue_no_node" {
+        if !layers.contains("shell") && !layers.contains("rescue-ui") {
+            return invalid("rescue_no_node must include the Shell or the rescue interface".into());
+        }
+        if layers.contains("hostd") || layers.contains(VERIFICATION_LAYER) {
+            return invalid("rescue_no_node runs no Node process: no hostd and no relay".into());
+        }
+        if manifest.node_memory.is_some() {
+            return invalid("rescue_no_node has no hostd to read Node figures from".into());
+        }
+        return Ok(());
+    }
+    let Some(source) = &manifest.node_memory else {
+        return invalid(format!(
+            "{} samples hostd's heap_used/external/array_buffers (node_memory)",
+            manifest.state
+        ));
+    };
+    if !manifest
+        .units
+        .iter()
+        .any(|unit| unit.name == source.unit && unit.layer == "hostd")
+    {
+        return invalid("node_memory must name the hostd unit".into());
+    }
+    Ok(())
+}
+
+/// hostd's process id and V8 figures from a desktop.plugins.diagnostics
+/// response (`{"result": {"host": {"heap": …, "process": {"pid": …}}}}`).
+pub fn parse_diagnostics(response: &serde_json::Value) -> Result<(u32, NodeMemory), String> {
+    if let Some(error) = response.get("error") {
+        return Err(format!("diagnostics refused: {error}"));
+    }
+    let host = response
+        .pointer("/result/host")
+        .ok_or("diagnostics response has no host")?;
+    let state = host.get("state").and_then(|v| v.as_str()).unwrap_or("");
+    let pid = host
+        .pointer("/process/pid")
+        .and_then(|v| v.as_u64())
+        .and_then(|pid| u32::try_from(pid).ok())
+        .ok_or_else(|| format!("hostd has no process (state {state:?})"))?;
+    let heap = host
+        .get("heap")
+        .filter(|heap| !heap.is_null())
+        .ok_or_else(|| format!("hostd has not reported its heap yet (state {state:?})"))?;
+    let field = |name: &str| {
+        heap.get(name)
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| format!("heap.{name} missing"))
+    };
+    Ok((
+        pid,
+        NodeMemory {
+            heap_used_bytes: field("heap_used")?,
+            external_bytes: field("external")?,
+            array_buffers_bytes: field("array_buffers")?,
+        },
+    ))
+}
+
+fn relay_call(socket: &Path, method: &str) -> Result<serde_json::Value, String> {
+    let failed = |error: io::Error| format!("relay {}: {error}", socket.display());
+    let mut stream = UnixStream::connect(socket).map_err(failed)?;
+    let timeout = Some(Duration::from_secs(3));
+    stream.set_read_timeout(timeout).map_err(failed)?;
+    stream.set_write_timeout(timeout).map_err(failed)?;
+    let request = serde_json::json!({"method": method, "params": {}});
+    stream
+        .write_all(format!("{request}\n").as_bytes())
+        .map_err(failed)?;
+    let mut line = String::new();
+    BufReader::new(stream)
+        .read_line(&mut line)
+        .map_err(failed)?;
+    serde_json::from_str(&line).map_err(|error| format!("relay answer: {error}"))
+}
+
+/// Attach hostd's V8 figures to its own process sample. Every failure becomes
+/// a note on the sample, never a number.
+pub fn attach_node_memory(
+    processes: &mut [ProcessSample],
+    unit: &str,
+    response: Result<serde_json::Value, String>,
+) -> Vec<String> {
+    let (pid, memory) = match response.and_then(|value| parse_diagnostics(&value)) {
+        Ok(found) => found,
+        Err(error) => return vec![error],
+    };
+    match processes
+        .iter_mut()
+        .find(|process| process.unit == unit && process.pid == pid)
+    {
+        Some(process) => {
+            process.node_memory = Some(memory);
+            Vec::new()
+        }
+        None => vec![format!(
+            "hostd reports PID {pid}, which is not a process of {unit}"
+        )],
+    }
 }
 
 fn unit_cgroup(unit: &Unit) -> io::Result<String> {
@@ -386,6 +579,14 @@ impl Sampler {
             }
         }
         self.previous_ticks = next_ticks;
+        let node_memory_errors = match &manifest.node_memory {
+            Some(source) => attach_node_memory(
+                &mut processes,
+                &source.unit,
+                relay_call(&source.relay_socket, "desktop.plugins.diagnostics"),
+            ),
+            None => Vec::new(),
+        };
         Sample {
             run_id: manifest.run_id.clone(),
             ts: chrono::Utc::now().to_rfc3339(),
@@ -398,6 +599,8 @@ impl Sampler {
                 reason: "GPU collector not configured for reference hardware".into(),
             },
             errors,
+            login_id: manifest.login_id.clone(),
+            node_memory_errors,
         }
     }
 }
@@ -435,10 +638,209 @@ mod tests {
                 scope: Scope::User,
             }],
             excluded: vec![],
+            login_id: None,
+            node_memory: None,
         };
         assert!(validate_manifest(&manifest)
             .unwrap_err()
             .to_string()
             .contains("Core, Shell and compositor"));
+    }
+
+    fn unit(name: &str, layer: &str) -> Unit {
+        Unit {
+            name: name.into(),
+            layer: layer.into(),
+            scope: Scope::User,
+        }
+    }
+
+    fn g1_manifest(state: &str) -> Manifest {
+        Manifest {
+            run_id: "run".into(),
+            state: state.into(),
+            fingerprint: BTreeMap::new(),
+            units: vec![
+                unit("ditto-wayfire.scope", "compositor"),
+                unit("ditto-core.service", "core"),
+                unit("ditto-quickshell.scope", "shell"),
+                unit("ditto-supervisor.service", "supervisor"),
+                unit("ditto-hostd.scope", "hostd"),
+            ],
+            excluded: vec![],
+            login_id: Some("4".into()),
+            node_memory: Some(NodeMemorySource {
+                unit: "ditto-hostd.scope".into(),
+                relay_socket: "/run/user/1000/ditto/verify-relay.sock".into(),
+            }),
+        }
+    }
+
+    #[test]
+    fn g1_desktop_states_need_hostd_and_its_heap() {
+        for state in [
+            "desktop_full_no_agent",
+            "desktop_full_plus10_a",
+            "desktop_full_plus10_b",
+            "desktop_full_no_avatar",
+        ] {
+            assert!(validate_g1(&g1_manifest(state)).is_ok(), "{state}");
+            let mut without_hostd = g1_manifest(state);
+            without_hostd.units.retain(|unit| unit.layer != "hostd");
+            assert!(validate_g1(&without_hostd)
+                .unwrap_err()
+                .to_string()
+                .contains("hostd"));
+            let mut without_heap = g1_manifest(state);
+            without_heap.node_memory = None;
+            assert!(validate_g1(&without_heap).is_err());
+            let mut heap_elsewhere = g1_manifest(state);
+            heap_elsewhere.node_memory.as_mut().unwrap().unit = "ditto-core.service".into();
+            assert!(validate_g1(&heap_elsewhere).is_err());
+        }
+    }
+
+    #[test]
+    fn g1_supervisor_cannot_be_left_out() {
+        let mut manifest = g1_manifest("desktop_full_no_agent");
+        manifest.units.retain(|unit| unit.layer != "supervisor");
+        assert!(validate_g1(&manifest)
+            .unwrap_err()
+            .to_string()
+            .contains("supervisor"));
+    }
+
+    #[test]
+    fn g1_runs_carry_their_login() {
+        let mut manifest = g1_manifest("desktop_full_no_agent");
+        manifest.login_id = Some(" ".into());
+        assert!(validate_g1(&manifest)
+            .unwrap_err()
+            .to_string()
+            .contains("login"));
+    }
+
+    #[test]
+    fn rescue_state_refuses_node_processes() {
+        let mut manifest = g1_manifest("rescue_no_node");
+        assert!(validate_g1(&manifest)
+            .unwrap_err()
+            .to_string()
+            .contains("no hostd"));
+        manifest.units.retain(|unit| unit.layer != "hostd");
+        assert!(
+            validate_g1(&manifest).is_err(),
+            "Node figures without hostd"
+        );
+        manifest.node_memory = None;
+        assert!(validate_g1(&manifest).is_ok());
+        manifest
+            .units
+            .push(unit("ditto-dittoctl.scope", VERIFICATION_LAYER));
+        assert!(validate_g1(&manifest).is_err(), "the relay is Node");
+        manifest.units.pop();
+        manifest.units.retain(|unit| unit.layer != "shell");
+        assert!(validate_g1(&manifest).is_err());
+        manifest
+            .units
+            .push(unit("ditto-rescue-shell.scope", "rescue-ui"));
+        assert!(validate_g1(&manifest).is_ok());
+    }
+
+    fn process(unit: &str, pid: u32) -> ProcessSample {
+        ProcessSample {
+            unit: unit.into(),
+            layer: "hostd".into(),
+            pid,
+            cgroup: String::new(),
+            cmdline: String::new(),
+            pss_kib: Some(1),
+            rss_kib: Some(1),
+            cpu_pct: None,
+            threads: None,
+            fds: None,
+            node_memory: None,
+            read_errors: vec![],
+        }
+    }
+
+    #[test]
+    fn heap_lands_on_the_reporting_hostd_process_only() {
+        let response = serde_json::json!({"result": {"host": {"state": "running",
+            "process": {"pid": 42, "pss_kib": 1},
+            "heap": {"heap_used": 10, "external": 20, "array_buffers": 30}}}});
+        let mut processes = vec![
+            process("ditto-hostd.scope", 41),
+            process("ditto-hostd.scope", 42),
+        ];
+        assert!(
+            attach_node_memory(&mut processes, "ditto-hostd.scope", Ok(response.clone()))
+                .is_empty()
+        );
+        assert!(processes[0].node_memory.is_none());
+        let memory = processes[1].node_memory.as_ref().unwrap();
+        assert_eq!(
+            (
+                memory.heap_used_bytes,
+                memory.external_bytes,
+                memory.array_buffers_bytes
+            ),
+            (10, 20, 30)
+        );
+        // A PID outside the unit is a note, not a number.
+        let mut elsewhere = vec![process("ditto-core.service", 42)];
+        let notes = attach_node_memory(&mut elsewhere, "ditto-hostd.scope", Ok(response));
+        assert!(notes[0].contains("not a process of"));
+        assert!(elsewhere[0].node_memory.is_none());
+    }
+
+    #[test]
+    fn missing_heap_and_relay_failures_are_notes() {
+        let mut processes = vec![process("ditto-hostd.scope", 42)];
+        let no_heap = serde_json::json!({"result": {"host": {"state": "starting", "process": {"pid": 42}, "heap": null}}});
+        assert!(
+            attach_node_memory(&mut processes, "ditto-hostd.scope", Ok(no_heap))[0]
+                .contains("not reported its heap")
+        );
+        let no_process = serde_json::json!({"result": {"host": {"state": "rescue_mode"}}});
+        assert!(
+            attach_node_memory(&mut processes, "ditto-hostd.scope", Ok(no_process))[0]
+                .contains("rescue_mode")
+        );
+        let refused = serde_json::json!({"error": {"code": "unauthorized"}});
+        assert!(
+            attach_node_memory(&mut processes, "ditto-hostd.scope", Ok(refused))[0]
+                .contains("refused")
+        );
+        assert_eq!(
+            attach_node_memory(
+                &mut processes,
+                "ditto-hostd.scope",
+                Err("relay: gone".into())
+            ),
+            vec!["relay: gone".to_string()]
+        );
+        assert!(processes[0].node_memory.is_none());
+    }
+
+    #[test]
+    fn g0_samples_serialize_without_g1_fields() {
+        let sample = Sample {
+            run_id: "r".into(),
+            ts: "t".into(),
+            state: "desktop_full_no_agent_g0_subset".into(),
+            fingerprint: BTreeMap::new(),
+            processes: vec![],
+            excluded: vec![],
+            gpu: GpuStatus {
+                available: false,
+                reason: "none".into(),
+            },
+            errors: vec![],
+            login_id: None,
+            node_memory_errors: vec![],
+        };
+        let text = serde_json::to_string(&sample).unwrap();
+        assert!(!text.contains("login_id") && !text.contains("node_memory_errors"));
     }
 }

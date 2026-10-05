@@ -40,7 +40,7 @@ G1-PLAT-02 把登入 script 從 `ditto-g0-session` 改為 `ditto-session`，並�
 | `ditto-g0-core.scope`（`systemd-run`） | `ditto-core.service`（`Type=notify`、`WatchdogSec=10`、`OnFailure=ditto-rescue.service`） |
 | `ditto-g0-quickshell.scope`（前綴 `ditto-g0`） | `ditto-quickshell.scope`（Core 的受控啟動器，前綴 `ditto`；若 Core 改以 kind `shell` 啟動則為 `ditto-shell.scope`） |
 | — | `ditto-supervisor.service`、`ditto-rescue.service`、`ditto-session.target` |
-| 量測變體：`~/.config/ditto-g0/measure-variant` | `${DITTO_MEASURE_CONDITIONS:-$XDG_STATE_HOME/ditto/measure-conditions.json}` 的 `desktop_variant`（`standard`／`avatar-off`／`reduced-motion`）；不再讀 `XDG_CONFIG_HOME` |
+| 量測變體：`~/.config/ditto-g0/measure-variant` | `${DITTO_MEASURE_CONDITIONS:-$XDG_STATE_HOME/ditto/measure-conditions.json}` 的 `desktop_variant`（`standard`／`avatar-off`／`reduced-motion`／`rescue-no-node`）；不再讀 `XDG_CONFIG_HOME`。`rescue-no-node` 只用於 EX1-10（`tests/g1/measure/cold-login.sh`）：登入 script 在 `session.env` 寫入 `DITTO_CORE_MODE_ARGS=--mode rescue`，`ditto-core.service` 把它接在命令列末尾；驗證安裝的 relay（Node）在這個變體不啟動。其他登入不設這個變數，Core 的命令列不變 |
 | Core 或 Wayfire 任一結束即結束工作階段 | 只有 Wayfire 結束才結束工作階段；Core 的重啟與救援都在工作階段內發生 |
 
 G1 的安裝**不移除** G0 的登入項目與 `/usr/local/libexec/ditto-g0-*`，兩個項目可以並存。

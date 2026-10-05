@@ -17,12 +17,26 @@ fn main() -> io::Result<()> {
             PathBuf::from(&args[3]),
             PathBuf::from(&args[4]),
         ];
-        let content = report::generate(&conditions, &[&paths[0], &paths[1], &paths[2]])?;
+        // The G0 subset keeps its own report; the G1 states get EX1-10's.
+        let content = report::generate_any(&conditions, &[&paths[0], &paths[1], &paths[2]])?;
         return fs::write(&args[5], content);
+    }
+    if args.len() == 9 && args[0] == "report-ab" {
+        let conditions: report::Conditions = serde_json::from_slice(&fs::read(&args[1])?)?;
+        let paths: Vec<PathBuf> = args[2..8].iter().map(PathBuf::from).collect();
+        let content = report::generate_ab(
+            &conditions,
+            &[
+                (&paths[0], &paths[1]),
+                (&paths[2], &paths[3]),
+                (&paths[4], &paths[5]),
+            ],
+        )?;
+        return fs::write(&args[8], content);
     }
     if args.len() != 5 || args[0] != "sample" {
         eprintln!(
-            "usage: ditto-measure sample <manifest.json> <count> <interval-ms> <output.jsonl>\n       ditto-measure report <conditions.json> <run1.jsonl> <run2.jsonl> <run3.jsonl> <output.md>"
+            "usage: ditto-measure sample <manifest.json> <count> <interval-ms> <output.jsonl>\n       ditto-measure report <conditions.json> <run1.jsonl> <run2.jsonl> <run3.jsonl> <output.md>\n       ditto-measure report-ab <conditions.json> <a1.jsonl> <b1.jsonl> <a2.jsonl> <b2.jsonl> <a3.jsonl> <b3.jsonl> <output.md>"
         );
         std::process::exit(2);
     }
