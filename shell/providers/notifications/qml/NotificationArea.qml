@@ -31,6 +31,10 @@ Scope {
     readonly property bool policyUnavailable: !!client && ((client.policyStatus && client.policyStatus.available === false)
         || client.notifications.some(item => item.policy_unavailable))
 
+    /// The notice shown when the policy service is unavailable, empty when
+    /// it is not shown (read by the Shell's `services` control line).
+    readonly property string policyNotice: policyUnavailable && shown ? policyText.text : ""
+
     function healthy() {
         return ready && client !== null && tokens !== null;
     }

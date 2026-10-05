@@ -103,6 +103,18 @@ ShellRoot {
         };
     }
 
+    /// What the `services` control line answers: whether the tasks and
+    /// notification-policy services are shown as unavailable, and the exact
+    /// product text the surfaces show for it. Read-only.
+    function servicesReport() {
+        const panel = providers.item("ui.tasks_panel");
+        const area = providers.item("ui.notifications");
+        return {
+            tasks: panel ? { mounted: true, unavailable: panel.unavailable === true, text: panel.headerText || "" } : { mounted: false },
+            notification_policy: area ? { mounted: true, unavailable: area.policyUnavailable === true, text: area.policyNotice || "" } : { mounted: false }
+        };
+    }
+
     function runCommand(commandId, args) {
         switch (commandId) {
         case "launcher.toggle": {
@@ -398,6 +410,9 @@ ShellRoot {
     ///                     control with keyboard focus in the centers, and the
     ///                     names of the groups around it. Read-only; a keyboard
     ///                     verification run uses it to know where Tab went
+    ///   services        → one JSON line: whether the tasks and notification-
+    ///                     policy services are shown as unavailable, with the
+    ///                     text the surfaces show. Read-only
     ///   tasks           → one JSON line: whether a tasks panel is mounted and
     ///                     the open tasks it holds to show. Read-only
     SocketServer {
@@ -425,6 +440,9 @@ ShellRoot {
                         root.runCommand(command[1], {});
                     } else if (command[0] === "focus") {
                         connection.write(JSON.stringify(root.focusReport()) + "\n");
+                        connection.flush();
+                    } else if (command[0] === "services") {
+                        connection.write(JSON.stringify(root.servicesReport()) + "\n");
                         connection.flush();
                     } else if (command[0] === "tasks") {
                         connection.write(JSON.stringify(root.tasksReport()) + "\n");

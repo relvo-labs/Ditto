@@ -8,8 +8,8 @@
 # hostd's fibers, effects and registrations, and the Shell's mounted
 # providers. First and last counts must be identical; hostd and Shell PSS
 # medians may grow ≤10%, with no monotonic trend at the ten points
-# (Mann-Kendall p ≥ 0.05). Shell PSS and ① need a Shell. In this fixture ②
-# and ③ run for real, each against its own Core and hostd (hostd started with
+# (Mann-Kendall p ≥ 0.05). ① runs against the real Shell in a headless
+# desktop (its PSS judged); ② and ③ run each against its own Core and hostd (hostd started with
 # the same Node flags as the systemd unit); ③ uses the realm_cycle fixture
 # (packages/plugin-fixtures/stress/realm_cycle), see driver.mjs.
 #
@@ -85,7 +85,30 @@ else
   fi
 fi
 
-check dock-swap environment "① Dock A/B swaps need a Shell participant and its mounted-provider count (logged-in Ditto session)"
-check shell-pss environment "Shell PSS needs a running Shell (logged-in Ditto session)"
+# ① against the real Shell, in a headless desktop of its own (Wayfire, Core
+# in normal mode supervising the Shell, the verification relay). The judge is
+# the same, on the Shell's PSS and PID: counts identical first→last, Shell
+# PSS median growth ≤10 %, no monotonic trend.
+dock_swap() {
+  (
+    source "$WORKSPACE/tests/g1/lib/shell-fixture.sh"
+    WINDOW_PIDS=()
+    trap shell_fixture_stop EXIT
+    start_compositor >/dev/null
+    if ! shell_fixture_start; then
+      cp "$RUNTIME_DIR/core.log" "$evidence/core-dock-swap.log" 2>/dev/null || true
+      echo '{"ok": false, "error": "the desktop fixture did not come up"}' >"$evidence/dock-swap.json"
+      exit 0
+    fi
+    python3 "$WORKSPACE/tests/g1/cleanup-stress/dock_cycle.py" "$evidence/dock-swap.json" "$cycles" "$warmup"
+    cp "$RUNTIME_DIR/core.log" "$evidence/core-dock-swap.log" 2>/dev/null || true
+  )
+  local judged
+  judged="$(python3 "$WORKSPACE/tests/g1/cleanup-stress/judge.py" "$evidence/dock-swap.json" --process shell)"
+  check dock-swap "$(jq -r .status <<<"$judged")" \
+    "① Dock A/B re-bound against the real Shell (Shell PSS judged): $(jq -r .detail <<<"$judged")" \
+    "$(jq -c --arg snapshots "$evidence/dock-swap.json" '(.evidence // {}) + {snapshots: $snapshots}' <<<"$judged")"
+}
+dock_swap
 
 g1_finish

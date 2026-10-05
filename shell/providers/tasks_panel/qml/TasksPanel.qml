@@ -27,6 +27,9 @@ Scope {
     readonly property var snapshot: client ? client.tasks : null
     readonly property var openTasks: snapshot ? snapshot.tasks.filter(task => !task.done) : []
     readonly property bool unavailable: !client || client.tasksStatus === "unavailable"
+    /// What the panel's header says right now (read by the Shell's `services`
+    /// control line).
+    readonly property string headerText: header.text
         || (client.mode === "rescue")
 
     function healthy() {

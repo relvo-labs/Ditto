@@ -226,7 +226,18 @@ elif python3 -c 'import json, sys; sys.exit(0 if not json.loads(sys.argv[1])["ho
 else
   check cordis-unavailable-rescue-mode fail "hostd-dependent capabilities not marked rescue_mode" "$availability"
 fi
-check shell-says-unavailable environment "the Shell's '待辦與通知策略暫不可用' text needs a logged-in session (manual check list)"
+# ④ the Shell's product text, in a rescue-mode desktop of its own: the
+# relay reads Core, the Shell's `services` line reads what is shown.
+shell_text="$(bash "$WORKSPACE/tests/g1/rescue-no-node/shell-text.sh" 2>"$evidence_dir/shell-text.log" || echo '{}')"
+printf '%s\n' "$shell_text" >"$evidence_dir/shell-text.json"
+if jq -e '.services.tasks.unavailable == true and .services.notification_policy.unavailable == true
+    and (.services.tasks.text | length) > 0 and (.services.notification_policy.text | length) > 0
+    and ([.services.tasks.text, .services.notification_policy.text] | all(test("desktop\\.|unavailable|rescue_mode") | not))
+    and .rescue_status.mode == "rescue"' <<<"$shell_text" >/dev/null 2>&1; then
+  check shell-says-unavailable pass "the Shell says, in product language: $(jq -r '.services.tasks.text + " / " + .services.notification_policy.text' <<<"$shell_text")" "$shell_text"
+else
+  check shell-says-unavailable fail "the Shell did not show both services as unavailable in product language" "$(jq -c . <<<"$shell_text" 2>/dev/null || echo null)"
+fi
 
 # ⑤ no Node process among what Ditto started.
 ps -eo pid,ppid,comm,args --no-headers >"$evidence_dir/processes.txt"

@@ -28,6 +28,9 @@ def mann_kendall(values):
 
 
 def main():
+    # `judge.py <result.json> [--process shell]`: the PSS and PID judged are
+    # hostd's by default, the Shell's for ① (same thresholds either way).
+    process = "shell" if "--process" in sys.argv and sys.argv[sys.argv.index("--process") + 1] == "shell" else "hostd"
     result = json.load(open(sys.argv[1], encoding="utf-8"))
     if not result.get("ok"):
         print(json.dumps({"status": "fail", "detail": result.get("error")}))
@@ -38,25 +41,25 @@ def main():
     problems = []
     if drift:
         problems.append(f"counts differ first→last: {drift}")
-    pss = [snapshot["hostd_pss_kib"] for snapshot in snapshots[1:]]
-    evidence = {"counts_first": first, "counts_last": last, "hostd_pss_kib": [s["hostd_pss_kib"] for s in snapshots], "seconds": result.get("seconds")}
+    pss = [snapshot[f"{process}_pss_kib"] for snapshot in snapshots[1:]]
+    evidence = {"counts_first": first, "counts_last": last, f"{process}_pss_kib": [s[f"{process}_pss_kib"] for s in snapshots], "seconds": result.get("seconds")}
     if any(value is None for value in pss) or len(pss) < 4:
-        problems.append("hostd PSS was not reported at every snapshot")
+        problems.append(f"{process} PSS was not reported at every snapshot")
     else:
         half = len(pss) // 2
         growth = statistics.median(pss[half:]) / statistics.median(pss[:half]) - 1
         s, p = mann_kendall(pss)
         evidence.update({"pss_median_growth": round(growth, 4), "mann_kendall_s": s, "mann_kendall_p": round(p, 4)})
         if growth > 0.10:
-            problems.append(f"hostd PSS median grew {growth:.1%} (> 10%)")
+            problems.append(f"{process} PSS median grew {growth:.1%} (> 10%)")
         if p < 0.05:
-            problems.append(f"hostd PSS has a monotonic trend (Mann-Kendall S={s}, p={p:.3f})")
-    pids = {snapshot["hostd_pid"] for snapshot in snapshots}
+            problems.append(f"{process} PSS has a monotonic trend (Mann-Kendall S={s}, p={p:.3f})")
+    pids = {snapshot[f"{process}_pid"] for snapshot in snapshots}
     if len(pids) != 1:
-        problems.append(f"hostd restarted during the run (PIDs {sorted(p for p in pids if p)})")
+        problems.append(f"{process} restarted during the run (PIDs {sorted(p for p in pids if p)})")
     detail = "; ".join(problems) or (
         f"{result['cycles']} cycles after {result['warmup']} warm-up: counts identical first→last, "
-        f"hostd PSS growth {evidence.get('pss_median_growth')}, Mann-Kendall p={evidence.get('mann_kendall_p')}")
+        f"{process} PSS growth {evidence.get('pss_median_growth')}, Mann-Kendall p={evidence.get('mann_kendall_p')}")
     print(json.dumps({"status": "fail" if problems else "pass", "detail": detail, "evidence": evidence}, ensure_ascii=False))
 
 
