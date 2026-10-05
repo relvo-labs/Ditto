@@ -30,6 +30,7 @@ VM 非圖形開發回歸可用 `bash tools/dev-vm/run-g1.sh` 一次執行，或�
 | `cordis-independent/run.sh` | EX1-07 | headless 桌面夾具（`lib/shell-fixture.sh`）：Wayfire 與夾具自己的工作階段匯流排，正常模式 Core 監督的真實 Shell、hostd、Agent 替身與回讀 relay；Core 以 `DITTO_SYSTEM=no-logind` 在夾具的匯流排上擁有通知伺服器。① 面板內容取自 Shell 的 `tasks` 控制行，2 秒以用戶端單調時鐘量「檔案寫入 → 面板顯示」（每 20 ms 輪詢，QML 面板沒有 Core 時間戳）；通知以 `gdbus` 送出，決定經 Core 讀回（規則：專注模式、允許清單為空；緊急通知是對照）。② Shell 不在時（socket 拒絕且 Core 回報無 Shell 連線）改檔並送通知，重啟後的面板內容與策略紀錄經回讀判定。③ hostd PID 三個時點相同 |
 | `cleanup-stress/run.sh` | EX1-04 | ② tasks 服務停用／啟用與 ③ realm 往返（`packages/plugin-fixtures/stress/realm_cycle`）各在一組新的 Core 與 hostd 上真的跑 100 次；① Dock A／B 往返在 headless 桌面夾具（真實 Shell、回讀 relay）上跑 100 次（`dock_cycle.py`：先加入膠囊 Dock，之後每次以一筆 `bind_slot` ChangeSet 換綁並等 Shell 回報掛載）。每 10 次取快照：Core 的綁定／租約／訂閱、hostd 的 fiber／effect／註冊、Shell 已掛載的供應者數；`judge.py` 比對首尾計數、PSS 中位數增幅與 Mann-Kendall（② ③ 判 hostd，① 以 `--process shell` 判 Shell 的 PSS 與 PID） |
 | `latency/run.sh` | EX1-11 | 兩個夾具。② 另列的 Cordis 服務數字：fixture 合成器＋hostd，`change_updated` 的 `updated_at`。①②③：headless 桌面夾具（真實 Shell、hostd、foot 與 Kate；參考機另加 Firefox），由 Core 啟動的 driver 執行。① 工作區與聚焦取 Core 回應的 `_meta.handled_us`（Core 單調時鐘，從讀到請求到回讀確認後寫出結果）；外觀 token 是 ChangeSet，取 `created_at` 到最後一次 readback 操作的 `ended_at`（皆為 Core 寫入，毫秒）；每種先暖機 5 次，保留但不判定。② 取 `prepared`／`committed` 的 `updated_at`，每次切換後另以 `desktop.panels.list` 確認 Shell 掛上對的 Dock。③ 合成器對應的 PID 每 0.5 秒檢查，Kate 未儲存緩衝雜湊前後比對。driver 的往返時間只並列參考。樣本寫到 `latency-<run_id>.jsonl` |
+| `measure/cold-login.sh`、`measure/series.sh` | EX1-10 | 參考機上以登入管理器登入的「Ditto (Wayfire)」，每次 run 一次登入：`prepare <狀態>` 寫 `measure-conditions.json`，重新登入後 `sample <狀態>` 檢查實際狀態（Core 模式、Shell 的角色變數、Ditto 單元中的 Node 程序、Profile 中沒有 D-34 插件）、開參考應用、暖機 300 秒、採樣 600 秒，三次不同登入後 `report <狀態>`。`series.sh` 在開啟自動登入的機器上把 prepare → `ditto-relogin` → 等新登入 → sample → report 串起來，可中斷續跑。需要 `install-session.sh --verification-relay`。`measure/dry-run.sh` 是 headless 夾具上的短時試跑、`measure/test-series.sh` 以替身測 `series.sh`，兩者都只是開發證據 |
 
 ## 共用函式（`lib/common.sh`）
 
@@ -64,6 +65,7 @@ Rust 整合測試不能自己連上正常模式的 Core，所以由 Core 以 `--
 | Core／dittoctl | `dittoctl probe call`；`dittoctl rescue restart shell`；`dittoctl --offline rescue restore-last-good` | lock、rescue-supervision ①③、rescue-no-node ②③ |
 | Core | 熱插拔後把視窗移回剩餘輸出的可見範圍（plan/03/05 §7）；角色位置的回讀（2026-10-04 已提供，見下方紀錄） | output-hotplug |
 | HOST | 會連續崩潰的測試插件 `tests/g1/fixtures/crashing-plugin` | rescue-supervision ② |
+| Core＋Shell | 能同時掛上多個 QML 狀態項的位置：D-34 的五個 QML 插件宣告 `ui.status_item`，但 Profile 的 slot 一次只綁一個 entry，Core 不認得 `ui.status_item`，Shell 也只掛綁在 slot 上的 QML，所以沒有 slot 的 entry 不會被載入（2026-10-05 夾具中 `shell_mounted_providers` 啟用前後不變） | measure 的 `desktop_full_plus10`：在此之前 A/B 報告不對 ≤50 MiB 判定 |
 
 ## 開發機上的第一次執行（2026-09-27，headless，開發證據）
 
@@ -159,3 +161,14 @@ Rust 整合測試不能自己連上正常模式的 Core，所以由 Core 以 `--
 4. 測試本身的問題：回讀 relay 與 Agent 替身的 `hold` 模式在 Core 結束後仍然留著。現在它們會跟著 Core 結束；headless 夾具的 runtime 目錄也會清掉。
 
 還沒成立的：參考機上的執行（含 Firefox、release build）；EX1-11 的 UI 首幀參考值與啟動器替換 30 次；EX1-07 的面板時間是用戶端時鐘，QML 面板沒有 Core 時間戳可用。
+
+## EX1-10 分層資源量測工具（2026-10-05，開發機，headless 夾具，開發證據）
+
+`measure/` 是 G1-QA-05 的工具，**還沒有在參考機跑過任何一次正式量測**，所以 EX1-10 沒有任何數字可以主張。
+
+- `cold-login.sh` 沿用 G0 的規則：每次 run 一次登入管理器登入、登入超過 600 秒拒絕、同一個登入不得量第二次（登入以 `<boot_id>:<logind session>` 記在 `cold-login-logins.txt`，開始採樣前就寫入）、非參考機只能 `DITTO_FORMAT_CHECK=1`，暖機 300 秒、採樣 600 秒（121 點，跨度滿 600 秒）、間隔 5 秒、登入年齡上限與三個參考應用只有在格式檢查時才能放寬。開始前回讀實際狀態：Core 的命令列有沒有 `--mode rescue`、Shell 的 `DITTO_AVATAR`、Ditto 單元中的 Node 程序（`rescue_no_node` 必須為零）、hostd 是否 `running`、Profile 中沒有 D-34 插件；每個執行中的 `ditto-*` 單元都必須能歸類到一層，否則拒絕。採樣前後單元集合或主程序有變，這次 run 不記錄。
+- `rescue_no_node` 經 `measure-conditions.json` 的 `desktop_variant: rescue-no-node` 選擇；登入 script 寫入 `DITTO_CORE_MODE_ARGS=--mode rescue`，驗證安裝的 relay 改由兩個環境變數組成，在這個變體換成第二個 `--mode rescue`，所以不啟動 Node。一般登入不設這些變數，Core 的命令列不變（以 systemd 255 的暫時單元確認：未設定或空值的 `$VAR` 展開為零個參數，`EnvironmentFile=` 覆蓋 `Environment=`）。
+- hostd 的 `heap_used`／`external`／`array_buffers` 由 `ditto-measure` 每次採樣經 relay 讀 `desktop.plugins.diagnostics`，與 PSS 分欄。回讀 relay 本身是 Node 程序，報告逐次列出它的 PSS，但不計入桌面合計，並寫明原因。
+- 夾具試跑（`dry-run.sh`，commit `ee637af`，乾淨工作樹，暖機 2 秒、採樣 3 秒、只開 foot）：四個狀態各三次「登入」都記錄成功並產生報告，報告全部標為開發試跑、不判定。`rescue_no_node` 三次 Core 都是 rescue 模式、Ditto 單元中 Node 程序 0 個；完整桌面各狀態是 2 個（hostd 與 relay）。hostd 的 V8 欄位在 B 採樣時有值；A 與 `desktop_full_no_agent` 的 2 秒暖機短於 hostd 每 10 秒一次的回報，所以全是缺值並列出原因，參考機的 300 秒暖機不受影響。一次較早的試跑在中途改了工作樹，`report-ab` 因指紋（未提交路徑數）不同而拒絕產生報告，這是預期的行為。
+- **找到的缺口：D-34 的五個 QML 插件掛不上。** 啟用的 ChangeSet 會提交，五個 Cordis 插件三次都是 `active`，但 Shell 掛上的 QML 數三次都是 0：它們宣告的 `ui.status_item` 不是 Core 認得的 slot，Profile 的 slot 一次只綁一個 entry，Shell 只載入綁在 slot 上的 QML。A/B 報告因此寫「不對 ≤50 MiB 判定」。這需要 Core 與 Shell 提供能同時掛上多個狀態項的位置（見上方「各工作流要提供什麼」），量測工具不繞過它。
+- 沒有驗證的：真正的登入管理器登入、GDM 自動登入與 `ditto-relogin` 的串接（`series.sh` 只以替身測過續跑、重試與失敗上限，`test-series.sh`）、Firefox 與 Kate 的啟動、Fcitx 層、`install-session.sh --verification-relay` 實際安裝後的單元（只在暫存目錄展開並以 `systemd-analyze verify` 檢查）。本機沒有 `shellcheck`，腳本只做了 `bash -n`。

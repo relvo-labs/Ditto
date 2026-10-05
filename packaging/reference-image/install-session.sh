@@ -30,8 +30,10 @@ done
 # an exit review; the session itself is identical.
 #
 # `--verification-relay` is for verification runs only: Core uses built-ins
-# that add the G1 fault fixtures (target/ditto-packages-verification) and also launches
-# tests/g1/lib/relay.mjs as `dittoctl`, listening on
+# that add the G1 fault fixtures and the D-34 set of ten simple plugins
+# (target/ditto-packages-verification) and also launches
+# tests/g1/lib/relay.mjs as `dittoctl` (except in an EX1-10 rescue_no_node
+# measurement login, which starts no Node), listening on
 # $XDG_RUNTIME_DIR/ditto/verify-relay.sock (0700 directory), so the G1 runners
 # can read a logged-in session back through Core. It lets any process of the
 # user that reaches that socket act with dittoctl's rights, which a terminal
@@ -106,7 +108,16 @@ if [[ -n "$verification_relay" ]]; then
   (cd "$workspace" && pnpm --filter @ditto/plugin-fixtures build >/dev/null)
   "$workspace/packages/host-sdk/bin/ditto-plugin" pack "$workspace/packages/plugin-fixtures/faults/crashes_host" \
     --out "$verification_packages/ditto.fixture.fault_crashes_host-1.0.0.dittopkg" --no-handlers >/dev/null
-  # The drop-in repeats Core's ExecStart with those built-ins and one more --launch.
+  # The D-34 set (five QML status items, five Cordis settings plugins) for
+  # EX1-10's desktop_full_plus10 A/B (tests/g1/measure/cold-login.sh): the
+  # same fixed, version-locked packages every run, never the product's.
+  node "$workspace/packages/host-sdk/scripts/pack-each.mjs" \
+    "$workspace"/packages/plugin-fixtures/qml/* "$workspace"/packages/plugin-fixtures/cordis/* \
+    --out "$verification_packages" >/dev/null
+  # The drop-in repeats Core's ExecStart with those built-ins and the relay,
+  # whose launch is two words from the environment: `--launch` and its spec
+  # by default, overridden from session.env by a rescue_no_node measurement
+  # login (see session/ditto-session), which must start no Node at all.
   python3 - "$temporary/ditto-core.service" "$node" "$workspace" >"$temporary/verification-relay.conf" <<'PYEOF'
 import sys
 unit, node, workspace = sys.argv[1:]
@@ -119,9 +130,11 @@ for line in open(unit, encoding="utf-8"):
         if not line.rstrip("\n").endswith("\\"):
             break
 lines[-1] += " \\"
-lines.append(f'    --launch "dittoctl 0.2.0 {node} {workspace}/tests/g1/lib/relay.mjs %t/ditto/verify-relay.sock"')
+lines.append("    $DITTO_VERIFY_RELAY_OPTION ${DITTO_VERIFY_RELAY_SPEC}")
 print("# Verification runs only (install-session.sh --verification-relay).")
 print("[Service]")
+print("Environment=DITTO_VERIFY_RELAY_OPTION=--launch")
+print(f'Environment="DITTO_VERIFY_RELAY_SPEC=dittoctl 0.2.0 {node} {workspace}/tests/g1/lib/relay.mjs %t/ditto/verify-relay.sock"')
 print("ExecStart=")
 print("\n".join(lines))
 PYEOF

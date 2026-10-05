@@ -111,7 +111,7 @@ try:
 except (OSError, ValueError):
     sys.exit(0)
 variant = document.get("desktop_variant", "standard")
-print(variant if variant in ("standard", "avatar-off", "reduced-motion") else "invalid")
+print(variant if variant in ("standard", "avatar-off", "reduced-motion", "rescue-no-node") else "invalid")
 PYEOF
 )"
 install -d -m 0700 "$XDG_RUNTIME_DIR/ditto"
@@ -121,6 +121,17 @@ install -d -m 0700 "$XDG_RUNTIME_DIR/ditto"
   case "$variant" in
     avatar-off) echo 'DITTO_AVATAR=off' ;;
     reduced-motion) echo 'DITTO_REDUCED_MOTION=1' ;;
+    # EX1-10 rescue_no_node (tests/g1/measure/cold-login.sh): Core starts in
+    # `--mode rescue` and nothing of this login runs Node. ditto-core.service
+    # appends $DITTO_CORE_MODE_ARGS to its command line; a normal login never
+    # sets it, so its command line is unchanged. The verification relay is a
+    # Node program too: its drop-in reads its two words from the variables
+    # below, which here become a second `--mode rescue` instead of the relay.
+    rescue-no-node)
+      echo 'DITTO_CORE_MODE_ARGS=--mode rescue'
+      echo 'DITTO_VERIFY_RELAY_OPTION=--mode'
+      echo 'DITTO_VERIFY_RELAY_SPEC=rescue'
+      ;;
     invalid) echo "unknown desktop_variant in $conditions; starting the standard desktop" >&2 ;;
   esac
   if [[ -n "$variant" ]]; then echo "DITTO_MEASURE_CONDITIONS=$conditions"; fi

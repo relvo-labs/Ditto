@@ -26,7 +26,9 @@ WatchdogSec=10
 TimeoutStartSec=30
 Restart=on-failure
 RestartSec=1
-# The login script writes WAYFIRE_SOCKET and the measurement variant here.
+# The login script writes WAYFIRE_SOCKET and the measurement variant here
+# (including DITTO_CORE_MODE_ARGS, see ExecStart). Values from this file
+# override Environment= lines, which the verification drop-in relies on.
 EnvironmentFile=-%t/ditto/session.env
 Environment=PATH=@DITTO_WAYFIRE_PREFIX@/bin:@DITTO_QT_PREFIX@/bin:/usr/local/bin:/usr/bin:/bin
 Environment=LD_LIBRARY_PATH=@DITTO_WAYFIRE_PREFIX@/lib
@@ -39,13 +41,21 @@ Environment=DITTO_LAUNCH_SCOPE_PREFIX=ditto
 # script would be refused (packages/host-runtime/bin/ditto-hostd). Its Node
 # flags sit between node and the bundle (packages/host-runtime/hostd.node-flags).
 # The rescue UI and the lock client are only started when Core needs them.
-# `--mode rescue` is never set here; it is only for tests/g1/rescue-no-node.
+#
+# $DITTO_CORE_MODE_ARGS (unquoted: split into words, and zero words when unset
+# or empty) is how a measurement login starts Core in rescue mode: the login
+# script writes `DITTO_CORE_MODE_ARGS=--mode rescue` to session.env only when
+# measure-conditions.json asks for `desktop_variant: rescue-no-node`
+# (EX1-10's rescue_no_node, tests/g1/measure/). Every other login leaves it
+# unset, so Core's command line is exactly the one without it. Nothing else
+# sets `--mode rescue` here.
 ExecStart=@DITTO_WORKSPACE@/target/release/ditto-core serve --compositor wayfire \
     --builtin-packages @DITTO_WORKSPACE@/target/ditto-packages \
     --shell "quickshell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/shell.qml" \
     --hostd "hostd 0.2.0 @DITTO_NODE@ @DITTO_HOSTD_NODE_FLAGS@ @DITTO_WORKSPACE@/packages/host-runtime/dist/ditto-hostd.mjs" \
     --rescue-ui "rescue-shell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/rescue/shell.qml" \
-    --lock "lock 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/lock/shell.qml"
+    --lock "lock 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/lock/shell.qml" \
+    $DITTO_CORE_MODE_ARGS
 
 [Install]
 WantedBy=ditto-session.target

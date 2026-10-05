@@ -51,3 +51,20 @@ cargo run --locked -p ditto-measure -- report conditions.json artifacts/g0/measu
 ```
 
 121 個樣本、間隔 5 秒涵蓋至少 600 秒。先完成冷登入與 300 秒暖機，再啟動採樣；重複三次，三個 run ID 必須不同。整個流程由 [`tests/g0/measure/run.sh`](../../tests/g0/measure/run.sh) 執行，它在非參考機上只允許格式檢查。完整固定變因清單見 [量測 profile](../../tests/g0/measure/profile.md)。
+
+## G1 狀態（EX1-10）
+
+`state` 另接受 plan/03/06 §7.2 的四個狀態：`rescue_no_node`、`desktop_full_no_agent`、`desktop_full_no_avatar`，以及 10 插件 A/B 的兩半 `desktop_full_plus10_a`／`desktop_full_plus10_b`。G1 的 manifest 多兩個欄位：
+
+- `login_id`：這次 run 所在的登入（必填）。報告要求三次來自三個不同登入；A/B 報告要求每組 A 與 B 來自同一個登入。
+- `node_memory`：`{"unit": "<hostd 的單元>", "relay_socket": "<驗證 relay 的 socket>"}`。每次採樣經 relay 讀 `desktop.plugins.diagnostics` 的 `host.heap`，把 `heap_used`、`external`、`array_buffers` 掛在 hostd 回報的那個 PID 上（必須屬於該單元）。讀不到時記在該樣本的 `node_memory_errors`，不產生數字。三欄**不相加，也不與 PSS 相加**。
+
+驗證時檢查每個狀態必備的層：完整桌面各狀態要有 Core、Shell、合成器、`supervisor` 與 `hostd`，且必須有 `node_memory`；`rescue_no_node` 要有 Core、合成器、`supervisor` 與 Shell 或救援介面，且**不得**有 `hostd`、驗證 relay 或 `node_memory`。`verification-relay` 層（`install-session.sh --verification-relay` 才有的回讀 relay）照樣採樣與列出，但不計入桌面合計，報告會寫明。
+
+`report` 依樣本的狀態選報告：G0 子集沿用原本的 G0 報告（程式未改），G1 狀態產生 EX1-10 報告。G1 報告寫出適用的預算與量到的值：`desktop_full_no_agent` 是 hostd ≤100 MiB 與全桌面 ≤600 MiB，以三次各自的 p95 判定；`rescue_no_node` 沒有預算（分列，不作全桌面數字）；`desktop_full_no_avatar` 只列數字；`desktop_full_plus10_b` 指向 A/B 報告。只有條件齊全（參考機、實體機、每次冷登入、暖機 ≥300 秒、每次採樣跨度 ≥600 秒）且三次都在門檻內時才寫「三次 p95 皆未超過門檻」，否則是「未達」或「不判定」。
+
+```sh
+ditto-measure report-ab conditions.json a1.jsonl b1.jsonl a2.jsonl b2.jsonl a3.jsonl b3.jsonl report-ab.md
+```
+
+`report-ab` 以每組的 p95(B) − p95(A)（桌面合計）對 10 插件增量 ≤50 MiB 判定，並列中位數增量、分層增量與 hostd 的 V8 欄位。`conditions.json` 的 `plus10_loaded` 記錄每次登入啟用後實際載入的數量（Cordis 執行中、Shell 掛上的 QML）；任何一次不足 5＋5，報告就不對門檻判定。流程由 [`tests/g1/measure/cold-login.sh`](../../tests/g1/measure/cold-login.sh) 執行。
