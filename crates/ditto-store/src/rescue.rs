@@ -166,6 +166,7 @@ pub(crate) mod tests {
                 host: HostKind::Cordis,
                 config: serde_json::json!({}),
                 disabled: false,
+                area: None,
             }],
             slots: BTreeMap::new(),
             layout: LayoutIntent {

@@ -59,7 +59,7 @@ const REQUIRED_KEYS = [
   'started.profile',
   // diff labels (docops::diff)
   'diff.slot.changed', 'diff.entry.added', 'diff.entry.removed', 'diff.entry.config', 'diff.entry.disabled',
-  'diff.entry.enabled', 'diff.entry.version', 'diff.shortcuts', 'diff.appearance.token',
+  'diff.entry.enabled', 'diff.entry.version', 'diff.area.joined', 'diff.area.left', 'diff.shortcuts', 'diff.appearance.token',
   ...['theme', 'locale', 'reduced_motion', 'reduced_transparency', 'low_power_style'].map((field) => `diff.appearance.${field}`),
   ...['enabled', 'hidden', 'scale', 'animations', 'output', 'corner'].map((field) => `diff.avatar.${field}`),
   'diff.layout.workspace_grid', 'diff.layout.rules',
@@ -77,7 +77,7 @@ const REQUIRED_KEYS = [
   'shortcut.command_failed',
   // slot names (Tr.slotName)
   ...['ui.panel_top', 'ui.dock', 'ui.launcher', 'ui.tasks_panel', 'ui.notifications', 'layout.strategy', 'svc.tasks',
-    'svc.notification_policy'].map((slot) => `slot.${slot}`),
+    'svc.notification_policy', 'ui.status_item'].map((slot) => `slot.${slot}`),
   // error names and reasons (DittoClient.errorText)
   ...['unsupported', 'invalid_params', 'not_found', 'permission_denied', 'timeout', 'cancelled', 'conflict', 'unavailable',
     'protocol_version_unsupported', 'identity_rejected', 'preflight_rejected', 'internal'].map((name) => `error.${name}`),

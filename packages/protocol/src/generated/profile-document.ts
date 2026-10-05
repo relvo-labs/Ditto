@@ -49,6 +49,12 @@ export interface AvatarSettings {
   scale: number;
 }
 export interface EntrySpec {
+  /**
+   * The multi-entry area this entry is a member of (one of `AREAS`).
+   * Absent means none, and is left out of the document, so a Profile
+   * written before areas existed keeps its digest.
+   */
+  area?: string | null;
   config?: {
     [k: string]: unknown;
   };

@@ -115,6 +115,34 @@ ShellRoot {
         };
     }
 
+    /// What the `status` control line answers: the `ui.status_item` members
+    /// as laid out, in order, read from the items themselves (their parent,
+    /// size and text), so a run can tell they are on screen
+    /// without taking the Shell's report for it. Read-only; nothing is sent.
+    function statusReport() {
+        const area = providers.statusArea;
+        const region = area.region;
+        const items = area.mountedItems().map(item => {
+            const unit = Object.values(providers.slots).find(found => found.activeItem === item);
+            // The first child's text, when it has one (the D-34 items do).
+            const label = item.children.length > 0 && typeof item.children[0].text === "string" ? item.children[0].text : "";
+            return {
+                entry_id: unit && unit.active ? unit.active.binding.entry_id : "",
+                package: unit && unit.active ? unit.active.binding.package : "",
+                in_region: region !== null && item.parent === region,
+                visible: item.visible === true,
+                width: Math.round(item.width),
+                height: Math.round(item.height),
+                text: label
+            };
+        });
+        return {
+            region: region === null ? "none" : (area.panelProvider !== null ? "panel" : "strip"),
+            region_shown: area.regionShown,
+            items: items
+        };
+    }
+
     function runCommand(commandId, args) {
         switch (commandId) {
         case "launcher.toggle": {
@@ -415,6 +443,9 @@ ShellRoot {
     ///                     text the surfaces show. Read-only
     ///   tasks           → one JSON line: whether a tasks panel is mounted and
     ///                     the open tasks it holds to show. Read-only
+    ///   status          → one JSON line: where the status items are placed
+    ///                     (the panel's region or the Shell's strip) and each
+    ///                     item in order, read from the items. Read-only
     SocketServer {
         active: true
         path: (Quickshell.env("DITTO_RUNTIME_DIR")
@@ -446,6 +477,9 @@ ShellRoot {
                         connection.flush();
                     } else if (command[0] === "tasks") {
                         connection.write(JSON.stringify(root.tasksReport()) + "\n");
+                        connection.flush();
+                    } else if (command[0] === "status") {
+                        connection.write(JSON.stringify(root.statusReport()) + "\n");
                         connection.flush();
                     } else {
                         console.log("ditto-shell ignored control line");

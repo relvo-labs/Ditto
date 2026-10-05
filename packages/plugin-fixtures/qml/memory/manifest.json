@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.fixture.status_memory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": {
     "zh-TW": "記憶體用量",
     "en": "Memory"

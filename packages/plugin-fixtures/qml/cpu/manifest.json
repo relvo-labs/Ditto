@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.fixture.status_cpu",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": {
     "zh-TW": "處理器用量",
     "en": "CPU"

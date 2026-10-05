@@ -1246,7 +1246,7 @@ pub fn panels(core: &Core) -> Result<PanelsListOutput, CoreError> {
     let (mounts, avatar) = observation
         .map(|observation| (observation.mounts, observation.avatar_placement))
         .unwrap_or_default();
-    let panels = SLOTS
+    let mut panels: Vec<PanelStatus> = SLOTS
         .iter()
         .filter(|slot| slot.starts_with("ui."))
         .map(|slot| {
@@ -1265,6 +1265,41 @@ pub fn panels(core: &Core) -> Result<PanelsListOutput, CoreError> {
             }
         })
         .collect();
+    // An area lists one row per enabled member, in entry order, then any
+    // item the Shell still shows that is no longer a member.
+    for area in AREAS.iter().filter(|area| area.starts_with("ui.")) {
+        let members: Vec<_> = document
+            .area_members(area)
+            .filter(|entry| !entry.disabled)
+            .collect();
+        for entry in &members {
+            let mount = mounts
+                .iter()
+                .find(|mount| mount.slot == *area && mount.entry_id == entry.entry_id);
+            panels.push(PanelStatus {
+                slot: (*area).into(),
+                bound_entry: Some(entry.entry_id.clone()),
+                package: Some(entry.package.clone()),
+                mounted_entry: mount.map(|mount| mount.entry_id.clone()),
+                mounted: mount.is_some_and(|mount| mount.mounted),
+                visible: mount.is_some_and(|mount| mount.visible),
+            });
+        }
+        for mount in mounts.iter().filter(|mount| {
+            mount.slot == *area && !members.iter().any(|entry| entry.entry_id == mount.entry_id)
+        }) {
+            panels.push(PanelStatus {
+                slot: (*area).into(),
+                bound_entry: None,
+                package: document
+                    .entry(&mount.entry_id)
+                    .map(|entry| entry.package.clone()),
+                mounted_entry: Some(mount.entry_id.clone()),
+                mounted: mount.mounted,
+                visible: mount.visible,
+            });
+        }
+    }
     Ok(PanelsListOutput {
         shell_connected: core.shell.is_connected(),
         panels,
@@ -1400,7 +1435,8 @@ fn commands(core: &Core) -> Result<Vec<CommandInfo>, CoreError> {
         let bound = document
             .slots
             .values()
-            .any(|bound| bound == &entry.entry_id);
+            .any(|bound| bound == &entry.entry_id)
+            || entry.area.is_some();
         if !bound && entry.host != HostKind::Cordis {
             continue;
         }
@@ -1487,11 +1523,7 @@ fn plugins_list(core: &Core) -> Handled {
         .entries
         .iter()
         .map(|entry| {
-            let slot = document
-                .slots
-                .iter()
-                .find(|(_, bound)| *bound == &entry.entry_id)
-                .map(|(slot, _)| slot.clone());
+            let slot = document.placement_of(&entry.entry_id).map(String::from);
             let disabled_by_supervisor = supervisor_notes.iter().find(|row| {
                 row.action == "supervisor.disable"
                     && row.redacted_detail.starts_with(&entry.entry_id)

@@ -31,8 +31,9 @@ pub struct Plus10Loaded {
     pub login_id: String,
     /// Cordis entries of the set whose fiber is `active` in hostd.
     pub cordis_active: u32,
-    /// QML entries of the set the Shell mounted (shell_mounted_providers after
-    /// minus before).
+    /// QML entries of the set the Shell mounted and shows: rows of
+    /// `desktop.panels.list` in the `ui.status_item` area for the set's
+    /// packages, mounted and visible.
     pub qml_mounted: u32,
     #[serde(default)]
     pub note: String,

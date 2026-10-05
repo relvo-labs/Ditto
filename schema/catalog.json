@@ -2126,6 +2126,13 @@
           "EntrySpec": {
             "additionalProperties": false,
             "properties": {
+              "area": {
+                "description": "The multi-entry area this entry is a member of (one of `AREAS`).\nAbsent means none, and is left out of the document, so a Profile\nwritten before areas existed keeps its digest.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "config": {
                 "default": {}
               },
@@ -3140,6 +3147,13 @@
           "EntrySpec": {
             "additionalProperties": false,
             "properties": {
+              "area": {
+                "description": "The multi-entry area this entry is a member of (one of `AREAS`).\nAbsent means none, and is left out of the document, so a Profile\nwritten before areas existed keeps its digest.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "config": {
                 "default": {}
               },

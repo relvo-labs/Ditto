@@ -13,6 +13,12 @@ import Quickshell.Networking
 /// Provider interface (plan/03/04 §2.1): the host sets client, tokens, config,
 /// screen, slotName and shown; the provider declares reservedEdge, ready,
 /// healthy() and release(). It reaches Core only through `client`.
+///
+/// Optionally a panel offers `statusRegion`, an Item in its bar where the
+/// Shell places the mounted `ui.status_item` members (shell/core/StatusArea.qml).
+/// The panel lays the region out and nothing more: which items are in it,
+/// and in what order, is the Shell's. A panel without one still works; the
+/// Shell then shows the items in a strip of its own.
 Scope {
     id: provider
 
@@ -25,6 +31,7 @@ Scope {
     property bool shown: false
 
     readonly property string reservedEdge: "top"
+    readonly property Item statusRegion: statusRow
     property bool ready: false
     property bool menuOpen: false
 
@@ -269,6 +276,14 @@ Scope {
                     anchors.fill: parent
                     onClicked: provider.client.launchApp("nm-connection-editor")
                 }
+            }
+
+            /// Status items (`ui.status_item`), placed here by the Shell.
+            Row {
+                id: statusRow
+                spacing: provider.tokens.spaceWide
+                Accessible.role: Accessible.StatusBar
+                Accessible.name: provider.t(qsTr("狀態列項目"))
             }
 
             Text {

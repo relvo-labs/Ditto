@@ -222,11 +222,25 @@ Flickable {
         propose([{ op: "set_entry_disabled", entry_id: entry.entry_id, disabled: disabled }]);
     }
 
+    /// The multi-entry area a package can join (status items), or "".
+    /// Joining adds a place beside the others; no single slot is taken.
+    readonly property var areas: ["ui.status_item"]
+    function areaOf(manifest) {
+        if (!manifest || !manifest.slots) {
+            return "";
+        }
+        const found = manifest.slots.find(slot => areas.indexOf(slot) >= 0);
+        return found || "";
+    }
+
     function enablePackage(summary) {
         const manifest = manifestOf(summary.package_id, summary.version);
         const entry = { package: summary.package_id, version: summary.version, host: summary.host_kind, config: {}, disabled: false };
         const op = { op: "add_entry", entry: entry };
-        if (manifest && manifest.slots && manifest.slots.length === 1 && summary.host_kind === "cordis") {
+        const area = summary.host_kind === "qml" ? areaOf(manifest) : "";
+        if (area.length > 0) {
+            op.slot = area;
+        } else if (manifest && manifest.slots && manifest.slots.length === 1 && summary.host_kind === "cordis") {
             op.slot = manifest.slots[0];
         }
         propose([op]);
@@ -485,8 +499,21 @@ Flickable {
                                 enabled: !page.busy
                                 onClicked: page.enablePackage(packageRow.modelData)
                             }
+                            // A status item joins the status items beside the
+                            // others; it needs no place chosen.
+                            Button {
+                                visible: packageRow.packageEntries.length === 0 && packageRow.modelData.host_kind === "qml"
+                                    && page.areaOf(packageRow.manifest).length > 0
+                                tokens: page.tokens
+                                kind: "primary"
+                                text: page.t(qsTr("顯示在狀態列"))
+                                accessibleName: page.t(qsTr("在狀態列顯示「%1」")).arg(page.client.tr.localized(packageRow.modelData.name) || packageRow.modelData.package_id)
+                                enabled: !page.busy
+                                onClicked: page.enablePackage(packageRow.modelData)
+                            }
                             Text {
                                 visible: packageRow.packageEntries.length === 0 && packageRow.modelData.host_kind === "qml"
+                                    && page.areaOf(packageRow.manifest).length === 0
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: page.t(qsTr("桌面元件在組合中心選擇要放的位置後啟用。"))
                                 color: page.tokens.foregroundMuted

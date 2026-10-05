@@ -14,7 +14,7 @@ use ditto_protocol::{
         HostEntryProjection, HostObservation, HostProjection, ParticipantRole, Projection,
         ShellObservation, ShellProjection, ShellSlotBinding,
     },
-    profile::{AvatarSettings, EntrySpec, HostKind, ProfileDocument},
+    profile::{is_area, AvatarSettings, EntrySpec, HostKind, ProfileDocument, AREAS},
     services::Grant,
 };
 use ditto_store::{packages::PackageRow, Paths};
@@ -90,35 +90,46 @@ impl Resolver<'_> {
     }
 }
 
+/// One binding per single-provider `ui.*` slot, then one per enabled member
+/// of each area, in entry order (the order the Shell lays them out in).
 pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjection {
-    let mut slots = Vec::new();
-    for (slot, entry_id) in &document.slots {
-        if slot_role(slot) != Some(ParticipantRole::Shell) {
-            continue;
-        }
-        let Some(entry) = document.entry(entry_id) else {
-            continue;
-        };
+    let binding = |slot: &str, entry: &EntrySpec| -> Option<ShellSlotBinding> {
         if entry.disabled || entry.host != HostKind::Qml {
-            continue;
+            return None;
         }
-        let (Some(manifest), Some(directory)) = (
-            resolver.packages.manifest(entry),
-            resolver.package_dir(entry),
-        ) else {
-            continue;
-        };
-        let Some(qml_entry) = &manifest.qml_entry else {
-            continue;
-        };
-        slots.push(ShellSlotBinding {
-            slot: slot.clone(),
+        let manifest = resolver.packages.manifest(entry)?;
+        let directory = resolver.package_dir(entry)?;
+        let qml_entry = manifest.qml_entry.as_ref()?;
+        Some(ShellSlotBinding {
+            slot: slot.into(),
             entry_id: entry.entry_id.clone(),
             package: entry.package.clone(),
             version: entry.version.clone(),
             qml_url: format!("file://{}", directory.join(qml_entry).display()),
             config: entry.config.clone(),
-        });
+        })
+    };
+    let mut slots = Vec::new();
+    for (slot, entry_id) in &document.slots {
+        if slot_role(slot) != Some(ParticipantRole::Shell) || is_area(slot) {
+            continue;
+        }
+        if let Some(found) = document
+            .entry(entry_id)
+            .and_then(|entry| binding(slot, entry))
+        {
+            slots.push(found);
+        }
+    }
+    for area in AREAS {
+        if slot_role(area) != Some(ParticipantRole::Shell) {
+            continue;
+        }
+        slots.extend(
+            document
+                .area_members(area)
+                .filter_map(|entry| binding(area, entry)),
+        );
     }
     ShellProjection {
         appearance: document.appearance.clone(),
@@ -285,6 +296,15 @@ pub fn check_shell(
     connected: Option<&[String]>,
 ) -> Vec<Verdict> {
     let mut verdicts = Vec::new();
+    // A slot is read back by its name; an area member by its entry id, since
+    // an area holds many.
+    let key = |slot: &str, entry_id: &str| -> String {
+        if is_area(slot) {
+            entry_id.into()
+        } else {
+            slot.into()
+        }
+    };
     for binding in &target.slots {
         let mounted = observed.mounts.iter().any(|mount| {
             mount.slot == binding.slot
@@ -293,21 +313,25 @@ pub fn check_shell(
                 && mount.visible
         });
         verdicts.push(verdict(
-            &binding.slot,
+            &key(&binding.slot, &binding.entry_id),
             mounted,
             "the provider is not mounted and visible",
         ));
     }
     for mount in &observed.mounts {
-        let wanted = target
-            .slots
-            .iter()
-            .any(|binding| binding.slot == mount.slot);
+        let wanted = target.slots.iter().any(|binding| {
+            binding.slot == mount.slot
+                && (!is_area(&mount.slot) || binding.entry_id == mount.entry_id)
+        });
         if !wanted && mount.mounted {
             verdicts.push(verdict(
-                &mount.slot,
+                &key(&mount.slot, &mount.entry_id),
                 false,
-                "a provider is still mounted in a slot the profile left empty",
+                if is_area(&mount.slot) {
+                    "an item the profile removed from the area is still mounted"
+                } else {
+                    "a provider is still mounted in a slot the profile left empty"
+                },
             ));
         }
     }
@@ -442,4 +466,91 @@ pub fn check_compositor(
         ));
     }
     verdicts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ditto_protocol::participant::PanelMount;
+    use ditto_protocol::profile::{Appearance, AvatarSettings};
+
+    fn binding(slot: &str, entry_id: &str) -> ShellSlotBinding {
+        ShellSlotBinding {
+            slot: slot.into(),
+            entry_id: entry_id.into(),
+            package: format!("pkg-{entry_id}"),
+            version: "1.0.0".into(),
+            qml_url: "file:///x.qml".into(),
+            config: serde_json::json!({}),
+        }
+    }
+
+    fn mount(slot: &str, entry_id: &str, visible: bool) -> PanelMount {
+        PanelMount {
+            slot: slot.into(),
+            entry_id: entry_id.into(),
+            mounted: true,
+            visible,
+        }
+    }
+
+    fn appearance() -> Appearance {
+        Appearance {
+            theme: "soft-jelly".into(),
+            tokens: Default::default(),
+            reduced_motion: false,
+            reduced_transparency: false,
+            low_power_style: false,
+            locale: "zh-TW".into(),
+        }
+    }
+
+    #[test]
+    fn several_area_members_are_read_back_one_by_one() {
+        let target = ShellProjection {
+            appearance: appearance(),
+            avatar: AvatarSettings::default(),
+            slots: vec![
+                binding("ui.dock", "ent-dock"),
+                binding("ui.status_item", "ent-a"),
+                binding("ui.status_item", "ent-b"),
+            ],
+            shortcuts: vec![],
+        };
+        let observed = |mounts: Vec<PanelMount>| ShellObservation {
+            mounts,
+            appearance: Some(appearance()),
+            avatar: Some(AvatarSettings::default()),
+            avatar_placement: None,
+        };
+        let all = check_shell(
+            &target,
+            &observed(vec![
+                mount("ui.dock", "ent-dock", true),
+                mount("ui.status_item", "ent-a", true),
+                mount("ui.status_item", "ent-b", true),
+            ]),
+            None,
+        );
+        assert!(all.iter().all(|verdict| verdict.ok), "{all:?}");
+        let keys: Vec<&str> = all.iter().map(|verdict| verdict.key.as_str()).collect();
+        assert_eq!(keys, ["ui.dock", "ent-a", "ent-b", "appearance", "avatar"]);
+
+        // One member missing, one hidden, and one the profile no longer has.
+        let wrong = check_shell(
+            &target,
+            &observed(vec![
+                mount("ui.dock", "ent-dock", true),
+                mount("ui.status_item", "ent-b", false),
+                mount("ui.status_item", "ent-gone", true),
+            ]),
+            None,
+        );
+        let failed: Vec<&str> = wrong
+            .iter()
+            .filter(|verdict| !verdict.ok)
+            .map(|verdict| verdict.key.as_str())
+            .collect();
+        assert_eq!(failed, ["ent-a", "ent-b", "ent-gone"]);
+    }
 }
