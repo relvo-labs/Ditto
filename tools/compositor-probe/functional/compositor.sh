@@ -30,10 +30,11 @@ compositor_label() {
 }
 
 # Wait until exactly one window with this app id is mapped.
+# compositor_wait_for_window <app_id> [tries]: about 0.1 s per try (100 by default).
 compositor_wait_for_window() {
-  local app_id="$1"
+  local app_id="$1" tries="${2:-100}"
   local _
-  for _ in $(seq 1 100); do
+  for _ in $(seq 1 "$tries"); do
     case "$DITTO_COMPOSITOR" in
       sway)
         swaymsg --raw --type get_tree 2>/dev/null |

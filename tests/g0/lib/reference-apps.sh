@@ -38,7 +38,12 @@ start_reference_app() {
   esac
   local pid=$!
   WINDOW_PIDS+=("$pid")
-  if ! compositor_wait_for_window "$app_id"; then
+  # The Firefox snap asks the settings portal before its first window. With
+  # no desktop login at the seat no portal backend can start, and GDBus gives
+  # up after about 25 s (nightly 37472287369); the window then maps normally.
+  local tries=100
+  [[ "$role" == browser ]] && tries=600
+  if ! compositor_wait_for_window "$app_id" "$tries"; then
     case "$role" in
       browser) cat "$RUNTIME_DIR/firefox.log" 2>/dev/null || true ;;
       terminal) cat "$RUNTIME_DIR/foot.log" 2>/dev/null || true ;;
