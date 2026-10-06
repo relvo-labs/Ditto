@@ -123,7 +123,18 @@ jobs:
         run: bash tests/g1/lifecycle/run.sh
       - name: EX1-09 persistence faults
         if: success() || failure()
-        run: bash tests/g1/persistence-faults/run.sh
+        # ② needs a filesystem that really fills up: an 80 MiB tmpfs, as in
+        # the VM run. Mounting needs root; without passwordless sudo the
+        # check stays `environment` and this step is red.
+        run: |
+          small=/mnt/ditto-g1-small
+          if sudo -n mkdir -p "$small" && sudo -n mount -t tmpfs -o size=80m,uid="$(id -u)" tmpfs "$small"; then
+            export DITTO_G1_SMALL_FS="$small"
+          fi
+          status=0
+          bash tests/g1/persistence-faults/run.sh || status=$?
+          sudo -n umount "$small" 2>/dev/null || true
+          exit "$status"
       - name: EX1-12 rescue and supervision
         if: success() || failure()
         # Decided in a logged-in session (and, for EX1-13, with the second
