@@ -69,7 +69,7 @@
 
 ### 3.2 VM（`tools/dev-vm/run-g2.sh`，快照 `ditto-g2`，核心 7.0.0-38）
 
-2026-10-08T09:08Z（`15af0b5`）：還原、同步、建置、Rust、Node、foundation、Codex binary、D-Bus proxy 建置、`ditto-confine`、codex-run、codex-faults、codex-injection、jobs、lifecycle、layout、codex-desktop、shell 共 17 項全數通過。原快照 `ditto-base`（核心 6.8）沒有 Landlock ABI 6，Core 依設計拒絕啟動後端；那些套件現在記 `not_run` 而非失敗。
+2026-10-08T09:08Z（`15af0b5`）：還原、同步、建置、Rust、Node、foundation、Codex binary、D-Bus proxy 建置、`ditto-confine`、codex-run、codex-faults、codex-injection、jobs、lifecycle、layout、codex-desktop、shell 共 17 項全數通過。之後（`58d5fcb`，`2026-10-08T10:08:49Z-58d5`）再跑一次，加上 fault-injection 建置、codex-crash、codex-races：20 項全數通過。前一次（`6c492d3`）的 codex-faults 失敗揭露了一個缺陷，見 §4.1。原快照 `ditto-base`（核心 6.8）沒有 Landlock ABI 6，Core 依設計拒絕啟動後端；那些套件現在記 `not_run` 而非失敗。
 
 ### 3.3 單獨執行
 
@@ -91,6 +91,7 @@
 | Codex turn 失敗一律報 `interrupted` | 使用者看不出是模型服務不可用 | 依 `codexErrorInfo` 報 `provider_unavailable`／`rate_limited`（`78bc437`） |
 | 連線關閉時每條連線留下 2 執行緒、3 fd | 每個 Agent 世代約 107 KiB PSS 累積 | 關閉時送出 Shutdown（`63c0624`） |
 | Profile 可透過 `/shortcuts` 綁 Core 保留的組合鍵 | Super+A 可被改掉，聊天入口消失 | preflight 拒絕（`cb250d5`） |
+| 第一次啟動 Agent 時，Core 在 10 秒啟動期限內雜湊並掃描 290 MB 的 Codex binary | 慢的機器（debug 建置的 VM）上，新 store 的第一個 Agent 在連上時被拒 | 期限改從 controller 啟動起算；以 memchr 搜尋目錄；dev 建置最佳化 sha2／memchr（`58d5fcb`） |
 | 量測乾跑的 `prepare` 會連到登入中的工作階段的 relay | 2026-10-08 一次嘗試在使用中的 Profile 建立了一筆 `aborted` 的 ChangeSet（無任何套用，head 不變） | 乾跑在登入前把 relay 指向不存在的路徑（`c9f3b5a`） |
 
 ### 4.2 環境限制
