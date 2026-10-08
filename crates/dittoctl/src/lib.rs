@@ -103,5 +103,8 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     "agent.providers.logout",
     "desktop.approvals.get",
     "desktop.approvals.list",
+    "desktop.context.acquire",
+    "desktop.context.preview",
+    "desktop.context.release",
     "desktop.approvals.decide",
 ];

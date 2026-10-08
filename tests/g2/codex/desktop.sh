@@ -38,6 +38,7 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 accent="#3366ff"
+export DITTO_G2_CLIP="clip-canary-$RANDOM$RANDOM"
 node "$HERE/provider.mjs" "$evidence/model-requests.jsonl" "$accent" >"$evidence/provider.port" 2>"$evidence/provider.log" &
 PROVIDER_PID=$!
 for _ in $(seq 1 50); do [[ -s "$evidence/provider.port" ]] && break; sleep 0.1; done
@@ -203,6 +204,31 @@ if ask "再看一次視窗"; then
   check approval-revoked pass "after revoking, the Agent had to ask again" "$(jq -c "{grant_id:.result.grant_id,revoked_at:.result.revoked_at}" "$evidence/revoke.json")"
 else
   check approval-revoked fail "no prompt after revoke" "$(cat "$evidence/revoke.json")"
+fi
+
+# ⑪ clipboard and ⑫ screen, attached from the chat and sent with a message
+attach_and_send() { # <kind> <message> <expected answer> <check id>
+  shell_line "command chat.open" >/dev/null 2>&1 || true
+  sleep 1
+  shell_line "chat-attach $1" >/dev/null 2>&1 || true
+  if ! wait_chat "(.attached|length) == 1 and .attached[0].kind == \"$1\"" 20; then
+    check "$4" fail "the $1 was not attached" "$(cat "$evidence/chat.json")"; return
+  fi
+  "${G1_GUI[@]}" paste "$2"; "${G1_GUI[@]}" press enter
+  if wait_chat "(.state == \"done\" or .state == \"failed\") and (.answer|type==\"string\") and (.answer|test(\"$3\")) and (.attached|length)==0" 60; then
+    check "$4" pass "attached $1 reached the model with the message and was cleared from the draft" "$(jq -c '{answer,attached}' "$evidence/chat.json")"
+  else
+    check "$4" fail "the $1 attachment did not complete" "$(cat "$evidence/chat.json")"
+  fi
+}
+printf '%s' "$DITTO_G2_CLIP" | wl-copy
+attach_and_send clipboard "看看這個附件" "剪貼簿" context-clipboard
+WAYLAND_DISPLAY="$WAYLAND_DISPLAY" grim "$evidence/before-capture.png" 2>/dev/null || true
+attach_and_send capture "看看附件截圖" "截圖" context-capture
+if grep -q "$DITTO_G2_CLIP" "$RUNTIME_DIR/core.log"; then
+  check context-private fail "the clipboard text appeared in Core's log"
+else
+  check context-private pass "the clipboard text is in no Core log line"
 fi
 
 # ⑤ the Agent goes; the desktop stays

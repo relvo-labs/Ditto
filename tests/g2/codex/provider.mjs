@@ -10,6 +10,12 @@ const accent=process.argv[3]??'#3366ff'
 const provider=await startProvider(body=>{
   appendFileSync(log,JSON.stringify(body)+'\n')
   const outputs=toolOutputs(body)
+  if(userText(body).includes('附件')){
+    const input=JSON.stringify(body.input)
+    if(input.includes('input_image'))return [say('收到截圖。')]
+    if(userText(body).includes('<ditto_context kind="clipboard"')&&userText(body).includes(process.env.DITTO_G2_CLIP??'\u0000'))return [say('收到剪貼簿。')]
+    return [say('沒有看到附件。')]
+  }
   if(userText(body).includes('視窗')){
     // Reading windows needs the person's approval for the Agent.
     if(!outputs.has('list-windows'))return [call('desktop__windows__list',{},'list-windows')]

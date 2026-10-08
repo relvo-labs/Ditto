@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import Quickshell
 import "../ui"
 import "../change"
@@ -259,6 +260,99 @@ FloatingWindow {
                 text: window.conversation.errorDiagnostic
             }
 
+            // Attached context: what will be sent with the next message.
+            Flow {
+                width: parent.width
+                spacing: window.tokens.spaceTight
+                visible: window.conversation.attached.length > 0
+                Accessible.role: Accessible.List
+                Accessible.name: window.t(qsTr("附加內容"))
+                Repeater {
+                    model: window.conversation.attached
+                    Rectangle {
+                        id: chip
+                        required property var modelData
+                        readonly property string kindText: modelData.kind === "file" ? window.t(qsTr("檔案"))
+                            : modelData.kind === "clipboard" ? window.t(qsTr("剪貼簿")) : window.t(qsTr("螢幕畫面"))
+                        height: window.tokens.controlHeight
+                        width: chipLabel.implicitWidth + remove.width + window.tokens.space * 3
+                        radius: height / 2
+                        color: window.tokens.surface
+                        border.color: window.tokens.border
+                        Text {
+                            id: chipLabel
+                            anchors.left: parent.left
+                            anchors.leftMargin: window.tokens.space
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: (chip.modelData.kind === "clipboard" ? chip.kindText : window.t(qsTr("%1：%2")).arg(chip.kindText).arg(chip.modelData.label))
+                                + "  " + Math.max(1, Math.round(chip.modelData.bytes / 1024)) + " KB"
+                                + (chip.modelData.truncated ? window.t(qsTr("（已截斷）")) : "")
+                            color: window.tokens.foreground
+                            font.pixelSize: window.tokens.fontSmall
+                        }
+                        Button {
+                            id: remove
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            tokens: window.tokens
+                            kind: "subtle"
+                            text: "✕"
+                            accessibleName: window.t(qsTr("移除附加內容：%1")).arg(chip.kindText)
+                            onClicked: window.conversation.detach(chip.modelData.context_id)
+                        }
+                    }
+                }
+            }
+            Text {
+                visible: text.length > 0
+                width: parent.width
+                maximumLineCount: 3
+                elide: Text.ElideRight
+                wrapMode: Text.Wrap
+                textFormat: Text.PlainText
+                text: {
+                    const items = window.conversation.attached;
+                    if (items.length === 0) {
+                        return "";
+                    }
+                    const preview = window.conversation.previews[items[items.length - 1].context_id];
+                    if (!preview) {
+                        return "";
+                    }
+                    return preview.text !== null && preview.text !== undefined
+                        ? window.t(qsTr("預覽：")) + preview.text
+                        : window.t(qsTr("螢幕畫面 %1×%2，只在送出時傳給模型")).arg(preview.image_size[0]).arg(preview.image_size[1]);
+                }
+                color: window.tokens.foregroundMuted
+                font.pixelSize: window.tokens.fontSmall
+            }
+
+            Row {
+                spacing: window.tokens.spaceTight
+                visible: window.conversation.connected
+                Button {
+                    tokens: window.tokens
+                    kind: "subtle"
+                    text: window.t(qsTr("附加檔案…"))
+                    enabled: !window.conversation.attaching
+                    onClicked: fileDialog.open()
+                }
+                Button {
+                    tokens: window.tokens
+                    kind: "subtle"
+                    text: window.t(qsTr("附加剪貼簿"))
+                    enabled: !window.conversation.attaching
+                    onClicked: window.conversation.attach("clipboard")
+                }
+                Button {
+                    tokens: window.tokens
+                    kind: "subtle"
+                    text: window.t(qsTr("附加螢幕畫面"))
+                    enabled: !window.conversation.attaching
+                    onClicked: window.conversation.attach("capture")
+                }
+            }
+
             Row {
                 width: parent.width
                 spacing: window.tokens.space
@@ -304,5 +398,14 @@ FloatingWindow {
         }
 
         Component.onCompleted: input.focusInput()
+    }
+
+    /// Only the path the person chooses here is read, by Core, beneath their
+    /// home directory.
+    FileDialog {
+        id: fileDialog
+        title: window.t(qsTr("選擇要附加的文字檔"))
+        nameFilters: [window.t(qsTr("文字檔 (*.txt *.md *.json *.csv *.log)")), window.t(qsTr("所有檔案 (*)"))]
+        onAccepted: window.conversation.attach("file", decodeURIComponent(selectedFile.toString().replace("file://", "")))
     }
 }

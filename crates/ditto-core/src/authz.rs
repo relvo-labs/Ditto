@@ -43,6 +43,9 @@ pub fn policy(subject: &Subject, scope_name: &str) -> PolicyDefault {
         scope::AGENT_INTERACT | scope::AGENT_READ => [Allow, Allow, Deny, Deny, Deny, Allow, Deny],
         scope::AGENT_WRITE => [Deny, Deny, Deny, Deny, Deny, Allow, Deny],
         scope::AGENT_MANAGE => [Allow, Allow, Deny, Deny, Deny, Deny, Deny],
+        // Only a person's own surface (or the CLI they run) takes private
+        // context; the Agent and plugins never fetch it themselves.
+        scope::CONTEXT => [Allow, Allow, Deny, Deny, Deny, Deny, Deny],
         scope::READ => [Allow, Allow, Allow, Allow, Allow, Allow, Deny],
         scope::CONFIG => [Allow, Allow, Deny, Deny, GrantRequired, Allow, Deny],
         scope::WINDOWS_READ => [

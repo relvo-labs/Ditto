@@ -5,7 +5,7 @@
 // path and its boundaries, never model quality or subscription access.
 import {spawn} from 'node:child_process'
 import {createHash} from 'node:crypto'
-import {mkdtempSync,openSync,closeSync,readFileSync,existsSync,rmSync,chmodSync,readdirSync,statSync,realpathSync} from 'node:fs'
+import {mkdtempSync,openSync,closeSync,readFileSync,existsSync,rmSync,chmodSync,readdirSync,statSync,lstatSync,realpathSync} from 'node:fs'
 import {tmpdir,homedir} from 'node:os'
 import {resolve,join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -20,6 +20,7 @@ const sha=createHash('sha256').update(readFileSync(codex)).digest('hex')
 if(sha!==pin.sha256){console.log(JSON.stringify({ok:false,not_run:'installed Codex binary differs from tools/codex/pin.json'}));process.exit(2)}
 
 const canary='ditto-canary-'+Math.random().toString(36).slice(2)
+const fileCanary='ditto-file-canary-'+Math.random().toString(36).slice(2)
 // The scripted model: try two disabled built-ins, read the profile, turn on
 // the notification policy's focus rule on the head revision (a hostd-backed
 // plugin config, so the fixture needs no Shell), then report. Each step
@@ -32,6 +33,7 @@ const findEntry=(value,pkg)=>{
 const provider=await startProvider(body=>{
   const outputs=toolOutputs(body)
   if(userText(body).includes('follow-up'))return [say('好的。')]
+  if(userText(body).includes('attached-note'))return [say(userText(body).includes('<ditto_context kind="file" label="plan.txt"')&&userText(body).includes(fileCanary)?'收到附件。':'沒有看到附件。')]
   if(!userText(body).includes(canary))return [say('unexpected request')]
   if(!outputs.has('read-profile'))return [
     call('exec_command',{cmd:'touch /tmp/ditto-g2-escape'},'builtin-exec'),
@@ -51,7 +53,12 @@ const provider=await startProvider(body=>{
 
 const root=mkdtempSync(tmpdir()+'/ditto-g2-codex-')
 const log=openSync(root+'/core.log','w')
-const env={...process.env,DITTO_RUNTIME_DIR:root+'/run',DITTO_DATA_DIR:root+'/store',DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:root+'/result.json',DITTO_G2_CANARY:canary}
+// Core's home is a private test directory: file context is taken only
+// from beneath it.
+const home=root+'/home';(await import('node:fs')).mkdirSync(home+'/notes',{recursive:true})
+;(await import('node:fs')).writeFileSync(home+'/notes/plan.txt','左邊專案，右邊終端 '+fileCanary)
+;(await import('node:fs')).symlinkSync('/etc/hostname',home+'/notes/escape.txt')
+const env={...process.env,HOME:home,DITTO_G2_HOME:home,DITTO_G2_FILE_CANARY:fileCanary,DITTO_RUNTIME_DIR:root+'/run',DITTO_DATA_DIR:root+'/store',DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:root+'/result.json',DITTO_G2_CANARY:canary}
 for(const key of ['DITTO_DEV_TOKEN','DITTO_LAUNCH_SCOPE_PREFIX','DITTO_REQUIRE_QUOTA','WAYFIRE_SOCKET','SWAYSOCK'])delete env[key]
 const child=spawn(resolve(workspace,'target/debug/ditto-core'),['serve','--compositor','fixture',
   '--builtin-packages',resolve(workspace,'target/ditto-packages'),
@@ -68,7 +75,7 @@ const verify=(name,value)=>{if(!value)throw new Error('check failed: '+name);che
 function grep(path,needle){
   if(!existsSync(path))return []
   const found=[]
-  const walk=p=>{const s=statSync(p);if(s.isDirectory()){for(const n of readdirSync(p))walk(p+'/'+n)}else if(s.isFile()&&readFileSync(p).includes(needle))found.push(p)}
+  const walk=p=>{const s=lstatSync(p);if(s.isDirectory()){for(const n of readdirSync(p))walk(p+'/'+n)}else if(s.isFile()&&readFileSync(p).includes(needle))found.push(p)}
   walk(path);return found
 }
 try{
@@ -96,6 +103,9 @@ try{
   verify('no file escaped the boundary',!existsSync('/tmp/ditto-g2-escape'))
   const leaks=grep(join(root,'store'),canary).filter(p=>!p.includes('/conversations/'))
   verify('canary only in Core conversation store: '+JSON.stringify(leaks),leaks.length===0)
+  verify('attached file content reached the model',sent.some(b=>userText(b).includes(fileCanary)))
+  const fileLeaks=[...grep(join(root,'store'),fileCanary),...grep(join(root,'run'),fileCanary)]
+  verify('attached content stored nowhere (only its reference): '+JSON.stringify(fileLeaks),fileLeaks.length===0&&!readFileSync(root+'/core.log','utf8').includes(fileCanary))
   const followUp=sent.find(b=>userText(b).includes('follow-up'))
   verify('a follow-up turn carries the verified change it can refer to',!!followUp&&JSON.stringify(followUp.input).includes(result.change_id)&&JSON.stringify(followUp.input).includes('Recent verified changes'))
   const pss=existsSync(env.DITTO_G2_TEST_OUT+'.pss')?JSON.parse(readFileSync(env.DITTO_G2_TEST_OUT+'.pss','utf8')):null
@@ -110,7 +120,7 @@ try{
   await sleep(300)
   try{process.kill(-child.pid,'SIGKILL')}catch{}
   await provider.close()
-  function writable(path){if(statSync(path).isDirectory()){chmodSync(path,0o700);for(const name of readdirSync(path))writable(path+'/'+name)}else chmodSync(path,0o600)}
+  function writable(path){const s=lstatSync(path);if(s.isSymbolicLink())return;if(s.isDirectory()){chmodSync(path,0o700);for(const name of readdirSync(path))writable(path+'/'+name)}else chmodSync(path,0o600)}
   if(process.env.DITTO_G2_KEEP)console.error('kept '+root)
   else{writable(root);rmSync(root,{recursive:true,force:true})}
 }

@@ -213,7 +213,8 @@ ShellRoot {
             events: conversation.events.map(event => event.type),
             changes: conversation.changeIds(),
             answer: last && last.data ? last.data.text : null,
-            error: conversation.errorText
+            error: conversation.errorText,
+            attached: conversation.attached.map(item => ({ kind: item.kind, label: item.label, bytes: item.bytes }))
         };
     }
 
@@ -600,6 +601,8 @@ ShellRoot {
     ///                     answer, read from the shared state. Read-only
     ///   chat-send <text> open the chat and send <text> as if typed and
     ///                     submitted with Enter
+    ///   chat-attach <clipboard|capture|file PATH>
+    ///                     attach context as the chat's buttons do
     ///   status          → one JSON line: where the status items are placed
     ///                     (the panel's region or the Shell's strip) and each
     ///                     item in order, read from the items. Read-only
@@ -643,6 +646,11 @@ ShellRoot {
                         root.openChat();
                         conversation.draft = line.trim().slice("chat-send ".length);
                         conversation.send();
+                    } else if (command[0] === "chat-attach" && command.length >= 2) {
+                        // The same route as the attachment buttons (and, for
+                        // a file, the path the file dialog returns).
+                        root.openChat();
+                        conversation.attach(command[1], command.length > 2 ? line.trim().split(" ").slice(2).join(" ") : "");
                     } else if (command[0] === "status") {
                         connection.write(JSON.stringify(root.statusReport()) + "\n");
                         connection.flush();

@@ -5,7 +5,7 @@
     <name>ApprovalWindow</name>
     <message>
         <source>Agent 的說明（未經驗證）：</source>
-        <translation>The Agent's note (not verified): </translation>
+        <translation>The Agent&apos;s note (not verified): </translation>
     </message>
     <message>
         <source>Ditto 想在這次對話中做一件需要你同意的事：</source>
@@ -411,6 +411,10 @@
 <context>
     <name>ChatWindow</name>
     <message>
+        <source>%1：%2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
         <source>AI 對話目前關閉。開啟後才會連接模型。</source>
         <translation>AI chat is off. The model is connected only after you turn it on.</translation>
     </message>
@@ -439,6 +443,10 @@
         <translation>Stop</translation>
     </message>
     <message>
+        <source>剪貼簿</source>
+        <translation>Clipboard</translation>
+    </message>
+    <message>
         <source>取消登入</source>
         <translation>Cancel sign-in</translation>
     </message>
@@ -455,12 +463,36 @@
         <translation>Signed in</translation>
     </message>
     <message>
+        <source>所有檔案 (*)</source>
+        <translation>All files (*)</translation>
+    </message>
+    <message>
         <source>描述想調整的桌面，例如「開啟通知專注模式」</source>
         <translation>Describe what to change, for example “turn on notification focus mode”</translation>
     </message>
     <message>
+        <source>文字檔 (*.txt *.md *.json *.csv *.log)</source>
+        <translation>Text files (*.txt *.md *.json *.csv *.log)</translation>
+    </message>
+    <message>
         <source>新對話</source>
         <translation>New conversation</translation>
+    </message>
+    <message>
+        <source>檔案</source>
+        <translation>File</translation>
+    </message>
+    <message>
+        <source>移除附加內容：%1</source>
+        <translation>Remove attachment: %1</translation>
+    </message>
+    <message>
+        <source>螢幕畫面</source>
+        <translation>Screen</translation>
+    </message>
+    <message>
+        <source>螢幕畫面 %1×%2，只在送出時傳給模型</source>
+        <translation>Screen %1×%2, sent to the model only with your message</translation>
     </message>
     <message>
         <source>訊息</source>
@@ -483,6 +515,10 @@
         <translation>Sending</translation>
     </message>
     <message>
+        <source>選擇要附加的文字檔</source>
+        <translation>Choose a text file to attach</translation>
+    </message>
+    <message>
         <source>重新開啟登入頁</source>
         <translation>Open the sign-in page again</translation>
     </message>
@@ -491,8 +527,32 @@
         <translation>Turn on AI chat</translation>
     </message>
     <message>
+        <source>附加內容</source>
+        <translation>Attached</translation>
+    </message>
+    <message>
+        <source>附加剪貼簿</source>
+        <translation>Attach clipboard</translation>
+    </message>
+    <message>
+        <source>附加檔案…</source>
+        <translation>Attach file…</translation>
+    </message>
+    <message>
+        <source>附加螢幕畫面</source>
+        <translation>Attach screen</translation>
+    </message>
+    <message>
+        <source>預覽：</source>
+        <translation>Preview: </translation>
+    </message>
+    <message>
         <source>額度已用 %1%</source>
         <translation>%1% of quota used</translation>
+    </message>
+    <message>
+        <source>（已截斷）</source>
+        <translation> (cut short)</translation>
     </message>
 </context>
 <context>
@@ -1143,12 +1203,12 @@
         <translation>Version of “{package}”</translation>
     </message>
     <message>
-        <source>diff.layout.rules</source>
-        <translation>Window rules</translation>
-    </message>
-    <message>
         <source>diff.layout.region</source>
         <translation>Where {app_id} windows go</translation>
+    </message>
+    <message>
+        <source>diff.layout.rules</source>
+        <translation>Window rules</translation>
     </message>
     <message>
         <source>diff.layout.workspace_grid</source>

@@ -5,6 +5,13 @@
     "client_message_id": {
       "type": "string"
     },
+    "contexts": {
+      "description": "Context the person attached to this message (`desktop.context.*`\nids). Attaching is the consent to send it to the model in this turn.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "session_id": {
       "type": "string"
     },

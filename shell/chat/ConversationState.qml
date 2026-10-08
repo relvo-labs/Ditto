@@ -31,6 +31,12 @@ QtObject {
     // ---- what the user has not sent -------------------------------------------------
     property string draft: ""
     property bool sending: false
+    /// Context the person attached to the draft: Core references (label,
+    /// size, hash), with a preview fetched on demand. The content stays in
+    /// Core; removing a chip releases it there.
+    property var attached: []
+    property var previews: ({})
+    property bool attaching: false
 
     // ---- internals --------------------------------------------------------------------
     property bool wanted: false
@@ -402,10 +408,13 @@ QtObject {
         }
         sending = true;
         const submit = function () {
-            client.capability("agent.turns.submit", { session_id: sessionId, client_message_id: pendingKey, text: text }, function (result) {
+            const contexts = attached.map(item => item.context_id);
+            client.capability("agent.turns.submit", { session_id: sessionId, client_message_id: pendingKey, text: text, contexts: contexts }, function (result) {
                 sending = false;
                 pendingKey = "";
                 draft = "";
+                attached = [];
+                previews = {};
                 turn = result;
                 setError(null);
                 readNew();
@@ -427,6 +436,41 @@ QtObject {
             sending = false;
             setError(error);
         });
+    }
+
+    /// kind: "file" (with an absolute path), "clipboard" or "capture".
+    /// Taking context is always this explicit act; nothing watches the
+    /// clipboard or the screen.
+    function attach(kind, path) {
+        if (attaching) {
+            return;
+        }
+        attaching = true;
+        const params = { kind: kind };
+        if (path) {
+            params.path = path;
+        }
+        client.capability("desktop.context.acquire", params, function (reference) {
+            attaching = false;
+            attached = attached.concat([reference]);
+            setError(null);
+            client.capability("desktop.context.preview", { context_id: reference.context_id }, function (preview) {
+                const table = Object.assign({}, previews);
+                table[reference.context_id] = preview;
+                previews = table;
+            });
+        }, function (error) {
+            attaching = false;
+            setError(error);
+        }, { deadlineMs: 15000 });
+    }
+
+    function detach(contextId) {
+        attached = attached.filter(item => item.context_id !== contextId);
+        const table = Object.assign({}, previews);
+        delete table[contextId];
+        previews = table;
+        client.capability("desktop.context.release", { context_id: contextId });
     }
 
     function stop() {

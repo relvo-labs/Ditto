@@ -216,6 +216,77 @@ pub struct TurnSubmitInput {
     pub session_id: String,
     pub client_message_id: String,
     pub text: String,
+    /// Context the person attached to this message (`desktop.context.*`
+    /// ids). Attaching is the consent to send it to the model in this turn.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub contexts: Vec<String>,
+}
+
+// ---- context (G2-CORE-03, PLAT-02) ------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextKind {
+    File,
+    Clipboard,
+    Capture,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ContextAcquireInput {
+    pub kind: ContextKind,
+    /// `file`: a path under the person's home directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// `capture`: the output to capture; absent means the primary one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+}
+
+/// What a piece of context is, without its content. This is what a
+/// conversation keeps; the content lives in Core's memory until released.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ContextReference {
+    pub context_id: String,
+    pub kind: ContextKind,
+    /// A file name (never its path), "clipboard" or an output name.
+    pub label: String,
+    pub mime: String,
+    pub bytes: u64,
+    pub sha256: String,
+    pub captured_at: String,
+    pub expires_at_ms: u64,
+    /// The content was cut at the size limit.
+    pub truncated: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ContextIdInput {
+    pub context_id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ContextPreviewOutput {
+    pub reference: ContextReference,
+    /// The beginning of text content, for the person to check.
+    pub text: Option<String>,
+    /// Image size, for captures.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_size: Option<[u32; 2]>,
+}
+
+/// Context content handed to the Agent for the one turn it was attached to.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ContextPayload {
+    pub reference: ContextReference,
+    pub text: Option<String>,
+    /// `data:image/png;base64,…`
+    pub image_data_url: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -252,6 +323,11 @@ pub struct TurnClaimOutput {
     /// Core recorded them: what "that", "it" or "a bit more" can refer to.
     #[serde(default)]
     pub recent_changes: Vec<RecentChange>,
+    /// Context attached to this turn's message and still held by Core.
+    /// A reference whose content was released (expiry, Core restart) is
+    /// absent: the Agent says so instead of guessing.
+    #[serde(default)]
+    pub contexts: Vec<ContextPayload>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

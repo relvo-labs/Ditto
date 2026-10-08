@@ -411,6 +411,10 @@
 <context>
     <name>ChatWindow</name>
     <message>
+        <source>%1：%2</source>
+        <translation>%1：%2</translation>
+    </message>
+    <message>
         <source>AI 對話目前關閉。開啟後才會連接模型。</source>
         <translation>AI 對話目前關閉。開啟後才會連接模型。</translation>
     </message>
@@ -439,6 +443,10 @@
         <translation>停止</translation>
     </message>
     <message>
+        <source>剪貼簿</source>
+        <translation>剪貼簿</translation>
+    </message>
+    <message>
         <source>取消登入</source>
         <translation>取消登入</translation>
     </message>
@@ -455,12 +463,36 @@
         <translation>已登入</translation>
     </message>
     <message>
+        <source>所有檔案 (*)</source>
+        <translation>所有檔案 (*)</translation>
+    </message>
+    <message>
         <source>描述想調整的桌面，例如「開啟通知專注模式」</source>
         <translation>描述想調整的桌面，例如「開啟通知專注模式」</translation>
     </message>
     <message>
+        <source>文字檔 (*.txt *.md *.json *.csv *.log)</source>
+        <translation>文字檔 (*.txt *.md *.json *.csv *.log)</translation>
+    </message>
+    <message>
         <source>新對話</source>
         <translation>新對話</translation>
+    </message>
+    <message>
+        <source>檔案</source>
+        <translation>檔案</translation>
+    </message>
+    <message>
+        <source>移除附加內容：%1</source>
+        <translation>移除附加內容：%1</translation>
+    </message>
+    <message>
+        <source>螢幕畫面</source>
+        <translation>螢幕畫面</translation>
+    </message>
+    <message>
+        <source>螢幕畫面 %1×%2，只在送出時傳給模型</source>
+        <translation>螢幕畫面 %1×%2，只在送出時傳給模型</translation>
     </message>
     <message>
         <source>訊息</source>
@@ -483,6 +515,10 @@
         <translation>送出中</translation>
     </message>
     <message>
+        <source>選擇要附加的文字檔</source>
+        <translation>選擇要附加的文字檔</translation>
+    </message>
+    <message>
         <source>重新開啟登入頁</source>
         <translation>重新開啟登入頁</translation>
     </message>
@@ -491,8 +527,32 @@
         <translation>開啟 AI 對話</translation>
     </message>
     <message>
+        <source>附加內容</source>
+        <translation>附加內容</translation>
+    </message>
+    <message>
+        <source>附加剪貼簿</source>
+        <translation>附加剪貼簿</translation>
+    </message>
+    <message>
+        <source>附加檔案…</source>
+        <translation>附加檔案…</translation>
+    </message>
+    <message>
+        <source>附加螢幕畫面</source>
+        <translation>附加螢幕畫面</translation>
+    </message>
+    <message>
+        <source>預覽：</source>
+        <translation>預覽：</translation>
+    </message>
+    <message>
         <source>額度已用 %1%</source>
         <translation>額度已用 %1%</translation>
+    </message>
+    <message>
+        <source>（已截斷）</source>
+        <translation>（已截斷）</translation>
     </message>
 </context>
 <context>
@@ -1143,12 +1203,12 @@
         <translation>「{package}」的版本</translation>
     </message>
     <message>
-        <source>diff.layout.rules</source>
-        <translation>視窗規則</translation>
-    </message>
-    <message>
         <source>diff.layout.region</source>
         <translation>{app_id} 的視窗位置</translation>
+    </message>
+    <message>
+        <source>diff.layout.rules</source>
+        <translation>視窗規則</translation>
     </message>
     <message>
         <source>diff.layout.workspace_grid</source>

@@ -427,7 +427,11 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
         return crate::desktop::execute(&core.session, &call);
     }
     match call.contract.capability_id {
-        method if method.starts_with("agent.") || method.starts_with("desktop.approvals.") => {
+        method
+            if method.starts_with("agent.")
+                || method.starts_with("desktop.approvals.")
+                || method.starts_with("desktop.context.") =>
+        {
             crate::agent_routes::dispatch(core, caller, &call)
         }
         catalog::CAPABILITIES_LIST => {

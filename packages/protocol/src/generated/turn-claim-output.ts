@@ -1,5 +1,6 @@
 /* Generated from schema/turn-claim-output.json; do not edit. */
 
+export type ContextKind = 'file' | 'clipboard' | 'capture';
 export type DiffKind = 'added' | 'removed' | 'changed';
 export type ResultKind = ('succeeded' | 'failed' | 'partial' | 'unknown') | 'scheduled';
 export type ChangeState =
@@ -36,6 +37,12 @@ export type TurnState =
   | 'cancelled';
 
 export interface TurnClaimOutput {
+  /**
+   * Context attached to this turn's message and still held by Core.
+   * A reference whose content was released (expiry, Core restart) is
+   * absent: the Agent says so instead of guessing.
+   */
+  contexts?: ContextPayload[];
   message_seq: number;
   /**
    * The latest ChangeSets this conversation produced, newest first, as
@@ -45,6 +52,38 @@ export interface TurnClaimOutput {
   settings: AgentPreferences;
   text: string;
   turn: Turn;
+}
+/**
+ * Context content handed to the Agent for the one turn it was attached to.
+ */
+export interface ContextPayload {
+  /**
+   * `data:image/png;base64,…`
+   */
+  image_data_url?: string | null;
+  reference: ContextReference;
+  text?: string | null;
+}
+/**
+ * What a piece of context is, without its content. This is what a
+ * conversation keeps; the content lives in Core's memory until released.
+ */
+export interface ContextReference {
+  bytes: number;
+  captured_at: string;
+  context_id: string;
+  expires_at_ms: number;
+  kind: ContextKind;
+  /**
+   * A file name (never its path), "clipboard" or an output name.
+   */
+  label: string;
+  mime: string;
+  sha256: string;
+  /**
+   * The content was cut at the size limit.
+   */
+  truncated: boolean;
 }
 export interface RecentChange {
   change_id: string;

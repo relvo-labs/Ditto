@@ -182,7 +182,9 @@ mod tests {
                 session_id: session.session_id.clone(),
                 client_message_id: "message".into(),
                 text: "windows".into(),
+                contexts: vec![],
             },
+            &[],
         )
         .unwrap();
         turns::claim(store, &turn.turn_id, "generation-1").unwrap();
@@ -302,7 +304,9 @@ mod tests {
                 session_id: session.session_id.clone(),
                 client_message_id: "late".into(),
                 text: "windows".into(),
+                contexts: vec![],
             },
+            &[],
         )
         .unwrap();
         turns::claim(store, &turn.turn_id, "generation-1").unwrap();

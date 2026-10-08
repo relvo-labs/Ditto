@@ -19000,6 +19000,13 @@
           "client_message_id": {
             "type": "string"
           },
+          "contexts": {
+            "description": "Context the person attached to this message (`desktop.context.*`\nids). Attaching is the consent to send it to the model in this turn.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "session_id": {
             "type": "string"
           },
@@ -19444,6 +19451,91 @@
             ],
             "type": "string"
           },
+          "ContextKind": {
+            "enum": [
+              "file",
+              "clipboard",
+              "capture"
+            ],
+            "type": "string"
+          },
+          "ContextPayload": {
+            "additionalProperties": false,
+            "description": "Context content handed to the Agent for the one turn it was attached to.",
+            "properties": {
+              "image_data_url": {
+                "description": "`data:image/png;base64,…`",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reference": {
+                "$ref": "#/$defs/ContextReference"
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "reference"
+            ],
+            "type": "object"
+          },
+          "ContextReference": {
+            "additionalProperties": false,
+            "description": "What a piece of context is, without its content. This is what a\nconversation keeps; the content lives in Core's memory until released.",
+            "properties": {
+              "bytes": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "captured_at": {
+                "type": "string"
+              },
+              "context_id": {
+                "type": "string"
+              },
+              "expires_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "kind": {
+                "$ref": "#/$defs/ContextKind"
+              },
+              "label": {
+                "description": "A file name (never its path), \"clipboard\" or an output name.",
+                "type": "string"
+              },
+              "mime": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "truncated": {
+                "description": "The content was cut at the size limit.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "context_id",
+              "kind",
+              "label",
+              "mime",
+              "bytes",
+              "sha256",
+              "captured_at",
+              "expires_at_ms",
+              "truncated"
+            ],
+            "type": "object"
+          },
           "DiffItem": {
             "additionalProperties": false,
             "description": "One line of a change card. The label is a translation key so Core never\nemits locale-specific text; the Shell renders it in the Profile's language.",
@@ -19640,6 +19732,14 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "contexts": {
+            "default": [],
+            "description": "Context attached to this turn's message and still held by Core.\nA reference whose content was released (expiry, Core restart) is\nabsent: the Agent says so instead of guessing.",
+            "items": {
+              "$ref": "#/$defs/ContextPayload"
+            },
+            "type": "array"
+          },
           "message_seq": {
             "format": "uint64",
             "minimum": 0,
@@ -21054,6 +21154,330 @@
       "readback": null,
       "resource_scope": [
         "agent.sessions.read"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.context.acquire",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$defs": {
+          "ContextKind": {
+            "enum": [
+              "file",
+              "clipboard",
+              "capture"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/ContextKind"
+          },
+          "output": {
+            "description": "`capture`: the output to capture; absent means the primary one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "description": "`file`: a path under the person's home directory.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ContextAcquireInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ContextKind": {
+            "enum": [
+              "file",
+              "clipboard",
+              "capture"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "What a piece of context is, without its content. This is what a\nconversation keeps; the content lives in Core's memory until released.",
+        "properties": {
+          "bytes": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "captured_at": {
+            "type": "string"
+          },
+          "context_id": {
+            "type": "string"
+          },
+          "expires_at_ms": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/$defs/ContextKind"
+          },
+          "label": {
+            "description": "A file name (never its path), \"clipboard\" or an output name.",
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "truncated": {
+            "description": "The content was cut at the size limit.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "context_id",
+          "kind",
+          "label",
+          "mime",
+          "bytes",
+          "sha256",
+          "captured_at",
+          "expires_at_ms",
+          "truncated"
+        ],
+        "title": "ContextReference",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "desktop.context"
+      ],
+      "timeout_ms": {
+        "default_ms": 5000,
+        "max_ms": 30000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.context.preview",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "context_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_id"
+        ],
+        "title": "ContextIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ContextKind": {
+            "enum": [
+              "file",
+              "clipboard",
+              "capture"
+            ],
+            "type": "string"
+          },
+          "ContextReference": {
+            "additionalProperties": false,
+            "description": "What a piece of context is, without its content. This is what a\nconversation keeps; the content lives in Core's memory until released.",
+            "properties": {
+              "bytes": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "captured_at": {
+                "type": "string"
+              },
+              "context_id": {
+                "type": "string"
+              },
+              "expires_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "kind": {
+                "$ref": "#/$defs/ContextKind"
+              },
+              "label": {
+                "description": "A file name (never its path), \"clipboard\" or an output name.",
+                "type": "string"
+              },
+              "mime": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "truncated": {
+                "description": "The content was cut at the size limit.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "context_id",
+              "kind",
+              "label",
+              "mime",
+              "bytes",
+              "sha256",
+              "captured_at",
+              "expires_at_ms",
+              "truncated"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "image_size": {
+            "description": "Image size, for captures.",
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reference": {
+            "$ref": "#/$defs/ContextReference"
+          },
+          "text": {
+            "description": "The beginning of text content, for the person to check.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "reference"
+        ],
+        "title": "ContextPreviewOutput",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "desktop.context"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.context.release",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "context_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "context_id"
+        ],
+        "title": "ContextIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "desktop.context"
       ],
       "timeout_ms": {
         "default_ms": 2000,

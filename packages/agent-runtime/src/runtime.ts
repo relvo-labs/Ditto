@@ -103,7 +103,7 @@ export class AgentRuntime {
       const tools=await this.root.agentTools.desktop.discover()
       const output=await this.backend.run(claim.text,history,claim.settings,tools,
         (callId,name,args)=>this.root.agentTools.desktop.execute(turnId,callId,name,args,abort.signal),abort.signal,
-        delta=>this.root.emit('agent/text',turnId,delta))
+        delta=>this.root.emit('agent/text',turnId,delta),claim.contexts??[])
       await handle.append('model/selection',{turn_id:turnId,provider:claim.settings.provider,model:output.model,settings_revision:claim.settings.revision})
       if(output.text)await handle.append('assistant/message',{turn_id:turnId,text:output.text,...(output.usage?{usage:output.usage}:{})})
       await handle.flush();state=output.interrupted?'cancelled':'succeeded'

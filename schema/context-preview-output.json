@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ContextKind": {
+      "enum": [
+        "file",
+        "clipboard",
+        "capture"
+      ],
+      "type": "string"
+    },
+    "ContextReference": {
+      "additionalProperties": false,
+      "description": "What a piece of context is, without its content. This is what a\nconversation keeps; the content lives in Core's memory until released.",
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "captured_at": {
+          "type": "string"
+        },
+        "context_id": {
+          "type": "string"
+        },
+        "expires_at_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ContextKind"
+        },
+        "label": {
+          "description": "A file name (never its path), \"clipboard\" or an output name.",
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "truncated": {
+          "description": "The content was cut at the size limit.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context_id",
+        "kind",
+        "label",
+        "mime",
+        "bytes",
+        "sha256",
+        "captured_at",
+        "expires_at_ms",
+        "truncated"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "image_size": {
+      "description": "Image size, for captures.",
+      "items": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "reference": {
+      "$ref": "#/$defs/ContextReference"
+    },
+    "text": {
+      "description": "The beginning of text content, for the person to check.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "reference"
+  ],
+  "title": "ContextPreviewOutput",
+  "type": "object"
+}

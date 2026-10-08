@@ -33,7 +33,25 @@ fn update(store: &mut Store, turn: &Turn, owner: Option<&str>) -> StoreResult<()
     store.write(|tx|{tx.execute("UPDATE agent_turns SET state=?2,turn_json=?3,owner_connection=?4,updated_at=?5 WHERE turn_id=?1",
         rusqlite::params![turn.turn_id,state,serde_json::to_string(turn)?,owner,time::now()])?;Ok(())})
 }
-pub fn submit(store: &mut Store, input: &TurnSubmitInput) -> StoreResult<Turn> {
+/// The turn a message key already created, if any.
+pub fn by_client_message(connection: &Connection, key: &str) -> StoreResult<Option<Turn>> {
+    let id: Option<String> = connection
+        .query_row(
+            "SELECT turn_id FROM agent_turns WHERE client_message_id=?1",
+            [key],
+            |r| r.get(0),
+        )
+        .optional()?;
+    id.map(|id| get(connection, &id)).transpose()
+}
+
+/// `contexts` are the references of the context attached to the message;
+/// the conversation keeps them (label, size, hash), never the content.
+pub fn submit(
+    store: &mut Store,
+    input: &TurnSubmitInput,
+    contexts: &[ContextReference],
+) -> StoreResult<Turn> {
     if input.text.trim().is_empty()
         || input.text.len() > MAX_MESSAGE_BYTES
         || input.client_message_id.is_empty()
@@ -74,7 +92,11 @@ pub fn submit(store: &mut Store, input: &TurnSubmitInput) -> StoreResult<Turn> {
         &input.session_id,
         &format!("message:{}", input.client_message_id),
         SessionEventKind::UserMessage,
-        json!({"text":input.text,"client_message_id":input.client_message_id}),
+        if contexts.is_empty() {
+            json!({"text":input.text,"client_message_id":input.client_message_id})
+        } else {
+            json!({"text":input.text,"client_message_id":input.client_message_id,"contexts":contexts})
+        },
     )?;
     let turn = Turn {
         turn_id: format!("turn-{}", ids::ulid()),
@@ -138,6 +160,7 @@ pub fn claim(store: &mut Store, id: &str, owner: &str) -> StoreResult<TurnClaimO
         message_seq: seq as u64,
         settings,
         recent_changes,
+        contexts: vec![],
     })
 }
 
@@ -548,7 +571,9 @@ mod tests {
                 session_id: session.session_id,
                 text: "request".into(),
                 client_message_id: "message".into(),
+                contexts: vec![],
             },
+            &[],
         )
         .unwrap();
         claim(&mut t.store, &turn.turn_id, "agent").unwrap();
@@ -745,10 +770,14 @@ mod tests {
         let input = TurnSubmitInput {
             session_id: session.session_id,
             text: "left dock".into(),
+            contexts: vec![],
             client_message_id: "msg-1".into(),
         };
-        let turn = submit(&mut t.store, &input).unwrap();
-        assert_eq!(submit(&mut t.store, &input).unwrap().turn_id, turn.turn_id);
+        let turn = submit(&mut t.store, &input, &[]).unwrap();
+        assert_eq!(
+            submit(&mut t.store, &input, &[]).unwrap().turn_id,
+            turn.turn_id
+        );
         let claimed = claim(&mut t.store, &turn.turn_id, "agent-1").unwrap();
         assert_eq!(claimed.text, "left dock");
         let request = ToolIntentInput {

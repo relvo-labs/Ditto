@@ -194,7 +194,19 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             let input: TurnSubmitInput = call.input()?;
             // Durable acceptance comes first. Startup failure leaves a visible
             // queued request, retrievable by its original message key.
-            let turn = write(core, call, move |s| turns::submit(s, &input))?;
+            // A repeated message key returns its turn; otherwise every
+            // attached context must be this caller's and still unsent.
+            let existing = core.read(|c| turns::by_client_message(c, &input.client_message_id))?;
+            let references = if existing.is_some() {
+                vec![]
+            } else {
+                core.contexts.references(&owner, &input.contexts)?
+            };
+            let ids = input.contexts.clone();
+            let turn = write(core, call, move |s| turns::submit(s, &input, &references))?;
+            if existing.is_none() {
+                core.contexts.bind(&ids, &turn.turn_id);
+            }
             announce(core, &turn.session_id, Some(&turn));
             if !turn.state.terminal() {
                 let _ = ensure(core);
@@ -212,6 +224,9 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
         "agent.turns.cancel" => {
             let input: TurnIdInput = call.input()?;
             let turn = write(core, call, move |s| turns::cancel(s, &input.turn_id))?;
+            if turn.state.terminal() {
+                core.contexts.release_turn(&turn.turn_id);
+            }
             announce(core, &turn.session_id, Some(&turn));
             core.agent
                 .notify("agent.controller.cancel", json!({"turn_id":turn.turn_id}));
@@ -219,7 +234,8 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
         }
         "agent.turns.claim" => {
             let input: TurnIdInput = call.input()?;
-            let claimed = write(core, call, move |s| turns::claim(s, &input.turn_id, &owner))?;
+            let mut claimed = write(core, call, move |s| turns::claim(s, &input.turn_id, &owner))?;
+            claimed.contexts = core.contexts.payloads(&claimed.turn.turn_id);
             announce(core, &claimed.turn.session_id, Some(&claimed.turn));
             core.agent
                 .activity(&format!("turn:{}", claimed.turn.turn_id), true);
@@ -228,6 +244,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
         "agent.turns.complete" => {
             let input: TurnCompleteInput = call.input()?;
             let turn = write(core, call, move |s| turns::complete(s, &owner, &input))?;
+            core.contexts.release_turn(&turn.turn_id);
             announce(core, &turn.session_id, Some(&turn));
             core.agent
                 .activity(&format!("turn:{}", turn.turn_id), false);
@@ -381,6 +398,43 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             }
             announce_turn(core, &approval.request.turn_id);
             written(approval)
+        }
+        "desktop.context.acquire" => {
+            let input: ContextAcquireInput = call.input()?;
+            let home = std::env::var_os("HOME")
+                .map(std::path::PathBuf::from)
+                .ok_or_else(|| {
+                    CoreError::unavailable(
+                        UnavailableReason::SystemUnavailable,
+                        "no home directory",
+                    )
+                })?;
+            let primary = core
+                .session
+                .with_adapter(|adapter| adapter.outputs())
+                .ok()
+                .and_then(|outputs| crate::outputs::primary(&outputs).map(|o| o.name.clone()));
+            let reference =
+                core.contexts
+                    .acquire(&owner, &input, &home, core.session_locked(), primary)?;
+            // Ids and kinds only: never a path, label or content in the log.
+            crate::log::event(
+                "context.acquired",
+                &[
+                    ("context_id", reference.context_id.as_str()),
+                    ("bytes", &reference.bytes.to_string()),
+                ],
+            );
+            ok(reference)
+        }
+        "desktop.context.preview" => {
+            let input: ContextIdInput = call.input()?;
+            ok(core.contexts.preview(&owner, &input.context_id)?)
+        }
+        "desktop.context.release" => {
+            let input: ContextIdInput = call.input()?;
+            core.contexts.release(&owner, &input.context_id)?;
+            ok(ditto_protocol::Empty {})
         }
         "desktop.approvals.list" => {
             empty(call)?;

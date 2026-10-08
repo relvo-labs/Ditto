@@ -105,6 +105,8 @@ pub struct SubscriptionInfo {
 
 pub struct Core {
     pub agent: Arc<crate::agent_manager::AgentManager>,
+    /// Context attached to messages; memory only (G2-CORE-03).
+    pub contexts: crate::context::ContextBroker,
     pub agent_storage_ready: bool,
     pub session: Arc<Session>,
     pub paths: Paths,
@@ -242,6 +244,7 @@ impl Core {
                 config.socket.clone(),
                 config.paths.state.join("agent"),
             )),
+            contexts: crate::context::ContextBroker::default(),
             agent_storage_ready,
             session,
             paths: config.paths.clone(),

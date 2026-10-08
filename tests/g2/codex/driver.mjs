@@ -65,6 +65,27 @@ try{
   // first change as a recent target (the runner checks the model saw it).
   const second=await core.must('agent.turns.submit',{session_id:session.session_id,client_message_id:'m1-follow',text:'follow-up: a little more'})
   await eventually(async()=>{const t=await core.must('agent.turns.get',{turn_id:second.turn_id});return ['succeeded','failed','cancelled','unknown','partial'].includes(t.state)},1200)
+  // Attached file context: taken by Core from beneath home, previewed,
+  // sent with one message, released when that turn ends.
+  const home=process.env.DITTO_G2_HOME
+  const escape=await core.call('desktop.context.acquire',{kind:'file',path:home+'/notes/escape.txt'})
+  verify('a symlink out of home is refused',escape.error?.name==='permission_denied')
+  const outside=await core.call('desktop.context.acquire',{kind:'file',path:'/etc/hostname'})
+  verify('a file outside home is refused',outside.error?.name==='permission_denied')
+  const note=await core.must('desktop.context.acquire',{kind:'file',path:home+'/notes/plan.txt'})
+  verify('file reference has a label, never a path',note.label==='plan.txt'&&!JSON.stringify(note).includes(home))
+  const preview=await core.must('desktop.context.preview',{context_id:note.context_id})
+  verify('preview shows the content to the person',preview.text.includes(process.env.DITTO_G2_FILE_CANARY))
+  const withFile=await core.must('agent.turns.submit',{session_id:session.session_id,client_message_id:'m1-attached',text:'attached-note: please read it',contexts:[note.context_id]})
+  const done=await eventually(async()=>{const t=await core.must('agent.turns.get',{turn_id:withFile.turn_id});return ['succeeded','failed','cancelled','unknown','partial'].includes(t.state)?t:false},1200)
+  verify('the turn with a file finished',done&&done.state==='succeeded')
+  const page=await core.must('agent.sessions.read',{session_id:session.session_id,offset:0,limit:50})
+  const sentMessage=page.events.find(e=>e.type==='user/message'&&e.data.client_message_id==='m1-attached')
+  verify('the conversation keeps the reference, not the content',sentMessage.data.contexts?.[0]?.sha256===note.sha256&&!JSON.stringify(page).includes(process.env.DITTO_G2_FILE_CANARY))
+  verify('the model saw the attachment',page.events.some(e=>e.type==='assistant/message'&&e.data.text==='收到附件。'))
+  verify('context is released when its turn ends',(await core.call('desktop.context.preview',{context_id:note.context_id})).error?.name==='not_found')
+  const reuse=await core.call('agent.turns.submit',{session_id:session.session_id,client_message_id:'m1-reuse',text:'again',contexts:[note.context_id]})
+  verify('released context cannot be attached again',reuse.error?.name==='not_found')
   const undo=await core.must('desktop.changes.undo',{change_id:change.change_id,idempotency_key:'m1-undo'})
   verify('undo committed',['committed','succeeded'].includes(undo.state)||!!undo.committed_revision)
   verify('undo restores readback',!(await focus()))

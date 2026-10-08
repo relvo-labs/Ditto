@@ -8,6 +8,7 @@ pub mod agent_backend;
 pub mod agent_manager;
 pub mod agent_routes;
 pub mod authz;
+pub mod context;
 pub mod coordinator;
 pub mod core;
 pub mod defaults;
@@ -787,6 +788,12 @@ fn serve_connection_with_auth(
     if let Some(connection) = &connection {
         connection.gone.store(true, Ordering::SeqCst);
         connection.peer.close();
+        // Unsent context leaves with the surface that took it; a gone Agent
+        // ends its turns, so their context is released too.
+        core.contexts.release_owner(&connection.connection_id);
+        if connection.kind == "agent" {
+            core.contexts.release_bound();
+        }
         if connection.kind == "agent" {
             let owner = connection.connection_id.clone();
             core.submit(move |c| {

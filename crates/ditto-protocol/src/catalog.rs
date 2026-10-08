@@ -202,6 +202,9 @@ pub mod scope {
     pub const AGENT_READ: &str = "agent.sessions.read";
     pub const AGENT_WRITE: &str = "agent.sessions.write";
     pub const AGENT_MANAGE: &str = "agent.settings.manage";
+    /// Acquiring private context (a file, the clipboard, the screen) at the
+    /// person's explicit request.
+    pub const CONTEXT: &str = "desktop.context";
     pub const READ: &str = "desktop.read";
     pub const CONFIG: &str = "desktop.config";
     pub const WINDOWS_READ: &str = "desktop.windows.read";
@@ -228,6 +231,7 @@ pub mod scope {
         AGENT_READ,
         AGENT_WRITE,
         AGENT_MANAGE,
+        CONTEXT,
         READ,
         CONFIG,
         WINDOWS_READ,
@@ -1131,6 +1135,25 @@ fn agent_definitions() -> Vec<Definition> {
             schema::<ApprovalIdInput>,
             schema::<Approval>,
             &[s::AGENT_READ],
+        ),
+        def(
+            "desktop.context.acquire",
+            schema::<ContextAcquireInput>,
+            schema::<ContextReference>,
+            &[s::CONTEXT],
+        )
+        .timeout(5_000, 30_000),
+        def(
+            "desktop.context.preview",
+            schema::<ContextIdInput>,
+            schema::<ContextPreviewOutput>,
+            &[s::CONTEXT],
+        ),
+        def(
+            "desktop.context.release",
+            schema::<ContextIdInput>,
+            schema::<Empty>,
+            &[s::CONTEXT],
         ),
         def(
             "desktop.approvals.list",
