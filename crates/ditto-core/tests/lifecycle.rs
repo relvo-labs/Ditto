@@ -79,7 +79,11 @@ fn prerequisites() -> Prerequisites {
         .map(PathBuf::from)
         .unwrap_or_else(|| workspace.join("target/ditto-packages"));
     assert!(
-        packages.join("ditto.svc.tasks-1.0.0.dittopkg").is_file(),
+        std::fs::read_dir(&packages).is_ok_and(|entries| entries.flatten().any(|e| {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            name.starts_with("ditto.svc.tasks-") && name.ends_with(".dittopkg")
+        })),
         "{} has no ditto.svc.tasks package: bash scripts/build-builtin-packages.sh",
         packages.display()
     );

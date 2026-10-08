@@ -30,6 +30,9 @@ pub enum Outgoing {
     /// A request or notification Core itself sends to the client
     /// (`participant.*`, `host.invoke`, `shell.command`).
     Request(Box<RpcRequest>),
+    /// The connection is over: its writer stops even while other parts of
+    /// Core still hold the connection's `Peer` (and so a sender).
+    Shutdown,
 }
 
 pub struct Session {

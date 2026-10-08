@@ -647,6 +647,7 @@ fn write_message(stream: &mut UnixStream, message: Outgoing) -> io::Result<()> {
             "params": event,
         }))?,
         Outgoing::Request(request) => serde_json::to_vec(&request)?,
+        Outgoing::Shutdown => return Ok(()),
     };
     stream.write_all(&line)?;
     stream.write_all(b"\n")
@@ -669,6 +670,9 @@ fn serve_connection_with_auth(
     let mut writer_stream = stream.try_clone()?;
     let writer = thread::spawn(move || -> io::Result<()> {
         for message in outgoing {
+            if matches!(message, Outgoing::Shutdown) {
+                break;
+            }
             if let Err(error) = write_message(&mut writer_stream, message) {
                 // A client that leaves mid-stream ends the connection; it is
                 // not a service failure, and pending work still unwinds.
@@ -839,6 +843,10 @@ fn serve_connection_with_auth(
     for worker in workers {
         let _ = worker.join();
     }
+    // A Peer of this connection may still be held elsewhere (the Agent or
+    // Shell manager until its next tick, a waiting request): its sender
+    // must not keep the writer, and with it this thread, alive forever.
+    let _ = sink.send(Outgoing::Shutdown);
     drop(sink);
     writer
         .join()
