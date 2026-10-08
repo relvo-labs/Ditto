@@ -62,7 +62,7 @@ const REQUIRED_KEYS = [
   'diff.entry.enabled', 'diff.entry.version', 'diff.area.joined', 'diff.area.left', 'diff.shortcuts', 'diff.appearance.token',
   ...['theme', 'locale', 'reduced_motion', 'reduced_transparency', 'low_power_style'].map((field) => `diff.appearance.${field}`),
   ...['enabled', 'hidden', 'scale', 'animations', 'output', 'corner'].map((field) => `diff.avatar.${field}`),
-  'diff.layout.workspace_grid', 'diff.layout.rules',
+  'diff.layout.workspace_grid', 'diff.layout.rules', 'diff.layout.region',
   // import problems (exports::problem)
   ...['schema_invalid', 'format_unsupported', 'protocol_incompatible', 'digest_mismatch', 'package_missing',
     'integrity_mismatch', 'grant_required', 'secret_detected', 'private_path_detected'].map((kind) => `import.${kind}`),

@@ -114,6 +114,27 @@ pub trait CompositorAdapter: Send {
         width: u32,
         height: u32,
     ) -> AdapterResult<()>;
+    /// The usable area of an output — the output without the exclusive zones
+    /// of panels and docks — as `(x, y, width, height)` in that output's own
+    /// logical coordinates, the same frame as `Window::x`/`y`. A compositor
+    /// that cannot say has no region layout (D-40).
+    fn workarea(&mut self, output: &str) -> AdapterResult<(i32, i32, u32, u32)> {
+        Err(AdapterError::Unsupported(format!(
+            "no work area for output {output}"
+        )))
+    }
+    /// Move and resize in one step where the compositor can.
+    fn place_window(
+        &mut self,
+        window_id: &WindowSessionId,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+    ) -> AdapterResult<()> {
+        self.move_window(window_id, x, y)?;
+        self.resize_window(window_id, width, height)
+    }
     fn set_window_state(
         &mut self,
         window_id: &WindowSessionId,

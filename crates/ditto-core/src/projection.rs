@@ -454,6 +454,15 @@ pub fn check_compositor(
             "the compositor reports a different layout strategy",
         ));
     }
+    // Windows the commit placed by region rules: where the compositor says
+    // they are, within the declared tolerance of where the rule puts them.
+    for placement in &observed.regions {
+        verdicts.push(verdict(
+            &format!("region:{}:{}", placement.rule_id, placement.window_id),
+            placement.placed(),
+            "the window is not where its region rule puts it",
+        ));
+    }
     if shortcuts_supported {
         let mut expected = target.shortcuts.clone();
         let mut seen = observed.shortcuts.clone();

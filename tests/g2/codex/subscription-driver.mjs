@@ -27,7 +27,7 @@ try{
   if(!status.authenticated){
     const login=await core.must('agent.providers.login',{provider:'codex-app-server'})
     writeFileSync(process.env.DITTO_G2_LOGIN_FILE,JSON.stringify({auth_url:login.auth_url}))
-    status=await eventually(async()=>{const s=await core.must('agent.providers.status',{provider:'codex-app-server'});return s.authenticated?s:false},300,3000)
+    status=await eventually(async()=>{const s=await core.must('agent.providers.status',{provider:'codex-app-server'});return s.authenticated?s:false},Math.ceil(Number(process.env.DITTO_G2_LOGIN_WAIT_MIN??15)*20),3000)
     verify('signed in through the browser',!!status)
     checks.push('sign-in performed this run')
   }else checks.push('sign-in reused from the keyring')

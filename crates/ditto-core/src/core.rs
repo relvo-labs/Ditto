@@ -272,6 +272,19 @@ impl Core {
         });
         hosts.set_events(Arc::new(Events(Arc::downgrade(&core))));
         crate::outputs::install(&core, config.output_settle);
+        // Region rules follow windows that open later (D-40). On its own
+        // thread: the compositor event pump never waits on placement.
+        let compositor = Arc::clone(&core.compositor);
+        core.session.set_windows_opened(Arc::new(move |opened| {
+            let compositor = Arc::clone(&compositor);
+            let _ = std::thread::Builder::new()
+                .name("ditto-regions".into())
+                .spawn(move || {
+                    for window in &opened {
+                        compositor.window_opened(window);
+                    }
+                });
+        }));
         let coordinator_core = Arc::clone(&core);
         let builtin = config.builtin_packages.clone();
         thread::Builder::new()

@@ -23,6 +23,10 @@ export type Observation =
       role: 'hostd';
     }
   | {
+      /**
+       * Each open window a region rule covers, with where it actually is.
+       */
+      regions?: RegionPlacement[];
       role: 'compositor';
       shortcuts: ShortcutBinding[];
       strategy?: string | null;
@@ -109,6 +113,27 @@ export interface HostEntryObservation {
   fiber_state: FiberState;
   mode: EntryMode;
   waiting_for?: string[];
+}
+/**
+ * One window under a region rule, read back from the compositor.
+ */
+export interface RegionPlacement {
+  /**
+   * Where the compositor reports it; absent when it cannot say.
+   *
+   * @minItems 4
+   * @maxItems 4
+   */
+  observed?: [number, number, number, number] | null;
+  rule_id: string;
+  /**
+   * Where the rule puts it, in output-relative logical pixels.
+   *
+   * @minItems 4
+   * @maxItems 4
+   */
+  target: [number, number, number, number];
+  window_id: string;
 }
 export interface ShortcutBinding {
   chord: string;

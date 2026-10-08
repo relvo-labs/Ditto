@@ -631,8 +631,25 @@ pub struct LayoutGetOutput {
     pub available: Vec<LayoutStrategyInfo>,
     pub workspace_grid: [u32; 2],
     pub rules: Vec<crate::profile::LayoutRule>,
+    /// Region rules of the Profile (D-40), with the open windows they cover
+    /// and where those windows are now.
+    #[serde(default)]
+    pub regions: Vec<crate::profile::RegionRule>,
+    #[serde(default)]
+    pub region_windows: Vec<RegionWindow>,
     /// Session-restart changes waiting for the next login.
     pub pending_next_login: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegionWindow {
+    pub rule_id: String,
+    pub window_id: String,
+    pub app_id: String,
+    pub output: Option<String>,
+    /// `[x, y, width, height]` in output-relative logical pixels.
+    pub geometry: Option<[i64; 4]>,
 }
 
 // ---- session ----------------------------------------------------------------

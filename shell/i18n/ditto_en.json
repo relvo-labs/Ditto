@@ -471,6 +471,7 @@
   "diff.entry.enabled": "Enable “{package}”",
   "diff.entry.removed": "Remove “{package}”",
   "diff.entry.version": "Version of “{package}”",
+  "diff.layout.region": "Where {app_id} windows go",
   "diff.layout.rules": "Window rules",
   "diff.layout.workspace_grid": "Workspace grid",
   "diff.shortcuts": "Shortcuts",

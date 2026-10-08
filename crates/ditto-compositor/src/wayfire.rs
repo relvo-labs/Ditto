@@ -840,6 +840,45 @@ impl CompositorAdapter for WayfireAdapter {
         )
     }
 
+    fn workarea(&mut self, output: &str) -> AdapterResult<(i32, i32, u32, u32)> {
+        let entry = self
+            .output_list()?
+            .into_iter()
+            .find(|entry| entry.get("name").and_then(Value::as_str) == Some(output))
+            .ok_or_else(|| AdapterError::NotFound(format!("no output {output}")))?;
+        let area = entry
+            .get("workarea")
+            .ok_or_else(|| AdapterError::Unsupported("Wayfire reports no work area".into()))?;
+        // Wayfire's workarea is in global layout coordinates; windows are
+        // reported relative to their output.
+        let origin = entry.get("geometry");
+        let (ox, oy) = (
+            origin.and_then(|g| number(g, "x")).unwrap_or(0),
+            origin.and_then(|g| number(g, "y")).unwrap_or(0),
+        );
+        Ok((
+            (number(area, "x").unwrap_or(0) - ox) as i32,
+            (number(area, "y").unwrap_or(0) - oy) as i32,
+            number(area, "width").unwrap_or(0).max(0) as u32,
+            number(area, "height").unwrap_or(0).max(0) as u32,
+        ))
+    }
+
+    fn place_window(
+        &mut self,
+        window_id: &WindowSessionId,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+    ) -> AdapterResult<()> {
+        let (id, _) = self.floating_geometry(window_id)?;
+        self.configure(
+            id,
+            json!({"geometry": {"x": x, "y": y, "width": width, "height": height}}),
+        )
+    }
+
     fn set_window_state(
         &mut self,
         window_id: &WindowSessionId,

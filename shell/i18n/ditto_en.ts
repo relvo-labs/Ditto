@@ -1147,6 +1147,10 @@
         <translation>Window rules</translation>
     </message>
     <message>
+        <source>diff.layout.region</source>
+        <translation>Where {app_id} windows go</translation>
+    </message>
+    <message>
         <source>diff.layout.workspace_grid</source>
         <translation>Workspace grid</translation>
     </message>

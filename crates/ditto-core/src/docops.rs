@@ -510,6 +510,52 @@ pub fn diff(base: &ProfileDocument, target: &ProfileDocument) -> Vec<DiffItem> {
                 .or_insert_with(|| json!(ditto_protocol::profile::AvatarCorner::default()));
         }
     }
+    // Region rules read per rule, as the share of the work area they take,
+    // not as a whole array (D-40).
+    for document in [&mut before, &mut after] {
+        if let Some(layout) = document["layout"].as_object_mut() {
+            layout.remove("regions");
+        }
+    }
+    let span = |r: &ditto_protocol::profile::Region| {
+        let pct = |v: f64| (v * 100.0).round() as i64;
+        json!(format!(
+            "{}–{}% × {}–{}%",
+            pct(r.x),
+            pct(r.x + r.width),
+            pct(r.y),
+            pct(r.y + r.height)
+        ))
+    };
+    let mut rule_ids: Vec<&String> = target.layout.regions.iter().map(|r| &r.rule_id).collect();
+    for rule in &base.layout.regions {
+        if !rule_ids.contains(&&rule.rule_id) {
+            rule_ids.push(&rule.rule_id);
+        }
+    }
+    for rule_id in rule_ids {
+        let old = base.layout.regions.iter().find(|r| &r.rule_id == rule_id);
+        let new = target.layout.regions.iter().find(|r| &r.rule_id == rule_id);
+        if old == new {
+            continue;
+        }
+        let app = new
+            .or(old)
+            .map(|r| r.matcher.app_id.clone())
+            .unwrap_or_default();
+        items.push(item(
+            format!("/layout/regions/{rule_id}"),
+            match (old, new) {
+                (None, Some(_)) => DiffKind::Added,
+                (Some(_), None) => DiffKind::Removed,
+                _ => DiffKind::Changed,
+            },
+            old.map(|r| span(&r.region)),
+            new.map(|r| span(&r.region)),
+            "diff.layout.region",
+            json!({"app_id": app, "rule_id": rule_id}),
+        ));
+    }
     for section in ["appearance", "avatar", "layout"] {
         diff_values(
             &format!("/{section}"),
@@ -711,6 +757,7 @@ pub(crate) mod tests {
             layout: LayoutIntent {
                 workspace_grid: [3, 3],
                 rules: vec![],
+                regions: vec![],
             },
             appearance: Appearance {
                 theme: "soft-jelly".into(),

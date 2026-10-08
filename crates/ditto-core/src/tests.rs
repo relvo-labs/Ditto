@@ -2667,3 +2667,180 @@ fn contract_vectors_scenarios_hold_against_the_rust_core() {
         }
     }
 }
+
+// ---- region layout (D-40, G2-PLAT-01) --------------------------------------------
+
+fn geometry(peer: &TestPeer, id: &str) -> [i64; 4] {
+    let window = peer.result(catalog::WINDOWS_GET, json!({"window_id": id}));
+    ["x", "y", "width", "height"].map(|field| window[field].as_i64().unwrap())
+}
+
+fn propose(peer: &TestPeer, ops: Value) -> Value {
+    peer.call(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(peer), "ops": ops}),
+    )
+}
+
+#[test]
+fn region_rules_place_narrow_undo_and_follow_new_windows() {
+    let harness = harness("regions");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let before = geometry(&cli, "fixture-window-2");
+    // The editor on the left half of the work area (the fixture's work area
+    // is the 1920×1080 output below a 40-pixel panel).
+    let placed = record(
+        &propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions", "after": [
+                {"rule_id": "editor", "match": {"app_id": "fixture.editor"},
+                 "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}
+            ]}]),
+        )["result"],
+    );
+    assert_eq!(placed.state, ChangeState::Committed, "{placed:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 960, 1040]);
+    let layout = cli.result(catalog::LAYOUT_GET, json!({}));
+    assert_eq!(layout["regions"][0]["rule_id"], json!("editor"));
+    assert_eq!(
+        layout["region_windows"][0]["geometry"],
+        json!([0, 40, 960, 1040])
+    );
+
+    // "A bit narrower": only that rule's width changes.
+    let narrower = record(
+        &propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions/0/region/width", "after": 0.4}]),
+        )["result"],
+    );
+    assert_eq!(narrower.state, ChangeState::Committed, "{narrower:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 768, 1040]);
+
+    // Undo puts the window back where the narrowing found it.
+    let undo = record(&cli.result(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": narrower.change_id}),
+    ));
+    assert_eq!(undo.state, ChangeState::Committed, "{undo:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 960, 1040]);
+
+    // A window that opens later follows the rule; Core places it, not a change.
+    harness
+        .core
+        .session
+        .with_adapter(|adapter| {
+            adapter.fixture().unwrap().open_window(
+                "fixture-window-3",
+                "fixture.editor",
+                "FIXTURE-1",
+            );
+            Ok(())
+        })
+        .unwrap();
+    harness.core.session.publish_changes();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while geometry(&cli, "fixture-window-3") != [0, 40, 960, 1040] && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(geometry(&cli, "fixture-window-3"), [0, 40, 960, 1040]);
+
+    // Undo follows Core's order: the older change is blocked while a newer
+    // one touched the same rule.
+    let blocked = cli.call(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": placed.change_id}),
+    );
+    assert_eq!(
+        blocked["error"]["data"]["reason"],
+        json!("undo_blocked_by_newer_change")
+    );
+
+    // Removing the rule moves nothing: windows stay where they are.
+    let removed = record(
+        &propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions", "after": []}]),
+        )["result"],
+    );
+    assert_eq!(removed.state, ChangeState::Committed, "{removed:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 960, 1040]);
+    assert_ne!(before, [0, 40, 960, 1040]);
+}
+
+#[test]
+fn region_rules_are_validated_and_need_floating_geometry() {
+    let harness = harness("regions-invalid");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    for bad in [
+        json!({"rule_id": "r", "match": {"app_id": "fixture.editor"}, "region": {"x": 0.6, "y": 0.0, "width": 0.5, "height": 1.0}}),
+        json!({"rule_id": "", "match": {"app_id": "fixture.editor"}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}),
+        json!({"rule_id": "r", "match": {"app_id": ""}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}),
+        json!({"rule_id": "r", "match": {"app_id": "a"}, "region": {"x": 0.0, "y": 0.0, "width": 0.01, "height": 1.0}}),
+    ] {
+        let response = propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions", "after": [bad]}]),
+        );
+        assert_eq!(
+            response["error"]["name"],
+            json!("preflight_rejected"),
+            "{response}"
+        );
+    }
+    let twice = propose(
+        &cli,
+        json!([{"op": "set_value", "path": "/layout/regions", "after": [
+            {"rule_id": "r", "match": {"app_id": "a"}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}},
+            {"rule_id": "r", "match": {"app_id": "b"}, "region": {"x": 0.5, "y": 0.0, "width": 0.5, "height": 1.0}}
+        ]}]),
+    );
+    assert_eq!(
+        twice["error"]["name"],
+        json!("preflight_rejected"),
+        "{twice}"
+    );
+
+    // The terminal is tiled in the fixture: the compositor owns its geometry,
+    // so the rule cannot place it and the change does not claim success.
+    let tiled = propose(
+        &cli,
+        json!([{"op": "set_value", "path": "/layout/regions", "after": [
+            {"rule_id": "term", "match": {"app_id": "fixture.terminal"},
+             "region": {"x": 0.5, "y": 0.0, "width": 0.5, "height": 1.0}}
+        ]}]),
+    );
+    let outcome = tiled.get("result").map(record);
+    assert!(
+        outcome
+            .as_ref()
+            .is_none_or(|r| r.result != Some(ditto_protocol::change::ResultKind::Succeeded)),
+        "{tiled}"
+    );
+
+    // Under the tiling strategy, region rules are refused at prepare.
+    let floating = entry_of(&document(&cli), "ditto.layout.floating").unwrap();
+    let both = propose(
+        &cli,
+        json!([
+            {"op": "add_entry", "entry": {"package": "ditto.layout.simple-tile", "version": "1.0.0", "host": "core_builtin"}, "slot": "layout.strategy"},
+            {"op": "remove_entry", "entry_id": floating},
+            {"op": "set_value", "path": "/layout/regions", "after": [
+                {"rule_id": "ed", "match": {"app_id": "fixture.editor"}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}
+            ]}
+        ]),
+    );
+    let refused = both.get("result").map(record);
+    assert!(
+        refused
+            .as_ref()
+            .is_none_or(|r| r.state != ChangeState::Committed),
+        "{both}"
+    );
+}

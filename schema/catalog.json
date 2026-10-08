@@ -2183,6 +2183,13 @@
             "additionalProperties": false,
             "description": "Layout intent. Which strategy applies is the `layout.strategy` slot.",
             "properties": {
+              "regions": {
+                "description": "Where windows of an application go, as a share of their output's work\narea (D-40). Applied to the windows open when the change commits and to\nthose that open later; moving a window by hand afterwards is respected\nuntil the next explicit change. Floating strategy only.",
+                "items": {
+                  "$ref": "#/$defs/RegionRule"
+                },
+                "type": "array"
+              },
               "rules": {
                 "default": [],
                 "items": {
@@ -2319,6 +2326,63 @@
               "active",
               "created_at",
               "updated_at"
+            ],
+            "type": "object"
+          },
+          "Region": {
+            "additionalProperties": false,
+            "description": "A rectangle as fractions (0–1) of an output's work area.",
+            "properties": {
+              "height": {
+                "format": "double",
+                "type": "number"
+              },
+              "width": {
+                "format": "double",
+                "type": "number"
+              },
+              "x": {
+                "format": "double",
+                "type": "number"
+              },
+              "y": {
+                "format": "double",
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "type": "object"
+          },
+          "RegionRule": {
+            "additionalProperties": false,
+            "properties": {
+              "match": {
+                "$ref": "#/$defs/LayoutMatch"
+              },
+              "output": {
+                "description": "The output whose work area the region divides; absent means the\noutput the window is on.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "region": {
+                "$ref": "#/$defs/Region"
+              },
+              "rule_id": {
+                "description": "Stable within the Profile, so a later turn can name \"the same rule\".",
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "match",
+              "region"
             ],
             "type": "object"
           },
@@ -3204,6 +3268,13 @@
             "additionalProperties": false,
             "description": "Layout intent. Which strategy applies is the `layout.strategy` slot.",
             "properties": {
+              "regions": {
+                "description": "Where windows of an application go, as a share of their output's work\narea (D-40). Applied to the windows open when the change commits and to\nthose that open later; moving a window by hand afterwards is respected\nuntil the next explicit change. Floating strategy only.",
+                "items": {
+                  "$ref": "#/$defs/RegionRule"
+                },
+                "type": "array"
+              },
               "rules": {
                 "default": [],
                 "items": {
@@ -3380,6 +3451,63 @@
               "document_sha256",
               "packages",
               "required_grants"
+            ],
+            "type": "object"
+          },
+          "Region": {
+            "additionalProperties": false,
+            "description": "A rectangle as fractions (0–1) of an output's work area.",
+            "properties": {
+              "height": {
+                "format": "double",
+                "type": "number"
+              },
+              "width": {
+                "format": "double",
+                "type": "number"
+              },
+              "x": {
+                "format": "double",
+                "type": "number"
+              },
+              "y": {
+                "format": "double",
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "type": "object"
+          },
+          "RegionRule": {
+            "additionalProperties": false,
+            "properties": {
+              "match": {
+                "$ref": "#/$defs/LayoutMatch"
+              },
+              "output": {
+                "description": "The output whose work area the region divides; absent means the\noutput the window is on.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "region": {
+                "$ref": "#/$defs/Region"
+              },
+              "rule_id": {
+                "description": "Stable within the Profile, so a later turn can name \"the same rule\".",
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "match",
+              "region"
             ],
             "type": "object"
           },
@@ -12196,6 +12324,102 @@
               "runtime_switchable"
             ],
             "type": "object"
+          },
+          "Region": {
+            "additionalProperties": false,
+            "description": "A rectangle as fractions (0–1) of an output's work area.",
+            "properties": {
+              "height": {
+                "format": "double",
+                "type": "number"
+              },
+              "width": {
+                "format": "double",
+                "type": "number"
+              },
+              "x": {
+                "format": "double",
+                "type": "number"
+              },
+              "y": {
+                "format": "double",
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "type": "object"
+          },
+          "RegionRule": {
+            "additionalProperties": false,
+            "properties": {
+              "match": {
+                "$ref": "#/$defs/LayoutMatch"
+              },
+              "output": {
+                "description": "The output whose work area the region divides; absent means the\noutput the window is on.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "region": {
+                "$ref": "#/$defs/Region"
+              },
+              "rule_id": {
+                "description": "Stable within the Profile, so a later turn can name \"the same rule\".",
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "match",
+              "region"
+            ],
+            "type": "object"
+          },
+          "RegionWindow": {
+            "additionalProperties": false,
+            "properties": {
+              "app_id": {
+                "type": "string"
+              },
+              "geometry": {
+                "description": "`[x, y, width, height]` in output-relative logical pixels.",
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "maxItems": 4,
+                "minItems": 4,
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "output": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rule_id": {
+                "type": "string"
+              },
+              "window_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "rule_id",
+              "window_id",
+              "app_id"
+            ],
+            "type": "object"
           }
         },
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -12217,6 +12441,21 @@
             "description": "Session-restart changes waiting for the next login.",
             "items": {
               "type": "string"
+            },
+            "type": "array"
+          },
+          "region_windows": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/RegionWindow"
+            },
+            "type": "array"
+          },
+          "regions": {
+            "default": [],
+            "description": "Region rules of the Profile (D-40), with the open windows they cover\nand where those windows are now.",
+            "items": {
+              "$ref": "#/$defs/RegionRule"
             },
             "type": "array"
           },

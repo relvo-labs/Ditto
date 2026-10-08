@@ -280,6 +280,35 @@ pub struct CompositorObservation {
     pub strategy: Option<String>,
     pub shortcuts: Vec<ShortcutBinding>,
     pub workspace_grid: Option<[u32; 2]>,
+    /// Each open window a region rule covers, with where it actually is.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<RegionPlacement>,
+}
+
+/// One window under a region rule, read back from the compositor.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegionPlacement {
+    pub rule_id: String,
+    pub window_id: String,
+    /// Where the rule puts it, in output-relative logical pixels.
+    pub target: [i64; 4],
+    /// Where the compositor reports it; absent when it cannot say.
+    pub observed: Option<[i64; 4]>,
+}
+
+/// Window borders and rounding: placements within this many logical pixels
+/// of the target count as placed (plan/04/05 §5).
+pub const REGION_TOLERANCE_PX: i64 = 2;
+
+impl RegionPlacement {
+    pub fn placed(&self) -> bool {
+        self.observed.is_some_and(|seen| {
+            seen.iter()
+                .zip(self.target.iter())
+                .all(|(a, b)| (a - b).abs() <= REGION_TOLERANCE_PX)
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

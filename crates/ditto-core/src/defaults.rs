@@ -89,6 +89,7 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
         layout: LayoutIntent {
             workspace_grid: [3, 3],
             rules: vec![],
+            regions: vec![],
         },
         appearance: appearance(),
         shortcuts: vec![ShortcutBinding {
@@ -107,6 +108,7 @@ pub fn empty_document() -> ProfileDocument {
         layout: LayoutIntent {
             workspace_grid: [3, 3],
             rules: vec![],
+            regions: vec![],
         },
         appearance: appearance(),
         shortcuts: vec![],

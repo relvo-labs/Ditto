@@ -72,6 +72,7 @@
   "diff.entry.enabled": "啟用「{package}」",
   "diff.entry.removed": "移除「{package}」",
   "diff.entry.version": "「{package}」的版本",
+  "diff.layout.region": "{app_id} 的視窗位置",
   "diff.layout.rules": "視窗規則",
   "diff.layout.workspace_grid": "工作區格線",
   "diff.shortcuts": "快捷鍵",

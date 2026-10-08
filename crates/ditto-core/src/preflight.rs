@@ -142,6 +142,36 @@ fn check_all(
             ));
         }
     }
+    // Region rules (D-40): stable unique ids, an application to match, a
+    // rectangle inside the work area, and a bounded number of rules.
+    let mut rule_ids = BTreeSet::new();
+    if target.layout.regions.len() > 32 {
+        reasons.push(reason(
+            PreflightCode::SchemaInvalid,
+            None,
+            json!({"why": "too_many_region_rules", "limit": 32}),
+        ));
+    }
+    for rule in &target.layout.regions {
+        let why = if rule.rule_id.trim().is_empty() || rule.rule_id.len() > 64 {
+            Some("region_rule_id_invalid")
+        } else if !rule_ids.insert(&rule.rule_id) {
+            Some("duplicate_region_rule_id")
+        } else if rule.matcher.app_id.trim().is_empty() || rule.matcher.app_id.len() > 256 {
+            Some("region_match_invalid")
+        } else if !rule.region.valid() {
+            Some("region_out_of_bounds")
+        } else {
+            None
+        };
+        if let Some(why) = why {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"rule_id": rule.rule_id, "why": why}),
+            ));
+        }
+    }
     // An area is not a slot: its members are entries that name it, so the
     // single-provider map may not hold it, and only known areas are named.
     for slot in target.slots.keys() {

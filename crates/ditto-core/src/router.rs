@@ -1623,6 +1623,32 @@ fn layout_get(core: &Core) -> Handled {
         available,
         workspace_grid: document.layout.workspace_grid,
         rules: document.layout.rules,
+        region_windows: core
+            .session
+            .with_adapter(|adapter| adapter.windows())
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|window| {
+                let rule = document
+                    .layout
+                    .regions
+                    .iter()
+                    .find(|rule| rule.matcher.app_id == window.app_id)?;
+                Some(ditto_protocol::services::RegionWindow {
+                    rule_id: rule.rule_id.clone(),
+                    window_id: window.id.0.clone(),
+                    app_id: window.app_id.clone(),
+                    output: window.output.clone(),
+                    geometry: match (window.x, window.y, window.width, window.height) {
+                        (Some(x), Some(y), Some(w), Some(h)) => {
+                            Some([i64::from(x), i64::from(y), i64::from(w), i64::from(h)])
+                        }
+                        _ => None,
+                    },
+                })
+            })
+            .collect(),
+        regions: document.layout.regions,
         pending_next_login: vec![],
     })
 }

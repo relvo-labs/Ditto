@@ -363,6 +363,7 @@ mod tests {
             layout: ditto_protocol::profile::LayoutIntent {
                 workspace_grid: [3, 3],
                 rules: vec![],
+                regions: vec![],
             },
             appearance: ditto_protocol::profile::Appearance {
                 theme: "legacy".into(),

@@ -86,6 +86,61 @@ pub struct LayoutIntent {
     pub workspace_grid: [u32; 2],
     #[serde(default)]
     pub rules: Vec<LayoutRule>,
+    /// Where windows of an application go, as a share of their output's work
+    /// area (D-40). Applied to the windows open when the change commits and to
+    /// those that open later; moving a window by hand afterwards is respected
+    /// until the next explicit change. Floating strategy only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<RegionRule>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegionRule {
+    /// Stable within the Profile, so a later turn can name "the same rule".
+    pub rule_id: String,
+    #[serde(rename = "match")]
+    pub matcher: LayoutMatch,
+    /// The output whose work area the region divides; absent means the
+    /// output the window is on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    pub region: Region,
+}
+
+/// A rectangle as fractions (0–1) of an output's work area.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Region {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Region {
+    /// Inside the unit square, with a usable size (at least 5% each way).
+    pub fn valid(&self) -> bool {
+        [self.x, self.y, self.width, self.height]
+            .iter()
+            .all(|v| v.is_finite())
+            && self.x >= 0.0
+            && self.y >= 0.0
+            && self.width >= 0.05
+            && self.height >= 0.05
+            && self.x + self.width <= 1.0 + 1e-9
+            && self.y + self.height <= 1.0 + 1e-9
+    }
+
+    /// The rectangle in a work area `(x, y, width, height)`.
+    pub fn resolve(&self, area: (i32, i32, u32, u32)) -> (i32, i32, u32, u32) {
+        let (ax, ay, aw, ah) = area;
+        let x = ax + (self.x * f64::from(aw)).round() as i32;
+        let y = ay + (self.y * f64::from(ah)).round() as i32;
+        let width = (self.width * f64::from(aw)).round().max(1.0) as u32;
+        let height = (self.height * f64::from(ah)).round().max(1.0) as u32;
+        (x, y, width, height)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

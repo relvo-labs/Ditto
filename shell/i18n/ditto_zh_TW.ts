@@ -1147,6 +1147,10 @@
         <translation>視窗規則</translation>
     </message>
     <message>
+        <source>diff.layout.region</source>
+        <translation>{app_id} 的視窗位置</translation>
+    </message>
+    <message>
         <source>diff.layout.workspace_grid</source>
         <translation>工作區格線</translation>
     </message>

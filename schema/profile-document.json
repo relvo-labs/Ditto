@@ -133,6 +133,13 @@
       "additionalProperties": false,
       "description": "Layout intent. Which strategy applies is the `layout.strategy` slot.",
       "properties": {
+        "regions": {
+          "description": "Where windows of an application go, as a share of their output's work\narea (D-40). Applied to the windows open when the change commits and to\nthose that open later; moving a window by hand afterwards is respected\nuntil the next explicit change. Floating strategy only.",
+          "items": {
+            "$ref": "#/$defs/RegionRule"
+          },
+          "type": "array"
+        },
         "rules": {
           "default": [],
           "items": {
@@ -183,6 +190,63 @@
       "required": [
         "match",
         "workspace"
+      ],
+      "type": "object"
+    },
+    "Region": {
+      "additionalProperties": false,
+      "description": "A rectangle as fractions (0–1) of an output's work area.",
+      "properties": {
+        "height": {
+          "format": "double",
+          "type": "number"
+        },
+        "width": {
+          "format": "double",
+          "type": "number"
+        },
+        "x": {
+          "format": "double",
+          "type": "number"
+        },
+        "y": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "type": "object"
+    },
+    "RegionRule": {
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/LayoutMatch"
+        },
+        "output": {
+          "description": "The output whose work area the region divides; absent means the\noutput the window is on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "region": {
+          "$ref": "#/$defs/Region"
+        },
+        "rule_id": {
+          "description": "Stable within the Profile, so a later turn can name \"the same rule\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "match",
+        "region"
       ],
       "type": "object"
     },

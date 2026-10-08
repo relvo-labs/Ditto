@@ -26,7 +26,7 @@ const run=join(root,'run-'+Date.now())
 mkdirSync(run,{recursive:true,mode:0o700})
 const out=join(run,'result.json'),loginFile=join(run,'login.json')
 const log=openSync(join(run,'core.log'),'w')
-const env={...process.env,DITTO_RUNTIME_DIR:join(run,'rt'),DITTO_DATA_DIR:join(root,'store'),DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:out,DITTO_G2_LOGIN_FILE:loginFile,DITTO_G2_TASK:process.env.DITTO_G2_TASK??'focus'}
+const env={...process.env,DITTO_G2_LOGIN_WAIT_MIN:process.env.DITTO_G2_LOGIN_WAIT_MIN??'15',DITTO_RUNTIME_DIR:join(run,'rt'),DITTO_DATA_DIR:join(root,'store'),DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:out,DITTO_G2_LOGIN_FILE:loginFile,DITTO_G2_TASK:process.env.DITTO_G2_TASK??'focus'}
 for(const key of ['DITTO_DEV_TOKEN','DITTO_LAUNCH_SCOPE_PREFIX','DITTO_REQUIRE_QUOTA','WAYFIRE_SOCKET','SWAYSOCK'])delete env[key]
 const child=spawn(resolve(workspace,'target/debug/ditto-core'),['serve','--compositor','fixture',
   '--builtin-packages',resolve(workspace,'target/ditto-packages'),
@@ -39,12 +39,14 @@ closeSync(log)
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let announced=false
 try{
-  for(let i=0;i<20*60*10&&!existsSync(out);i++){
+  const waitMinutes=Number(process.env.DITTO_G2_LOGIN_WAIT_MIN??15)
+  for(let i=0;i<(waitMinutes+5)*60*10&&!existsSync(out);i++){
     if(child.exitCode!==null)throw new Error('Core exited')
     if(!announced&&existsSync(loginFile)){
       announced=true
       const login=JSON.parse(readFileSync(loginFile,'utf8'))
-      console.log('SIGN-IN REQUIRED: open this address in your browser and sign in with your ChatGPT account:\n'+login.auth_url+'\n(waiting up to 15 minutes)')
+      if(process.env.DITTO_G2_OPEN_BROWSER)spawn('xdg-open',[login.auth_url],{stdio:'ignore',detached:true}).unref()
+      console.log('SIGN-IN REQUIRED: open this address in your browser and sign in with your ChatGPT account:\n'+login.auth_url+`\n(waiting up to ${waitMinutes} minutes)`)
     }
     await sleep(100)
   }
