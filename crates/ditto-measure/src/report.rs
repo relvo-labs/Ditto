@@ -261,6 +261,10 @@ const MIB: u64 = 1024;
 const HOSTD_BUDGET_KIB: u64 = 100 * MIB;
 const DESKTOP_BUDGET_KIB: u64 = 600 * MIB;
 const PLUS10_BUDGET_KIB: u64 = 50 * MIB;
+/// plan/04/07 §4: the Agent (controller, app-server and their helpers) warm,
+/// and the full desktop with it.
+const AGENT_WARM_BUDGET_KIB: u64 = 150 * MIB;
+const DESKTOP_AGENT_BUDGET_KIB: u64 = 750 * MIB;
 /// The D-34 set: five QML status items and five Cordis settings plugins.
 const PLUS10_QML: u32 = 5;
 const PLUS10_CORDIS: u32 = 5;
@@ -395,6 +399,8 @@ fn state_title(state: &str) -> &'static str {
         "desktop_full_plus10_a" => "完整桌面＋10 插件 A/B 的 A（啟用前）",
         "desktop_full_plus10_b" => "完整桌面＋D-34 的 10 個簡單插件（A/B 的 B）",
         "desktop_full_no_avatar" => "完整桌面、角色關閉",
+        "desktop_full_agent_warm" => "完整桌面＋Agent 暖態（後端已載入、無進行中的 turn）",
+        "desktop_full_agent_active" => "完整桌面＋Agent 活動（模型 turn 進行中）",
         _ => "未知狀態",
     }
 }
@@ -469,6 +475,8 @@ fn push_header(out: &mut String, conditions: &Conditions, state: &str, complete:
     }
     let scope = if state == "rescue_no_node" {
         "Core（`--mode rescue`）、Shell 或救援介面、合成器、`ditto-supervisor`、鎖定客戶端（若在執行）、Fcitx；沒有 hostd，也沒有任何 Node 程序"
+    } else if state.starts_with("desktop_full_agent") {
+        "Core、Shell、hostd、合成器、`ditto-supervisor`、鎖定客戶端（若在執行）、Fcitx，以及 Agent（controller、`ditto-confine` 內的 Codex app-server、其 D-Bus proxy）"
     } else {
         "Core、Shell、hostd、合成器、`ditto-supervisor`、鎖定客戶端（若在執行）、Fcitx；Agent 不存在"
     };
@@ -651,8 +659,18 @@ pub fn generate_g1(conditions: &Conditions, inputs: &[&Path; 3]) -> io::Result<S
     }
     let complete = conditions_complete(conditions, &refs);
     let mut out = format!(
-        "# G1 分層資源報告：{}（EX1-10，待出口評審）\n\n",
-        state_title(&state)
+        "# {} 分層資源報告：{}（{}，待出口評審）\n\n",
+        if state.starts_with("desktop_full_agent") {
+            "G2"
+        } else {
+            "G1"
+        },
+        state_title(&state),
+        if state.starts_with("desktop_full_agent") {
+            "EX2-14"
+        } else {
+            "EX1-10"
+        }
     );
     push_header(&mut out, conditions, &state, complete);
 
@@ -686,6 +704,28 @@ pub fn generate_g1(conditions: &Conditions, inputs: &[&Path; 3]) -> io::Result<S
             }
             out.push('\n');
         }
+        "desktop_full_agent_warm" => {
+            out.push_str("穩態門檻以每次的 p95 判定（三次都要在門檻內）。\n\n| 預算 | 依據 | 三次 p95（MiB） | 判定 |\n| --- | --- | --- | --- |\n");
+            let pick = |layer: &str| -> Vec<u64> {
+                refs.iter()
+                    .map(|stats| stats.layers.get(layer).map(|l| stats_of(l).1).unwrap_or(0))
+                    .collect()
+            };
+            let total: Vec<u64> = refs.iter().map(|stats| stats_of(&stats.total).1).collect();
+            for (label, values, limit) in [
+                ("hostd PSS ≤100 MiB", &pick("hostd"), HOSTD_BUDGET_KIB),
+                ("Agent 暖態 PSS ≤150 MiB（controller＋app-server＋子程序）", &pick("agent"), AGENT_WARM_BUDGET_KIB),
+                ("全桌面 PSS ≤750 MiB（Agent 暖態）", &total, DESKTOP_AGENT_BUDGET_KIB),
+            ] {
+                out.push_str(&format!(
+                    "| {label} | plan/04/07 §4、PRD 19.1 | {} | {} |\n",
+                    values.iter().map(|value| mib(*value as f64)).collect::<Vec<_>>().join("、"),
+                    verdict(complete, values, limit)
+                ));
+            }
+            out.push('\n');
+        }
+        "desktop_full_agent_active" => out.push_str("plan/04/07 §4 未另訂活動狀態預算：模型 turn 進行中的數字分列報告，不對門檻判定，也不作暖態數字。\n\n"),
         "rescue_no_node" => out.push_str("無：plan/03/06 §7.2 規定救援模式分列報告，不作全桌面數字，也不以它代表完整桌面成本。\n\n"),
         "desktop_full_plus10_b" => out.push_str("10 插件增量 ≤50 MiB 以同一次登入的 A/B 判定，見 `report-ab` 產生的 A/B 報告；本報告只列 B 狀態的分層數字。\n\n"),
         "desktop_full_plus10_a" => out.push_str("A 狀態只作 A/B 的對照，不單獨對預算判定。\n\n"),

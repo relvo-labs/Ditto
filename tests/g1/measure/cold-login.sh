@@ -24,7 +24,12 @@
 #       many runs from distinct logins the state's series holds.
 #
 # States: rescue_no_node, desktop_full_no_agent, desktop_full_plus10,
-# desktop_full_no_avatar.
+# desktop_full_no_avatar, and G2's desktop_full_agent_warm (the Agent and its
+# Codex backend started, no turn) and desktop_full_agent_active (model turns
+# running back to back; needs the subscription signed in). An Agent state
+# keeps the Agent from its normal five-minute release with a
+# measurement-only hold: `agent.runtime.ensure` every 60 s through the relay,
+# the same call the chat makes when it opens. Production has no such hold.
 #
 # DITTO_FORMAT_CHECK=1 runs the same flow on a development machine: no
 # reference-machine preflight, separate series, reports that say they are not
@@ -75,8 +80,8 @@ series_file() { echo "$artifacts/cold-login-series$fc-$1.jsonl"; }
 ledger="$artifacts/cold-login-logins$fc.txt"
 
 valid_state() {
-  case "$1" in rescue_no_node|desktop_full_no_agent|desktop_full_plus10|desktop_full_no_avatar) return 0 ;; esac
-  echo "unknown state '$1'; expected rescue_no_node, desktop_full_no_agent, desktop_full_plus10 or desktop_full_no_avatar" >&2
+  case "$1" in rescue_no_node|desktop_full_no_agent|desktop_full_plus10|desktop_full_no_avatar|desktop_full_agent_warm|desktop_full_agent_active) return 0 ;; esac
+  echo "unknown state '$1'; expected rescue_no_node, desktop_full_no_agent, desktop_full_plus10, desktop_full_no_avatar, desktop_full_agent_warm or desktop_full_agent_active" >&2
   return 2
 }
 
@@ -139,6 +144,8 @@ layer_of() {
     fcitx.scope) echo input-method ;;
     rescue-shell.scope|rescue.service) echo rescue-ui ;;
     dittoctl.scope) echo verification-relay ;;
+    agent.scope|agent-backend.scope) echo agent ;;
+    job-*.scope) echo worker ;;
     ref-*.scope) echo excluded ;;
     *) echo unknown ;;
   esac
@@ -205,6 +212,8 @@ required_layers() {
   local layers=(compositor core supervisor)
   [[ -n "$fixture" ]] || layers+=(input-method)
   if [[ "$1" == rescue_no_node ]]; then layers+=(shell-or-rescue-ui); else layers+=(shell hostd verification-relay); fi
+  # `ready` is asked before the Agent is started; sample requires it after.
+  [[ "$1" == desktop_full_agent_* && -n "${agent_started:-}" ]] && layers+=(agent)
   echo "${layers[*]}"
 }
 
@@ -240,6 +249,11 @@ session_ready() {
     fi
   done
   (( ${#missing[@]} == 0 )) || { echo "missing layers: ${missing[*]}"; return 1; }
+  # Outside the Agent states the Agent must not be running at all.
+  if [[ "$state" != desktop_full_agent_* ]] && grep -qE ' (agent|worker)$' <<<"$units"; then
+    echo "an Agent or worker is running: $(awk '$2 == "agent" || $2 == "worker" {print $1}' <<<"$units" | xargs)"
+    return 1
+  fi
   if [[ "$state" != rescue_no_node ]]; then
     relay_up || { echo "the verification relay does not answer at $DITTO_G1_RELAY"; return 1; }
     [[ "$(relay_call desktop.plugins.diagnostics '{}' | jq -r '.result.host.state // empty')" == running ]] ||
@@ -429,8 +443,59 @@ measure() {
   done <<<"$units"
 }
 
+# ---- the Agent states ---------------------------------------------------------
+
+hold_pid=""
+load_pid=""
+agent_turns_file=""
+# Start the Agent and its confined backend the way the chat does, and wait
+# until Core reports it ready and isolated. Prints the runtime status.
+agent_up() {
+  local status deadline=$(( $(date +%s) + 90 ))
+  relay_call agent.runtime.ensure '{}' >/dev/null
+  while :; do
+    status="$(relay_call agent.runtime.get '{}')"
+    [[ "$(jq -r .result.phase <<<"$status")" == ready ]] && break
+    [[ "$(jq -r .result.phase <<<"$status")" == failed ]] && { echo "the Agent failed to start: $(jq -c .result <<<"$status")" >&2; return 1; }
+    (( $(date +%s) < deadline )) || { echo 'the Agent did not become ready in 90 s' >&2; return 1; }
+    sleep 1
+  done
+  [[ "$(jq -r .result.isolation_verified <<<"$status")" == true ]] ||
+    { echo 'the Agent backend is not confined; Agent states are measured only with the real boundary' >&2; return 1; }
+  jq -c .result <<<"$status"
+}
+# measurement-only hold: what opening the chat does, once a minute.
+agent_hold() {
+  ( while sleep 60; do relay_call agent.runtime.ensure '{}' >/dev/null 2>&1 || true; done ) &
+  hold_pid=$!
+}
+# Model turns back to back in one conversation, without tools, until killed.
+agent_load() {
+  agent_turns_file="$artifacts/agent-active-turns-$1.jsonl"
+  local session
+  session="$(relay_call agent.sessions.create "{\"title\":\"measurement $1\",\"idempotency_key\":\"measure-$1\"}" | jq -r .result.session_id)"
+  [[ -n "$session" && "$session" != null ]] || { echo 'could not create the measurement conversation' >&2; return 1; }
+  (
+    local n=0 turn state
+    while :; do
+      n=$(( n + 1 ))
+      turn="$(relay_call agent.turns.submit "$(jq -cn --arg s "$session" --arg k "measure-$1-$n" \
+        '{session_id: $s, client_message_id: $k, text: "請用大約三百字介紹在 Ditto 桌面上可以怎麼調整外觀與布局。不要呼叫任何工具，也不要修改任何設定。", contexts: []}')" | jq -r .result.turn_id)"
+      while :; do
+        state="$(relay_call agent.turns.get "{\"turn_id\":\"$turn\"}" | jq -r .result.state)"
+        case "$state" in succeeded|failed|cancelled|unknown|partial) break ;; esac
+        sleep 1
+      done
+      jq -cn --arg turn "$turn" --arg state "$state" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{turn_id: $turn, state: $state, ended_at: $at}' >>"$agent_turns_file"
+    done
+  ) &
+  load_pid=$!
+}
+
 plus10_enabled=""
 cleanup_sample() {
+  [[ -n "$hold_pid" ]] && kill "$hold_pid" 2>/dev/null
+  [[ -n "$load_pid" ]] && kill "$load_pid" 2>/dev/null
   stop_apps
   if [[ -n "$plus10_enabled" ]]; then
     echo "removing the D-34 plugins: $(d34_remove 2>/dev/null || echo failed)" >&2
@@ -451,7 +516,18 @@ sample() {
     echo "this login was prepared for '${prepared:-nothing}', not '$state'; run prepare $state and log in again" >&2
     exit 1
   }
-  local why
+  local why agent_status=""
+  if [[ "$state" == desktop_full_agent_* ]]; then
+    relay_up || { echo "the verification relay does not answer at $DITTO_G1_RELAY" >&2; exit 1; }
+    if [[ "$state" == desktop_full_agent_active ]]; then
+      [[ "$(relay_call agent.providers.status '{"provider":"codex-app-server"}' | jq -r .result.authenticated)" == true ]] || {
+        echo 'desktop_full_agent_active runs real model turns: sign in to the subscription first (AI 設定)' >&2
+        exit 2
+      }
+    fi
+    agent_status="$(agent_up)" || exit 1
+    agent_started=1
+  fi
   why="$(session_ready "$state")" || { echo "not a session in state $state: $why" >&2; exit 1; }
 
   local login age
@@ -524,6 +600,10 @@ sample() {
   local role
   for role in $apps; do start_app "$role"; done
 
+  if [[ "$state" == desktop_full_agent_* ]]; then
+    agent_hold
+    [[ "$state" == desktop_full_agent_active ]] && agent_load "$run_id"
+  fi
   echo "login $login (${age}s old), state $state: warming up for ${warmup}s"
   sleep "$warmup"
   local record
@@ -582,10 +662,11 @@ sample() {
   series="$(series_file "$state")"
   jq -cn --arg run "$run_id" --arg login "$login" --argjson age "$age" --argjson warmup "$warmup" \
     --arg state "$state" --arg mode "$core_mode" --arg nodes "$node_list" --argjson record "$record" \
-    --arg units "$(ditto_units)" --argjson duration "$duration" --argjson interval "$interval_ms" --arg apps "$apps" \
+    --arg units "$(ditto_units)" --arg agent "$agent_status" --arg turns "$agent_turns_file" --argjson duration "$duration" --argjson interval "$interval_ms" --arg apps "$apps" \
     '{run_id: $run, login_id: $login, login_age_seconds: $age, warmup_seconds: $warmup, sample_seconds: $duration,
       interval_ms: $interval, state: $state, core_mode: $mode, reference_apps: ($apps | split(" ")),
       node_processes: ($nodes | split("\n") | map(select(length > 0))),
+      agent: (if ($agent | length) > 0 then {runtime: ($agent | fromjson), hold: "measurement-only: agent.runtime.ensure every 60 s", turns_log: $turns} else null end),
       ditto_units: ($units | split("\n") | map(select(length > 0)))} + $record' >>"$series"
   echo "run $run_id recorded in $series ($(wc -l <"$series") so far)"
 }
@@ -617,7 +698,7 @@ report() {
       "measurement state \($state); Core mode \($runs | map(.core_mode) | unique | join("/"))",
       "Ditto G1 Core, Shell, hostd, ditto-supervisor, Wayfire and Fcitx from packaging/reference-image (install-session.sh --verification-relay), the frozen character asset, 1920x1080 60 Hz scale 1",
       "reference applications \($runs | map(.reference_apps | join("+")) | unique | join(" / ")) (browser = Firefox, terminal = foot, editor = Kate) with the G0 fixture content, started after login in ditto-ref-*.scope and excluded",
-      "no Agent and no Agent stand-in",
+      (if ($state | startswith("desktop_full_agent")) then "the Agent controller and its Codex app-server in ditto-confine, started with agent.runtime.ensure after login and kept with the measurement-only hold (agent.runtime.ensure every 60 s)" + (if $state == "desktop_full_agent_active" then "; model turns back to back without tools, logged per run" else "; no turn" end) else "no Agent and no Agent stand-in" end),
       "Node processes in Ditto units at the start of each run: \($runs | map((.node_processes | length) | tostring) | join(", "))"
     ] + (if $state == "desktop_full_plus10" then [
       "A/B in each login: A without the D-34 set, then one ChangeSet enabling its ten packages, a warm-up of \($runs | map(.warmup_b_seconds | tostring) | join(", ")) s, then B; the set is removed afterwards"

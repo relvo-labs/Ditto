@@ -13,6 +13,9 @@
 # The state comes from the same measure-conditions.json `prepare` writes,
 # read the way packaging/reference-image/session/ditto-session reads it.
 #
+# The G2 Agent states (desktop_full_agent_warm, desktop_full_agent_active)
+# are run only when named; they need the pinned Codex binary.
+#
 # Short durations (DITTO_FORMAT_CHECK=1): warm-up 2 s, 3 s of samples every
 # 1 s unless set otherwise; foot is the only reference application.
 # Reports land in artifacts/g1/measure-dry-run-<run_id>/.
@@ -33,6 +36,9 @@ cold_login="$WORKSPACE/tests/g1/measure/cold-login.sh"
 export DITTO_FORMAT_CHECK=1 DITTO_MEASURE_FIXTURE=1 DITTO_MEASURE_UNIT_PREFIX="$prefix"
 export DITTO_ARTIFACTS="$out" DITTO_BINARIES="${DITTO_BINARIES:-$WORKSPACE/target/debug}"
 export DITTO_MEASURE_CONDITIONS="$out/measure-conditions.json"
+# `prepare` talks to whatever relay DITTO_G1_RELAY names. Before a fixture
+# login exists that must be no relay at all, never a logged-in session's.
+export DITTO_G1_RELAY="$out/no-relay-before-login.sock"
 export DITTO_WARMUP_SECONDS="${DITTO_WARMUP_SECONDS:-2}" DITTO_SAMPLE_SECONDS="${DITTO_SAMPLE_SECONDS:-3}"
 export DITTO_SAMPLE_INTERVAL_MS="${DITTO_SAMPLE_INTERVAL_MS:-1000}" DITTO_MEASURE_APPS="${DITTO_MEASURE_APPS:-terminal}"
 
@@ -88,6 +94,15 @@ except (OSError, ValueError): print("standard")' "$DITTO_MEASURE_CONDITIONS")"
     *) serve+=(--launch "dittoctl 0.2.0 $node $WORKSPACE/tests/g1/lib/relay.mjs $relay") ;;
   esac
   [[ "$variant" == avatar-off ]] && core_env+=(DITTO_AVATAR=off)
+  # The Agent states need the Agent and its pinned, confined Codex backend.
+  if [[ "$state" == desktop_full_agent_* ]]; then
+    local codex pin_version pin_sha
+    codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}")"
+    pin_version="$(jq -r .version "$WORKSPACE/tools/codex/pin.json")"
+    pin_sha="$(jq -r .sha256 "$WORKSPACE/tools/codex/pin.json")"
+    serve+=(--agent "agent 0.3.0 $node $WORKSPACE/packages/agent-runtime/dist/ditto-agentd.mjs"
+      --agent-backend "codex-app-server $pin_version $pin_sha $codex")
+  fi
   unset DITTO_DEV_TOKEN
   systemd-run --user --scope --quiet --collect --unit="$prefix-core" -- \
     env "${core_env[@]}" "$BINARIES/ditto-core" "${serve[@]}" >"$RUNTIME_DIR/core.log" 2>&1 &
