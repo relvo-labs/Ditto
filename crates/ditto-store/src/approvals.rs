@@ -131,7 +131,11 @@ pub fn decide(
     Ok(approval)
 }
 fn record(store: &mut Store, approval: &Approval, kind: SessionEventKind) -> StoreResult<()> {
-    let tag = if kind == SessionEventKind::ApprovalAsked { "asked" } else { "decided" };
+    let tag = if kind == SessionEventKind::ApprovalAsked {
+        "asked"
+    } else {
+        "decided"
+    };
     crate::conversations::append_internal(
         store,
         &approval.request.session_id,
@@ -315,13 +319,27 @@ mod tests {
                     SessionEventKind::ApprovalAsked | SessionEventKind::ApprovalDecided
                 )
             })
-            .map(|e| (e.kind, e.data["request_id"].clone(), e.data["decision"].clone()))
+            .map(|e| {
+                (
+                    e.kind,
+                    e.data["request_id"].clone(),
+                    e.data["decision"].clone(),
+                )
+            })
             .collect();
         assert_eq!(
             approvals,
             vec![
-                (SessionEventKind::ApprovalAsked, json!(approval.request_id), json!(null)),
-                (SessionEventKind::ApprovalDecided, json!(approval.request_id), json!("allowed-once")),
+                (
+                    SessionEventKind::ApprovalAsked,
+                    json!(approval.request_id),
+                    json!(null)
+                ),
+                (
+                    SessionEventKind::ApprovalDecided,
+                    json!(approval.request_id),
+                    json!("allowed-once")
+                ),
             ]
         );
     }

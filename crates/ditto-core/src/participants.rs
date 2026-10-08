@@ -346,7 +346,8 @@ impl CompositorParticipant {
         const MIN: Duration = Duration::from_millis(150);
         const MAX: Duration = Duration::from_millis(1500);
         const STEP: Duration = Duration::from_millis(50);
-        let geometry = || -> Vec<(Option<i32>, Option<i32>, Option<u32>, Option<u32>)> {
+        type Geometry = (Option<i32>, Option<i32>, Option<u32>, Option<u32>);
+        let geometry = || -> Vec<Geometry> {
             let windows = self.placement();
             placed
                 .iter()
