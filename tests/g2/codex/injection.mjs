@@ -10,6 +10,8 @@ import {tmpdir,homedir} from 'node:os'
 import {resolve,join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {startProvider,toolOutputs,call,say} from './mock-provider.mjs'
+import {exitUnlessConfinable} from '../lib/environment.mjs'
+exitUnlessConfinable()
 
 const workspace=fileURLToPath(new URL('../../../',import.meta.url))
 const pin=JSON.parse(readFileSync(resolve(workspace,'tools/codex/pin.json'),'utf8'))

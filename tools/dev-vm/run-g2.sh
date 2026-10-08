@@ -2,6 +2,9 @@
 # Disposable VM verification of the G2 foundation. These results are
 # development evidence, never reference-machine resource/desktop exit data.
 set -euo pipefail
+# ditto-g2 = ditto-base plus the HWE kernel (Landlock ABI >= 6, which Core
+# requires before it starts the Codex backend) and GLib development files.
+export DITTO_VM_SNAPSHOT="${DITTO_VM_SNAPSHOT:-ditto-g2}"
 source "$(dirname "$0")/lib.sh"
 [[ "$(virsh_vm domstate "$VM_NAME" 2>/dev/null)" == "shut off" ]] || { echo 'VM is already in use' >&2; exit 2; }
 run_id="$(date -u +%Y-%m-%dT%H:%M:%SZ)-$(git -C "$WORKSPACE" rev-parse --short=4 HEAD)"
@@ -22,12 +25,15 @@ finish() {
 trap finish EXIT
 record() { jq -cn --arg check "$1" --arg status "$2" '{check:$check,status:$status,evidence_class:"development-vm"}' >>"$out/summary.jsonl"; }
 step() {
-  local name="$1" command="$2"
-  if vm_ssh "$VM_ENV"" $command" >"$out/$name.log" 2>&1; then record "$name" pass; else record "$name" fail; return 1; fi
+  local name="$1" command="$2" code=0
+  vm_ssh "$VM_ENV"" $command" >"$out/$name.log" 2>&1 || code=$?
+  # Exit 2: the suite could not run here (environment), not a failure.
+  if (( code == 0 )); then record "$name" pass; elif (( code == 2 )); then record "$name" not_run; else record "$name" fail; return 1; fi
 }
 virsh_vm snapshot-revert "$VM_NAME" "$VM_SNAPSHOT" --running --force >"$out/restore.log" 2>&1
 started=1
 vm_wait_ssh >>"$out/restore.log" 2>&1
+vm_ssh "uname -r" >>"$out/restore.log" 2>&1
 record restore pass
 vm_ssh 'sudo systemctl restart systemd-timesyncd >/dev/null 2>&1' || true
 vm_sync_workspace >"$out/sync.log" 2>&1
@@ -44,7 +50,7 @@ if [[ -n "$codex" && -f "$codex" ]]; then
 else
   record codex-binary not_run
 fi
-step dbus-proxy 'command -v meson >/dev/null || sudo apt-get install -y -q meson libglib2.0-dev >/dev/null; bash tools/dev-vm/../dbus-proxy/build.sh debug' || true
+step dbus-proxy 'bash tools/dbus-proxy/build.sh debug' || true
 label='DITTO_ENVIRONMENT_LABEL=development-vm'
 step confine "cargo test --locked -p ditto-confine" || true
 for suite in codex/run codex/faults codex/injection jobs/run lifecycle/run; do

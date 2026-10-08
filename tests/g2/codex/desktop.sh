@@ -32,6 +32,7 @@ codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}" 2>/dev/null
 pin_sha="$(jq -r .sha256 "$WORKSPACE/tools/codex/pin.json")"
 pin_version="$(jq -r .version "$WORKSPACE/tools/codex/pin.json")"
 [[ -n "$codex" && -f "$codex" && "$(sha256sum "$codex" | cut -d' ' -f1)" == "$pin_sha" ]] || missing+=("the pinned Codex binary")
+"$WORKSPACE/target/debug/ditto-confine" --read /usr -- /usr/bin/true 2>/dev/null || { check environment environment "this kernel cannot confine the Codex backend (Landlock ABI < 6); Core refuses it, as designed"; g1_finish; }
 if (( ${#missing[@]} > 0 )); then
   check g2-m1-desktop environment "missing: ${missing[*]}"
   g1_finish

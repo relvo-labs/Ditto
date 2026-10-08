@@ -12,6 +12,8 @@ import {tmpdir,homedir} from 'node:os'
 import {resolve,join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {startProvider,say} from '../codex/mock-provider.mjs'
+import {exitUnlessConfinable} from '../lib/environment.mjs'
+exitUnlessConfinable('release')
 
 const runs=Number(process.argv[2]??30)
 const workspace=fileURLToPath(new URL('../../../',import.meta.url))
