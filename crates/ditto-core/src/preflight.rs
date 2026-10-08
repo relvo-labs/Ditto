@@ -65,6 +65,35 @@ fn origin_may_change_while_locked(origin: &ChangeOrigin) -> bool {
     )
 }
 
+const COLOR_TOKENS: &[&str] = &[
+    "accent",
+    "on_accent",
+    "background",
+    "surface",
+    "surface_strong",
+    "foreground",
+    "foreground_muted",
+    "border",
+    "focus",
+    "warning",
+    "danger",
+    "success",
+];
+const NUMBER_TOKENS: &[&str] = &[
+    "blur_radius",
+    "surface_opacity",
+    "shadow_radius",
+    "radius_scale",
+    "font_scale",
+    "space_scale",
+];
+
+/// `#rrggbb` or `#rrggbbaa`, as the Shell accepts.
+fn is_color(value: &str) -> bool {
+    let hex = value.strip_prefix('#').unwrap_or("");
+    matches!(hex.len(), 6 | 8) && hex.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 fn version_matches(range: &str, version: &str) -> bool {
     match (
         semver::VersionReq::parse(range),
@@ -169,6 +198,30 @@ fn check_all(
                 PreflightCode::SchemaInvalid,
                 None,
                 json!({"rule_id": rule.rule_id, "why": why}),
+            ));
+        }
+    }
+    // Appearance tokens the Shell reads (shell/jelly/Tokens.qml) must hold a
+    // value it can use: a malformed one would commit, read back as changed,
+    // and show nothing. Only changed tokens are judged.
+    for (token, value) in &target.appearance.tokens {
+        if base.appearance.tokens.get(token) == Some(value) {
+            continue;
+        }
+        let why = if COLOR_TOKENS.contains(&token.as_str()) && !is_color(value) {
+            Some("token_not_a_color")
+        } else if NUMBER_TOKENS.contains(&token.as_str())
+            && !value.trim().parse::<f64>().is_ok_and(f64::is_finite)
+        {
+            Some("token_not_a_number")
+        } else {
+            None
+        };
+        if let Some(why) = why {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"token": token, "why": why}),
             ));
         }
     }

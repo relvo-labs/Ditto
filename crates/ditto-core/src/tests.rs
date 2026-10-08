@@ -1658,6 +1658,15 @@ fn preflight_refuses_every_problem_at_once_and_changes_nothing() {
             json!([{"op": "add_entry", "entry": {"package": "ditto.test.greedy", "version": "1.0.0", "host": "cordis"}}]),
             "budget_exceeded",
         ),
+        // A JSON-encoded colour would commit and show nothing.
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/accent", "after": "\"#22C55E\""}]),
+            "schema_invalid",
+        ),
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/font_scale", "after": "large"}]),
+            "schema_invalid",
+        ),
     ];
     for (ops, code) in cases {
         let response = cli.call(
