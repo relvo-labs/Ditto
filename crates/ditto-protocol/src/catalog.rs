@@ -1148,6 +1148,32 @@ fn agent_definitions() -> Vec<Definition> {
             &[s::AGENT_READ],
         ),
         def(
+            "agent.credentials.create",
+            schema::<CredentialCreateInput>,
+            schema::<CredentialStatus>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(KeyBased, "agent.credentials.status", false),
+        def(
+            "agent.credentials.status",
+            schema::<CredentialRefInput>,
+            schema::<CredentialStatus>,
+            &[s::AGENT_MANAGE],
+        ),
+        def(
+            "agent.credentials.delete",
+            schema::<CredentialRefInput>,
+            schema::<CredentialStatus>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.credentials.status", false),
+        def(
+            "agent.credentials.resolve",
+            schema::<CredentialResolveInput>,
+            schema::<CredentialResolveOutput>,
+            &[s::AGENT_WRITE],
+        ),
+        def(
             "desktop.context.acquire",
             schema::<ContextAcquireInput>,
             schema::<ContextReference>,

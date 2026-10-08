@@ -315,7 +315,13 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
             .starts_with("desktop.approvals.")
     {
         crate::agent_routes::current(core, caller)?;
-        if !core.agent.status().isolation_verified && call.contract.writes {
+        // The Codex backend has built-in tools of its own, so desktop writes
+        // need Core's proof that it runs confined. The direct-model path is
+        // Ditto's own loop with no executing backend to confine.
+        let direct = core
+            .read(ditto_store::preferences::get)
+            .is_ok_and(|p| p.provider == "direct-model");
+        if !core.agent.status().isolation_verified && !direct && call.contract.writes {
             return Err(CoreError::denied(
                 ditto_protocol::PermissionDeniedReason::PolicyDenied,
                 None,

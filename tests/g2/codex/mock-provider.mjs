@@ -18,7 +18,7 @@ export async function startProvider(decide){
   const server=http.createServer((req,res)=>{
     let body='';req.on('data',c=>body+=c);req.on('end',()=>{
       const parsed=body?JSON.parse(body):null
-      requests.push({method:req.method,url:req.url,body:parsed})
+      requests.push({method:req.method,url:req.url,body:parsed,authorization:req.headers.authorization??null})
       if(!req.url.endsWith('/responses')){res.writeHead(404);res.end();return}
       const id='resp-'+(++count)
       let items

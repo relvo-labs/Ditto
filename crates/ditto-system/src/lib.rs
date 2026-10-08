@@ -16,6 +16,7 @@ pub mod index;
 pub mod launch;
 pub mod notify;
 pub mod real;
+pub mod secrets;
 mod time;
 mod watch;
 

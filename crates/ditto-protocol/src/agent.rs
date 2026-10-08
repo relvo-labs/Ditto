@@ -152,6 +152,48 @@ pub struct AgentPreferences {
     /// still apply). Never an automatic yes.
     #[serde(default)]
     pub approval_mode: ApprovalMode,
+    /// `direct-model` only: the OpenAI-compatible Responses endpoint
+    /// (`https://…/v1`). Its key is the `api_key` credential reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+}
+
+// ---- credentials (G2-CORE-04) -------------------------------------------------
+
+/// A new API key from the person's settings form. The value goes straight
+/// to the Secret Service; Core answers with an opaque reference only.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CredentialCreateInput {
+    pub provider: String,
+    pub secret: String,
+    pub idempotency_key: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CredentialRefInput {
+    pub credential_ref: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CredentialStatus {
+    pub credential_ref: String,
+    /// Resolvable now (present and the keyring is unlocked).
+    pub available: bool,
+    /// `missing`, `locked` or `keyring_unavailable` when not available.
+    pub reason: Option<String>,
+}
+/// The Agent asks for the key of the turn it runs, nothing else.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CredentialResolveInput {
+    pub turn_id: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CredentialResolveOutput {
+    pub secret: String,
+    pub endpoint: String,
 }
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -179,6 +221,7 @@ impl Default for AgentPreferences {
             turn_timeout_ms: 120_000,
             retain_conversations: true,
             approval_mode: ApprovalMode::Ask,
+            endpoint: None,
         }
     }
 }

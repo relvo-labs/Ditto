@@ -6,6 +6,7 @@ import type {ProviderStatus} from '../../protocol/src/generated/provider-status.
 import {CoreSessionHandle} from './session.ts'
 import {DesktopTools} from './tools.ts'
 import type {CodexBackend} from './codex.ts'
+import {DirectModelBackend} from './direct.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {agentSessions:AgentSessions;agentTools:AgentTools;agentModels:AgentModels}
@@ -54,7 +55,9 @@ export class AgentRuntime {
   private active?:{turnId:string;abort:AbortController}
   private stopped=false
   private handles=new Set<CoreSessionHandle>()
+  private direct:DirectModelBackend
   constructor(private core:CoreChannel,private backend?:CodexBackend){
+    this.direct=new DirectModelBackend(core)
     new AgentSessions(this.root,core);new AgentTools(this.root,core);new AgentModels(this.root,backend)
   }
   async start():Promise<void>{await this.root.plugin(controllerPlugin)}
@@ -88,7 +91,10 @@ export class AgentRuntime {
     let state:Turn['state']='failed',reason:string|undefined
     try{
       handle=await this.root.agentSessions.open(claim.turn.session_id);this.handles.add(handle)
-      if(!this.backend)throw new Error('backend_unsupported')
+      // The backend is the one the turn's settings snapshot names; the two
+      // never run one turn together (no second autonomous loop).
+      const direct=claim.settings.provider==='direct-model'
+      if(!direct&&!this.backend)throw new Error('backend_unsupported')
       const page=await handle.read(Math.max(0,claim.message_seq-50),50)
       let history=''
       for(const event of page.events){
@@ -101,9 +107,11 @@ export class AgentRuntime {
       const recent=recentChangesText(claim.recent_changes??[])
       if(recent)history+=(history?'\n':'')+recent
       const tools=await this.root.agentTools.desktop.discover()
-      const output=await this.backend.run(claim.text,history,claim.settings,tools,
-        (callId,name,args)=>this.root.agentTools.desktop.execute(turnId,callId,name,args,abort.signal),abort.signal,
-        delta=>this.root.emit('agent/text',turnId,delta),claim.contexts??[])
+      const execute=(callId:string,name:string,args:unknown)=>this.root.agentTools.desktop.execute(turnId,callId,name,args,abort.signal)
+      const onText=(delta:string)=>{this.root.emit('agent/text',turnId,delta)}
+      const output=direct
+        ?await this.direct.run(turnId,claim.text,history,claim.settings,tools,execute,abort.signal,onText,claim.contexts??[])
+        :await this.backend!.run(claim.text,history,claim.settings,tools,execute,abort.signal,onText,claim.contexts??[])
       await handle.append('model/selection',{turn_id:turnId,provider:claim.settings.provider,model:output.model,settings_revision:claim.settings.revision})
       if(output.text)await handle.append('assistant/message',{turn_id:turnId,text:output.text,...(output.usage?{usage:output.usage}:{})})
       await handle.flush();state=output.interrupted?'cancelled':'succeeded'

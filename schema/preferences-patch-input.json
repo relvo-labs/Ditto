@@ -21,6 +21,13 @@
         "enabled": {
           "type": "boolean"
         },
+        "endpoint": {
+          "description": "`direct-model` only: the OpenAI-compatible Responses endpoint\n(`https://…/v1`). Its key is the `api_key` credential reference.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "max_tool_calls": {
           "format": "uint32",
           "minimum": 0,

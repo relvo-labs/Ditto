@@ -58,6 +58,40 @@ pub(crate) fn announce_turn(core: &Core, turn_id: &str) {
     }
 }
 
+fn secrets() -> Result<ditto_system::secrets::SecretStore, CoreError> {
+    ditto_system::secrets::SecretStore::connect().map_err(secret_error)
+}
+
+/// Closed reasons in the message only; the secret never appears anywhere.
+fn secret_error(error: ditto_system::secrets::SecretError) -> CoreError {
+    use ditto_system::secrets::SecretError::*;
+    match error {
+        Unavailable => {
+            CoreError::unavailable(UnavailableReason::SystemUnavailable, "keyring_unavailable")
+        }
+        Locked => CoreError::unavailable(UnavailableReason::SystemUnavailable, "keyring_locked"),
+        Missing => CoreError::not_found("credential"),
+        Failed(_) => CoreError::unavailable(UnavailableReason::SystemUnavailable, "keyring_failed"),
+    }
+}
+
+fn credential_status(reference: &str) -> CredentialStatus {
+    let (available, reason) = match secrets() {
+        Err(_) => (false, Some("keyring_unavailable")),
+        Ok(store) => match store.exists(reference) {
+            Ok(true) => (true, None),
+            Ok(false) => (false, Some("missing")),
+            Err(ditto_system::secrets::SecretError::Locked) => (false, Some("locked")),
+            Err(_) => (false, Some("keyring_unavailable")),
+        },
+    };
+    CredentialStatus {
+        credential_ref: reference.into(),
+        available,
+        reason: reason.map(String::from),
+    }
+}
+
 fn empty(call: &Call<'_>) -> Result<(), CoreError> {
     let _: ditto_protocol::Empty = call.input()?;
     Ok(())
@@ -398,6 +432,86 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             }
             announce_turn(core, &approval.request.turn_id);
             written(approval)
+        }
+        "agent.credentials.create" => {
+            let input: CredentialCreateInput = call.input()?;
+            if input.provider != "direct-model"
+                || input.secret.trim().is_empty()
+                || input.secret.len() > 4096
+                || input.secret.chars().any(char::is_control)
+                || input.idempotency_key.is_empty()
+            {
+                return Err(CoreError::invalid("invalid credential"));
+            }
+            // The same request key names the same keyring item, so a retry
+            // replaces rather than leaves an orphan behind.
+            let reference = format!(
+                "cred-{}",
+                &ditto_protocol::jcs::digest(&json!(input.idempotency_key))
+                    .trim_start_matches("sha256:")[..24]
+            );
+            secrets()?
+                .store(&reference, "Ditto model API key", input.secret.as_bytes())
+                .map_err(secret_error)?;
+            crate::log::event(
+                "credential.stored",
+                &[("credential_ref", reference.as_str())],
+            );
+            written(CredentialStatus {
+                credential_ref: reference,
+                available: true,
+                reason: None,
+            })
+        }
+        "agent.credentials.status" => {
+            let input: CredentialRefInput = call.input()?;
+            ok(credential_status(&input.credential_ref))
+        }
+        "agent.credentials.delete" => {
+            let input: CredentialRefInput = call.input()?;
+            if !input.credential_ref.starts_with("cred-") {
+                return Err(CoreError::invalid("not a Ditto credential"));
+            }
+            secrets()?
+                .delete(&input.credential_ref)
+                .map_err(secret_error)?;
+            crate::log::event(
+                "credential.deleted",
+                &[("credential_ref", input.credential_ref.as_str())],
+            );
+            written(credential_status(&input.credential_ref))
+        }
+        "agent.credentials.resolve" => {
+            // Only the current Agent, for the direct-model turn it is
+            // running, and only the key that turn's settings name.
+            let input: CredentialResolveInput = call.input()?;
+            let turn = core.read(|c| turns::owner(c, &input.turn_id, &owner))?;
+            if !matches!(turn.state, TurnState::Running | TurnState::AwaitingApproval) {
+                return Err(CoreError::denied(
+                    PermissionDeniedReason::PolicyDenied,
+                    None,
+                ));
+            }
+            let settings = core.read(preferences::get)?;
+            let (
+                Some(ProviderAuthentication::ApiKey { credential_ref }),
+                Some(endpoint),
+                "direct-model",
+            ) = (
+                settings.auth.as_ref(),
+                settings.endpoint.clone(),
+                settings.provider.as_str(),
+            )
+            else {
+                return Err(CoreError::denied(
+                    PermissionDeniedReason::PolicyDenied,
+                    None,
+                ));
+            };
+            let secret = secrets()?.lookup(credential_ref).map_err(secret_error)?;
+            let secret = String::from_utf8(secret)
+                .map_err(|_| CoreError::internal("credential is not text"))?;
+            ok(CredentialResolveOutput { secret, endpoint })
         }
         "desktop.context.acquire" => {
             let input: ContextAcquireInput = call.input()?;

@@ -58,6 +58,31 @@ pub fn patch(tx: &Transaction<'_>, input: &PreferencesPatchInput) -> StoreResult
     }) {
         return Err(StoreError::Invalid("invalid credential reference".into()));
     }
+    // A direct-model endpoint is HTTPS, or plain HTTP to this machine only
+    // (a local model server or a test stand-in); credentials never cross
+    // the network in clear text.
+    if let Some(endpoint) = &next.endpoint {
+        let loopback = ["http://127.0.0.1:", "http://localhost:", "http://[::1]:"]
+            .iter()
+            .any(|prefix| endpoint.starts_with(prefix));
+        if next.provider != "direct-model"
+            || endpoint.len() > 512
+            || endpoint
+                .chars()
+                .any(|c| c.is_control() || c.is_whitespace())
+            || !(endpoint.starts_with("https://") || loopback)
+        {
+            return Err(StoreError::Invalid("invalid model endpoint".into()));
+        }
+    }
+    if next.provider == "direct-model"
+        && next.enabled
+        && (next.endpoint.is_none() || next.auth.is_none())
+    {
+        return Err(StoreError::Invalid(
+            "a direct model needs an endpoint and a key".into(),
+        ));
+    }
     for value in [next.model.as_ref(), next.reasoning_effort.as_ref()]
         .into_iter()
         .flatten()

@@ -23,6 +23,11 @@ export interface AgentPreferences {
   approval_mode?: 'ask' | 'never';
   auth?: ProviderAuthentication | null;
   enabled: boolean;
+  /**
+   * `direct-model` only: the OpenAI-compatible Responses endpoint
+   * (`https://…/v1`). Its key is the `api_key` credential reference.
+   */
+  endpoint?: string | null;
   max_tool_calls: number;
   model?: string | null;
   provider: string;

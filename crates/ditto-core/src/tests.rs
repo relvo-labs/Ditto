@@ -713,7 +713,8 @@ fn every_catalog_entry_has_a_handler_and_a_consumer() {
         include_str!("../../../packages/agent-runtime/src/runtime.ts"),
         include_str!("../../../packages/agent-runtime/src/session.ts"),
         include_str!("../../../packages/agent-runtime/src/tools.ts"),
-        include_str!("../../../packages/agent-runtime/src/main.ts")
+        include_str!("../../../packages/agent-runtime/src/main.ts"),
+        include_str!("../../../packages/agent-runtime/src/direct.ts")
     );
     for contract in ditto_protocol::catalog::contracts()
         .into_iter()
