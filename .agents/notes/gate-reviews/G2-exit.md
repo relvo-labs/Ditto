@@ -61,7 +61,7 @@
 | lifecycle quick | 通過 | 100 次啟停，Core PSS 20 418→20 454 KiB |
 | cold-start | 通過 | 30 次：authenticated p50 112、p95 118、最大 425 ms（目標 p95 ≤2 000） |
 | layout | 通過 | 6／6（Wayfire） |
-| codex-desktop | 失敗（無效） | 執行途中本人修改了 `desktop.sh`，bash 讀到半截檔案；單獨重跑見下 |
+| codex-desktop | 失敗（無效） | 執行途中 `desktop.sh` 正被修改（加入鎖定案例），bash 讀到半截檔案；單獨重跑見下 |
 | shell | 通過 | 6／6 |
 | semantic 自我檢查／空白對照 | 通過 | 固定、保留各 50／50 與 0／50 |
 
