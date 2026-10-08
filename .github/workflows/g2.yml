@@ -1,0 +1,50 @@
+name: g2
+# G2-QA-08: the headless G2 suites (fixture compositor, scripted loopback
+# model) on every change to the Agent path. Desktop suites run in the VM
+# job of vm-regression.yml; real-subscription and semantic sets are operator
+# runs on the reference machine and never part of CI.
+on:
+  push:
+    branches: [main]
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'packages/**', 'schema/**', 'tests/g2/**', 'tests/g1/lib/**', 'tools/codex/**', 'tools/dbus-proxy/**', 'scripts/build-builtin-packages.sh', 'package.json', 'pnpm-lock.yaml', '.github/workflows/g2.yml']
+  pull_request:
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/**', 'packages/**', 'schema/**', 'tests/g2/**', 'tests/g1/lib/**', 'tools/codex/**', 'tools/dbus-proxy/**', 'scripts/build-builtin-packages.sh', 'package.json', 'pnpm-lock.yaml', '.github/workflows/g2.yml']
+jobs:
+  g2:
+    runs-on: [self-hosted, ditto-ci]
+    timeout-minutes: 60
+    env:
+      DITTO_ARTIFACTS: ${{ github.workspace }}/artifacts/g2
+      DITTO_ENVIRONMENT_LABEL: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - run: pnpm install --frozen-lockfile
+      - name: Build Core, the Agent, hostd, the boundary helper and packages
+        run: |
+          cargo build --locked --workspace --bins
+          cargo build --locked --release -p ditto-core -p ditto-confine
+          pnpm -r build
+          bash scripts/build-builtin-packages.sh
+          bash tools/dbus-proxy/build.sh debug
+          bash tools/dbus-proxy/build.sh release
+      # The pinned Codex binary is provisioned on the runner (not in the
+      # repository); without it the Codex suites report not_run, not pass.
+      - name: G2 headless suites
+        run: bash tests/g2/run.sh
+      - name: Pack artifacts
+        if: always()
+        run: tar -czf g2-artifacts.tar.gz --ignore-failed-read artifacts/g2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g2-${{ github.run_id }}
+          path: g2-artifacts.tar.gz
+          retention-days: 30

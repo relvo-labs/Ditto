@@ -18,13 +18,15 @@ export async function startProvider(decide){
   const requests=[],hanging=new Set(),closed=[]
   let count=0
   const server=http.createServer((req,res)=>{
-    let body='';req.on('data',c=>body+=c);req.on('end',()=>{
+    let body='';req.on('data',c=>body+=c);req.on('end',async()=>{
       const parsed=body?JSON.parse(body):null
       requests.push({method:req.method,url:req.url,body:parsed,authorization:req.headers.authorization??null})
       if(!req.url.endsWith('/responses')){res.writeHead(404);res.end();return}
       const id='resp-'+(++count)
+      // `decide` may return a promise: a scripted model can wait for the
+      // test to do something between two of its steps.
       let items
-      try{items=decide(parsed)}catch(error){items=[say('mock provider error: '+error.message)]}
+      try{items=await decide(parsed)}catch(error){items=[say('mock provider error: '+error.message)]}
       if(items==='hang'){
         // A model that never finishes: the stream stays open until the
         // client goes away (interrupt, crash) or the server closes.

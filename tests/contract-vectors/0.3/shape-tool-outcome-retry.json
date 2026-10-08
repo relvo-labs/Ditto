@@ -1,0 +1,16 @@
+{
+  "kind": "shape",
+  "description": "shape-tool-outcome-retry",
+  "type": "tool-trace",
+  "valid": false,
+  "value": {
+    "intent_id": "intent-1",
+    "call_id": "call-1",
+    "capability_id": "desktop.changes.propose",
+    "outcome": "retry",
+    "change_id": null,
+    "change_state": null,
+    "committed_revision": null,
+    "recovered": false
+  }
+}
