@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from 'vitest'
-import {CodexBackend,contextInput,type BackendTransport} from '../src/codex.ts'
+import {CodexBackend,contextInput,failureReason,type BackendTransport} from '../src/codex.ts'
 import type {AgentPreferences} from '../../protocol/src/generated/agent-preferences.ts'
 
 const settings:AgentPreferences={revision:1,enabled:true,provider:'codex-app-server',model:'example-model',reasoning_effort:'medium',max_tool_calls:24,turn_timeout_ms:1000,retain_conversations:true}
@@ -142,5 +142,14 @@ describe('Codex delegated-turn adapter',()=>{
     const first=backend.run('one','',settings,[],async()=>({contentItems:[],success:true}),abort.signal)
     await expect(backend.run('two','',settings,[],async()=>({contentItems:[],success:true}),abort.signal)).rejects.toThrow('busy')
     abort.abort();release({account:null});await expect(first).rejects.toThrow('cancelled')
+  })
+})
+
+describe('failed Codex turns',()=>{
+  it('report the closed reason their failure detail maps to',()=>{
+    expect(failureReason({message:'x',codexErrorInfo:'usageLimitExceeded'})).toBe('rate_limited')
+    expect(failureReason({message:'x',codexErrorInfo:{httpConnectionFailed:{httpStatusCode:500}}})).toBe('provider_unavailable')
+    expect(failureReason({message:'x',codexErrorInfo:'internalServerError'})).toBe('provider_unavailable')
+    expect(failureReason(undefined)).toBe('provider_unavailable')
   })
 })

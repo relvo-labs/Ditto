@@ -18,10 +18,16 @@ if(!existsSync(candidate)){console.log(JSON.stringify({ok:false,not_run:'pinned 
 const codex=realpathSync(candidate)
 if(createHash('sha256').update(readFileSync(codex)).digest('hex')!==pin.sha256){console.log(JSON.stringify({ok:false,not_run:'Codex binary differs from pin'}));process.exit(2)}
 
-const provider=await startProvider(()=> 'hang')
+// The driver picks the model's behaviour per scenario through a file.
+let modeFile
+const provider=await startProvider(()=>{
+  let mode='hang';try{mode=readFileSync(modeFile,'utf8').trim()||'hang'}catch{}
+  return mode==='error'?{status:500}:mode
+})
 const root=mkdtempSync(tmpdir()+'/ditto-g2-faults-')
+modeFile=root+'/model-mode'
 const log=openSync(root+'/core.log','w')
-const env={...process.env,DITTO_RUNTIME_DIR:root+'/run',DITTO_DATA_DIR:root+'/store',DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:root+'/result.json',DITTO_G2_PROVIDER_STATE:root+'/provider.json'}
+const env={...process.env,DITTO_RUNTIME_DIR:root+'/run',DITTO_DATA_DIR:root+'/store',DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:root+'/result.json',DITTO_G2_PROVIDER_STATE:root+'/provider.json',DITTO_G2_MODEL_MODE:root+'/model-mode'}
 for(const key of ['DITTO_DEV_TOKEN','DITTO_LAUNCH_SCOPE_PREFIX','DITTO_REQUIRE_QUOTA','WAYFIRE_SOCKET','SWAYSOCK'])delete env[key]
 const child=spawn(resolve(workspace,'target/debug/ditto-core'),['serve','--compositor','fixture',
   '--builtin-packages',resolve(workspace,'target/ditto-packages'),

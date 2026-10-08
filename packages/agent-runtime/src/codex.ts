@@ -50,6 +50,15 @@ interface Active {
  * dynamic tools; Ditto does not wrap it in a second tool-driving model loop.
  * Private ephemeral threads are rehydrated from bounded Core text on restart;
  * historical tool calls are never replayed as requests. */
+/** Codex's failure detail (`turn.error.codexErrorInfo`, a name or a
+ * one-key object) mapped onto Ditto's closed turn reasons. Anything not
+ * recognisably the person's quota is the model service being unavailable. */
+export function failureReason(error:unknown):string{
+  const info=error&&typeof error==='object'?(error as ObjectValue).codexErrorInfo:undefined
+  const name=typeof info==='string'?info:info&&typeof info==='object'?Object.keys(info)[0]??'':''
+  if(name==='usageLimitExceeded')return 'rate_limited'
+  return 'provider_unavailable'
+}
 export class CodexBackend {
   private active?:Active
   private alive=true
@@ -224,7 +233,7 @@ export class CodexBackend {
     }else if(method==='turn/completed'){
       const turn=object(p.turn);if(turn.id!==active.turnId)return
       if(turn.status==='completed'){active.assembler.push({type:'finish',reason:{kind:'stop'}});active.resolve()}
-      else active.reject(new Error(turn.status==='interrupted'?'cancelled':'provider_error'))
+      else active.reject(new Error(turn.status==='interrupted'?'cancelled':failureReason(turn.error)))
     }
   }
   private async request(method:string,raw:unknown):Promise<unknown>{

@@ -46,6 +46,30 @@ try{
   await core.must('agent.runtime.ensure')
   const again=await eventually(async()=>{const r=await core.must('agent.runtime.get');return r.phase==='ready'?r:false})
   verify('a new generation starts confined with a new backend',again&&again.generation>before.generation&&again.isolation_verified&&again.backend_pid!==before.backend_pid)
+  // ④⑤⑥ the model service fails: an HTTP error, a cut connection, and a
+  // model that outlives the turn's model-time budget. Each ends the turn
+  // without success, dispatches nothing, and leaves the desktop alone.
+  const mode=m=>writeFileSync(process.env.DITTO_G2_MODEL_MODE,m)
+  const outage=async(name,key,setup)=>{
+    await setup?.()
+    const started=Date.now()
+    const turn=await core.must('agent.turns.submit',{session_id:session.session_id,client_message_id:key,text:name})
+    const ended=await eventually(async()=>{const t=await core.must('agent.turns.get',{turn_id:turn.turn_id});return terminal.includes(t.state)?t:false},1800)
+    facts[name]=ended&&{state:ended.state,reason:ended.error_reason,ms:Date.now()-started,tools:ended.tool_calls}
+    verify(`${name}: the turn ends without success and no tool ran`,ended&&ended.state!=='succeeded'&&ended.tool_calls===0)
+    verify(`${name}: nothing changed on the desktop`,(await core.must('desktop.profiles.get')).profile.head_revision===head)
+  }
+  await outage('model_http_error','outage-500',()=>mode('error'))
+  await outage('model_connection_cut','outage-drop',()=>mode('drop'))
+  await outage('model_timeout','outage-slow',async()=>{
+    mode('hang')
+    const s=await core.must('agent.settings.describe');const {_meta,...p}=s
+    await core.must('agent.settings.patch',{expected_revision:s.revision,settings:{...p,turn_timeout_ms:3000}})
+  })
+  verify('an unavailable model service is reported as one, not as an interruption',facts.model_http_error?.reason==='provider_unavailable'&&facts.model_connection_cut?.reason==='provider_unavailable')
+  verify('the model timeout is reported as one, within its budget',facts.model_timeout?.reason==='provider_timeout'&&facts.model_timeout.ms<15000)
+  const events2=await core.must('agent.sessions.read',{session_id:session.session_id,offset:0,limit:100})
+  verify('no tool call was recorded in any failed turn',!events2.events.some(e=>e.type==='tool/call'))
   await core.must('agent.runtime.stop')
   report({ok:true,checks,facts});core.close()
 }catch(error){report({ok:false,checks,facts,error:String(error)});process.exitCode=1}

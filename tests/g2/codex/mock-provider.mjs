@@ -27,6 +27,9 @@ export async function startProvider(decide){
       // test to do something between two of its steps.
       let items
       try{items=await decide(parsed)}catch(error){items=[say('mock provider error: '+error.message)]}
+      // An unavailable service: an HTTP error, or the connection cut.
+      if(items&&typeof items==='object'&&!Array.isArray(items)&&items.status){res.writeHead(items.status,{'content-type':'application/json'});res.end(JSON.stringify({error:{message:'scripted outage'}}));return}
+      if(items==='drop'){req.socket.destroy();return}
       if(items==='hang'){
         // A model that never finishes: the stream stays open until the
         // client goes away (interrupt, crash) or the server closes.
