@@ -106,5 +106,6 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     "desktop.context.acquire",
     "desktop.context.preview",
     "desktop.context.release",
+    "desktop.jobs.submit",
     "desktop.approvals.decide",
 ];

@@ -107,6 +107,8 @@ pub struct Core {
     pub agent: Arc<crate::agent_manager::AgentManager>,
     /// Context attached to messages; memory only (G2-CORE-03).
     pub contexts: crate::context::ContextBroker,
+    /// Trusted background jobs (G2-CORE-05).
+    pub jobs: crate::jobs_pool::JobPool,
     pub agent_storage_ready: bool,
     pub session: Arc<Session>,
     pub paths: Paths,
@@ -245,6 +247,11 @@ impl Core {
                 config.paths.state.join("agent"),
             )),
             contexts: crate::context::ContextBroker::default(),
+            // Fixture kinds (CPU loop, memory hog) only in test runs.
+            jobs: crate::jobs_pool::JobPool::new(
+                std::env::var("DITTO_SYSTEM").is_ok_and(|v| v == "none")
+                    || std::env::var("DITTO_TEST_FIXTURE").is_ok_and(|v| v == "1"),
+            ),
             agent_storage_ready,
             session,
             paths: config.paths.clone(),
@@ -275,6 +282,7 @@ impl Core {
         });
         hosts.set_events(Arc::new(Events(Arc::downgrade(&core))));
         crate::outputs::install(&core, config.output_settle);
+        crate::jobs_pool::install(&core);
         // Region rules follow windows that open later (D-40). On its own
         // thread: the compositor event pump never waits on placement.
         let compositor = Arc::clone(&core.compositor);

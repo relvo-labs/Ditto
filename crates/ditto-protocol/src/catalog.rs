@@ -186,6 +186,7 @@ pub const SESSION_POWEROFF: &str = "desktop.session.poweroff";
 pub const JOBS_GET: &str = "desktop.jobs.get";
 pub const JOBS_LIST: &str = "desktop.jobs.list";
 pub const JOBS_CANCEL: &str = "desktop.jobs.cancel";
+pub const JOBS_SUBMIT: &str = "desktop.jobs.submit";
 // tasks
 pub const TASKS_LIST: &str = "desktop.tasks.list";
 pub const TASKS_ADD: &str = "desktop.tasks.add";
@@ -205,6 +206,8 @@ pub mod scope {
     /// Acquiring private context (a file, the clipboard, the screen) at the
     /// person's explicit request.
     pub const CONTEXT: &str = "desktop.context";
+    /// Submitting and cancelling trusted background jobs (G2-CORE-05).
+    pub const JOBS_RUN: &str = "desktop.jobs.run";
     pub const READ: &str = "desktop.read";
     pub const CONFIG: &str = "desktop.config";
     pub const WINDOWS_READ: &str = "desktop.windows.read";
@@ -232,6 +235,7 @@ pub mod scope {
         AGENT_WRITE,
         AGENT_MANAGE,
         CONTEXT,
+        JOBS_RUN,
         READ,
         CONFIG,
         WINDOWS_READ,
@@ -859,9 +863,16 @@ fn definitions() -> Vec<Definition> {
             JOBS_CANCEL,
             schema::<JobIdInput>,
             schema::<Job>,
-            &[s::PLUGINS_MANAGE],
+            &[s::JOBS_RUN],
         )
         .write(Natural, JOBS_GET, true),
+        def(
+            JOBS_SUBMIT,
+            schema::<JobsSubmitInput>,
+            schema::<Job>,
+            &[s::JOBS_RUN],
+        )
+        .write(KeyBased, JOBS_GET, true),
         // ---- tasks (svc.tasks) ------------------------------------------------
         def(
             TASKS_LIST,

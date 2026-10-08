@@ -677,6 +677,9 @@ pub struct SessionActionOutput {
 pub enum JobState {
     Queued,
     Running,
+    /// Cancel was asked of a running job; it ends `cancelled` once its
+    /// worker is gone (or with its real outcome if that came first).
+    Cancelling,
     Succeeded,
     Failed,
     Cancelled,
@@ -694,6 +697,27 @@ pub struct Job {
     pub idempotency_key: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// The subject that submitted it (`agent`, `shell`, `cli`); Core owns
+    /// the job from then on, whoever leaves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    /// What the worker reports it is doing (`hashing 3/12`, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    /// Whether `desktop.jobs.cancel` can stop it now.
+    #[serde(default)]
+    pub cancellable: bool,
+}
+
+/// Trusted job kinds only: the caller names a kind Core knows and gives its
+/// parameters; never an executable, arguments or code.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct JobsSubmitInput {
+    pub kind: String,
+    #[serde(default)]
+    pub params: Value,
+    pub idempotency_key: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

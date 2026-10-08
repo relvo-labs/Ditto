@@ -8,7 +8,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::error::{StoreError, StoreResult};
 
-pub const CURRENT_VERSION: u32 = 2;
+pub const CURRENT_VERSION: u32 = 3;
 
 const V1: &str = r#"
 CREATE TABLE core_meta (
@@ -320,6 +320,34 @@ fn apply(transaction: &Transaction<'_>, version: u32) -> StoreResult<()> {
                 expires_at_ms INTEGER NOT NULL, decided INTEGER NOT NULL DEFAULT 0,
                 consumed INTEGER NOT NULL DEFAULT 0
             );
+        "#)?,
+        // G2-CORE-05: the job table becomes a work queue. New columns and the
+        // `cancelling` state; existing install records keep their meaning.
+        3 => transaction.execute_batch(r#"
+            CREATE TABLE jobs_v3 (
+                job_id           TEXT PRIMARY KEY,
+                kind             TEXT NOT NULL,
+                state            TEXT NOT NULL CHECK (state IN ('queued','running','cancelling','succeeded','failed','cancelled')),
+                progress         REAL,
+                result_json      TEXT,
+                error_key        TEXT,
+                idempotency_key  TEXT UNIQUE,
+                created_at       TEXT NOT NULL,
+                updated_at       TEXT NOT NULL,
+                owner            TEXT,
+                params_json      TEXT,
+                params_hash      TEXT,
+                phase            TEXT,
+                started_at       TEXT,
+                deadline_ms      INTEGER,
+                cancel_requested INTEGER NOT NULL DEFAULT 0,
+                unit             TEXT
+            );
+            INSERT INTO jobs_v3 (job_id, kind, state, progress, result_json, error_key, idempotency_key, created_at, updated_at)
+                SELECT job_id, kind, state, progress, result_json, error_key, idempotency_key, created_at, updated_at FROM jobs;
+            DROP TABLE jobs;
+            ALTER TABLE jobs_v3 RENAME TO jobs;
+            CREATE INDEX jobs_by_state ON jobs(state, created_at);
         "#)?,
         other => return Err(StoreError::Invalid(format!("no migration to {other}"))),
     }

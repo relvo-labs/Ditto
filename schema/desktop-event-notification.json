@@ -621,6 +621,11 @@
     "Job": {
       "additionalProperties": false,
       "properties": {
+        "cancellable": {
+          "default": false,
+          "description": "Whether `desktop.jobs.cancel` can stop it now.",
+          "type": "boolean"
+        },
         "created_at": {
           "type": "string"
         },
@@ -641,6 +646,20 @@
         },
         "kind": {
           "type": "string"
+        },
+        "owner": {
+          "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phase": {
+          "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "progress": {
           "format": "double",
@@ -667,14 +686,23 @@
       "type": "object"
     },
     "JobState": {
-      "enum": [
-        "queued",
-        "running",
-        "succeeded",
-        "failed",
-        "cancelled"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "cancelling",
+          "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+          "type": "string"
+        }
+      ]
     },
     "NotificationItem": {
       "additionalProperties": false,

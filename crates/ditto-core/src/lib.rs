@@ -21,6 +21,7 @@ pub mod exports;
 pub mod fault;
 pub mod hosts;
 pub mod identity;
+pub mod jobs_pool;
 pub mod launcher;
 pub mod log;
 pub mod outputs;

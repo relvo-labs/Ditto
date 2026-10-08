@@ -33,6 +33,11 @@ const findEntry=(value,pkg)=>{
 const provider=await startProvider(body=>{
   const outputs=toolOutputs(body)
   if(userText(body).includes('follow-up'))return [say('好的。')]
+  if(userText(body).includes('verify-plugins')){
+    const outputs=toolOutputs(body)
+    if(!outputs.has('verify'))return [call('desktop__jobs__submit',{kind:'packages.verify',params:{},idempotency_key:'agent-verify-1'},'verify')]
+    return [say(outputs.get('verify').includes('"queued"')||outputs.get('verify').includes('"running"')?'已開始檢查插件。':'無法開始檢查。')]
+  }
   if(userText(body).includes('attached-note'))return [say(userText(body).includes('<ditto_context kind="file" label="plan.txt"')&&userText(body).includes(fileCanary)?'收到附件。':'沒有看到附件。')]
   if(!userText(body).includes(canary))return [say('unexpected request')]
   if(!outputs.has('read-profile'))return [

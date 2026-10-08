@@ -10020,19 +10020,33 @@
       "output_schema": {
         "$defs": {
           "JobState": {
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
-            "type": "string"
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
           }
         },
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "cancellable": {
+            "default": false,
+            "description": "Whether `desktop.jobs.cancel` can stop it now.",
+            "type": "boolean"
+          },
           "created_at": {
             "type": "string"
           },
@@ -10053,6 +10067,20 @@
           },
           "kind": {
             "type": "string"
+          },
+          "owner": {
+            "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "progress": {
             "format": "double",
@@ -13986,19 +14014,33 @@
       "output_schema": {
         "$defs": {
           "JobState": {
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
-            "type": "string"
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
           }
         },
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "cancellable": {
+            "default": false,
+            "description": "Whether `desktop.jobs.cancel` can stop it now.",
+            "type": "boolean"
+          },
           "created_at": {
             "type": "string"
           },
@@ -14019,6 +14061,20 @@
           },
           "kind": {
             "type": "string"
+          },
+          "owner": {
+            "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "progress": {
             "format": "double",
@@ -14087,6 +14143,11 @@
           "Job": {
             "additionalProperties": false,
             "properties": {
+              "cancellable": {
+                "default": false,
+                "description": "Whether `desktop.jobs.cancel` can stop it now.",
+                "type": "boolean"
+              },
               "created_at": {
                 "type": "string"
               },
@@ -14107,6 +14168,20 @@
               },
               "kind": {
                 "type": "string"
+              },
+              "owner": {
+                "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phase": {
+                "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "progress": {
                 "format": "double",
@@ -14133,14 +14208,23 @@
             "type": "object"
           },
           "JobState": {
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
-            "type": "string"
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
           }
         },
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -14208,19 +14292,33 @@
       "output_schema": {
         "$defs": {
           "JobState": {
-            "enum": [
-              "queued",
-              "running",
-              "succeeded",
-              "failed",
-              "cancelled"
-            ],
-            "type": "string"
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
           }
         },
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "cancellable": {
+            "default": false,
+            "description": "Whether `desktop.jobs.cancel` can stop it now.",
+            "type": "boolean"
+          },
           "created_at": {
             "type": "string"
           },
@@ -14241,6 +14339,20 @@
           },
           "kind": {
             "type": "string"
+          },
+          "owner": {
+            "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "progress": {
             "format": "double",
@@ -14270,7 +14382,151 @@
       "provider": "core",
       "readback": "desktop.jobs.get",
       "resource_scope": [
-        "plugins.manage"
+        "desktop.jobs.run"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.jobs.submit",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "key-based",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Trusted job kinds only: the caller names a kind Core knows and gives its\nparameters; never an executable, arguments or code.",
+        "properties": {
+          "idempotency_key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "params": {
+            "default": null
+          }
+        },
+        "required": [
+          "kind",
+          "idempotency_key"
+        ],
+        "title": "JobsSubmitInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "JobState": {
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cancellable": {
+            "default": false,
+            "description": "Whether `desktop.jobs.cancel` can stop it now.",
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "error_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "owner": {
+            "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "result": true,
+          "state": {
+            "$ref": "#/$defs/JobState"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "kind",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.jobs.get",
+      "resource_scope": [
+        "desktop.jobs.run"
       ],
       "timeout_ms": {
         "default_ms": 2000,

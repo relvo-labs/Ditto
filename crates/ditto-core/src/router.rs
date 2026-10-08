@@ -137,6 +137,16 @@ pub fn authorize(
 
 pub fn resolve(core: &Core, contract: &CapabilityContract) -> Resolved {
     let id = contract.capability_id;
+    if id == catalog::JOBS_SUBMIT && !core.jobs.available {
+        return Resolved {
+            provider_label: None,
+            availability: Availability::DependsOnSystem {
+                component: "systemd-user".into(),
+                available: false,
+                reason: Some(UnavailableReason::SystemUnavailable),
+            },
+        };
+    }
     if id.starts_with("agent.") && id != "agent.runtime.get" {
         let storage = !core.agent_storage_ready;
         let process = id.starts_with("agent.providers.") || id == "agent.runtime.ensure";
@@ -885,8 +895,9 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
             })
         }
         catalog::JOBS_CANCEL => {
-            // Installation jobs run to completion in one step; a finished job
-            // cannot be cancelled and a running one does not stop midway.
+            // Pool jobs stop (queued: never start; running: cancelling, then
+            // the worker is stopped). Installation jobs run to completion in
+            // one step and cannot be stopped midway.
             let input: JobIdInput = call.input()?;
             let job = core.read(|connection| jobs::get(connection, &input.job_id))?;
             if matches!(
@@ -898,10 +909,67 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
                     "the job already finished",
                 ));
             }
-            Err(CoreError::conflict(
-                ditto_protocol::ConflictReason::ChangeInProgress,
-                "the job is running and cannot be stopped midway",
-            ))
+            if !jobs::pool_kind(&job.kind) {
+                return Err(CoreError::conflict(
+                    ditto_protocol::ConflictReason::ChangeInProgress,
+                    "the job is running and cannot be stopped midway",
+                ));
+            }
+            let job_id = input.job_id.clone();
+            let job = coordinate(core, &call, move |c| {
+                c.store().write(|tx| jobs::request_cancel(tx, &job_id))
+            })??;
+            core.jobs.wake();
+            core.publish(DesktopEventPayload::JobsUpdated { job: job.clone() });
+            Ok((json!(job), true))
+        }
+        catalog::JOBS_SUBMIT => {
+            let input: ditto_protocol::services::JobsSubmitInput = call.input()?;
+            if !core.jobs.available {
+                return Err(CoreError::unavailable(
+                    UnavailableReason::SystemUnavailable,
+                    "background jobs need a systemd user manager to enforce their limits",
+                ));
+            }
+            if !core.jobs.accepts(&input.kind) {
+                return Err(CoreError::invalid("unknown job kind"));
+            }
+            // Fixture kinds take bounded numbers; real kinds take nothing.
+            let params = match input.kind.as_str() {
+                "test.spin" | "test.sleep" => {
+                    json!({"ms": input.params.get("ms").and_then(Value::as_u64).unwrap_or(1_000).min(120_000)})
+                }
+                "test.memory" => {
+                    json!({"mb": input.params.get("mb").and_then(Value::as_u64).unwrap_or(64).min(4_096)})
+                }
+                _ => json!({}),
+            };
+            let deadline = input
+                .params
+                .get("deadline_ms")
+                .and_then(Value::as_u64)
+                .filter(|_| input.kind.starts_with("test."))
+                .unwrap_or(
+                    crate::jobs_pool::kind_spec(&input.kind)
+                        .map(|s| s.deadline_ms)
+                        .unwrap_or(120_000),
+                );
+            let owner = caller.subject.0.clone();
+            let job = coordinate(core, &call, move |c| {
+                c.store().write(|tx| {
+                    jobs::enqueue(
+                        tx,
+                        &input.kind,
+                        &owner,
+                        &params,
+                        &input.idempotency_key,
+                        deadline,
+                    )
+                })
+            })??;
+            core.jobs.wake();
+            core.publish(DesktopEventPayload::JobsUpdated { job: job.clone() });
+            Ok((json!(job), true))
         }
         catalog::RESCUE_STATUS => {
             empty(&call)?;

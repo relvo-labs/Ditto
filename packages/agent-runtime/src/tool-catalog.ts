@@ -28,7 +28,9 @@ export const TOOL_GUIDE:Readonly<Record<string,string>>=Object.freeze({
   'desktop.outputs.list':'Connected outputs (screens) with size and scale. Needs approval like windows.list.',
   'desktop.workspaces.list':'Workspaces and which is active. Needs approval like windows.list.',
   'desktop.workspaces.get':'One workspace. Needs approval like windows.list.',
-  'desktop.jobs.get':'One background job (install/verification) and its state.',
+  'desktop.jobs.get':'One background job and its state (queued, running, cancelling, succeeded, failed, cancelled), phase and result.',
+  'desktop.jobs.submit':'Start a trusted background job by kind. Available kind: "packages.verify" (re-check every installed plugin package against what was recorded at installation; no parameters). Returns the job at once; it runs in Core\'s pool (at most two at a time) and continues even if this conversation ends. Read its outcome with desktop.jobs.get.',
+  'desktop.jobs.cancel':'Stop a queued or running background job.',
   'desktop.jobs.list':'Recent background jobs.',
   'desktop.tasks.list':'The user\'s to-do items from the tasks service.',
   // ---- changing the desktop -----------------------------------------------------
