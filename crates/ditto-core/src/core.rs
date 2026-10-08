@@ -34,6 +34,7 @@ pub struct CoreConfig {
     pub agent: Option<Specification>,
     /// The Agent's model backend, launched confined by Core (G2-PLAT-04).
     pub agent_backend: Option<crate::agent_backend::BackendSpecification>,
+    pub agent_idle: std::time::Duration,
     pub paths: Paths,
     pub mode: CoreMode,
     pub socket: PathBuf,
@@ -61,6 +62,7 @@ impl CoreConfig {
         Self {
             agent: None,
             agent_backend: None,
+            agent_idle: crate::agent_manager::IDLE,
             paths,
             mode: CoreMode::Normal,
             socket,
@@ -239,13 +241,16 @@ impl Core {
         let compositor = Arc::new(CompositorParticipant::new(Arc::clone(&session)));
         let (sender, receiver) = mpsc::channel::<Work>();
         let core = Arc::new(Core {
-            agent: Arc::new(crate::agent_manager::AgentManager::new(
-                config.agent.clone(),
-                config.agent_backend.clone(),
-                Arc::clone(&registry),
-                config.socket.clone(),
-                config.paths.state.join("agent"),
-            )),
+            agent: Arc::new(
+                crate::agent_manager::AgentManager::new(
+                    config.agent.clone(),
+                    config.agent_backend.clone(),
+                    Arc::clone(&registry),
+                    config.socket.clone(),
+                    config.paths.state.join("agent"),
+                )
+                .with_idle(config.agent_idle),
+            ),
             contexts: crate::context::ContextBroker::default(),
             // Fixture kinds (CPU loop, memory hog) only in test runs.
             jobs: crate::jobs_pool::JobPool::new(

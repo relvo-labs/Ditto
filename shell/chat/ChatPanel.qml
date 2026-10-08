@@ -12,6 +12,19 @@ PanelWindow {
     required property var client
     required property var tokens
     required property var conversation
+    /// The Shell's RpcCounter: marks the first frame this surface shows
+    /// (NFR-02: input → first visible frame).
+    property var counter: null
+    property bool framed: false
+    Connections {
+        target: body.Window.window
+        function onFrameSwapped() {
+            if (!panel.framed && panel.counter) {
+                panel.framed = true;
+                panel.counter.mark("chat.frame");
+            }
+        }
+    }
     /// The character's corner (`bottom_right`, …) and the space it takes.
     property string corner: "bottom_right"
     property int avatarHeight: 250

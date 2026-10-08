@@ -9,6 +9,19 @@ FloatingWindow {
     required property var client
     required property var tokens
     required property var conversation
+    /// The Shell's RpcCounter: marks the first frame this surface shows
+    /// (NFR-02: input → first visible frame).
+    property var counter: null
+    property bool framed: false
+    Connections {
+        target: body.Window.window
+        function onFrameSwapped() {
+            if (!window.framed && window.counter) {
+                window.framed = true;
+                window.counter.mark("chat.frame");
+            }
+        }
+    }
     signal closeRequested()
     signal collapseRequested()
     signal settingsRequested()

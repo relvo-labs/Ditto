@@ -66,24 +66,35 @@ try{
     verify('Core memory flat across cycles (≤10% growth after warm-up): '+JSON.stringify(facts.core_pss_kib),corePss[1]<=corePss[0]*1.1)
     verify('the desktop host survived every cycle',descendants().some(p=>/ditto-hostd/.test(p.cmd)))
     facts.generation=(await runtime()).generation
-  }else{
-    // ③ busy longer than the idle limit: not cut off
+  }else if(process.env.DITTO_G2_MODE==='activity'){
+    // ③ shortened idle limit (20 s): a 45 s turn keeps its Agent; once it
+    // ends, the Agent leaves about 20 s later
     const session=await core.must('agent.sessions.create',{title:'long',idempotency_key:'long'})
-    const long=await core.must('agent.turns.submit',{session_id:session.session_id,client_message_id:'long',text:'long-task',contexts:[]})
+    const long=await core.must('agent.turns.submit',{session_id:session.session_id,client_message_id:'long',text:'long-task'})
     await ready()
-    const started=Date.now()
-    await sleep(320_000)
-    verify('a turn running past five minutes keeps its Agent',(await runtime()).phase==='ready')
-    await core.must('agent.turns.cancel',{turn_id:long.turn_id})
-    await eventually(async()=>['cancelled','failed'].includes((await core.must('agent.turns.get',{turn_id:long.turn_id})).state),300)
-    facts.long_turn_s=Math.round((Date.now()-started)/1000)
-    // ④ then idle: gone after five minutes, within ten seconds
-    const idleFrom=Date.now()
-    await sleep(295_000)
+    await sleep(35_000)
+    verify('a turn running longer than the idle limit keeps its Agent',(await runtime()).phase==='ready'&&(await core.must('agent.turns.get',{turn_id:long.turn_id})).state==='running')
+    const done=await eventually(async()=>{const t=await core.must('agent.turns.get',{turn_id:long.turn_id});return ['succeeded','failed','cancelled'].includes(t.state)?t:false},400)
+    verify('the long turn finished on its own',done&&done.state==='succeeded')
+    const endedAt=Date.now()
+    await sleep(15_000)
+    verify('not released before the idle limit after the turn',(await runtime()).phase==='ready')
+    const gone=await eventually(async()=>{const r=await runtime();return r.phase==='stopped'?r:false},300,100)
+    facts.release_after_turn_s=Math.round((Date.now()-endedAt)/100)/10
+    verify('released within 10 s after the idle limit: '+facts.release_after_turn_s,gone&&facts.release_after_turn_s>=20&&facts.release_after_turn_s<=30)
+    await sleep(500)
+    verify('no Agent process left',agentProcesses().length===0)
+  }else{
+    // ④ real time: an Agent with nothing to do leaves 5 min after it was
+    // last used, within 10 s
+    await core.must('agent.runtime.ensure')
+    await ready()
+    const from=Date.now()
+    await sleep(290_000)
     verify('still there just before five idle minutes',(await runtime()).phase==='ready')
-    const gone=await eventually(async()=>{const r=await runtime();return r.phase==='stopped'?r:false},200,100)
-    facts.idle_release_s=Math.round((Date.now()-idleFrom)/100)/10
-    verify('released between 300 and 310 s after the last activity: '+facts.idle_release_s,gone&&facts.idle_release_s>=300&&facts.idle_release_s<=310)
+    const gone=await eventually(async()=>{const r=await runtime();return r.phase==='stopped'?r:false},300,100)
+    facts.idle_release_s=Math.round((Date.now()-from)/100)/10
+    verify('released between 300 and 310 s after it was last used: '+facts.idle_release_s,gone&&facts.idle_release_s>=300&&facts.idle_release_s<=310)
     await sleep(500)
     verify('no Agent process left after the idle exit',agentProcesses().length===0)
   }

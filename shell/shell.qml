@@ -186,6 +186,7 @@ ShellRoot {
             if (chat.open) {
                 chat.open = false;
             } else {
+                rpcCounter.mark("chat.open");
                 root.openChat();
             }
             return;
@@ -464,6 +465,7 @@ ShellRoot {
             client: root.shellClient
             tokens: root.shellTokens
             conversation: root.shellConversation
+            counter: rpcCounter
             onCloseRequested: chat.open = false
             onCollapseRequested: chat.mode = "panel"
             onSettingsRequested: root.openAiSettings()
@@ -481,6 +483,7 @@ ShellRoot {
             screen: root.avatarScreen
             corner: root.avatarCorner
             avatarHeight: avatarLoader.item ? avatarLoader.item.implicitHeight : 0
+            counter: rpcCounter
             onCloseRequested: chat.open = false
             onExpandRequested: chat.mode = "window"
             onSettingsRequested: root.openAiSettings()

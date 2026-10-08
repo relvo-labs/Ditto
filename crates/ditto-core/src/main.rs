@@ -38,6 +38,7 @@ struct Options {
     agent: Option<String>,
     agent_backend: Option<String>,
     agent_backend_test_provider: Option<String>,
+    agent_idle_test_seconds: Option<u64>,
     rescue_ui: Option<String>,
     lock: Option<String>,
     launches: Vec<String>,
@@ -70,6 +71,7 @@ fn parse_options() -> io::Result<Options> {
         agent: None,
         agent_backend: None,
         agent_backend_test_provider: None,
+        agent_idle_test_seconds: None,
         rescue_ui: None,
         lock: None,
         launches: Vec::new(),
@@ -99,6 +101,9 @@ fn parse_options() -> io::Result<Options> {
             "--agent" => options.agent = Some(value()?),
             "--agent-backend" => options.agent_backend = Some(value()?),
             "--agent-backend-test-provider" => options.agent_backend_test_provider = Some(value()?),
+            "--agent-idle-test-seconds" => {
+                options.agent_idle_test_seconds = Some(value()?.parse().map_err(|_| usage())?)
+            }
             "--rescue-ui" => options.rescue_ui = Some(value()?),
             "--lock" => options.lock = Some(value()?),
             "--launch" => options.launches.push(value()?),
@@ -290,6 +295,15 @@ fn main() -> io::Result<()> {
         };
         backend.test_provider = Some(ditto_core::agent_backend::parse_test_provider(url)?);
         ditto_core::log::event("agent.test_provider", &[("url", url.as_str())]);
+    }
+    if let Some(seconds) = options.agent_idle_test_seconds {
+        if !matches!(options.compositor, Compositor::Fixture) || seconds == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "--agent-idle-test-seconds is for the fixture compositor only",
+            ));
+        }
+        config.agent_idle = Duration::from_secs(seconds);
     }
     config.rescue_ui = spec(&options.rescue_ui)?;
     config.lock = spec(&options.lock)?;

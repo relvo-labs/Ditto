@@ -35,11 +35,24 @@ pub struct AgentManager {
     state: Mutex<State>,
     specification: Option<Specification>,
     backend: Option<BackendSpecification>,
+    /// Release after this long without activity (RUN-03: five minutes).
+    idle: Duration,
     registry: Arc<IdentityRegistry>,
     socket: std::path::PathBuf,
     state_root: std::path::PathBuf,
 }
+/// RUN-03: an Agent with nothing to do leaves after five minutes.
+pub const IDLE: Duration = Duration::from_secs(300);
+
 impl AgentManager {
+    /// Test fixtures only (Core's `--agent-idle-test-seconds` needs the
+    /// fixture compositor): a shorter idle limit for the activity logic.
+    /// The exit criterion is measured with the real five minutes.
+    pub fn with_idle(mut self, idle: Duration) -> Self {
+        self.idle = idle;
+        self
+    }
+
     pub fn new(
         specification: Option<Specification>,
         backend: Option<BackendSpecification>,
@@ -65,6 +78,7 @@ impl AgentManager {
             }),
             specification,
             backend,
+            idle: IDLE,
             registry,
             socket,
             state_root,
@@ -299,7 +313,7 @@ impl AgentManager {
         }
         if s.phase == RuntimePhase::Ready
             && s.active.is_empty()
-            && s.last_activity.elapsed() >= Duration::from_secs(300)
+            && s.last_activity.elapsed() >= self.idle
         {
             if let Some(p) = &s.peer {
                 p.notify("agent.controller.stop", serde_json::json!({}));

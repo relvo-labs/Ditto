@@ -10,7 +10,7 @@ import {mkdtempSync,openSync,closeSync,readFileSync,existsSync,rmSync,chmodSync,
 import {tmpdir,homedir} from 'node:os'
 import {resolve,join} from 'node:path'
 import {fileURLToPath} from 'node:url'
-import {startProvider,say} from '../codex/mock-provider.mjs'
+import {startProvider,say,slowSay} from '../codex/mock-provider.mjs'
 
 const mode=process.argv[2]??'quick'
 const workspace=fileURLToPath(new URL('../../../',import.meta.url))
@@ -19,7 +19,9 @@ const codex=realpathSync(process.env.DITTO_CODEX_BINARY??join(homedir(),'.local/
 if(createHash('sha256').update(readFileSync(codex)).digest('hex')!==pin.sha256){console.log(JSON.stringify({ok:false,not_run:'Codex binary differs from pin'}));process.exit(2)}
 // A model that answers after a long time, for the "busy longer than idle"
 // case; otherwise at once.
-const provider=await startProvider(body=>JSON.stringify(body.input).includes('long-task')?'hang':[say('好。')])
+// "long-task": an answer that streams for 45 s (longer than the shortened
+// idle limit of the activity mode); otherwise an answer at once.
+const provider=await startProvider(body=>JSON.stringify(body.input).includes('long-task')?[slowSay(Array.from({length:45},(_,i)=>`第${i}段。`),1000)]:[say('好。')])
 const root=mkdtempSync(tmpdir()+'/ditto-g2-life-')
 const log=openSync(root+'/core.log','w')
 const env={...process.env,DITTO_RUNTIME_DIR:root+'/run',DITTO_DATA_DIR:root+'/store',DITTO_SYSTEM:'none',DITTO_G2_TEST_OUT:root+'/result.json',DITTO_G2_MODE:mode}
@@ -30,6 +32,7 @@ const child=spawn(resolve(workspace,'target/debug/ditto-core'),['serve','--compo
   '--agent',`agent 0.3.0 ${process.execPath} ${resolve(workspace,'packages/agent-runtime/dist/ditto-agentd.mjs')}`,
   '--agent-backend',`codex-app-server ${pin.version} ${pin.sha256} ${codex}`,
   '--agent-backend-test-provider',`http://127.0.0.1:${provider.port}/v1`,
+  ...(mode==='activity'?['--agent-idle-test-seconds','20']:[]),
   '--launch',`dittoctl 0.3.0 ${process.execPath} ${resolve(workspace,'tests/g2/lifecycle/driver.mjs')}`,
 ],{env,stdio:['ignore',log,log],detached:true})
 closeSync(log)
