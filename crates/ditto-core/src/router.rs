@@ -1785,6 +1785,9 @@ pub const CORE_COMMANDS: &[(&str, &str)] = &[
     ("plugins.open", "command.plugins.open"),
     ("history.open", "command.history.open"),
     ("personalization.open", "command.personalization.open"),
+    // The chat has a way in without the character (AVA-07).
+    ("chat.toggle", "command.chat.toggle"),
+    ("ai_settings.open", "command.ai_settings.open"),
 ];
 
 fn commands(core: &Core) -> Result<Vec<CommandInfo>, CoreError> {
@@ -1794,7 +1797,7 @@ fn commands(core: &Core) -> Result<Vec<CommandInfo>, CoreError> {
         .iter()
         .map(|(id, key)| CommandInfo {
             command_id: (*id).into(),
-            owner: if id.ends_with(".open") && *id != "rescue.open" {
+            owner: if (id.ends_with(".open") || id.starts_with("chat.")) && *id != "rescue.open" {
                 "shell".into()
             } else {
                 "core".into()

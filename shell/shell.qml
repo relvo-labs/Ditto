@@ -64,7 +64,7 @@ ShellRoot {
     /// groups it sits in, innermost first. Only names are read; nothing is
     /// pressed and nothing is sent to Core.
     function focusReport() {
-        const window = approvalLoader.item || centersLoader.item;
+        const window = approvalLoader.item || centersLoader.item || chatLoader.item || chatPanelLoader.item;
         if (!window || (window === centersLoader.item && !centers.open)) {
             return { open: false };
         }
@@ -189,13 +189,24 @@ ShellRoot {
                 root.openChat();
             }
             return;
+        case "ai_settings.open":
+            root.openAiSettings();
+            return;
         }
         console.log("ditto-shell ignored command " + commandId);
     }
 
-    function openChat() {
+    /// The chat opens beside the character, or as a window when there is no
+    /// character to sit beside (AVA-07: every way in works without it).
+    function openChat(mode) {
         conversation.open();
+        chat.mode = mode || (chat.open ? chat.mode : (avatarLoader.item && avatarLoader.item.visible ? "panel" : "window"));
         chat.open = true;
+        // Already open: bring the keyboard back to the message field.
+        const surface = chat.mode === "panel" ? chatPanelLoader.item : chatLoader.item;
+        if (surface) {
+            surface.requestFocus();
+        }
     }
 
     /// What the `chat` control line answers: what the chat shows, read from
@@ -204,6 +215,10 @@ ShellRoot {
         const last = conversation.events.filter(event => event.type === "assistant/message").slice(-1)[0];
         return {
             open: chat.open,
+            mode: chat.mode,
+            streaming: conversation.streamText.length,
+            sessions: conversation.sessions.length,
+            draft: conversation.draft,
             state: conversation.taskState,
             text: conversation.stateText,
             enabled: conversation.enabled,
@@ -333,6 +348,7 @@ ShellRoot {
             client: root.shellClient
             tokens: root.shellTokens
             providers: root.shellProviders
+            conversation: root.shellConversation
             page: centers.page
             onCloseRequested: centers.open = false
             onPageChanged: centers.page = page
@@ -342,6 +358,13 @@ ShellRoot {
     QtObject {
         id: chat
         property bool open: false
+        /// "panel" (beside the character) or "window"; switching changes
+        /// only the presentation of the one conversation state.
+        property string mode: "panel"
+    }
+
+    function openAiSettings() {
+        centers.show("ai");
     }
 
     /// Agent approval requests waiting for this person, oldest first. Each is
@@ -431,17 +454,36 @@ ShellRoot {
         }
     }
 
-    /// The chat window exists only while open. Closing it does not stop a
-    /// running turn: that is Core's, and only 「停止」 cancels it.
+    /// The chat exists only while open. Closing it does not stop a running
+    /// turn: that is Core's, and only 「停止」 cancels it.
     LazyLoader {
         id: chatLoader
-        active: chat.open
+        active: chat.open && chat.mode === "window"
 
         ChatWindow {
             client: root.shellClient
             tokens: root.shellTokens
             conversation: root.shellConversation
             onCloseRequested: chat.open = false
+            onCollapseRequested: chat.mode = "panel"
+            onSettingsRequested: root.openAiSettings()
+        }
+    }
+
+    LazyLoader {
+        id: chatPanelLoader
+        active: chat.open && chat.mode === "panel"
+
+        ChatPanel {
+            client: root.shellClient
+            tokens: root.shellTokens
+            conversation: root.shellConversation
+            screen: root.avatarScreen
+            corner: root.avatarCorner
+            avatarHeight: avatarLoader.item ? avatarLoader.item.implicitHeight : 0
+            onCloseRequested: chat.open = false
+            onExpandRequested: chat.mode = "window"
+            onSettingsRequested: root.openAiSettings()
         }
     }
 
@@ -529,7 +571,8 @@ ShellRoot {
                 tokens: avatarSurface.desktopTokens
                 tr: translator
                 animations: !root.avatarSettings || root.avatarSettings.animations !== false
-                onPressed: root.openChat()
+                avatarState: conversation.wanted ? conversation.taskState : "idle"
+                onPressed: root.openChat("panel")
             }
 
             /// The character's state is readable as text from the first day, so the
@@ -641,6 +684,9 @@ ShellRoot {
                     } else if (command[0] === "chat") {
                         connection.write(JSON.stringify(root.chatReport()) + "\n");
                         connection.flush();
+                    } else if (command[0] === "chat-mode" && command.length === 2) {
+                        // The same route as the 展開／收合 buttons.
+                        chat.mode = command[1] === "window" ? "window" : "panel";
                     } else if (command[0] === "chat-send" && command.length > 1) {
                         // The same route as typing and pressing Enter.
                         root.openChat();

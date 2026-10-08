@@ -3,13 +3,16 @@
 // JSON line. Scenario: read the profile, set the accent on its head
 // revision, report from the real tool result.
 import {appendFileSync} from 'node:fs'
-import {startProvider,toolOutputs,userText,call,say} from './mock-provider.mjs'
+import {startProvider,toolOutputs,userText,call,say,slowSay} from './mock-provider.mjs'
 
 const log=process.argv[2]
 const accent=process.argv[3]??'#3366ff'
 const provider=await startProvider(body=>{
   appendFileSync(log,JSON.stringify(body)+'\n')
   const outputs=toolOutputs(body)
+  if(userText(body).includes('慢慢說')){
+    return [slowSay(['好的，','我會','一點一點','回答，','這是','串流','測試。'],400)]
+  }
   if(userText(body).includes('附件')){
     const input=JSON.stringify(body.input)
     if(input.includes('input_image'))return [say('收到截圖。')]

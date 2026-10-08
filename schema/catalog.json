@@ -21450,6 +21450,62 @@
         "kind": "always"
       },
       "cancellable": false,
+      "capability_id": "agent.turns.stream",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "At most 4 KiB per call; the controller batches about every 50 ms.",
+            "type": "string"
+          },
+          "turn_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "text"
+        ],
+        "title": "TurnStreamInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "agent.sessions.write"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
       "capability_id": "agent.credentials.create",
       "claimable": false,
       "errors": [

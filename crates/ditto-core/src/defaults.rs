@@ -92,10 +92,16 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
             regions: vec![],
         },
         appearance: appearance(),
-        shortcuts: vec![ShortcutBinding {
-            chord: "Super+Space".into(),
-            command: "launcher.toggle".into(),
-        }],
+        shortcuts: vec![
+            ShortcutBinding {
+                chord: "Super+Space".into(),
+                command: "launcher.toggle".into(),
+            },
+            ShortcutBinding {
+                chord: "Super+A".into(),
+                command: "chat.toggle".into(),
+            },
+        ],
         avatar: AvatarSettings::default(),
     }
 }

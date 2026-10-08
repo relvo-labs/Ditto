@@ -9,6 +9,8 @@ const sse=(res,events)=>{
   res.end()
 }
 const call=(name,args,id)=>({type:'function_call',name,arguments:JSON.stringify(args),call_id:id})
+/** An answer streamed in pieces, `delay` ms apart. */
+const slowSay=(pieces,delay)=>({type:'message',role:'assistant',id:'msg-'+Math.random().toString(36).slice(2),_stream:pieces,_delay:delay})
 const say=text=>({type:'message',role:'assistant',id:'msg-'+Math.random().toString(36).slice(2),content:[{type:'output_text',text}]})
 
 /** `decide(body)` returns the output items of one model response. */
@@ -31,6 +33,26 @@ export async function startProvider(decide){
         hanging.add(res);res.on('close',()=>{hanging.delete(res);closed.push(id)})
         return
       }
+      const streamed=items.find(item=>item._stream)
+      if(streamed){
+        // An answer written a piece at a time, as a real model streams it.
+        res.writeHead(200,{'content-type':'text/event-stream'})
+        const send=o=>res.write(`event: ${o.type}\ndata: ${JSON.stringify(o)}\n\n`)
+        send({type:'response.created',response:{id}})
+        const {_stream:pieces,_delay:delay,...item}=streamed
+        send({type:'response.output_item.added',output_index:0,item:{...item,content:[]}})
+        let i=0
+        const next=()=>{
+          if(i<pieces.length){send({type:'response.output_text.delta',item_id:item.id,output_index:0,content_index:0,delta:pieces[i++]});setTimeout(next,delay)}
+          else{
+            send({type:'response.output_item.done',output_index:0,item:{...item,content:[{type:'output_text',text:pieces.join('')}]}})
+            send({type:'response.completed',response:{id,usage:{input_tokens:100,input_tokens_details:null,output_tokens:20,output_tokens_details:null,total_tokens:120}}})
+            res.end()
+          }
+        }
+        next()
+        return
+      }
       sse(res,[{type:'response.created',response:{id}},...items.map(item=>({type:'response.output_item.done',item})),
         {type:'response.completed',response:{id,usage:{input_tokens:100,input_tokens_details:null,output_tokens:20,output_tokens_details:null,total_tokens:120}}}])
     })
@@ -51,4 +73,4 @@ export function userText(body){
   for(const item of body?.input??[])if(item.type==='message'&&item.role==='user')for(const part of item.content??[])if(part.type==='input_text')texts.push(part.text)
   return texts.join('\n')
 }
-export {call,say}
+export {call,say,slowSay}

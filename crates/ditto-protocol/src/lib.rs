@@ -280,6 +280,14 @@ pub enum DesktopEventPayload {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         deleted: bool,
     },
+    /// Answer text as it streams. Not stored: the turn's final
+    /// `assistant/message` is the record; a surface that missed deltas waits
+    /// for it.
+    ConversationDelta {
+        session_id: String,
+        turn_id: String,
+        text: String,
+    },
 }
 
 impl DesktopEventPayload {
@@ -304,7 +312,9 @@ impl DesktopEventPayload {
             Self::HostEvent { name, .. } if name.starts_with("tasks/") => EventTopic::Tasks,
             Self::HostEvent { .. } => EventTopic::Plugins,
             Self::SessionChanged { .. } => EventTopic::Session,
-            Self::ConversationUpdated { .. } => EventTopic::Conversations,
+            Self::ConversationUpdated { .. } | Self::ConversationDelta { .. } => {
+                EventTopic::Conversations
+            }
         })
     }
 }

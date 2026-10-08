@@ -158,6 +158,14 @@ pub struct AgentPreferences {
     pub endpoint: Option<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TurnStreamInput {
+    pub turn_id: String,
+    /// At most 4 KiB per call; the controller batches about every 50 ms.
+    pub text: String,
+}
+
 // ---- credentials (G2-CORE-04) -------------------------------------------------
 
 /// A new API key from the person's settings form. The value goes straight

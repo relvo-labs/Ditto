@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "text": {
+      "description": "At most 4 KiB per call; the controller batches about every 50 ms.",
+      "type": "string"
+    },
+    "turn_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "turn_id",
+    "text"
+  ],
+  "title": "TurnStreamInput",
+  "type": "object"
+}

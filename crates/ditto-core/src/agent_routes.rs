@@ -433,6 +433,25 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             announce_turn(core, &approval.request.turn_id);
             written(approval)
         }
+        "agent.turns.stream" => {
+            let input: TurnStreamInput = call.input()?;
+            if input.text.len() > 4096 {
+                return Err(CoreError::invalid("stream batch exceeds 4 KiB"));
+            }
+            let turn = core.read(|c| turns::owner(c, &input.turn_id, &owner))?;
+            if !matches!(turn.state, TurnState::Running | TurnState::AwaitingApproval) {
+                return Err(CoreError::conflict(
+                    ditto_protocol::ConflictReason::AlreadyTerminal,
+                    "turn ended",
+                ));
+            }
+            core.publish(ditto_protocol::DesktopEventPayload::ConversationDelta {
+                session_id: turn.session_id,
+                turn_id: turn.turn_id,
+                text: input.text,
+            });
+            ok(ditto_protocol::Empty {})
+        }
         "agent.credentials.create" => {
             let input: CredentialCreateInput = call.input()?;
             if input.provider != "direct-model"

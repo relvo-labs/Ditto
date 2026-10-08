@@ -94,6 +94,13 @@ export type DesktopEventPayload =
       turn_state?: TurnState | null;
       type: 'conversation_updated';
       [k: string]: unknown;
+    }
+  | {
+      session_id: string;
+      text: string;
+      turn_id: string;
+      type: 'conversation_delta';
+      [k: string]: unknown;
     };
 /**
  * An opaque identifier valid only for the current compositor session.

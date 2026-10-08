@@ -606,6 +606,31 @@
             "next_seq"
           ],
           "type": "object"
+        },
+        {
+          "description": "Answer text as it streams. Not stored: the turn's final\n`assistant/message` is the record; a surface that missed deltas waits\nfor it.",
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "turn_id": {
+              "type": "string"
+            },
+            "type": {
+              "const": "conversation_delta",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session_id",
+            "turn_id",
+            "text"
+          ],
+          "type": "object"
         }
       ]
     },

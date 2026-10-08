@@ -37,6 +37,8 @@
   "change.title.plugin_state": "啟用或停用插件",
   "change.title.profile_switch": "切換組合",
   "change.title.provider_swap": "更換桌面元件",
+  "command.ai_settings.open": "開啟 AI 設定",
+  "command.chat.toggle": "開關 Ditto 對話",
   "command.composition.open": "開啟組合中心",
   "command.history.open": "開啟變更紀錄",
   "command.launcher.toggle": "開啟或關閉啟動器",

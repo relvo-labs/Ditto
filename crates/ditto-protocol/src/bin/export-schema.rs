@@ -103,6 +103,7 @@ fn main() -> std::io::Result<()> {
         "context-payload" => ContextPayload,
         "approvals-list-output" => ApprovalsListOutput,
         "credential-create-input" => CredentialCreateInput,
+        "turn-stream-input" => TurnStreamInput,
         "credential-ref-input" => CredentialRefInput,
         "credential-status" => CredentialStatus,
         "credential-resolve-input" => CredentialResolveInput,

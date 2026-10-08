@@ -29,6 +29,30 @@ const controllerPlugin={name:'ditto-agent-controller',inject:['agentSessions','a
   ctx.on('agent/text',()=>{})
 }}
 
+/** Batches answer text for the Shell: about every 50 ms, at most 4 KiB a
+ * call (split on a character boundary). Display only; lost batches are made
+ * good by the stored answer at the end of the turn. */
+export class StreamBatcher {
+  private buffer=''
+  private timer?:NodeJS.Timeout
+  constructor(private send:(text:string)=>void,private interval=50){}
+  push(delta:string):void{
+    this.buffer+=delta
+    if(Buffer.byteLength(this.buffer)>=4096)this.flush()
+    else if(!this.timer){this.timer=setTimeout(()=>this.flush(),this.interval);this.timer.unref()}
+  }
+  flush():void{
+    if(this.timer){clearTimeout(this.timer);this.timer=undefined}
+    while(this.buffer){
+      let cut=this.buffer.length
+      while(Buffer.byteLength(this.buffer.slice(0,cut))>4096)cut=Math.floor(cut*0.9)
+      // Do not split a surrogate pair.
+      if(cut<this.buffer.length&&/[\uD800-\uDBFF]/.test(this.buffer[cut-1]!))cut--
+      this.send(this.buffer.slice(0,cut));this.buffer=this.buffer.slice(cut)
+    }
+  }
+}
+
 /** Core's records of this conversation's latest changes, as compact text
  * for the model: the targets a follow-up ("a bit narrower") refers to. */
 export function recentChangesText(changes:TurnClaimOutput['recent_changes']):string{
@@ -108,10 +132,12 @@ export class AgentRuntime {
       if(recent)history+=(history?'\n':'')+recent
       const tools=await this.root.agentTools.desktop.discover()
       const execute=(callId:string,name:string,args:unknown)=>this.root.agentTools.desktop.execute(turnId,callId,name,args,abort.signal)
-      const onText=(delta:string)=>{this.root.emit('agent/text',turnId,delta)}
+      const stream=new StreamBatcher(text=>{void this.core.request('agent.turns.stream',{turn_id:turnId,text}).catch(()=>{})})
+      const onText=(delta:string)=>{this.root.emit('agent/text',turnId,delta);stream.push(delta)}
       const output=direct
         ?await this.direct.run(turnId,claim.text,history,claim.settings,tools,execute,abort.signal,onText,claim.contexts??[])
         :await this.backend!.run(claim.text,history,claim.settings,tools,execute,abort.signal,onText,claim.contexts??[])
+      stream.flush()
       await handle.append('model/selection',{turn_id:turnId,provider:claim.settings.provider,model:output.model,settings_revision:claim.settings.revision})
       if(output.text)await handle.append('assistant/message',{turn_id:turnId,text:output.text,...(output.usage?{usage:output.usage}:{})})
       await handle.flush();state=output.interrupted?'cancelled':'succeeded'

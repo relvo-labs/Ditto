@@ -73,7 +73,7 @@ const REQUIRED_KEYS = [
   'diagnostics.shared_host_no_per_plugin_memory',
   'layout.strategy.floating', 'layout.strategy.simple-tile',
   'command.composition.open', 'command.history.open', 'command.launcher.toggle', 'command.personalization.open',
-  'command.plugins.open', 'command.rescue.open', 'command.session.lock',
+  'command.plugins.open', 'command.rescue.open', 'command.session.lock', 'command.chat.toggle', 'command.ai_settings.open',
   'shortcut.command_failed',
   // slot names (Tr.slotName)
   ...['ui.panel_top', 'ui.dock', 'ui.launcher', 'ui.tasks_panel', 'ui.notifications', 'layout.strategy', 'svc.tasks',

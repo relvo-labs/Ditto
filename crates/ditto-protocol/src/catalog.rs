@@ -1148,6 +1148,12 @@ fn agent_definitions() -> Vec<Definition> {
             &[s::AGENT_READ],
         ),
         def(
+            "agent.turns.stream",
+            schema::<TurnStreamInput>,
+            schema::<Empty>,
+            &[s::AGENT_WRITE],
+        ),
+        def(
             "agent.credentials.create",
             schema::<CredentialCreateInput>,
             schema::<CredentialStatus>,

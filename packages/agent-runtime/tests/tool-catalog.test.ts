@@ -33,3 +33,17 @@ describe('recent changes context',()=>{
     expect(recentChangesText([])).toBe('')
   })
 })
+
+import {StreamBatcher} from '../src/runtime.ts'
+describe('stream batching',()=>{
+  it('groups deltas and never sends more than 4 KiB at once',async()=>{
+    const sent:string[]=[]
+    const batcher=new StreamBatcher(t=>sent.push(t),10)
+    batcher.push('你');batcher.push('好')
+    await new Promise(r=>setTimeout(r,30))
+    expect(sent).toEqual(['你好'])
+    batcher.push('字'.repeat(3000));batcher.flush()
+    expect(sent.slice(1).every(t=>Buffer.byteLength(t)<=4096)).toBe(true)
+    expect(sent.slice(1).join('')).toBe('字'.repeat(3000))
+  })
+})

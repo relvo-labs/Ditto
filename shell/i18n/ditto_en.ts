@@ -2,6 +2,149 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en" sourcelanguage="zh_TW">
 <context>
+    <name>AISettings</name>
+    <message>
+        <source>AI 對話</source>
+        <translation>AI chat</translation>
+    </message>
+    <message>
+        <source>AI 設定</source>
+        <translation>AI settings</translation>
+    </message>
+    <message>
+        <source>API 金鑰</source>
+        <translation>API key</translation>
+    </message>
+    <message>
+        <source>API 金鑰連線</source>
+        <translation>API key connection</translation>
+    </message>
+    <message>
+        <source>Codex 訂閱</source>
+        <translation>Codex subscription</translation>
+    </message>
+    <message>
+        <source>Ditto 想用尚未授權的能力（例如讀取視窗清單）時：詢問你一次，或一律不詢問並拒絕。可逆的桌面設定不會每次詢問。</source>
+        <translation>When Ditto wants something it is not yet allowed to do (such as reading the window list): ask you once, or never ask and refuse. Reversible desktop settings are not asked about each time.</translation>
+    </message>
+    <message>
+        <source>不要詢問，直接拒絕</source>
+        <translation>Never ask; refuse</translation>
+    </message>
+    <message>
+        <source>使用 Codex 訂閱登入</source>
+        <translation>Sign in with your Codex subscription</translation>
+    </message>
+    <message>
+        <source>儲存並使用</source>
+        <translation>Save and use</translation>
+    </message>
+    <message>
+        <source>取消登入</source>
+        <translation>Cancel sign-in</translation>
+    </message>
+    <message>
+        <source>啟用 AI 對話</source>
+        <translation>Turn on AI chat</translation>
+    </message>
+    <message>
+        <source>在瀏覽器以官方頁面登入。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</source>
+        <translation>Sign in on the official page in your browser. The sign-in is kept in the system keyring; Ditto does not read or show it. When the quota runs out Ditto waits for it to reset and never switches to the paid API.</translation>
+    </message>
+    <message>
+        <source>尚未登入</source>
+        <translation>Not signed in</translation>
+    </message>
+    <message>
+        <source>尚未連線；開啟 AI 對話後會在需要時啟動。</source>
+        <translation>Not connected; starts when needed once AI chat is on.</translation>
+    </message>
+    <message>
+        <source>尚無配額資料</source>
+        <translation>No quota data yet</translation>
+    </message>
+    <message>
+        <source>已儲存；輸入新金鑰以更換</source>
+        <translation>Saved; type a new key to replace it</translation>
+    </message>
+    <message>
+        <source>已存入鑰匙圈。</source>
+        <translation>Saved in the keyring.</translation>
+    </message>
+    <message>
+        <source>已登入：%1</source>
+        <translation>Signed in: %1</translation>
+    </message>
+    <message>
+        <source>思考深度</source>
+        <translation>Reasoning effort</translation>
+    </message>
+    <message>
+        <source>未知</source>
+        <translation>unknown</translation>
+    </message>
+    <message>
+        <source>模型</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>模型名稱</source>
+        <translation>Model name</translation>
+    </message>
+    <message>
+        <source>登出</source>
+        <translation>Log out</translation>
+    </message>
+    <message>
+        <source>確認方式</source>
+        <translation>Confirmations</translation>
+    </message>
+    <message>
+        <source>端點</source>
+        <translation>Endpoint</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>詢問我</source>
+        <translation>Ask me</translation>
+    </message>
+    <message>
+        <source>請在瀏覽器完成登入。</source>
+        <translation>Finish signing in in your browser.</translation>
+    </message>
+    <message>
+        <source>連接方式</source>
+        <translation>Connection</translation>
+    </message>
+    <message>
+        <source>金鑰直接存進系統鑰匙圈，設定裡只留它的代號；端點必須是 HTTPS（本機除外）。費用依供應商計價，Ditto 尚無費率資料。</source>
+        <translation>The key goes straight into the system keyring; settings keep only a reference to it. The endpoint must be HTTPS (except on this machine). Costs follow the provider&apos;s pricing; Ditto has no rate data.</translation>
+    </message>
+    <message>
+        <source>開</source>
+        <translation>On</translation>
+    </message>
+    <message>
+        <source>關</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>關閉時不連接模型；桌面、設定中心與救援照常使用。</source>
+        <translation>When off, no model is connected; the desktop, settings and rescue work as usual.</translation>
+    </message>
+    <message>
+        <source>額度已用 %1%，%2 重設</source>
+        <translation>%1% of quota used, resets %2</translation>
+    </message>
+    <message>
+        <source>（未提供帳號名稱）</source>
+        <translation>(no account name given)</translation>
+    </message>
+</context>
+<context>
     <name>ApprovalWindow</name>
     <message>
         <source>Agent 的說明（未經驗證）：</source>
@@ -81,6 +224,10 @@
 </context>
 <context>
     <name>Centers</name>
+    <message>
+        <source>AI 設定</source>
+        <translation>AI settings</translation>
+    </message>
     <message>
         <source>Ditto 設定</source>
         <translation>Ditto settings</translation>
@@ -409,7 +556,11 @@
     </message>
 </context>
 <context>
-    <name>ChatWindow</name>
+    <name>ChatBody</name>
+    <message>
+        <source>%1（%2）</source>
+        <translation>%1 (%2)</translation>
+    </message>
     <message>
         <source>%1：%2</source>
         <translation>%1: %2</translation>
@@ -419,8 +570,16 @@
         <translation>AI chat is off. The model is connected only after you turn it on.</translation>
     </message>
     <message>
+        <source>AI 設定</source>
+        <translation>AI settings</translation>
+    </message>
+    <message>
         <source>Ditto 對話</source>
         <translation>Ditto chat</translation>
+    </message>
+    <message>
+        <source>Ditto 正在回答：</source>
+        <translation>Ditto is answering: </translation>
     </message>
     <message>
         <source>Ditto：</source>
@@ -443,12 +602,28 @@
         <translation>Stop</translation>
     </message>
     <message>
+        <source>先不要</source>
+        <translation>Not now</translation>
+    </message>
+    <message>
+        <source>刪除這段對話（桌面維持原樣）</source>
+        <translation>Delete this conversation (the desktop stays as it is)</translation>
+    </message>
+    <message>
         <source>剪貼簿</source>
         <translation>Clipboard</translation>
     </message>
     <message>
         <source>取消登入</source>
         <translation>Cancel sign-in</translation>
+    </message>
+    <message>
+        <source>可以試試：</source>
+        <translation>You could try:</translation>
+    </message>
+    <message>
+        <source>對話</source>
+        <translation>Conversation</translation>
     </message>
     <message>
         <source>對話內容</source>
@@ -459,16 +634,48 @@
         <translation>No quota data yet</translation>
     </message>
     <message>
+        <source>展開</source>
+        <translation>Expand</translation>
+    </message>
+    <message>
+        <source>展開成完整視窗</source>
+        <translation>Expand to a full window</translation>
+    </message>
+    <message>
         <source>已登入</source>
         <translation>Signed in</translation>
+    </message>
+    <message>
+        <source>幫我做專注工作區，通知安靜一點</source>
+        <translation>Set up a focus workspace and make notifications quieter</translation>
     </message>
     <message>
         <source>所有檔案 (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
+        <source>把 Dock 移到左邊</source>
+        <translation>Move the Dock to the left</translation>
+    </message>
+    <message>
+        <source>把現在的桌面保存成一個新組合</source>
+        <translation>Save the current desktop as a new composition</translation>
+    </message>
+    <message>
         <source>描述想調整的桌面，例如「開啟通知專注模式」</source>
         <translation>Describe what to change, for example “turn on notification focus mode”</translation>
+    </message>
+    <message>
+        <source>撤銷這項變更</source>
+        <translation>Undo this change</translation>
+    </message>
+    <message>
+        <source>收合</source>
+        <translation>Collapse</translation>
+    </message>
+    <message>
+        <source>收合到角色旁</source>
+        <translation>Collapse beside the character</translation>
     </message>
     <message>
         <source>文字檔 (*.txt *.md *.json *.csv *.log)</source>
@@ -481,6 +688,14 @@
     <message>
         <source>檔案</source>
         <translation>File</translation>
+    </message>
+    <message>
+        <source>歷史</source>
+        <translation>History</translation>
+    </message>
+    <message>
+        <source>目前無法建立組合</source>
+        <translation>compositions cannot be created right now</translation>
     </message>
     <message>
         <source>移除附加內容：%1</source>
@@ -507,12 +722,20 @@
         <translation>Finish signing in in your browser. This updates by itself when you are done.</translation>
     </message>
     <message>
+        <source>載入較早的訊息</source>
+        <translation>Load earlier messages</translation>
+    </message>
+    <message>
         <source>送出</source>
         <translation>Send</translation>
     </message>
     <message>
         <source>送出中</source>
         <translation>Sending</translation>
+    </message>
+    <message>
+        <source>通知規則服務目前不可用</source>
+        <translation>the notification rules service is unavailable</translation>
     </message>
     <message>
         <source>選擇要附加的文字檔</source>
@@ -543,6 +766,10 @@
         <translation>Attach screen</translation>
     </message>
     <message>
+        <source>需要已安裝的膠囊 Dock</source>
+        <translation>needs the installed pill Dock</translation>
+    </message>
+    <message>
         <source>預覽：</source>
         <translation>Preview: </translation>
     </message>
@@ -553,6 +780,13 @@
     <message>
         <source>（已截斷）</source>
         <translation> (cut short)</translation>
+    </message>
+</context>
+<context>
+    <name>ChatWindow</name>
+    <message>
+        <source>Ditto 對話</source>
+        <translation>Ditto chat</translation>
     </message>
 </context>
 <context>
@@ -1061,6 +1295,14 @@
     <message>
         <source>change.title.provider_swap</source>
         <translation>Swap desktop components</translation>
+    </message>
+    <message>
+        <source>command.ai_settings.open</source>
+        <translation>Open AI settings</translation>
+    </message>
+    <message>
+        <source>command.chat.toggle</source>
+        <translation>Open or close the Ditto chat</translation>
     </message>
     <message>
         <source>command.composition.open</source>

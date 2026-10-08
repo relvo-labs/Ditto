@@ -24,6 +24,15 @@ QtObject {
     property int loadedSeq: 0
     property var turn: null
     property var login: null
+    /// The answer as it streams for the active turn (display only; the
+    /// stored answer replaces it).
+    property string streamText: ""
+    property string streamTurn: ""
+    /// Conversations, newest first, for the history list.
+    property var sessions: []
+    /// The lowest seq loaded: older pages are read on request.
+    property int firstSeq: 0
+    readonly property bool hasOlder: firstSeq > 0
     /// The last error, in product language; diagnostics separately.
     property string errorText: ""
     property string errorDiagnostic: ""
@@ -156,6 +165,7 @@ QtObject {
     function open() {
         wanted = true;
         refreshSettings();
+        refreshSessions();
         if (subscriptionId.length === 0) {
             follow();
         }
@@ -307,20 +317,127 @@ QtObject {
                 return;
             }
             const latest = sessions.slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1)[0];
-            sessionId = latest.session_id;
-            events = [];
-            loadedSeq = Math.max(0, latest.next_seq - pageSize);
-            readNew();
+            selectSession(latest.session_id, latest.next_seq);
         }, function (error) {
             setError(error);
         });
+    }
+
+    function refreshSessions() {
+        client.capability("agent.sessions.list", {}, function (result) {
+            sessions = (result.sessions || []).slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1);
+        });
+    }
+
+    /// Show another conversation: its last page, then live updates.
+    function selectSession(id, nextSeq) {
+        sessionId = id;
+        events = [];
+        turn = null;
+        streamText = "";
+        loadedSeq = Math.max(0, (nextSeq || 0) - pageSize);
+        firstSeq = loadedSeq;
+        readNew();
+    }
+
+    /// One more page before what is loaded (long conversations are never
+    /// loaded whole).
+    function loadOlder() {
+        if (!hasOlder || sessionId.length === 0) {
+            return;
+        }
+        const from = Math.max(0, firstSeq - pageSize);
+        const count = firstSeq - from;
+        client.capability("agent.sessions.read", { session_id: sessionId, offset: from, limit: count }, function (result) {
+            const older = (result.events || []).filter(event => event.seq < firstSeq);
+            events = older.concat(events);
+            firstSeq = from;
+        }, function (error) {
+            setError(error);
+        });
+    }
+
+    function deleteSession(id) {
+        client.capability("agent.sessions.delete", { session_id: id }, function () {
+            if (id === sessionId) {
+                newConversation();
+            }
+            refreshSessions();
+        }, function (error) {
+            setError(error);
+        });
+    }
+
+    function undoChange(changeId) {
+        client.undoChange(changeId, function () {
+            setError(null);
+        }, function (error) {
+            setError(error);
+        });
+    }
+
+    /// Settings changes go through Core's revision check; a conflict re-reads.
+    function patchSettings(fields, then) {
+        if (!settings) {
+            return;
+        }
+        const next = {};
+        for (const name in settings) {
+            if (name !== "_meta") {
+                next[name] = settings[name];
+            }
+        }
+        Object.assign(next, fields);
+        client.capability("agent.settings.patch", { expected_revision: settings.revision, settings: next }, function (result) {
+            settings = result;
+            setError(null);
+            if (then) {
+                then(result);
+            }
+        }, function (error) {
+            setError(error);
+            refreshSettings();
+        });
+    }
+
+    function chooseModel(model, effort) {
+        patchSettings({ model: model, reasoning_effort: effort || null });
+    }
+
+    function setApprovalMode(mode) {
+        patchSettings({ approval_mode: mode });
+    }
+
+    function logout() {
+        client.capability("agent.providers.logout", { provider: "codex-app-server" }, function () {
+            refreshProvider();
+        }, function (error) {
+            setError(error);
+        }, { deadlineMs: 30000 });
+    }
+
+    /// The key goes from the form to Core to the keyring; only its
+    /// reference comes back. The caller clears the field afterwards.
+    function saveApiKey(endpoint, model, key, onDone) {
+        client.capability("agent.credentials.create", { provider: "direct-model", secret: key, idempotency_key: client.newKey("key") }, function (status) {
+            patchSettings({ provider: "direct-model", endpoint: endpoint, model: model || null,
+                auth: { kind: "api_key", credential_ref: status.credential_ref } }, onDone);
+        }, function (error) {
+            setError(error);
+        });
+    }
+
+    function useSubscription() {
+        patchSettings({ provider: "codex-app-server", endpoint: null, auth: null, model: null });
     }
 
     function newConversation() {
         sessionId = "";
         events = [];
         loadedSeq = 0;
+        firstSeq = 0;
         turn = null;
+        streamText = "";
     }
 
     /// Read the events after what is loaded. One read at a time; an update
@@ -343,6 +460,9 @@ QtObject {
                 for (const event of fresh) {
                     if (event.type === "user/message" || event.type === "turn/end") {
                         refreshTurnFrom(event);
+                    }
+                    if (event.type === "assistant/message" && event.data && event.data.turn_id === streamTurn) {
+                        streamText = "";
                     }
                 }
             }
@@ -369,6 +489,16 @@ QtObject {
     }
 
     function applyEvent(payload) {
+        if (payload.type === "conversation_delta") {
+            if (payload.session_id === sessionId) {
+                if (streamTurn !== payload.turn_id) {
+                    streamTurn = payload.turn_id;
+                    streamText = "";
+                }
+                streamText += payload.text;
+            }
+            return;
+        }
         if (payload.type !== "conversation_updated") {
             return;
         }
