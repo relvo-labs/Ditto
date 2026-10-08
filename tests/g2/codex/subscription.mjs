@@ -33,7 +33,8 @@ const child=spawn(resolve(workspace,'target/debug/ditto-core'),['serve','--compo
   '--hostd',`hostd 0.2.0 ${process.execPath} ${resolve(workspace,'packages/host-runtime/dist/ditto-hostd.mjs')}`,
   '--agent',`agent 0.3.0 ${process.execPath} ${resolve(workspace,'packages/agent-runtime/dist/ditto-agentd.mjs')}`,
   '--agent-backend',`codex-app-server ${pin.version} ${pin.sha256} ${codex}`,
-  '--launch',`dittoctl 0.3.0 ${process.execPath} ${resolve(workspace,'tests/g2/codex/subscription-driver.mjs')}`,
+  // DITTO_G2_TASK=matrix runs the account matrix on an existing sign-in.
+  '--launch',`dittoctl 0.3.0 ${process.execPath} ${resolve(workspace,'tests/g2/codex/'+(env.DITTO_G2_TASK==='matrix'?'account-matrix-driver.mjs':'subscription-driver.mjs'))}`,
 ],{env,stdio:['ignore',log,log],detached:true})
 closeSync(log)
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
