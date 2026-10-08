@@ -830,8 +830,32 @@ mod tests {
         }
     }
 
+    /// The size limit is per process, so the limited part runs in a child
+    /// copy of this test binary: tests running beside it are not touched.
     #[test]
     fn a_full_disk_fails_the_append_and_keeps_the_log_readable() {
+        if std::env::var_os("DITTO_DISK_FULL_CHILD").is_some() {
+            return disk_full_child();
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "conversations::tests::a_full_disk_fails_the_append_and_keeps_the_log_readable",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("DITTO_DISK_FULL_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn disk_full_child() {
         let (mut t, h) = setup();
         append(&mut t.store, "conn-1", &batch(&h)).unwrap();
         let path = t
@@ -847,8 +871,8 @@ mod tests {
         big.expected_next_seq = 1;
         big.events[0].seq = 1;
         big.events[0].data = serde_json::json!({"text": "滿".repeat(4000)});
-        // The process may write no file past this size: like a full disk for
-        // the event log (EFBIG instead of SIGXFSZ, which is ignored here).
+        // No file may grow past this size: like a full disk for the event log
+        // (EFBIG instead of SIGXFSZ, which is ignored here).
         let mut old = libc::rlimit {
             rlim_cur: 0,
             rlim_max: 0,
@@ -868,7 +892,7 @@ mod tests {
             result.is_err(),
             "the append must fail when the file cannot grow"
         );
-        // Whatever happened, what is readable is a valid prefix.
+        // What is readable is a valid prefix.
         let events = read_all(&t, &h.session.session_id);
         assert!(!events.is_empty() && events.iter().enumerate().all(|(i, e)| e.seq == i as u64));
         // And the log takes appends again once there is room.

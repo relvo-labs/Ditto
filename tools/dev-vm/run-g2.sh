@@ -33,6 +33,27 @@ vm_ssh 'sudo systemctl restart systemd-timesyncd >/dev/null 2>&1' || true
 vm_sync_workspace >"$out/sync.log" 2>&1
 record sync pass
 step build 'pnpm install --frozen-lockfile && cargo build --locked --workspace --bins && pnpm -r build && bash scripts/build-builtin-packages.sh'
-step rust 'cargo test --locked --workspace'
-step node 'pnpm -r typecheck && pnpm -r test && pnpm --filter @ditto/agent-runtime check:upstream'
-step foundation 'DITTO_ENVIRONMENT_LABEL=development-vm node tests/g2/foundation/run.mjs'
+step rust 'cargo test --locked --workspace' || true
+step node 'pnpm -r typecheck && pnpm -r test && pnpm --filter @ditto/agent-runtime check:upstream' || true
+step foundation 'DITTO_ENVIRONMENT_LABEL=development-vm node tests/g2/foundation/run.mjs' || true
+# G2 suites from a clean checkout. The pinned Codex binary is copied in (it is
+# not part of the repository); the session-bus proxy is built from its pin.
+codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}" 2>/dev/null || true)"
+if [[ -n "$codex" && -f "$codex" ]]; then
+  vm_ssh "mkdir -p '$(dirname "$codex")'" && vm_rsync "$codex" "neil@$(vm_ip):$codex" && vm_ssh "mkdir -p ~/.local/bin && ln -sf '$codex' ~/.local/bin/codex" && record codex-binary pass || record codex-binary fail
+else
+  record codex-binary not_run
+fi
+step dbus-proxy 'command -v meson >/dev/null || sudo apt-get install -y -q meson libglib2.0-dev >/dev/null; bash tools/dev-vm/../dbus-proxy/build.sh debug' || true
+label='DITTO_ENVIRONMENT_LABEL=development-vm'
+step confine "cargo test --locked -p ditto-confine" || true
+for suite in codex/run codex/faults codex/injection jobs/run lifecycle/run; do
+  name="$(echo "$suite" | tr / -)"
+  args=""; [[ "$suite" == lifecycle/run ]] && args="quick"
+  step "$name" "$label node tests/g2/$suite.mjs $args" || true
+done
+for suite in layout codex/desktop shell; do
+  name="$(echo "$suite" | tr / -)"
+  script="tests/g2/$suite/run.sh"; [[ "$suite" == codex/desktop ]] && script="tests/g2/codex/desktop.sh"
+  step "$name" "$label DITTO_COMPOSITOR=wayfire DITTO_ARTIFACTS=\$PWD/artifacts/g2 timeout -k 15 1800 bash $script" || true
+done
