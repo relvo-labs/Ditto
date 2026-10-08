@@ -32,7 +32,7 @@ fn manifest(id: &str, kind: &str, host: &str, slots: &[&str], extra: Value) -> V
     let mut manifest = json!({
         "manifest_version": 1, "id": id, "version": "1.0.0", "name": id, "author": "Ditto",
         "license": "UNLICENSED", "source": "builtin", "plugin_kind": kind, "host_kind": host,
-        "trust_level": "trusted", "required_protocol_version": "^0.2", "slots": slots,
+        "trust_level": "trusted", "required_protocol_version": "^0.3", "slots": slots,
         "hot_swap": if host == "qml" { "instant" } else { "controlled_handoff" },
         "health": {"timeout_ms": 2000}, "cleanup": {"timeout_ms": 2000}, "idle_policy": "resident"
     });
@@ -709,6 +709,29 @@ fn every_catalog_entry_has_a_handler_and_a_consumer() {
     let mut consumers: Vec<&str> = dittoctl::CONSUMED_CAPABILITIES.to_vec();
     // Core's notification server is the consumer of the policy decision.
     consumers.push(catalog::NOTIFICATIONS_POLICY_DECIDE);
+    let agent_source = concat!(
+        include_str!("../../../packages/agent-runtime/src/runtime.ts"),
+        include_str!("../../../packages/agent-runtime/src/session.ts"),
+        include_str!("../../../packages/agent-runtime/src/tools.ts"),
+        include_str!("../../../packages/agent-runtime/src/main.ts")
+    );
+    for contract in ditto_protocol::catalog::contracts()
+        .into_iter()
+        .filter(|contract| {
+            contract
+                .scopes
+                .contains(&ditto_protocol::catalog::scope::AGENT_WRITE)
+        })
+    {
+        assert!(
+            agent_source.contains(&format!("'{}'", contract.capability_id)),
+            "{} has no Agent consumer",
+            contract.capability_id
+        );
+        consumers.push(contract.capability_id);
+    }
+    assert!(agent_source.contains("'desktop.approvals.request'"));
+    consumers.push("desktop.approvals.request");
     catalog::validate_catalog(&catalog.capabilities, &handlers, &consumers).unwrap();
 }
 
@@ -780,6 +803,124 @@ fn an_appearance_change_commits_only_after_the_shell_reads_back() {
     let history = cli.result(catalog::CHANGES_LIST, json!({}));
     assert_eq!(history["changes"][0]["change_id"], json!(undone.change_id));
     assert_eq!(history["changes"][1]["change_id"], json!(change.change_id));
+}
+
+#[test]
+fn a_legacy_builtin_upgrades_by_changeset_without_rewriting_its_revision() {
+    use ditto_protocol::profile::{EntrySpec, HostKind};
+    let root = root("protocol-upgrade");
+    let builtin = root.join("builtin");
+    builtin_packages(&builtin);
+    pack(
+        &builtin,
+        &manifest(
+            "ditto.layout.floating",
+            "declarative_bundle",
+            "core_builtin",
+            &["layout.strategy"],
+            json!({"required_protocol_version":"^0.2"}),
+        ),
+    );
+    pack(
+        &builtin,
+        &manifest(
+            "ditto.layout.floating",
+            "declarative_bundle",
+            "core_builtin",
+            &["layout.strategy"],
+            json!({"version":"1.1.0"}),
+        ),
+    );
+    let mut legacy = plain_document("#123456");
+    legacy.entries.push(EntrySpec {
+        entry_id: "ent-preserved".into(),
+        package: "ditto.layout.floating".into(),
+        version: "1.0.0".into(),
+        host: HostKind::CoreBuiltin,
+        config: json!({"user_setting":"preserved"}),
+        disabled: false,
+        area: None,
+    });
+    legacy
+        .slots
+        .insert("layout.strategy".into(), "ent-preserved".into());
+    seed_store(&root, &legacy, &legacy, |_, _, _, _| Ok(()));
+    let harness = Harness {
+        core: start_at(&root, false),
+        root,
+    };
+    let _shell = fake_shell(&harness.core, Arc::new(Mutex::new(ShellState::default())));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    let before = head(&cli);
+    assert_eq!(document(&cli), json!(legacy));
+    let input = json!({"base_revision":before,"idempotency_key":"upgrade-once"});
+    let upgraded = record(&cli.result("desktop.profiles.upgrade", input.clone()));
+    assert_eq!(upgraded.state, ChangeState::Committed);
+    assert_eq!(
+        record(&cli.result("desktop.profiles.upgrade", input)).change_id,
+        upgraded.change_id
+    );
+    let mut expected = legacy.clone();
+    expected.entries[0].version = "1.1.0".into();
+    assert_eq!(document(&cli), json!(expected));
+    let old = cli.result(catalog::PROFILES_GET, json!({"revision_id":before}));
+    assert_eq!(old["document"], json!(legacy));
+    // Restoring an incompatible package is explicitly rejected by 0.3. The
+    // old revision/package and pre-migration DB backup remain available for
+    // an operator restoring the old application build.
+    let current = head(&cli);
+    let undo = cli.call(
+        catalog::CHANGES_UNDO,
+        json!({"change_id":upgraded.change_id}),
+    );
+    assert_eq!(undo["error"]["name"], "preflight_rejected");
+    assert_eq!(head(&cli), current);
+}
+
+#[test]
+fn public_agent_state_and_internal_writers_have_distinct_authorization() {
+    let harness = harness("agent-authority");
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    let standin = TestPeer::connect(&harness.core, "agent", None);
+    let session = cli.result(
+        "agent.sessions.create",
+        json!({"title":"chat","idempotency_key":"new"}),
+    );
+    for peer in [&cli, &standin] {
+        let response = peer.call(
+            "agent.sessions.open",
+            json!({"session_id":session["session_id"]}),
+        );
+        assert!(
+            response["error"]["name"] == "permission_denied"
+                || response["error"]["name"] == "identity_rejected"
+        );
+    }
+    assert_eq!(
+        standin.call("agent.settings.patch", json!({}))["error"]["name"],
+        "permission_denied"
+    );
+    let status = cli.result("agent.runtime.get", json!({}));
+    assert_eq!(status["installed"], false);
+    let catalog = cli.result(catalog::CAPABILITIES_LIST, json!({}));
+    let capability = catalog["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["capability_id"] == "agent.providers.login")
+        .unwrap();
+    assert_eq!(capability["availability"]["available"], false);
+    assert_eq!(
+        cli.call(
+            "agent.providers.login",
+            json!({"provider":"codex-app-server"})
+        )["error"]["name"],
+        "unavailable"
+    );
+    cli.result(
+        "agent.sessions.delete",
+        json!({"session_id":session["session_id"]}),
+    );
 }
 
 #[test]
@@ -2333,7 +2474,7 @@ fn a_full_disk_refuses_before_the_protected_revision_is_touched() {
 // ---- shared contract vectors (G1-QA-01) ----------------------------------------
 
 fn vectors() -> Vec<(String, Value)> {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/contract-vectors/0.2");
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/contract-vectors/0.3");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&directory)
         .expect("vector directory")
         .flatten()
@@ -2370,6 +2511,9 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
         "result-meta" => through::<ditto_protocol::ResultMeta>(value),
         "request-meta" => through::<ditto_protocol::RequestMeta>(value),
         "change-op" => through::<change::ChangeOp>(value),
+        "session-event" => through::<ditto_protocol::agent::SessionEvent>(value),
+        "turn" => through::<ditto_protocol::agent::Turn>(value),
+        "agent-preferences" => through::<ditto_protocol::agent::AgentPreferences>(value),
         "change-record" => through::<change::ChangeRecord>(value),
         "participant-prepare-params" => through::<participant::PrepareParams>(value),
         "shell-report-input" => through::<participant::ShellObservation>(value),

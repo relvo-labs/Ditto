@@ -1,0 +1,11 @@
+{
+  "kind": "shape",
+  "description": "shape-session-unknown-event",
+  "type": "session-event",
+  "valid": false,
+  "value": {
+    "seq": 0,
+    "type": "execute/arbitrary",
+    "data": {}
+  }
+}

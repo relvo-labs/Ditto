@@ -19,6 +19,7 @@ serde_json.workspace = true
 libc = "0.2"
 rusqlite = { version = "=0.40.2", features = ["bundled", "backup"] }
 semver = "1"
+sha2 = "0.10"
 
 [dev-dependencies]
 dittoctl = { path = "../dittoctl" }

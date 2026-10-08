@@ -45,7 +45,7 @@ all_checks=(standin-killed notification-policy shell-killed hostd-pid-stable)
 missing=()
 for tool in quickshell node gdbus dbus-daemon; do command -v "$tool" >/dev/null || missing+=("$tool"); done
 [[ -f "$WORKSPACE/packages/host-runtime/dist/ditto-hostd.mjs" ]] || missing+=("packages/host-runtime/dist/ditto-hostd.mjs (pnpm -r build)")
-[[ -f "$WORKSPACE/target/ditto-packages/ditto.svc.tasks-1.0.0.dittopkg" ]] || missing+=("target/ditto-packages (scripts/build-builtin-packages.sh)")
+[[ -f "$WORKSPACE/target/ditto-packages/ditto.svc.tasks-1.1.0.dittopkg" ]] || missing+=("target/ditto-packages (scripts/build-builtin-packages.sh)")
 if (( ${#missing[@]} > 0 )); then
   for id in "${all_checks[@]}"; do check "$id" environment "missing: ${missing[*]}"; done
   g1_finish

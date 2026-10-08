@@ -4,6 +4,12 @@ export type ParticipantPhase = ('prepared' | 'committed' | 'aborted' | 'rolled_b
 export type Observation =
   | {
       appearance?: Appearance | null;
+      /**
+       * The Shell shows approval requests and can answer them. Without it an
+       * Agent's approval request is recorded as unavailable at once: nobody
+       * would see it, and waiting would only stall the turn.
+       */
+      approval_responder?: boolean;
       avatar?: AvatarSettings | null;
       /**
        * Where the character actually is, as the Shell laid it out. `avatar`

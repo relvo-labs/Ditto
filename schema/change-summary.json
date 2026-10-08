@@ -47,6 +47,30 @@
         {
           "properties": {
             "kind": {
+              "const": "agent",
+              "type": "string"
+            },
+            "session_id": {
+              "type": "string"
+            },
+            "tool_call_id": {
+              "type": "string"
+            },
+            "turn_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "session_id",
+            "turn_id",
+            "tool_call_id"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
               "const": "rescue",
               "type": "string"
             }

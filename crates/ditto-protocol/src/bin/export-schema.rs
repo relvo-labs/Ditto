@@ -4,7 +4,8 @@ use std::{
 };
 
 use ditto_protocol::{
-    catalog, change::*, host, manifest::Manifest, participant, profile::*, rpc, services::*, *,
+    agent::*, catalog, change::*, host, manifest::Manifest, participant, profile::*, rpc,
+    services::*, *,
 };
 use schemars::JsonSchema;
 use serde_json::Value;
@@ -74,6 +75,43 @@ fn main() -> std::io::Result<()> {
         "rpc-response" => rpc::RpcResponse,
         "handshake-input" => rpc::HandshakeInput,
         "handshake-output" => rpc::HandshakeOutput,
+        // G2 Core-owned Agent contracts
+        "conversation" => Conversation,
+        "session-event" => SessionEvent,
+        "session-create-input" => SessionCreateInput,
+        "session-id-input" => SessionIdInput,
+        "sessions-list-output" => SessionsListOutput,
+        "session-read-input" => SessionReadInput,
+        "session-read-output" => SessionReadOutput,
+        "session-open-output" => SessionOpenOutput,
+        "session-write-input" => SessionWriteInput,
+        "session-append-input" => SessionAppendInput,
+        "session-delete-output" => SessionDeleteOutput,
+        "profile-upgrade-input" => ProfileUpgradeInput,
+        "agent-preferences" => AgentPreferences,
+        "preferences-patch-input" => PreferencesPatchInput,
+        "turn-submit-input" => TurnSubmitInput,
+        "turn" => Turn,
+        "turn-id-input" => TurnIdInput,
+        "turn-complete-input" => TurnCompleteInput,
+        "turn-claim-output" => TurnClaimOutput,
+        "tool-intent-input" => ToolIntentInput,
+        "tool-intent" => ToolIntent,
+        "tool-abandon-input" => ToolAbandonInput,
+        "agent-runtime-status" => AgentRuntimeStatus,
+        "agent-ready-input" => AgentReadyInput,
+        "provider-login-input" => ProviderLoginInput,
+        "provider-cancel-login-input" => ProviderCancelLoginInput,
+        "provider-login-output" => ProviderLoginOutput,
+        "provider-action-output" => ProviderActionOutput,
+        "provider-status" => ProviderStatus,
+        "provider-model" => ProviderModel,
+        "provider-rate-window" => ProviderRateWindow,
+        "provider-rate-limits" => ProviderRateLimits,
+        "approval-request-input" => ApprovalRequestInput,
+        "approval" => Approval,
+        "approval-id-input" => ApprovalIdInput,
+        "approval-decide-input" => ApprovalDecideInput,
         // profiles
         "profile-document" => ProfileDocument,
         "profile-summary" => ProfileSummary,

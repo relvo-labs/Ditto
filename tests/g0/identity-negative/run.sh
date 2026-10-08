@@ -64,7 +64,7 @@ connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 connection.connect(path)
 connection.sendall(json.dumps({
     "jsonrpc": "2.0", "id": "h", "method": "core.handshake",
-    "params": {"protocol_version": "0.2.0",
+    "params": {"protocol_version": "0.3.0",
                "client": {"kind": kind, "version": "0.2.0"},
                "auth": {"token": token}},
 }).encode() + b"\n")

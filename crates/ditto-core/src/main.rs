@@ -16,6 +16,9 @@ use ditto_protocol::rpc::CoreMode;
 const USAGE: &str = "usage: ditto-core serve [--compositor wayfire|sway|fixture] [--mode normal|rescue]\n\
                      \x20            [--shell \"<kind> <version> <executable> [args...]\"]\n\
                      \x20            [--hostd \"hostd <version> <executable> [args...]\"]\n\
+                     \x20            [--agent \"agent <version> <executable> [args...]\"]\n\
+                     \x20            [--agent-backend \"codex-app-server <version> <sha256> <executable>\"]\n\
+                     \x20            [--agent-backend-test-provider http://127.0.0.1:<port>/v1]  (fixture only)\n\
                      \x20            [--rescue-ui \"<spec>\"] [--lock \"<spec>\"]\n\
                      \x20            [--launch \"<spec>\"]... [--builtin-packages DIR] [--development]\n\
                      `--mode rescue` starts no Cordis host: native applications, history and\n\
@@ -32,6 +35,9 @@ struct Options {
     mode: CoreMode,
     shell: Option<String>,
     hostd: Option<String>,
+    agent: Option<String>,
+    agent_backend: Option<String>,
+    agent_backend_test_provider: Option<String>,
     rescue_ui: Option<String>,
     lock: Option<String>,
     launches: Vec<String>,
@@ -61,6 +67,9 @@ fn parse_options() -> io::Result<Options> {
         mode: CoreMode::Normal,
         shell: None,
         hostd: None,
+        agent: None,
+        agent_backend: None,
+        agent_backend_test_provider: None,
         rescue_ui: None,
         lock: None,
         launches: Vec::new(),
@@ -87,6 +96,9 @@ fn parse_options() -> io::Result<Options> {
             }
             "--shell" => options.shell = Some(value()?),
             "--hostd" => options.hostd = Some(value()?),
+            "--agent" => options.agent = Some(value()?),
+            "--agent-backend" => options.agent_backend = Some(value()?),
+            "--agent-backend-test-provider" => options.agent_backend_test_provider = Some(value()?),
             "--rescue-ui" => options.rescue_ui = Some(value()?),
             "--lock" => options.lock = Some(value()?),
             "--launch" => options.launches.push(value()?),
@@ -251,6 +263,34 @@ fn main() -> io::Result<()> {
     config.mode = options.mode;
     config.shell = spec(&options.shell)?;
     config.hostd = spec(&options.hostd)?;
+    config.agent = spec(&options.agent)?;
+    if config
+        .agent
+        .as_ref()
+        .is_some_and(|agent| agent.kind != "agent")
+    {
+        return Err(usage());
+    }
+    config.agent_backend = options
+        .agent_backend
+        .as_deref()
+        .map(ditto_core::agent_backend::parse)
+        .transpose()?;
+    if let Some(url) = &options.agent_backend_test_provider {
+        // A loopback stand-in for the subscription exists for automated
+        // tests only: the fixture compositor, or a headless desktop fixture
+        // that says so explicitly. The login session sets neither.
+        let test_run = matches!(options.compositor, Compositor::Fixture)
+            || env::var_os("DITTO_TEST_FIXTURE").is_some_and(|v| v == "1");
+        let (Some(backend), true) = (&mut config.agent_backend, test_run) else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "--agent-backend-test-provider needs --agent-backend and a test fixture",
+            ));
+        };
+        backend.test_provider = Some(ditto_core::agent_backend::parse_test_provider(url)?);
+        ditto_core::log::event("agent.test_provider", &[("url", url.as_str())]);
+    }
     config.rescue_ui = spec(&options.rescue_ui)?;
     config.lock = spec(&options.lock)?;
     config.builtin_packages = options.builtin_packages.clone();

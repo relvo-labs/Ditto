@@ -61,12 +61,12 @@ pub struct Call<'a> {
 }
 
 impl Call<'_> {
-    fn input<T: serde::de::DeserializeOwned>(&self) -> Result<T, CoreError> {
+    pub(crate) fn input<T: serde::de::DeserializeOwned>(&self) -> Result<T, CoreError> {
         serde_json::from_value(Value::Object(self.params.clone()))
             .map_err(|error| CoreError::invalid(format!("invalid parameters: {error}")))
     }
 
-    fn remaining(&self) -> Duration {
+    pub(crate) fn remaining(&self) -> Duration {
         self.deadline.saturating_sub(self.started.elapsed())
     }
 }
@@ -136,6 +136,38 @@ pub fn authorize(
 }
 
 pub fn resolve(core: &Core, contract: &CapabilityContract) -> Resolved {
+    let id = contract.capability_id;
+    if id.starts_with("agent.") && id != "agent.runtime.get" {
+        let storage = !core.agent_storage_ready;
+        let process = id.starts_with("agent.providers.") || id == "agent.runtime.ensure";
+        let unsupported_backend = id.starts_with("agent.providers.")
+            && id != "agent.providers.status"
+            && !core.agent.status().isolation_verified;
+        if storage
+            || process && (!core.agent.installed() || core.mode == CoreMode::Rescue)
+            || unsupported_backend
+        {
+            return Resolved {
+                provider_label: None,
+                availability: Availability::DependsOnSystem {
+                    component: if storage {
+                        "conversation-storage"
+                    } else {
+                        "agent"
+                    }
+                    .into(),
+                    available: false,
+                    reason: Some(if storage {
+                        UnavailableReason::StorageError
+                    } else if core.mode == CoreMode::Rescue {
+                        UnavailableReason::RescueMode
+                    } else {
+                        UnavailableReason::SystemUnavailable
+                    }),
+                },
+            };
+        }
+    }
     match contract.provider {
         Provider::Core => Resolved {
             availability: Availability::Always,
@@ -200,6 +232,17 @@ fn system_component(capability_id: &str) -> &'static str {
 fn check_available(core: &Core, contract: &CapabilityContract) -> Result<(), CoreError> {
     match (contract.provider, resolve(core, contract).availability) {
         (
+            Provider::Core,
+            Availability::DependsOnSystem {
+                available: false,
+                reason,
+                ..
+            },
+        ) => Err(CoreError::unavailable(
+            reason.unwrap_or(UnavailableReason::SystemUnavailable),
+            "this component is not available",
+        )),
+        (
             Provider::Compositor,
             Availability::DependsOnCompositor {
                 available: false,
@@ -250,7 +293,126 @@ pub struct CapabilitiesView(pub catalog::CapabilitiesListOutput);
 // ---- dispatch -------------------------------------------------------------
 
 pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
-    authorize(core, caller, call.contract, &call.params)?;
+    // The G1 stand-in remains a test caller. Every tool of the production
+    // controller must be correlated before its first side effect.
+    if caller.subject.as_str() == Subject::AGENT
+        && core.agent.is_connection(&caller.connection_id)
+        && call.contract.capability_id.starts_with("desktop.")
+        && call.contract.capability_id != catalog::CAPABILITIES_LIST
+        && !call
+            .contract
+            .capability_id
+            .starts_with("desktop.approvals.")
+    {
+        crate::agent_routes::current(core, caller)?;
+        if !core.agent.status().isolation_verified && call.contract.writes {
+            return Err(CoreError::denied(
+                ditto_protocol::PermissionDeniedReason::PolicyDenied,
+                None,
+            ));
+        }
+        let intent_id = call
+            .operation_id
+            .clone()
+            .ok_or_else(|| CoreError::invalid("a durable tool intent is required"))?;
+        let cap = call.contract.capability_id.to_string();
+        let args = Value::Object(call.params.clone());
+        let owner = caller.connection_id.clone();
+        let (turn, _, previous) =
+            core.read(|c| ditto_store::turns::validate_intent(c, &intent_id, &owner, &cap, &args))?;
+        if let Some(value) = previous {
+            // Cached delivery cannot bypass a revoked scope. Private read
+            // results are never stored with conversation history in the first
+            // place; a fresh read requires fresh authorization.
+            authorize_call(core, caller, &call)?;
+            if value.get("ephemeral").and_then(Value::as_bool) == Some(true) {
+                return Err(CoreError::unavailable(
+                    UnavailableReason::SystemUnavailable,
+                    "this context is not retained; request a new authorized read",
+                ));
+            }
+            if let Some(error) = value.get("error") {
+                let error: crate::error::CoreError = crate::error::CoreError {
+                    name: serde_json::from_value(error["name"].clone())
+                        .map_err(|_| CoreError::internal("invalid stored tool error"))?,
+                    message: error["message"].as_str().unwrap_or("tool failed").into(),
+                    data: error.get("data").cloned(),
+                };
+                return Err(error);
+            }
+            return Ok((
+                value["result"].clone(),
+                value["verified"].as_bool().unwrap_or(false),
+            ));
+        }
+        // Refused calls may request an approval and retry that same intent.
+        // Only an authorized dispatch consumes the execution reservation.
+        authorize_call(core, caller, &call)?;
+        let id = intent_id.clone();
+        coordinate(core, &call, move |c| {
+            ditto_store::turns::begin_execution(c.store(), &id, &owner, &cap, &args)
+        })??;
+        let remaining = call.remaining();
+        let outcome = dispatch_authorized(core, caller, call);
+        let value = match &outcome {
+            Ok((value, verified)) => json!({"result":value,"verified":verified}),
+            Err(error) => {
+                json!({"error":{"name":error.name,"message":error.message,"data":error.data}})
+            }
+        };
+        core.coordinate(remaining.max(Duration::from_millis(500)), move |c| {
+            ditto_store::turns::record_result(c.store(), &intent_id, &value)
+        })
+        .map_err(|_| {
+            CoreError::new(
+                ErrorName::Timeout,
+                "tool result is not acknowledged; query its outcome",
+            )
+        })??;
+        crate::agent_routes::announce_turn(core, &turn.turn_id);
+        return outcome;
+    }
+    authorize_call(core, caller, &call)?;
+    dispatch_authorized(core, caller, call)
+}
+
+fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<(), CoreError> {
+    let result = authorize(core, caller, call.contract, &call.params);
+    if result.as_ref().is_err_and(|e| {
+        e.data
+            .as_ref()
+            .and_then(|d| d.get("reason"))
+            .and_then(Value::as_str)
+            == Some("approval_unavailable")
+    }) && caller.subject.as_str() == Subject::AGENT
+        && core.agent.is_connection(&caller.connection_id)
+        && !core.session_locked()
+        && core.shell.peer().is_some()
+        && call
+            .contract
+            .scopes
+            .iter()
+            .all(|s| authz::policy(&caller.subject, s) != authz::PolicyDefault::Deny)
+    {
+        if let Some(id) = &call.operation_id {
+            let args = Value::Object(call.params.clone());
+            let cap = call.contract.capability_id;
+            let (turn, _, _) = core.read(|c| {
+                ditto_store::turns::validate_intent(c, id, &caller.connection_id, cap, &args)
+            })?;
+            let owner = caller.connection_id.clone();
+            let hash = ditto_protocol::jcs::digest(&args);
+            if coordinate(core, call, move |c| {
+                ditto_store::approvals::consume(c.store(), &owner, &turn.turn_id, cap, &hash)
+            })?? {
+                return Ok(());
+            }
+        }
+    }
+    result
+}
+
+fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
     if call.contract.writes
         && core.is_recovering()
         && !call.contract.capability_id.starts_with("desktop.rescue.")
@@ -265,6 +427,9 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
         return crate::desktop::execute(&core.session, &call);
     }
     match call.contract.capability_id {
+        method if method.starts_with("agent.") || method.starts_with("desktop.approvals.") => {
+            crate::agent_routes::dispatch(core, caller, &call)
+        }
         catalog::CAPABILITIES_LIST => {
             empty(&call)?;
             ok(served_catalog(core).0)
@@ -272,6 +437,84 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
         catalog::EVENTS_SUBSCRIBE => subscribe(core, caller, &call),
         catalog::PROFILES_LIST => profiles_list(core),
         catalog::PROFILES_GET => profiles_get(core, call.input()?),
+        "desktop.profiles.upgrade" => {
+            let input: ditto_protocol::agent::ProfileUpgradeInput = call.input()?;
+            if input.idempotency_key.is_empty() || input.idempotency_key.len() > 128 {
+                return Err(CoreError::invalid("invalid upgrade key"));
+            }
+            let upgrade_key = format!(
+                "upgrade:{}",
+                ditto_protocol::jcs::digest(
+                    &json!({"subject":caller.subject.as_str(),"key":input.idempotency_key})
+                )
+            );
+            if let Some(existing) = core.read(|c| changes::by_idempotency_key(c, &upgrade_key))? {
+                if existing.record.base_revision != input.base_revision
+                    || input
+                        .profile_id
+                        .as_ref()
+                        .is_some_and(|id| *id != existing.record.profile_id)
+                {
+                    return Err(CoreError::new(
+                        ErrorName::Conflict,
+                        "upgrade key has another target",
+                    ));
+                }
+                return change_outcome(existing.record);
+            }
+            let id = resolve_profile(core, input.profile_id)?;
+            let (_, _, document) = core.read(|c| profiles::head_document(c, &id))?;
+            let packages = package_set(core)?;
+            let protocol =
+                semver::Version::parse(ditto_protocol::PROTOCOL_VERSION).expect("protocol version");
+            let mut ops = Vec::new();
+            for entry in &document.entries {
+                let current = packages
+                    .get(&entry.package, &entry.version)
+                    .ok_or_else(|| CoreError::not_found("profile package"))?;
+                if current.summary.source != "builtin" {
+                    continue;
+                }
+                let compatible =
+                    semver::VersionReq::parse(&current.manifest.required_protocol_version)
+                        .is_ok_and(|r| r.matches(&protocol));
+                if compatible {
+                    continue;
+                }
+                let newest = packages
+                    .rows()
+                    .filter(|p| {
+                        p.summary.package_id == entry.package && p.summary.source == "builtin"
+                    })
+                    .filter(|p| {
+                        semver::VersionReq::parse(&p.manifest.required_protocol_version)
+                            .is_ok_and(|r| r.matches(&protocol))
+                    })
+                    .filter_map(|p| semver::Version::parse(&p.summary.version).ok())
+                    .max()
+                    .ok_or_else(|| CoreError::not_found("compatible built-in update"))?;
+                ops.push(ChangeOp::UpgradeEntry {
+                    entry_id: entry.entry_id.clone(),
+                    from_version: entry.version.clone(),
+                    to_version: newest.to_string(),
+                });
+            }
+            if ops.is_empty() {
+                return Err(CoreError::invalid("this profile needs no protocol upgrade"));
+            }
+            let proposal = Proposal {
+                profile_id: Some(id),
+                base_revision: input.base_revision,
+                ops,
+                mode: ChangeMode::Apply,
+                idempotency_key: Some(upgrade_key),
+                request_operation_id: call.operation_id.clone(),
+                origin: origin_for(core, caller, &call, Some("protocol-upgrade".into()))?,
+                subject: caller.subject.0.clone(),
+                target: None,
+            };
+            run_proposal(core, caller, proposal, &call)
+        }
         catalog::PROFILES_CREATE => profiles_create(core, call.input()?),
         catalog::PROFILES_DUPLICATE => profiles_duplicate(core, call.input()?),
         catalog::PROFILES_RENAME => profiles_rename(core, call.input()?),
@@ -297,7 +540,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
                 mode: input.mode,
                 idempotency_key: input.idempotency_key,
                 request_operation_id: call.operation_id.clone(),
-                origin: origin_for(caller, input.surface),
+                origin: origin_for(core, caller, &call, input.surface)?,
                 subject: caller.subject.0.clone(),
                 target: None,
             };
@@ -364,7 +607,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
                 mode: ChangeMode::Apply,
                 idempotency_key: input.idempotency_key,
                 request_operation_id: call.operation_id.clone(),
-                origin: origin_for(caller, Some("personalization".into())),
+                origin: origin_for(core, caller, &call, Some("personalization".into()))?,
                 subject: caller.subject.0.clone(),
                 target: None,
             };
@@ -717,7 +960,7 @@ fn system_error(error: ditto_system::SystemError) -> CoreError {
     }
 }
 
-fn coordinate<T: Send + 'static>(
+pub(crate) fn coordinate<T: Send + 'static>(
     core: &Core,
     call: &Call<'_>,
     work: impl FnOnce(&mut crate::coordinator::Coordinator) -> T + Send + 'static,
@@ -750,13 +993,39 @@ fn change_outcome(record: ChangeRecord) -> Handled {
     Ok((json!(record), verified))
 }
 
-fn origin_for(caller: &Caller, surface: Option<String>) -> ChangeOrigin {
-    match caller.subject.as_str() {
+fn origin_for(
+    core: &Core,
+    caller: &Caller,
+    call: &Call<'_>,
+    surface: Option<String>,
+) -> Result<ChangeOrigin, CoreError> {
+    if caller.subject.as_str() == Subject::AGENT && core.agent.is_connection(&caller.connection_id)
+    {
+        let id = call
+            .operation_id
+            .as_ref()
+            .ok_or_else(|| CoreError::invalid("tool intent is required"))?;
+        let (turn, call_id, _) = core.read(|c| {
+            ditto_store::turns::validate_intent(
+                c,
+                id,
+                &caller.connection_id,
+                call.contract.capability_id,
+                &Value::Object(call.params.clone()),
+            )
+        })?;
+        return Ok(ChangeOrigin::Agent {
+            session_id: turn.session_id,
+            turn_id: turn.turn_id,
+            tool_call_id: call_id,
+        });
+    }
+    Ok(match caller.subject.as_str() {
         Subject::SHELL => ChangeOrigin::Gui { surface },
         Subject::AGENT => ChangeOrigin::AgentStandin,
         Subject::CLI_RESCUE | Subject::RESCUE_UI => ChangeOrigin::Rescue,
         _ => ChangeOrigin::Cli,
-    }
+    })
 }
 
 /// Queue the proposal and wait: first for the draft (so the change id is
@@ -836,6 +1105,7 @@ fn topic_scope(topic: EventTopic) -> &'static str {
         EventTopic::Changes | EventTopic::Plugins | EventTopic::Session => catalog::scope::READ,
         EventTopic::Notifications => catalog::scope::NOTIFICATIONS_READ,
         EventTopic::Tasks => catalog::scope::TASKS_READ,
+        EventTopic::Conversations => catalog::scope::AGENT_READ,
     }
 }
 

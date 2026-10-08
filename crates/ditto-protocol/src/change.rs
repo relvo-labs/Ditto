@@ -59,6 +59,11 @@ pub enum ChangeOp {
         entry_id: String,
         disabled: bool,
     },
+    UpgradeEntry {
+        entry_id: String,
+        from_version: String,
+        to_version: String,
+    },
     BindSlot {
         slot: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -243,6 +248,11 @@ pub enum ChangeOrigin {
     },
     Cli,
     AgentStandin,
+    Agent {
+        session_id: String,
+        turn_id: String,
+        tool_call_id: String,
+    },
     Rescue,
     Supervisor {
         reason: String,

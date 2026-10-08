@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/ditto-protocol", "crates/ditto-store", "crates/ditto-system", "crates/ditto-supervisor", "crates/ditto-compositor", "crates/ditto-core", "crates/dittoctl", "crates/ditto-measure"]
+members = ["crates/ditto-protocol", "crates/ditto-store", "crates/ditto-system", "crates/ditto-supervisor", "crates/ditto-compositor", "crates/ditto-core", "crates/dittoctl", "crates/ditto-measure", "crates/ditto-confine"]
 
 [workspace.package]
 edition = "2021"

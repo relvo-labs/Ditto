@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "arguments": true,
+    "capability_id": {
+      "type": "string"
+    },
+    "tool_call_id": {
+      "type": "string"
+    },
+    "turn_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "turn_id",
+    "tool_call_id",
+    "capability_id",
+    "arguments"
+  ],
+  "title": "ToolIntentInput",
+  "type": "object"
+}

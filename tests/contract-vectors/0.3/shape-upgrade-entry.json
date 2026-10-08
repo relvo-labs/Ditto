@@ -1,0 +1,12 @@
+{
+  "kind": "shape",
+  "description": "shape-upgrade-entry",
+  "type": "change-op",
+  "valid": true,
+  "value": {
+    "op": "upgrade_entry",
+    "entry_id": "ent-existing",
+    "from_version": "1.0.0",
+    "to_version": "1.1.0"
+  }
+}

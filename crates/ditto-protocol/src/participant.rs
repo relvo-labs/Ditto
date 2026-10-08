@@ -210,6 +210,11 @@ pub struct ShellObservation {
     /// above echoes the settings; this is the readback of their effect.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar_placement: Option<AvatarPlacement>,
+    /// The Shell shows approval requests and can answer them. Without it an
+    /// Agent's approval request is recorded as unavailable at once: nobody
+    /// would see it, and waiting would only stall the turn.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub approval_responder: bool,
 }
 
 /// The character's placement as the Shell observes it after laying it out.

@@ -40,6 +40,9 @@ pub fn policy(subject: &Subject, scope_name: &str) -> PolicyDefault {
     };
     // Rows: shell, cli, cli:rescue, rescue_ui, host:<entry>, agent, lock.
     let row: [PolicyDefault; 7] = match scope_name {
+        scope::AGENT_INTERACT | scope::AGENT_READ => [Allow, Allow, Deny, Deny, Deny, Allow, Deny],
+        scope::AGENT_WRITE => [Deny, Deny, Deny, Deny, Deny, Allow, Deny],
+        scope::AGENT_MANAGE => [Allow, Allow, Deny, Deny, Deny, Deny, Deny],
         scope::READ => [Allow, Allow, Allow, Allow, Allow, Allow, Deny],
         scope::CONFIG => [Allow, Allow, Deny, Deny, GrantRequired, Allow, Deny],
         scope::WINDOWS_READ => [

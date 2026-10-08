@@ -2,6 +2,77 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_TW" sourcelanguage="zh_TW">
 <context>
+    <name>ApprovalWindow</name>
+    <message>
+        <source>Agent 的說明（未經驗證）：</source>
+        <translation>Agent 的說明（未經驗證）：</translation>
+    </message>
+    <message>
+        <source>Ditto 想在這次對話中做一件需要你同意的事：</source>
+        <translation>Ditto 想在這次對話中做一件需要你同意的事：</translation>
+    </message>
+    <message>
+        <source>Ditto 需要你的確認</source>
+        <translation>Ditto 需要你的確認</translation>
+    </message>
+    <message>
+        <source>使用一項桌面能力</source>
+        <translation>使用一項桌面能力</translation>
+    </message>
+    <message>
+        <source>允許這一次</source>
+        <translation>允許這一次</translation>
+    </message>
+    <message>
+        <source>只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。</source>
+        <translation>只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。</translation>
+    </message>
+    <message>
+        <source>安裝或管理插件</source>
+        <translation>安裝或管理插件</translation>
+    </message>
+    <message>
+        <source>拒絕</source>
+        <translation>拒絕</translation>
+    </message>
+    <message>
+        <source>新增或完成待辦事項</source>
+        <translation>新增或完成待辦事項</translation>
+    </message>
+    <message>
+        <source>查看目前開啟的視窗、工作區與螢幕</source>
+        <translation>查看目前開啟的視窗、工作區與螢幕</translation>
+    </message>
+    <message>
+        <source>確認請求</source>
+        <translation>確認請求</translation>
+    </message>
+    <message>
+        <source>移動、調整大小、切換或要求關閉視窗</source>
+        <translation>移動、調整大小、切換或要求關閉視窗</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>讀取待辦事項</source>
+        <translation>讀取待辦事項</translation>
+    </message>
+    <message>
+        <source>讀取通知內容</source>
+        <translation>讀取通知內容</translation>
+    </message>
+    <message>
+        <source>鎖定螢幕</source>
+        <translation>鎖定螢幕</translation>
+    </message>
+    <message>
+        <source>開啟應用程式</source>
+        <translation>開啟應用程式</translation>
+    </message>
+</context>
+<context>
     <name>Avatar</name>
     <message>
         <source>待命中</source>
@@ -338,6 +409,93 @@
     </message>
 </context>
 <context>
+    <name>ChatWindow</name>
+    <message>
+        <source>AI 對話目前關閉。開啟後才會連接模型。</source>
+        <translation>AI 對話目前關閉。開啟後才會連接模型。</translation>
+    </message>
+    <message>
+        <source>Ditto 對話</source>
+        <translation>Ditto 對話</translation>
+    </message>
+    <message>
+        <source>Ditto：</source>
+        <translation>Ditto：</translation>
+    </message>
+    <message>
+        <source>你：</source>
+        <translation>你：</translation>
+    </message>
+    <message>
+        <source>使用 Codex 訂閱登入</source>
+        <translation>使用 Codex 訂閱登入</translation>
+    </message>
+    <message>
+        <source>使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。</source>
+        <translation>使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。</translation>
+    </message>
+    <message>
+        <source>停止</source>
+        <translation>停止</translation>
+    </message>
+    <message>
+        <source>取消登入</source>
+        <translation>取消登入</translation>
+    </message>
+    <message>
+        <source>對話內容</source>
+        <translation>對話內容</translation>
+    </message>
+    <message>
+        <source>尚無配額資料</source>
+        <translation>尚無配額資料</translation>
+    </message>
+    <message>
+        <source>已登入</source>
+        <translation>已登入</translation>
+    </message>
+    <message>
+        <source>描述想調整的桌面，例如「開啟通知專注模式」</source>
+        <translation>描述想調整的桌面，例如「開啟通知專注模式」</translation>
+    </message>
+    <message>
+        <source>新對話</source>
+        <translation>新對話</translation>
+    </message>
+    <message>
+        <source>訊息</source>
+        <translation>訊息</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>請在瀏覽器完成登入。完成後這裡會自動更新。</source>
+        <translation>請在瀏覽器完成登入。完成後這裡會自動更新。</translation>
+    </message>
+    <message>
+        <source>送出</source>
+        <translation>送出</translation>
+    </message>
+    <message>
+        <source>送出中</source>
+        <translation>送出中</translation>
+    </message>
+    <message>
+        <source>重新開啟登入頁</source>
+        <translation>重新開啟登入頁</translation>
+    </message>
+    <message>
+        <source>開啟 AI 對話</source>
+        <translation>開啟 AI 對話</translation>
+    </message>
+    <message>
+        <source>額度已用 %1%</source>
+        <translation>額度已用 %1%</translation>
+    </message>
+</context>
+<context>
     <name>CompositionCenter</name>
     <message>
         <source>「%1」的版本</source>
@@ -598,6 +756,81 @@
     <message>
         <source>（未設定）</source>
         <translation>（未設定）</translation>
+    </message>
+</context>
+<context>
+    <name>ConversationState</name>
+    <message>
+        <source>AI 對話已關閉；桌面仍可照常操作</source>
+        <translation>AI 對話已關閉；桌面仍可照常操作</translation>
+    </message>
+    <message>
+        <source>只完成了一部分；請查看變更卡</source>
+        <translation>只完成了一部分；請查看變更卡</translation>
+    </message>
+    <message>
+        <source>可以描述想調整的桌面</source>
+        <translation>可以描述想調整的桌面</translation>
+    </message>
+    <message>
+        <source>完成；可以在變更紀錄撤銷</source>
+        <translation>完成；可以在變更紀錄撤銷</translation>
+    </message>
+    <message>
+        <source>已停止</source>
+        <translation>已停止</translation>
+    </message>
+    <message>
+        <source>桌面服務未連線</source>
+        <translation>桌面服務未連線</translation>
+    </message>
+    <message>
+        <source>桌面變更沒有完成；請查看變更卡</source>
+        <translation>桌面變更沒有完成；請查看變更卡</translation>
+    </message>
+    <message>
+        <source>模型尚未連接；桌面仍可照常操作</source>
+        <translation>模型尚未連接；桌面仍可照常操作</translation>
+    </message>
+    <message>
+        <source>模型後端無法使用</source>
+        <translation>模型後端無法使用</translation>
+    </message>
+    <message>
+        <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
+        <translation>模型沒有回應；桌面沒有被改動，可以再試一次</translation>
+    </message>
+    <message>
+        <source>正在停止</source>
+        <translation>正在停止</translation>
+    </message>
+    <message>
+        <source>正在啟動對話</source>
+        <translation>正在啟動對話</translation>
+    </message>
+    <message>
+        <source>正在套用並確認桌面變更</source>
+        <translation>正在套用並確認桌面變更</translation>
+    </message>
+    <message>
+        <source>正在理解需求；可停止</source>
+        <translation>正在理解需求；可停止</translation>
+    </message>
+    <message>
+        <source>沒有完成；可以再試一次</source>
+        <translation>沒有完成；可以再試一次</translation>
+    </message>
+    <message>
+        <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
+        <translation>結果尚未確認；不要重複送出，請查看變更紀錄</translation>
+    </message>
+    <message>
+        <source>訂閱額度已用完；等額度重設後再試</source>
+        <translation>訂閱額度已用完；等額度重設後再試</translation>
+    </message>
+    <message>
+        <source>需要你的確認</source>
+        <translation>需要你的確認</translation>
     </message>
 </context>
 <context>

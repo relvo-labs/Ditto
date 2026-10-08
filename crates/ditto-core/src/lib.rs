@@ -4,6 +4,9 @@
 //! both directions: clients call `desktop.*` capabilities, Core calls its
 //! transaction participants (`participant.*`) and hostd (`host.invoke`).
 
+pub mod agent_backend;
+pub mod agent_manager;
+pub mod agent_routes;
 pub mod authz;
 pub mod coordinator;
 pub mod core;
@@ -253,6 +256,23 @@ fn handshake(
     ));
     let host_generation = match input.client.kind.as_str() {
         "hostd" => Some(core.hosts.attach(Arc::clone(&peer))),
+        "agent" => {
+            let managed = core.agent.attach(Arc::clone(&peer));
+            // Production never falls back to G1's uncorrelated stand-in.
+            // Development sockets and explicit fault builds remain fixtures,
+            // and are not evidence of bound production Agent authority.
+            if !managed
+                && matches!(auth_mode, AuthMode::LauncherRegistry(_))
+                && !cfg!(feature = "fault-injection")
+            {
+                return Err(reject(
+                    id,
+                    ErrorName::IdentityRejected,
+                    "Agent must be started by the dedicated Core supervisor",
+                ));
+            }
+            None
+        }
         "quickshell" => {
             core.shell.attach(Arc::clone(&peer));
             // A (re)connected Shell mounts what is committed, never a half
@@ -767,6 +787,13 @@ fn serve_connection_with_auth(
     if let Some(connection) = &connection {
         connection.gone.store(true, Ordering::SeqCst);
         connection.peer.close();
+        if connection.kind == "agent" {
+            let owner = connection.connection_id.clone();
+            core.submit(move |c| {
+                let _ = ditto_store::conversations::release_connection(c.store(), &owner);
+                let _ = ditto_store::turns::interrupt_connection(c.store(), Some(&owner));
+            });
+        }
         match connection.kind.as_str() {
             "hostd" => {
                 if let Some(generation) = connection.host_generation {

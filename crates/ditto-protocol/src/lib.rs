@@ -2,6 +2,7 @@
 //! of crate versions. A required field or changed meaning needs a new contract
 //! version; an optional field does not.
 
+pub mod agent;
 pub mod catalog;
 pub mod change;
 pub mod host;
@@ -16,10 +17,10 @@ pub mod services;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// 0.2 is not wire-compatible with 0.1: `ResultMeta.revision` split in two,
-/// requests flow in both directions, and `preflight_rejected` joined the error
-/// set. A 0.1 client is refused at the handshake instead of being guessed at.
-pub const PROTOCOL_VERSION: &str = "0.2.0";
+/// Protocol 0.3 adds Core-owned Agent state, approvals and entry upgrades.
+/// Older clients are rejected at handshake; storage migration preserves
+/// immutable revisions and backs up the previous database before upgrading.
+pub const PROTOCOL_VERSION: &str = "0.3.0";
 
 /// How a controlled launcher hands a client its one-use token: on an inherited
 /// descriptor, so the secret never appears in the client's environment, which
@@ -172,16 +173,20 @@ pub enum EventTopic {
     Notifications,
     Tasks,
     Session,
+    /// Conversation and turn progress. Ids and states only: the content is
+    /// read through `agent.sessions.read`, under that capability's own scope.
+    Conversations,
 }
 
 impl EventTopic {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Desktop,
         Self::Changes,
         Self::Plugins,
         Self::Notifications,
         Self::Tasks,
         Self::Session,
+        Self::Conversations,
     ];
 }
 
@@ -262,6 +267,19 @@ pub enum DesktopEventPayload {
     SessionChanged {
         state: services::SessionState,
     },
+    /// A conversation gained accepted events, or a turn changed state.
+    /// `next_seq` is Core's cursor after the change; `deleted` marks a
+    /// conversation that no longer exists.
+    ConversationUpdated {
+        session_id: String,
+        next_seq: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        turn_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        turn_state: Option<agent::TurnState>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        deleted: bool,
+    },
 }
 
 impl DesktopEventPayload {
@@ -286,6 +304,7 @@ impl DesktopEventPayload {
             Self::HostEvent { name, .. } if name.starts_with("tasks/") => EventTopic::Tasks,
             Self::HostEvent { .. } => EventTopic::Plugins,
             Self::SessionChanged { .. } => EventTopic::Session,
+            Self::ConversationUpdated { .. } => EventTopic::Conversations,
         })
     }
 }

@@ -37,7 +37,7 @@ describe('ditto-plugin (built CLI)', () => {
     const out = join(scratch, 'out')
     const result = run('pack', dir, '--out', `${out}/`)
     expect(result.status).toBe(0)
-    const file = join(out, 'ditto.svc.notification-policy-1.0.0.dittopkg')
+    const file = join(out, 'ditto.svc.notification-policy-1.1.0.dittopkg')
     expect(existsSync(file)).toBe(true)
     expect(result.stdout).toMatch(/^sha256:[0-9a-f]{64}  /)
     const bundle = spawnSync('tar', ['--zstd', '-xOf', file, 'dist/index.mjs'], { encoding: 'utf8' }).stdout

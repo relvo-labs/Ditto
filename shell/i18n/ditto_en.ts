@@ -2,6 +2,77 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en" sourcelanguage="zh_TW">
 <context>
+    <name>ApprovalWindow</name>
+    <message>
+        <source>Agent 的說明（未經驗證）：</source>
+        <translation>The Agent's note (not verified): </translation>
+    </message>
+    <message>
+        <source>Ditto 想在這次對話中做一件需要你同意的事：</source>
+        <translation>In this conversation Ditto wants to do something that needs your consent:</translation>
+    </message>
+    <message>
+        <source>Ditto 需要你的確認</source>
+        <translation>Ditto needs your confirmation</translation>
+    </message>
+    <message>
+        <source>使用一項桌面能力</source>
+        <translation>Use a desktop capability</translation>
+    </message>
+    <message>
+        <source>允許這一次</source>
+        <translation>Allow this once</translation>
+    </message>
+    <message>
+        <source>只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。</source>
+        <translation>This allows it once; Ditto asks again next time. Refusing leaves your desktop as it is.</translation>
+    </message>
+    <message>
+        <source>安裝或管理插件</source>
+        <translation>Install or manage plugins</translation>
+    </message>
+    <message>
+        <source>拒絕</source>
+        <translation>Refuse</translation>
+    </message>
+    <message>
+        <source>新增或完成待辦事項</source>
+        <translation>Add or complete tasks</translation>
+    </message>
+    <message>
+        <source>查看目前開啟的視窗、工作區與螢幕</source>
+        <translation>See the open windows, workspaces and screens</translation>
+    </message>
+    <message>
+        <source>確認請求</source>
+        <translation>Confirmation request</translation>
+    </message>
+    <message>
+        <source>移動、調整大小、切換或要求關閉視窗</source>
+        <translation>Move, resize, switch or ask to close windows</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>讀取待辦事項</source>
+        <translation>Read your tasks</translation>
+    </message>
+    <message>
+        <source>讀取通知內容</source>
+        <translation>Read your notifications</translation>
+    </message>
+    <message>
+        <source>鎖定螢幕</source>
+        <translation>Lock the screen</translation>
+    </message>
+    <message>
+        <source>開啟應用程式</source>
+        <translation>Open applications</translation>
+    </message>
+</context>
+<context>
     <name>Avatar</name>
     <message>
         <source>待命中</source>
@@ -338,6 +409,93 @@
     </message>
 </context>
 <context>
+    <name>ChatWindow</name>
+    <message>
+        <source>AI 對話目前關閉。開啟後才會連接模型。</source>
+        <translation>AI chat is off. The model is connected only after you turn it on.</translation>
+    </message>
+    <message>
+        <source>Ditto 對話</source>
+        <translation>Ditto chat</translation>
+    </message>
+    <message>
+        <source>Ditto：</source>
+        <translation>Ditto: </translation>
+    </message>
+    <message>
+        <source>你：</source>
+        <translation>You: </translation>
+    </message>
+    <message>
+        <source>使用 Codex 訂閱登入</source>
+        <translation>Sign in with your Codex subscription</translation>
+    </message>
+    <message>
+        <source>使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。</source>
+        <translation>Sign in with your Codex subscription to chat. Ditto never switches to the paid API.</translation>
+    </message>
+    <message>
+        <source>停止</source>
+        <translation>Stop</translation>
+    </message>
+    <message>
+        <source>取消登入</source>
+        <translation>Cancel sign-in</translation>
+    </message>
+    <message>
+        <source>對話內容</source>
+        <translation>Conversation</translation>
+    </message>
+    <message>
+        <source>尚無配額資料</source>
+        <translation>No quota data yet</translation>
+    </message>
+    <message>
+        <source>已登入</source>
+        <translation>Signed in</translation>
+    </message>
+    <message>
+        <source>描述想調整的桌面，例如「開啟通知專注模式」</source>
+        <translation>Describe what to change, for example “turn on notification focus mode”</translation>
+    </message>
+    <message>
+        <source>新對話</source>
+        <translation>New conversation</translation>
+    </message>
+    <message>
+        <source>訊息</source>
+        <translation>Message</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>請在瀏覽器完成登入。完成後這裡會自動更新。</source>
+        <translation>Finish signing in in your browser. This updates by itself when you are done.</translation>
+    </message>
+    <message>
+        <source>送出</source>
+        <translation>Send</translation>
+    </message>
+    <message>
+        <source>送出中</source>
+        <translation>Sending</translation>
+    </message>
+    <message>
+        <source>重新開啟登入頁</source>
+        <translation>Open the sign-in page again</translation>
+    </message>
+    <message>
+        <source>開啟 AI 對話</source>
+        <translation>Turn on AI chat</translation>
+    </message>
+    <message>
+        <source>額度已用 %1%</source>
+        <translation>%1% of quota used</translation>
+    </message>
+</context>
+<context>
     <name>CompositionCenter</name>
     <message>
         <source>「%1」的版本</source>
@@ -598,6 +756,81 @@
     <message>
         <source>（未設定）</source>
         <translation>(not set)</translation>
+    </message>
+</context>
+<context>
+    <name>ConversationState</name>
+    <message>
+        <source>AI 對話已關閉；桌面仍可照常操作</source>
+        <translation>AI chat is off; the desktop works as usual</translation>
+    </message>
+    <message>
+        <source>只完成了一部分；請查看變更卡</source>
+        <translation>Only partly done; see the change card</translation>
+    </message>
+    <message>
+        <source>可以描述想調整的桌面</source>
+        <translation>Describe what to change on the desktop</translation>
+    </message>
+    <message>
+        <source>完成；可以在變更紀錄撤銷</source>
+        <translation>Done; you can undo it in the change history</translation>
+    </message>
+    <message>
+        <source>已停止</source>
+        <translation>Stopped</translation>
+    </message>
+    <message>
+        <source>桌面服務未連線</source>
+        <translation>Desktop service not connected</translation>
+    </message>
+    <message>
+        <source>桌面變更沒有完成；請查看變更卡</source>
+        <translation>The desktop change did not complete; see the change card</translation>
+    </message>
+    <message>
+        <source>模型尚未連接；桌面仍可照常操作</source>
+        <translation>No model connected yet; the desktop works as usual</translation>
+    </message>
+    <message>
+        <source>模型後端無法使用</source>
+        <translation>The model backend is unavailable</translation>
+    </message>
+    <message>
+        <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
+        <translation>The model did not answer; nothing on the desktop changed. You can try again</translation>
+    </message>
+    <message>
+        <source>正在停止</source>
+        <translation>Stopping</translation>
+    </message>
+    <message>
+        <source>正在啟動對話</source>
+        <translation>Starting the chat</translation>
+    </message>
+    <message>
+        <source>正在套用並確認桌面變更</source>
+        <translation>Applying and checking the desktop change</translation>
+    </message>
+    <message>
+        <source>正在理解需求；可停止</source>
+        <translation>Working out what you asked; you can stop it</translation>
+    </message>
+    <message>
+        <source>沒有完成；可以再試一次</source>
+        <translation>Not done; you can try again</translation>
+    </message>
+    <message>
+        <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
+        <translation>The result is not confirmed yet; do not send it again — see the change history</translation>
+    </message>
+    <message>
+        <source>訂閱額度已用完；等額度重設後再試</source>
+        <translation>Subscription quota used up; try again after it resets</translation>
+    </message>
+    <message>
+        <source>需要你的確認</source>
+        <translation>Needs your confirmation</translation>
     </message>
 </context>
 <context>

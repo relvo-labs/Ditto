@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capability_id": {
+      "type": "string"
+    },
+    "intent_id": {
+      "type": "string"
+    },
+    "payload_hash": {
+      "type": "string"
+    },
+    "previous_result": true,
+    "tool_call_id": {
+      "type": "string"
+    },
+    "turn_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "intent_id",
+    "turn_id",
+    "tool_call_id",
+    "capability_id",
+    "payload_hash"
+  ],
+  "title": "ToolIntent",
+  "type": "object"
+}

@@ -10,6 +10,17 @@ pub struct WriterLock {
     _file: File,
 }
 
+impl Drop for WriterLock {
+    fn drop(&mut self) {
+        // Other threads can fork between our last use and close. Their
+        // CLOEXEC copy must not extend this writer's lock until exec finishes.
+        // Explicitly release the owned open-file description before closing.
+        unsafe {
+            libc::flock(self._file.as_raw_fd(), libc::LOCK_UN);
+        }
+    }
+}
+
 impl WriterLock {
     /// Non-blocking: a second writer is refused, never queued behind the
     /// first, so rescue learns immediately that Core is still running.

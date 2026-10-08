@@ -241,6 +241,10 @@
             }
           ]
         },
+        "approval_responder": {
+          "description": "The Shell shows approval requests and can answer them. Without it an\nAgent's approval request is recorded as unavailable at once: nobody\nwould see it, and waiting would only stall the turn.",
+          "type": "boolean"
+        },
         "avatar": {
           "anyOf": [
             {

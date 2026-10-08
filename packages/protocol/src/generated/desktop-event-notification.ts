@@ -85,6 +85,15 @@ export type DesktopEventPayload =
       state: SessionState;
       type: 'session_changed';
       [k: string]: unknown;
+    }
+  | {
+      deleted?: boolean;
+      next_seq: number;
+      session_id: string;
+      turn_id?: string | null;
+      turn_state?: TurnState | null;
+      type: 'conversation_updated';
+      [k: string]: unknown;
     };
 /**
  * An opaque identifier valid only for the current compositor session.
@@ -127,6 +136,13 @@ export type ChangeOrigin =
       [k: string]: unknown;
     }
   | {
+      kind: 'agent';
+      session_id: string;
+      tool_call_id: string;
+      turn_id: string;
+      [k: string]: unknown;
+    }
+  | {
       kind: 'rescue';
       [k: string]: unknown;
     }
@@ -166,6 +182,16 @@ export type ChangeState =
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type PolicyDecision = 'show' | 'merge' | 'silence';
 export type Urgency = 'low' | 'normal' | 'critical';
+export type TurnState =
+  | 'queued'
+  | 'running'
+  | 'awaiting_approval'
+  | 'cancelling'
+  | 'succeeded'
+  | 'failed'
+  | 'partial'
+  | 'unknown'
+  | 'cancelled';
 
 export interface DesktopEventNotification {
   payload: DesktopEventPayload;

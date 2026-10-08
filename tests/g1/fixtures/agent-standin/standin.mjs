@@ -20,7 +20,7 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { Socket } from 'node:net';
 
-const PROTOCOL = '0.2.0';
+const PROTOCOL = '0.3.0';
 
 function socketPath() {
   if (process.env.DITTO_CORE_SOCKET) return process.env.DITTO_CORE_SOCKET;

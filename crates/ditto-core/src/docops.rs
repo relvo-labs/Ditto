@@ -238,6 +238,30 @@ pub fn apply(base: &ProfileDocument, ops: &[ChangeOp]) -> Applied {
                     after: after.clone(),
                 });
             }
+            ChangeOp::UpgradeEntry {
+                entry_id,
+                from_version,
+                to_version,
+            } => {
+                if semver::Version::parse(to_version).is_err() {
+                    reasons.push(reason(
+                        PreflightCode::SchemaInvalid,
+                        at,
+                        json!({"entry_id":entry_id,"why":"invalid_package_version"}),
+                    ));
+                }
+                match document.entry_mut(entry_id) {
+                    Some(entry) if entry.version == *from_version => {
+                        entry.version = to_version.clone()
+                    }
+                    _ => reasons.push(reason(
+                        PreflightCode::StaleIntent,
+                        at,
+                        json!({"entry_id":entry_id,"why":"package_version_changed"}),
+                    )),
+                }
+                normalized.push(op.clone());
+            }
             ChangeOp::SetEntryDisabled { entry_id, disabled } => {
                 match document.entry_mut(entry_id) {
                     Some(entry) => entry.disabled = *disabled,
@@ -632,6 +656,13 @@ pub fn ops_between(current: &ProfileDocument, target: &ProfileDocument) -> Vec<C
                 entry_id: entry.entry_id.clone(),
             }),
             Some(old) => {
+                if old.version != entry.version {
+                    ops.push(ChangeOp::UpgradeEntry {
+                        entry_id: entry.entry_id.clone(),
+                        from_version: entry.version.clone(),
+                        to_version: old.version.clone(),
+                    });
+                }
                 if old.config != entry.config {
                     ops.push(ChangeOp::SetEntryConfig {
                         entry_id: entry.entry_id.clone(),

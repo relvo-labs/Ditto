@@ -60,6 +60,12 @@ export type ChangeOp =
       op: 'set_entry_disabled';
     }
   | {
+      entry_id: string;
+      from_version: string;
+      op: 'upgrade_entry';
+      to_version: string;
+    }
+  | {
       from?: string | null;
       op: 'bind_slot';
       slot: string;
@@ -83,6 +89,13 @@ export type ChangeOrigin =
     }
   | {
       kind: 'agent_standin';
+      [k: string]: unknown;
+    }
+  | {
+      kind: 'agent';
+      session_id: string;
+      tool_call_id: string;
+      turn_id: string;
       [k: string]: unknown;
     }
   | {

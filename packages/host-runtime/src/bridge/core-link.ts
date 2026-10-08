@@ -3,7 +3,7 @@ import type { Duplex } from 'node:stream'
 import { DittoError } from '../errors.ts'
 import { RpcPeer } from './rpc.ts'
 
-export const protocolVersion = '0.2.0'
+export const protocolVersion = '0.3.0'
 
 export interface CallOptions {
   /** Entry this call is made for; Core maps it to `host:<entry_id>` if it assigned that entry here. */

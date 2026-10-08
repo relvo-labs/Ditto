@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "TurnState": {
+      "enum": [
+        "queued",
+        "running",
+        "awaiting_approval",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "partial",
+        "unknown",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "type": "string"
+    },
+    "error_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "operation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "settings_revision": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "state": {
+      "$ref": "#/$defs/TurnState"
+    },
+    "tool_calls": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "turn_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "turn_id",
+    "session_id",
+    "state",
+    "created_at",
+    "settings_revision",
+    "tool_calls",
+    "operation_ids"
+  ],
+  "title": "Turn",
+  "type": "object"
+}

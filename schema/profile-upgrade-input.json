@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_revision": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "profile_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "base_revision",
+    "idempotency_key"
+  ],
+  "title": "ProfileUpgradeInput",
+  "type": "object"
+}

@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "RuntimePhase": {
+      "enum": [
+        "stopped",
+        "starting",
+        "ready",
+        "draining",
+        "failed"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "active_turns": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "backend_pid": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "controller_pid": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "failure_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generation": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "installed": {
+      "type": "boolean"
+    },
+    "isolation_verified": {
+      "type": "boolean"
+    },
+    "phase": {
+      "$ref": "#/$defs/RuntimePhase"
+    }
+  },
+  "required": [
+    "installed",
+    "phase",
+    "generation",
+    "active_turns",
+    "isolation_verified"
+  ],
+  "title": "AgentRuntimeStatus",
+  "type": "object"
+}

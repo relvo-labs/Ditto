@@ -1,0 +1,72 @@
+{
+  "package": "@deepseek-ai/dsh-llm (selected value modules), dsh-brand, dsh-util-values, dsh-util-crypto, attachment types",
+  "version": "0.1.7-rc.2",
+  "upstream_repo": "https://github.com/deepseek-ai/deepseek-harness",
+  "upstream_commit": "477b4f420553e8a52c2fbccc464d7561b239c443",
+  "port_kind": "薄轉接",
+  "modifications": [],
+  "host_contract": "One Ditto Agent Cordis controller; Rust Core owns durable state. Module aliases resolve the unmodified selected sources. LlmRuntime/Agent/PTC are not included.",
+  "trust_level": "trusted first-party adapter; assembler is pure value processing, not a sandbox",
+  "license": "MIT; vendor/harness/LICENSE must accompany bundles",
+  "test_matrix": [
+    "tests/harness.test.ts: pending execution",
+    "tests/session.test.ts: pending execution",
+    "tests/codex.test.ts: pending execution"
+  ],
+  "files": [
+    {
+      "file": "llm/assembler.ts",
+      "upstream_file": "packages/llm/llm/src/assembler.ts",
+      "sha256": "a2d065645058a70195a504b101e9eed23df3eaced3def868d602f3a863b03887",
+      "modifications": []
+    },
+    {
+      "file": "llm/message.ts",
+      "upstream_file": "packages/llm/llm/src/message.ts",
+      "sha256": "5826fb32bc3d6e2221a7a39cc8b4fecc57282540a332417bb9f2ac3522b5c7da",
+      "modifications": []
+    },
+    {
+      "file": "llm/types.ts",
+      "upstream_file": "packages/llm/llm/src/types.ts",
+      "sha256": "f5206fd5daf18d3899202c96ca0edb6e7c1a10ddc535edead062ed28f2261b2d",
+      "modifications": []
+    },
+    {
+      "file": "llm/brand.ts",
+      "upstream_file": "packages/llm/llm/src/brand.ts",
+      "sha256": "a3a3f22174353af8aea34a9a439986530bffcc6df6339e55612fd5a1fa4fb14c",
+      "modifications": []
+    },
+    {
+      "file": "brand/index.ts",
+      "upstream_file": "packages/util/brand/src/index.ts",
+      "sha256": "f9d6da858d7308117227dcc2306ce7246b7309b2ae22d413d289cbae51e83e98",
+      "modifications": []
+    },
+    {
+      "file": "values/index.ts",
+      "upstream_file": "packages/util/values/src/index.ts",
+      "sha256": "6968960415feba883163314f4eb6e71497a18131d571bc300070fd16c2c359b1",
+      "modifications": []
+    },
+    {
+      "file": "crypto/index.ts",
+      "upstream_file": "packages/util/crypto/src/index.ts",
+      "sha256": "6d314b677a163808a732c53fc509eebea1f8b8cc34b67031644dcfa4a97e28f0",
+      "modifications": []
+    },
+    {
+      "file": "attachment/types.ts",
+      "upstream_file": "packages/attachment/attachment/src/types.ts",
+      "sha256": "893a8d2501251873d7a885ac9d7249f9a79c3e71e18ef921c260bf56e2c6c354",
+      "modifications": []
+    },
+    {
+      "file": "attachment/brand.ts",
+      "upstream_file": "packages/attachment/attachment/src/brand.ts",
+      "sha256": "558fa7aca6f787a568ca27d6bb7c5eb4747d56c811c625d4cb78d4885630064f",
+      "modifications": []
+    }
+  ]
+}

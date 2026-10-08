@@ -1,0 +1,16 @@
+{
+  "kind": "shape",
+  "description": "shape-unknown-turn-state",
+  "type": "turn",
+  "valid": false,
+  "value": {
+    "turn_id": "turn-1",
+    "session_id": "ses-1",
+    "state": "model_says_done",
+    "created_at": "2026-10-08",
+    "settings_revision": 0,
+    "tool_calls": 0,
+    "operation_ids": [],
+    "error_reason": null
+  }
+}

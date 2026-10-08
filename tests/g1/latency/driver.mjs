@@ -165,7 +165,7 @@ async function session(localCount, dockCount) {
   // composition center does for an entry already in the composition.
   let profile = await must('desktop.profiles.get', {});
   const bottom = profile.document.slots['ui.dock'];
-  const pill = await dockSwitch([{ op: 'add_entry', slot: 'ui.dock', entry: { package: 'ditto.dock.pill', version: '1.0.0', host: 'qml', config: {}, disabled: false } }], 'pill', true);
+  const pill = await dockSwitch([{ op: 'add_entry', slot: 'ui.dock', entry: { package: 'ditto.dock.pill', version: '1.1.0', host: 'qml', config: {}, disabled: false } }], 'pill', true);
   if (!pill) throw new Error('adding the pill Dock did not commit');
   profile = await must('desktop.profiles.get', {});
   const pillEntry = profile.document.slots['ui.dock'];

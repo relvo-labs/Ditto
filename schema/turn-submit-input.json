@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "client_message_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "client_message_id",
+    "text"
+  ],
+  "title": "TurnSubmitInput",
+  "type": "object"
+}

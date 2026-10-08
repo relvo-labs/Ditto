@@ -31,6 +31,9 @@ use crate::{
 };
 
 pub struct CoreConfig {
+    pub agent: Option<Specification>,
+    /// The Agent's model backend, launched confined by Core (G2-PLAT-04).
+    pub agent_backend: Option<crate::agent_backend::BackendSpecification>,
     pub paths: Paths,
     pub mode: CoreMode,
     pub socket: PathBuf,
@@ -56,6 +59,8 @@ pub struct CoreConfig {
 impl CoreConfig {
     pub fn new(paths: Paths, socket: PathBuf) -> Self {
         Self {
+            agent: None,
+            agent_backend: None,
             paths,
             mode: CoreMode::Normal,
             socket,
@@ -99,6 +104,8 @@ pub struct SubscriptionInfo {
 }
 
 pub struct Core {
+    pub agent: Arc<crate::agent_manager::AgentManager>,
+    pub agent_storage_ready: bool,
     pub session: Arc<Session>,
     pub paths: Paths,
     pub mode: CoreMode,
@@ -204,7 +211,13 @@ impl Core {
         registry: Arc<IdentityRegistry>,
     ) -> StoreResult<Arc<Core>> {
         let lock = WriterLock::acquire(&config.paths.lock())?;
-        let (store, report) = Store::open_writer(&config.paths, &lock)?;
+        let (mut store, report) = Store::open_writer(&config.paths, &lock)?;
+        let agent_storage_ready = ditto_store::conversations::recover(&mut store)
+            .and_then(|_| ditto_store::turns::interrupt_connection(&mut store, None))
+            .is_ok();
+        if !agent_storage_ready {
+            crate::log::event("agent.storage_unavailable", &[]);
+        }
         let rescue = config.mode == CoreMode::Rescue;
         let hosts = Arc::new(HostManager::new(
             config.hostd.clone(),
@@ -222,6 +235,14 @@ impl Core {
         let compositor = Arc::new(CompositorParticipant::new(Arc::clone(&session)));
         let (sender, receiver) = mpsc::channel::<Work>();
         let core = Arc::new(Core {
+            agent: Arc::new(crate::agent_manager::AgentManager::new(
+                config.agent.clone(),
+                config.agent_backend.clone(),
+                Arc::clone(&registry),
+                config.socket.clone(),
+                config.paths.state.join("agent"),
+            )),
+            agent_storage_ready,
             session,
             paths: config.paths.clone(),
             mode: config.mode,
@@ -451,6 +472,12 @@ impl Core {
     /// Supervision every 250 ms: hostd heartbeat and leases, Shell restarts,
     /// the lock client, subscriptions of closed connections.
     fn supervise(&self) {
+        if let Some(connection) = self.agent.tick() {
+            self.submit(move |c| {
+                let _ = ditto_store::conversations::release_connection(c.store(), &connection);
+                let _ = ditto_store::turns::interrupt_connection(c.store(), Some(&connection));
+            });
+        }
         if let Some(generation) = self.hosts.tick() {
             self.hosts.detach(generation, "heartbeat_timeout");
         }

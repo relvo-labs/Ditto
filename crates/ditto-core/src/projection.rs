@@ -522,6 +522,7 @@ mod tests {
             appearance: Some(appearance()),
             avatar: Some(AvatarSettings::default()),
             avatar_placement: None,
+            approval_responder: false,
         };
         let all = check_shell(
             &target,

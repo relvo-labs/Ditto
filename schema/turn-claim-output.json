@@ -1,0 +1,191 @@
+{
+  "$defs": {
+    "AgentPreferences": {
+      "additionalProperties": false,
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderAuthentication"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_tool_calls": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "reasoning_effort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retain_conversations": {
+          "type": "boolean"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turn_timeout_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "enabled",
+        "provider",
+        "max_tool_calls",
+        "turn_timeout_ms",
+        "retain_conversations"
+      ],
+      "type": "object"
+    },
+    "ProviderAuthentication": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "connection_ref": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "codex_subscription",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "connection_ref"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "credential_ref": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "api_key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "credential_ref"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Turn": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "error_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "settings_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState"
+        },
+        "tool_calls": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turn_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_id",
+        "session_id",
+        "state",
+        "created_at",
+        "settings_revision",
+        "tool_calls",
+        "operation_ids"
+      ],
+      "type": "object"
+    },
+    "TurnState": {
+      "enum": [
+        "queued",
+        "running",
+        "awaiting_approval",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "partial",
+        "unknown",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "message_seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "settings": {
+      "$ref": "#/$defs/AgentPreferences"
+    },
+    "text": {
+      "type": "string"
+    },
+    "turn": {
+      "$ref": "#/$defs/Turn"
+    }
+  },
+  "required": [
+    "turn",
+    "text",
+    "message_seq",
+    "settings"
+  ],
+  "title": "TurnClaimOutput",
+  "type": "object"
+}

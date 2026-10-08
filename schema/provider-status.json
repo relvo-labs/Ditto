@@ -1,0 +1,135 @@
+{
+  "$defs": {
+    "ProviderModel": {
+      "additionalProperties": false,
+      "properties": {
+        "default_effort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "reasoning_efforts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "supports_images": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "reasoning_efforts",
+        "supports_images"
+      ],
+      "type": "object"
+    },
+    "ProviderRateLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "primary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderRateWindow"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secondary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderRateWindow"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ProviderRateWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "resets_at_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "used_percent": {
+          "format": "double",
+          "type": "number"
+        },
+        "window_minutes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "used_percent"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "account_label": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authenticated": {
+      "type": "boolean"
+    },
+    "available": {
+      "type": "boolean"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/ProviderModel"
+      },
+      "type": "array"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "rate_limits": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderRateLimits"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "available",
+    "provider",
+    "authenticated",
+    "models"
+  ],
+  "title": "ProviderStatus",
+  "type": "object"
+}

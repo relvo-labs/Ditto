@@ -8,7 +8,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::error::{StoreError, StoreResult};
 
-pub const CURRENT_VERSION: u32 = 1;
+pub const CURRENT_VERSION: u32 = 2;
 
 const V1: &str = r#"
 CREATE TABLE core_meta (
@@ -288,6 +288,39 @@ fn apply(transaction: &Transaction<'_>, version: u32) -> StoreResult<()> {
             transaction.execute_batch(V1)?;
             transaction.execute_batch(&transitions_sql())?;
         }
+        2 => transaction.execute_batch(r#"
+            CREATE TABLE conversations (
+                session_id TEXT PRIMARY KEY, header_json TEXT NOT NULL,
+                next_seq INTEGER NOT NULL DEFAULT 0, durable_seq INTEGER NOT NULL DEFAULT 0,
+                create_key TEXT NOT NULL UNIQUE, create_hash TEXT NOT NULL,
+                deleted_at TEXT, writer_connection TEXT, writer_lease TEXT
+            );
+            CREATE TABLE agent_preferences (
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                revision INTEGER NOT NULL, settings_json TEXT NOT NULL
+            );
+            CREATE TABLE agent_turns (
+                turn_id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES conversations(session_id),
+                client_message_id TEXT NOT NULL UNIQUE, input_hash TEXT NOT NULL,
+                state TEXT NOT NULL, turn_json TEXT NOT NULL, text_ref INTEGER NOT NULL,
+                owner_connection TEXT, updated_at TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX one_running_turn ON agent_turns(session_id)
+                WHERE state IN ('running','awaiting_approval','cancelling');
+            CREATE TABLE agent_tool_intents (
+                intent_id TEXT PRIMARY KEY, turn_id TEXT NOT NULL REFERENCES agent_turns(turn_id),
+                call_id TEXT NOT NULL, capability_id TEXT NOT NULL, payload_hash TEXT NOT NULL,
+                owner_connection TEXT NOT NULL, result_json TEXT, change_id TEXT,
+                execution_started INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(turn_id,call_id)
+            );
+            CREATE TABLE agent_approvals (
+                request_id TEXT PRIMARY KEY, approval_json TEXT NOT NULL,
+                principal TEXT NOT NULL, owner_connection TEXT NOT NULL,
+                expires_at_ms INTEGER NOT NULL, decided INTEGER NOT NULL DEFAULT 0,
+                consumed INTEGER NOT NULL DEFAULT 0
+            );
+        "#)?,
         other => return Err(StoreError::Invalid(format!("no migration to {other}"))),
     }
     transaction.pragma_update(None, "user_version", version)?;
@@ -308,4 +341,89 @@ pub fn migrate(connection: &mut Connection) -> StoreResult<u32> {
         transaction.commit()?;
     }
     Ok(start)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn v1_migration_preserves_profiles_and_creates_a_readable_v1_backup() {
+        let root = crate::testing::temp_root("v1-migration");
+        let paths = crate::Paths::under(&root);
+        paths.create().unwrap();
+        let lock = crate::WriterLock::acquire(&paths.lock()).unwrap();
+        let mut db = Connection::open(paths.database()).unwrap();
+        configure(&db).unwrap();
+        let document = ditto_protocol::profile::ProfileDocument {
+            schema_version: 1,
+            entries: vec![],
+            slots: Default::default(),
+            shortcuts: vec![],
+            avatar: Default::default(),
+            layout: ditto_protocol::profile::LayoutIntent {
+                workspace_grid: [3, 3],
+                rules: vec![],
+            },
+            appearance: ditto_protocol::profile::Appearance {
+                theme: "legacy".into(),
+                tokens: Default::default(),
+                reduced_motion: false,
+                reduced_transparency: false,
+                low_power_style: false,
+                locale: "zh-TW".into(),
+            },
+        };
+        let tx = db.transaction().unwrap();
+        apply(&tx, 1).unwrap();
+        let (profile, revision) = crate::profiles::create(
+            &tx,
+            "legacy",
+            &document,
+            &ditto_protocol::profile::RevisionOrigin::Create {
+                from: "default".into(),
+            },
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        drop(db);
+        let (store, report) = crate::Store::open_writer(&paths, &lock).unwrap();
+        assert_eq!(report.migrated_from, Some(1));
+        let backup = Connection::open(report.backup.unwrap()).unwrap();
+        assert_eq!(user_version(&backup).unwrap(), 1);
+        assert_eq!(
+            crate::profiles::get(&backup, &profile.profile_id)
+                .unwrap()
+                .head_revision,
+            revision.revision_id
+        );
+        assert_eq!(
+            crate::profiles::get(store.connection(), &profile.profile_id)
+                .unwrap()
+                .head_revision,
+            revision.revision_id
+        );
+        drop(store);
+        drop(backup);
+        drop(lock);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn a_failed_v2_migration_rolls_back_all_new_tables() {
+        let mut db = Connection::open_in_memory().unwrap();
+        let tx = db.transaction().unwrap();
+        apply(&tx, 1).unwrap();
+        tx.commit().unwrap();
+        db.execute("CREATE TABLE agent_preferences (wrong TEXT)", [])
+            .unwrap();
+        assert!(migrate(&mut db).is_err());
+        assert_eq!(user_version(&db).unwrap(), 1);
+        let conversations: bool = db
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='conversations')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!conversations);
+    }
 }

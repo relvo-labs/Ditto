@@ -37,6 +37,12 @@ export type ChangeOp =
       op: 'set_entry_disabled';
     }
   | {
+      entry_id: string;
+      from_version: string;
+      op: 'upgrade_entry';
+      to_version: string;
+    }
+  | {
       from?: string | null;
       op: 'bind_slot';
       slot: string;

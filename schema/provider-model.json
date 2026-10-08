@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "default_effort": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "id": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "reasoning_efforts": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "supports_images": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "label",
+    "reasoning_efforts",
+    "supports_images"
+  ],
+  "title": "ProviderModel",
+  "type": "object"
+}

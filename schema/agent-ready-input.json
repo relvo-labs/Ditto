@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The controller reports readiness only. Backend identity and isolation are\nknown to Core from its own launch and are never taken from this message.",
+  "title": "AgentReadyInput",
+  "type": "object"
+}

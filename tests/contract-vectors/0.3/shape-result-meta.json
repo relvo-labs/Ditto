@@ -1,0 +1,2 @@
+{"kind": "shape", "description": "ResultMeta 拆成 observed_seq 與 profile_revision", "type": "result-meta", "valid": true,
+ "value": {"observed_seq": 412, "profile_revision": null, "readback_verified": true}}

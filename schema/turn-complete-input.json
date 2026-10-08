@@ -1,0 +1,40 @@
+{
+  "$defs": {
+    "TurnState": {
+      "enum": [
+        "queued",
+        "running",
+        "awaiting_approval",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "partial",
+        "unknown",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "error_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "state": {
+      "$ref": "#/$defs/TurnState"
+    },
+    "turn_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "turn_id",
+    "state"
+  ],
+  "title": "TurnCompleteInput",
+  "type": "object"
+}

@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "SessionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "data": true,
+        "seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/$defs/SessionEventKind"
+        }
+      },
+      "required": [
+        "seq",
+        "type",
+        "data"
+      ],
+      "type": "object"
+    },
+    "SessionEventKind": {
+      "description": "Restricted Harness vocabulary (pinned 477b4f4); unknown required events\nrefuse decoding rather than silently reconstructing a different history.",
+      "enum": [
+        "user/message",
+        "assistant/message",
+        "turn/start",
+        "turn/end",
+        "tool/call",
+        "tool/result",
+        "approval/asked",
+        "approval/decided",
+        "model/selection",
+        "compaction/summary",
+        "session/title",
+        "request/context"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "batch_id": {
+      "type": "string"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/SessionEvent"
+      },
+      "type": "array"
+    },
+    "expected_next_seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "writer_lease": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "writer_lease",
+    "batch_id",
+    "expected_next_seq",
+    "events"
+  ],
+  "title": "SessionAppendInput",
+  "type": "object"
+}

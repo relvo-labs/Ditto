@@ -1,6 +1,6 @@
 /* Generated from schema/events-subscribe-input.json; do not edit. */
 
-export type EventTopic = 'desktop' | 'changes' | 'plugins' | 'notifications' | 'tasks' | 'session';
+export type EventTopic = ('desktop' | 'changes' | 'plugins' | 'notifications' | 'tasks' | 'session') | 'conversations';
 
 export interface EventsSubscribeInput {
   after_seq?: number | null;

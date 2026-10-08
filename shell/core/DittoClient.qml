@@ -28,7 +28,7 @@ QtObject {
     readonly property string socketPath: Quickshell.env("DITTO_CORE_SOCKET")
         || ((Quickshell.env("DITTO_RUNTIME_DIR")
             || (Quickshell.env("XDG_RUNTIME_DIR") + "/ditto")) + "/core.sock")
-    readonly property string protocolVersion: "0.2.0"
+    readonly property string protocolVersion: "0.3.0"
     property var counter: null
     property var tr: null
     /// Answers `participant.*`: an object with handle(method, params, reply).
@@ -91,6 +91,9 @@ QtObject {
     signal jobUpdated(var job)
     signal hostEvent(string entryId, string name, var payload)
     signal resynced()
+    signal disconnected()
+    /// Core asks the Shell to show an Agent approval request.
+    signal approvalRequested(var approval)
 
     // ---- internals -------------------------------------------------------------------
     property string token: ""
@@ -103,6 +106,7 @@ QtObject {
     /// Other subscriptions on this connection: id → { lastSeq, onEvent, onLost }.
     property var extraSubscriptions: ({})
     property string tasksSubscription: ""
+    property int extraSubscribing: 0
     property int tasksWatchers: 0
 
     function t(source) {
@@ -531,6 +535,29 @@ QtObject {
         });
     }
 
+    // ---- other topics (own subscriptions) ---------------------------------------------
+    /// Subscribe to `topics` on a subscription of its own: `onEvent(payload)`
+    /// for each event, `onLost()` when the chain breaks (resubscribe and
+    /// re-read then), `onReady(result)` with the subscription's start.
+    function watchTopics(topics, onEvent, onLost, onReady, onError) {
+        extraSubscribing += 1;
+        capability("desktop.events.subscribe", { topics: topics }, function (result) {
+            extraSubscribing = Math.max(0, extraSubscribing - 1);
+            const table = Object.assign({}, extraSubscriptions);
+            table[result.subscription_id] = { lastSeq: result.seq, onEvent: onEvent, onLost: onLost };
+            extraSubscriptions = table;
+            if (onReady) {
+                onReady(result);
+            }
+            replayBuffered();
+        }, function (error) {
+            extraSubscribing = Math.max(0, extraSubscribing - 1);
+            if (onError) {
+                onError(error);
+            }
+        });
+    }
+
     function refreshTasks() {
         capability("desktop.tasks.list", {}, function (result) {
             tasks = result;
@@ -583,7 +610,7 @@ QtObject {
         }
         // An event may overtake the answer to the subscribe that created its
         // subscription; keep it until that answer arrives.
-        if (subscribing || tasksStatus === "loading") {
+        if (subscribing || tasksStatus === "loading" || extraSubscribing > 0) {
             buffered = buffered.concat([notification]);
         }
     }
@@ -702,6 +729,8 @@ QtObject {
         if (message.method !== undefined) {
             if (message.method === "desktop.events") {
                 applyEvent(message.params);
+            } else if (message.method === "desktop.approval_requested") {
+                approvalRequested(message.params || {});
             } else if (message.method === "shell.command") {
                 const params = message.params || {};
                 console.log("ditto-shell command " + params.command_id);
@@ -804,7 +833,9 @@ QtObject {
             client.buffered = [];
             client.extraSubscriptions = {};
             client.tasksSubscription = "";
+            client.extraSubscribing = 0;
             client.failPending("disconnected");
+            client.disconnected();
             client.changed();
         }
     }

@@ -19,7 +19,7 @@
   "platform": [
     "linux-x86_64"
   ],
-  "required_protocol_version": "^0.2",
+  "required_protocol_version": "^0.3",
   "slots": [],
   "provides": [
     {

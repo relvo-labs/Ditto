@@ -47,6 +47,30 @@
         {
           "properties": {
             "kind": {
+              "const": "agent",
+              "type": "string"
+            },
+            "session_id": {
+              "type": "string"
+            },
+            "tool_call_id": {
+              "type": "string"
+            },
+            "turn_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "session_id",
+            "turn_id",
+            "tool_call_id"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
               "const": "rescue",
               "type": "string"
             }
@@ -540,6 +564,48 @@
             "state"
           ],
           "type": "object"
+        },
+        {
+          "description": "A conversation gained accepted events, or a turn changed state.\n`next_seq` is Core's cursor after the change; `deleted` marks a\nconversation that no longer exists.",
+          "properties": {
+            "deleted": {
+              "type": "boolean"
+            },
+            "next_seq": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "session_id": {
+              "type": "string"
+            },
+            "turn_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "turn_state": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TurnState"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "const": "conversation_updated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session_id",
+            "next_seq"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -789,6 +855,20 @@
         "logind_available"
       ],
       "type": "object"
+    },
+    "TurnState": {
+      "enum": [
+        "queued",
+        "running",
+        "awaiting_approval",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "partial",
+        "unknown",
+        "cancelled"
+      ],
+      "type": "string"
     },
     "Urgency": {
       "enum": [

@@ -112,7 +112,7 @@ pub struct CapabilitiesListOutput {
     pub capabilities: Vec<CapabilityDescriptor>,
 }
 
-pub const CATALOG_REVISION: u64 = 4;
+pub const CATALOG_REVISION: u64 = 5;
 
 // G0
 pub const CAPABILITIES_LIST: &str = "desktop.capabilities.list";
@@ -198,6 +198,10 @@ pub const RESCUE_RESTORE_LAST_GOOD: &str = "desktop.rescue.restore_last_good";
 pub const RESCUE_RESUME_SHELL: &str = "desktop.rescue.resume_shell";
 
 pub mod scope {
+    pub const AGENT_INTERACT: &str = "agent.interact";
+    pub const AGENT_READ: &str = "agent.sessions.read";
+    pub const AGENT_WRITE: &str = "agent.sessions.write";
+    pub const AGENT_MANAGE: &str = "agent.settings.manage";
     pub const READ: &str = "desktop.read";
     pub const CONFIG: &str = "desktop.config";
     pub const WINDOWS_READ: &str = "desktop.windows.read";
@@ -220,6 +224,10 @@ pub mod scope {
     pub const FILES_PREFIX: &str = "files:";
 
     pub const ALL: &[&str] = &[
+        AGENT_INTERACT,
+        AGENT_READ,
+        AGENT_WRITE,
+        AGENT_MANAGE,
         READ,
         CONFIG,
         WINDOWS_READ,
@@ -414,7 +422,7 @@ use scope as s;
 
 fn definitions() -> Vec<Definition> {
     use Idempotency::{KeyBased, Natural};
-    vec![
+    let mut definitions = vec![
         // ---- G0 -------------------------------------------------------------
         def(
             CAPABILITIES_LIST,
@@ -915,6 +923,222 @@ fn definitions() -> Vec<Definition> {
         )
         .write(Natural, RESCUE_STATUS, false)
         .timeout(15_000, 30_000),
+    ];
+    definitions.extend(agent_definitions());
+    definitions
+}
+
+fn agent_definitions() -> Vec<Definition> {
+    use crate::agent::*;
+    use Idempotency::{KeyBased, Natural};
+    vec![
+        def(
+            "desktop.profiles.upgrade",
+            schema::<ProfileUpgradeInput>,
+            schema::<ChangeRecord>,
+            &[s::CONFIG],
+        )
+        .change(KeyBased, "desktop.changes.get")
+        .cancellable(),
+        def(
+            "agent.sessions.create",
+            schema::<SessionCreateInput>,
+            schema::<Conversation>,
+            &[s::AGENT_INTERACT],
+        )
+        .write(KeyBased, "agent.sessions.stat", false),
+        def(
+            "agent.sessions.list",
+            schema::<Empty>,
+            schema::<SessionsListOutput>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "agent.sessions.stat",
+            schema::<SessionIdInput>,
+            schema::<Conversation>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "agent.sessions.read",
+            schema::<SessionReadInput>,
+            schema::<SessionReadOutput>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "agent.sessions.open",
+            schema::<SessionIdInput>,
+            schema::<SessionOpenOutput>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.sessions.stat", false),
+        def(
+            "agent.sessions.append",
+            schema::<SessionAppendInput>,
+            schema::<Conversation>,
+            &[s::AGENT_WRITE],
+        )
+        .write(KeyBased, "agent.sessions.stat", false),
+        def(
+            "agent.sessions.flush",
+            schema::<SessionWriteInput>,
+            schema::<Conversation>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.sessions.stat", false),
+        def(
+            "agent.sessions.close",
+            schema::<SessionWriteInput>,
+            schema::<Conversation>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.sessions.stat", false),
+        def(
+            "agent.sessions.delete",
+            schema::<SessionIdInput>,
+            schema::<SessionDeleteOutput>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.sessions.list", false),
+        def(
+            "agent.settings.describe",
+            schema::<Empty>,
+            schema::<AgentPreferences>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "agent.settings.patch",
+            schema::<PreferencesPatchInput>,
+            schema::<AgentPreferences>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.settings.describe", false),
+        def(
+            "agent.turns.submit",
+            schema::<TurnSubmitInput>,
+            schema::<Turn>,
+            &[s::AGENT_INTERACT],
+        )
+        .write(KeyBased, "agent.turns.get", false),
+        def(
+            "agent.turns.get",
+            schema::<TurnIdInput>,
+            schema::<Turn>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "agent.turns.cancel",
+            schema::<TurnIdInput>,
+            schema::<Turn>,
+            &[s::AGENT_INTERACT],
+        )
+        .write(Natural, "agent.turns.get", false),
+        def(
+            "agent.turns.claim",
+            schema::<TurnIdInput>,
+            schema::<TurnClaimOutput>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.turns.get", false),
+        def(
+            "agent.turns.complete",
+            schema::<TurnCompleteInput>,
+            schema::<Turn>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.turns.get", false),
+        def(
+            "agent.tools.intent",
+            schema::<ToolIntentInput>,
+            schema::<ToolIntent>,
+            &[s::AGENT_WRITE],
+        )
+        .write(KeyBased, "agent.turns.get", false),
+        def(
+            "agent.tools.abandon",
+            schema::<ToolAbandonInput>,
+            schema::<Empty>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.turns.get", false),
+        def(
+            "agent.runtime.get",
+            schema::<Empty>,
+            schema::<AgentRuntimeStatus>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "agent.runtime.ensure",
+            schema::<Empty>,
+            schema::<AgentRuntimeStatus>,
+            &[s::AGENT_INTERACT],
+        )
+        .write(Natural, "agent.runtime.get", false)
+        .timeout(2_000, 10_000),
+        def(
+            "agent.runtime.ready",
+            schema::<AgentReadyInput>,
+            schema::<AgentRuntimeStatus>,
+            &[s::AGENT_WRITE],
+        )
+        .write(Natural, "agent.runtime.get", false),
+        def(
+            "agent.runtime.stop",
+            schema::<Empty>,
+            schema::<AgentRuntimeStatus>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.runtime.get", true),
+        def(
+            "agent.providers.status",
+            schema::<ProviderLoginInput>,
+            schema::<ProviderStatus>,
+            &[s::AGENT_MANAGE],
+        )
+        .cancellable()
+        .timeout(10_000, 30_000),
+        def(
+            "agent.providers.login",
+            schema::<ProviderLoginInput>,
+            schema::<ProviderLoginOutput>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.providers.status", true)
+        .timeout(10_000, 30_000),
+        def(
+            "agent.providers.cancel_login",
+            schema::<ProviderCancelLoginInput>,
+            schema::<ProviderActionOutput>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.providers.status", false),
+        def(
+            "agent.providers.logout",
+            schema::<ProviderLoginInput>,
+            schema::<ProviderActionOutput>,
+            &[s::AGENT_MANAGE],
+        )
+        .write(Natural, "agent.providers.status", true),
+        def(
+            "desktop.approvals.request",
+            schema::<ApprovalRequestInput>,
+            schema::<Approval>,
+            &[s::AGENT_INTERACT],
+        )
+        .write(KeyBased, "desktop.approvals.get", false),
+        def(
+            "desktop.approvals.get",
+            schema::<ApprovalIdInput>,
+            schema::<Approval>,
+            &[s::AGENT_READ],
+        ),
+        def(
+            "desktop.approvals.decide",
+            schema::<ApprovalDecideInput>,
+            schema::<Approval>,
+            &[s::PERMISSIONS_MANAGE],
+        )
+        .write(KeyBased, "desktop.approvals.get", false),
     ]
 }
 
@@ -1009,6 +1233,15 @@ fn descriptor(definition: Definition, availability: Availability) -> CapabilityD
 
 fn exported_availability(definition: &Definition) -> Availability {
     match definition.provider {
+        Provider::Core
+            if definition.capability_id.starts_with("agent.providers.")
+                || definition.capability_id == "agent.runtime.ensure" =>
+        {
+            Availability::ResolvedAtRuntime {
+                matrix_row: None,
+                slot: None,
+            }
+        }
         Provider::Core => Availability::Always,
         Provider::Compositor => Availability::ResolvedAtRuntime {
             matrix_row: definition.matrix_row.map(Into::into),
@@ -1068,14 +1301,7 @@ pub fn resolved_catalog(
                     writes: definition.kind != Kind::Read,
                     runs_change: definition.kind == Kind::Change,
                 };
-                let resolved = if definition.provider == Provider::Core {
-                    Resolved {
-                        availability: Availability::Always,
-                        provider_label: None,
-                    }
-                } else {
-                    resolve(&contract)
-                };
+                let resolved = resolve(&contract);
                 let mut item = descriptor(definition, resolved.availability);
                 if let Some(label) = resolved.provider_label {
                     item.provider = label;
@@ -1227,6 +1453,9 @@ mod tests {
         for item in catalog().capabilities {
             match (&item.availability, item.provider.as_str()) {
                 (Availability::Always, "core") => {}
+                (Availability::ResolvedAtRuntime { .. }, "core")
+                    if item.capability_id.starts_with("agent.providers.")
+                        || item.capability_id == "agent.runtime.ensure" => {}
                 (
                     Availability::ResolvedAtRuntime {
                         matrix_row: Some(_),
