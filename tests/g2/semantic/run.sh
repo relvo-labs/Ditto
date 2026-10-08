@@ -20,6 +20,9 @@ here="$(cd "$(dirname "$0")" && pwd)"
 export DITTO_ARTIFACTS="${DITTO_ARTIFACTS:-$(cd "$here/../../.." && pwd)/artifacts/g2}"
 source "$here/../../g1/lib/common.sh"
 source "$WORKSPACE/tests/g1/lib/shell-fixture.sh"
+# DITTO_REFERENCE_MACHINE only selects the fixture's isolation beside a live
+# session; this run is never reference-machine evidence (headless, nested).
+environment_label() { echo "development-headless-desktop"; }
 
 set_name="" mode=model ids=()
 while (( $# )); do
@@ -100,7 +103,9 @@ if (( status == 2 )); then
   check semantic environment "$(jq -r .not_run <<<"$summary")"
 elif [[ -f "$evidence/tasks/summary.json" ]]; then
   passed="$(jq -r .passed "$evidence/tasks/summary.json")"; total="$(jq -r .total "$evidence/tasks/summary.json")"
-  if [[ "$mode" == null ]]; then
+  if (( total == 0 )); then
+    check semantic fail "no task ran (unknown task ids?)" "$summary"
+  elif [[ "$mode" == null ]]; then
     (( passed == 0 )) && check null-control pass "no task passes when nothing is done" "$summary" \
       || check null-control fail "$passed tasks pass with nothing done: their oracle is vacuous" "$summary"
   elif [[ "$mode" == self-test ]]; then

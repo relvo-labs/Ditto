@@ -7,7 +7,6 @@
 //   again for the next run) and checks a cancelled sign-in.
 import {writeFileSync,existsSync} from 'node:fs'
 import {join} from 'node:path'
-import {createConnection} from 'node:net'
 import {connect,sleep} from '../../g1/lib/core-client.mjs'
 
 const cases=[],facts={}
@@ -76,7 +75,12 @@ try{
   await sleep(1500)
   try{process.kill(runtime.backend_pid,'SIGKILL')}catch{}
   const crashed=await eventually(async()=>{const x=await core.must('agent.turns.get',{turn_id:crashing.turn_id});return terminal.includes(x.state)?x:false},120,250)
-  await core.must('agent.runtime.ensure');await eventually(async()=>(await core.must('agent.runtime.get')).phase==='ready',150)
+  // The crashed generation may still read as ready until Core reaps it:
+  // wait for a newer generation to be ready.
+  await eventually(async()=>{
+    await core.call('agent.runtime.ensure',{})
+    const x=await core.must('agent.runtime.get');return x.phase==='ready'&&x.generation>runtime.generation
+  },150)
   const again=await core.must('agent.providers.status',{provider:'codex-app-server'})
   facts.crash={state:crashed&&crashed.state,reason:crashed&&crashed.error_reason,authenticated_after:again.authenticated}
   record('a backend crash ends the turn without success; the sign-in survives',crashed&&crashed.state!=='succeeded'&&again.authenticated?'pass':'fail',facts.crash)
@@ -91,10 +95,10 @@ try{
     record('signed out, a turn fails and nothing falls back to an API key',refused.state==='failed'&&refused.error_reason==='provider_unavailable'?'pass':'fail',{state:refused.state,reason:refused.error_reason})
     const login=await core.must('agent.providers.login',{provider:'codex-app-server'})
     await core.must('agent.providers.cancel_login',{provider:'codex-app-server',login_id:login.login_id})
-    const port=Number(new URL(new URL(login.auth_url).searchParams.get('redirect_uri')).port)
-    const closed=await new Promise(resolve=>{const c=createConnection(port,'127.0.0.1');c.on('connect',()=>{c.destroy();resolve(false)});c.on('error',()=>resolve(true))})
     const still=await core.must('agent.providers.status',{provider:'codex-app-server'})
-    record('a cancelled sign-in closes its callback and signs nobody in',closed&&!still.authenticated?'pass':'fail',{port})
+    const again=await core.must('agent.providers.login',{provider:'codex-app-server'})
+    await core.must('agent.providers.cancel_login',{provider:'codex-app-server',login_id:again.login_id})
+    record('a cancelled device-code sign-in signs nobody in and the next one gets a new code',!still.authenticated&&again.login_id!==login.login_id&&again.user_code!==login.user_code?'pass':'fail')
   }else record('sign-out and cancelled sign-in','not_run','set DITTO_G2_MATRIX_LOGOUT=1; the person signs in again afterwards')
   await core.must('agent.runtime.stop')
   report({ok:cases.every(c=>c.status!=='fail'),checks:cases.filter(c=>c.status==='pass').map(c=>c.case),cases,facts});core.close()

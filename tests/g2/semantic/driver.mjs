@@ -125,7 +125,7 @@ async function neutralWindows(apps){
 // ---- one task -----------------------------------------------------------------
 const FIXTURE_APPS=['org.kde.kate','foot','firefox']
 async function runTask(task,baseline){
-  const record={id:task.id,lang:task.lang,category:task.category,version:task.version,mode,turns:[]}
+  const record={id:task.id,lang:task.lang,category:task.category,version:task.version,mode,turns:[],approvals:[]}
   const setup=task.setup??{}
   await neutralWindows(FIXTURE_APPS)
   // A fresh copy of the baseline for this task; extra named profiles beside it.
@@ -161,6 +161,14 @@ async function runTask(task,baseline){
           turn=await must('agent.turns.get',{turn_id:submitted.turn_id})
           if(['succeeded','failed','cancelled','unknown','partial'].includes(turn.state))break
           if(Date.now()>deadline){await call('agent.turns.cancel',{turn_id:submitted.turn_id});turn={...turn,state:'timeout'};break}
+          // Nobody sits at this desktop: an approval the standing grants do
+          // not cover is declined at once, as an absent person's would be,
+          // and recorded with the task.
+          const pending=(await call('desktop.approvals.list')).result?.approvals??[]
+          for(const a of pending.filter(a=>a.request?.turn_id===submitted.turn_id)){
+            await call('desktop.approvals.decide',{request_id:a.request_id,decision:'rejected',intent_hash:a.request.intent_hash})
+            record.approvals.push({capability:a.request.capability_id,resource:a.request.resource,decision:'rejected'})
+          }
           await sleep(500)
         }
         const trace=(await call('agent.turns.trace',{turn_id:submitted.turn_id})).result
@@ -168,7 +176,7 @@ async function runTask(task,baseline){
           tools:(trace?.tools??[]).map(t=>({capability:t.capability_id,outcome:t.outcome,change_id:t.change_id,change_state:t.change_state}))})
         snapshots.push(await snapshot(task))
       }
-      const events=(await must('agent.sessions.read',{session_id:session.session_id,offset:0,limit:500})).events
+      const events=(await must('agent.sessions.read',{session_id:session.session_id,offset:0,limit:200})).events
       const said=events.filter(e=>e.type==='assistant/message')
       answer=String(said.at(-1)?.data?.text??'')
     }else{
@@ -225,12 +233,16 @@ async function runTask(task,baseline){
 
 // ---- the set ------------------------------------------------------------------
 packages=(await must('desktop.plugins.list')).packages
+await settings({enabled:true})
 if(mode==='model'){
+  // The provider answers only once the Agent is ready.
+  for(let i=0;i<150;i++){await call('agent.runtime.ensure');if((await must('agent.runtime.get')).phase==='ready')break;await sleep(200)}
   const status=await must('agent.providers.status',{provider:'codex-app-server'})
   if(!status.authenticated){console.log(JSON.stringify({ok:false,not_run:'the Codex subscription is not signed in'}));process.exit(2)}
 }
-await settings({enabled:true})
-for(const scope of ['desktop.windows.read','desktop.windows.control'])await must('desktop.permissions.grant',{subject:'agent',scope,idempotency_key:`${runId}-grant-${scope}`})
+// Standing grants a person who hands these tasks to the Agent gives it.
+// plugins.manage and session.lock stay ungranted.
+for(const scope of ['desktop.windows.read','desktop.windows.control','notifications.read','tasks.read','tasks.write'])await must('desktop.permissions.grant',{subject:'agent',scope,idempotency_key:`${runId}-grant-${scope}`})
 // The baseline every task copies: today's Profile, under a fixed name.
 const start=await activeDocument()
 let base=(await profiles()).find(p=>p.name==='semantic-base')
