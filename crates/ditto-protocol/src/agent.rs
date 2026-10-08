@@ -229,6 +229,20 @@ pub struct TurnClaimOutput {
     pub text: String,
     pub message_seq: u64,
     pub settings: AgentPreferences,
+    /// The latest ChangeSets this conversation produced, newest first, as
+    /// Core recorded them: what "that", "it" or "a bit more" can refer to.
+    #[serde(default)]
+    pub recent_changes: Vec<RecentChange>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RecentChange {
+    pub change_id: String,
+    pub turn_id: String,
+    pub state: crate::change::ChangeState,
+    pub result: Option<crate::change::ResultKind>,
+    pub items: Vec<crate::profile::DiffItem>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]

@@ -28,6 +28,23 @@ const controllerPlugin={name:'ditto-agent-controller',inject:['agentSessions','a
   ctx.on('agent/text',()=>{})
 }}
 
+/** Core's records of this conversation's latest changes, as compact text
+ * for the model: the targets a follow-up ("a bit narrower") refers to. */
+export function recentChangesText(changes:TurnClaimOutput['recent_changes']):string{
+  if(!changes?.length)return ''
+  const value=(v:unknown)=>v===undefined||v===null?'—':typeof v==='string'?v:JSON.stringify(v).slice(0,200)
+  const lines=['Recent verified changes in this conversation, newest first (from Ditto Core records):']
+  for(const change of changes){
+    lines.push(`- ${change.change_id}: ${change.state}${change.result?' / '+change.result:''}`)
+    for(const item of change.items.slice(0,8)){
+      const args=Object.entries(item.label_args??{}).map(([k,v])=>`${k}=${value(v)}`).join(', ')
+      lines.push(`  · ${item.path}${args?' ('+args+')':''}: ${value(item.before)} → ${value(item.after)}`)
+    }
+  }
+  const text=lines.join('\n')
+  return Buffer.byteLength(text)>8192?text.slice(0,8192):text
+}
+
 /** The one Agent controller. Core owns the accepted queue and all event bytes;
  * this process retains only its active request, bounded stream and handles. */
 export class AgentRuntime {
@@ -81,6 +98,8 @@ export class AgentRuntime {
       }
       // Slice by bytes, preserving valid UTF-8 through a bounded event window.
       while(Buffer.byteLength(history)>16384){const newline=history.indexOf('\n');history=newline>=0?history.slice(newline+1):''}
+      const recent=recentChangesText(claim.recent_changes??[])
+      if(recent)history+=(history?'\n':'')+recent
       const tools=await this.root.agentTools.desktop.discover()
       const output=await this.backend.run(claim.text,history,claim.settings,tools,
         (callId,name,args)=>this.root.agentTools.desktop.execute(turnId,callId,name,args,abort.signal),abort.signal,

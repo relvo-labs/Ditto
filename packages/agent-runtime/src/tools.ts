@@ -5,14 +5,9 @@ import type {CapabilityDescriptor,CapabilitiesListOutput} from '../../protocol/s
 import type {ToolIntent} from '../../protocol/src/generated/tool-intent.ts'
 import type {Approval} from '../../protocol/src/generated/approval.ts'
 import {snapshotJsonValue} from '../vendor/harness/values/index.ts'
+import {TOOL_GUIDE} from './tool-catalog.ts'
 
-const permitted=new Set([
-  'desktop.profiles.list','desktop.profiles.get','desktop.profiles.diff',
-  'desktop.changes.propose','desktop.changes.get','desktop.changes.list','desktop.changes.cancel','desktop.changes.undo',
-  'desktop.appearance.get','desktop.appearance.set','desktop.panels.list','desktop.dock.get',
-  'desktop.plugins.list','desktop.plugins.get','desktop.plugins.inspect',
-  'desktop.windows.list','desktop.windows.get','desktop.outputs.list','desktop.workspaces.list','desktop.workspaces.get',
-])
+const permitted=new Set(Object.keys(TOOL_GUIDE))
 export interface DynamicTool {type:'function';name:string;description:string;inputSchema:unknown}
 export interface ToolReply {contentItems:Array<{type:'inputText';text:string}>;success:boolean}
 
@@ -37,7 +32,7 @@ export class DesktopTools {
       const name=descriptor.capability_id.replaceAll('.','__')
       if(this.entries.has(name))throw new Error('duplicate capability tool name')
       this.entries.set(name,descriptor)
-      tools.push({type:'function',name,description:`${descriptor.capability_id}; Core contract ${descriptor.version}. Discover current configuration before changes; only Core readback proves an outcome.`,inputSchema:descriptor.input_schema})
+      tools.push({type:'function',name,description:TOOL_GUIDE[descriptor.capability_id]!,inputSchema:descriptor.input_schema})
     }
     return tools
   }

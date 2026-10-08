@@ -61,6 +61,10 @@ try{
   verify('conversation holds message, tool records and answer: '+JSON.stringify(types),types.includes('user/message')&&types.includes('assistant/message')&&types.some(t=>t.startsWith('tool/')))
   const answer=events.events.find(e=>e.type==='assistant/message')
   verify('answer stored by Core',answer?.data.text.includes('專注模式'))
+  // A second turn in the same conversation: Core hands the Agent the
+  // first change as a recent target (the runner checks the model saw it).
+  const second=await core.must('agent.turns.submit',{session_id:session.session_id,client_message_id:'m1-follow',text:'follow-up: a little more'})
+  await eventually(async()=>{const t=await core.must('agent.turns.get',{turn_id:second.turn_id});return ['succeeded','failed','cancelled','unknown','partial'].includes(t.state)},1200)
   const undo=await core.must('desktop.changes.undo',{change_id:change.change_id,idempotency_key:'m1-undo'})
   verify('undo committed',['committed','succeeded'].includes(undo.state)||!!undo.committed_revision)
   verify('undo restores readback',!(await focus()))
@@ -80,5 +84,5 @@ try{
   await eventually(async()=>!existsSync(`/proc/${runtime.backend_pid}`)||field(status(runtime.backend_pid),'State')?.startsWith('Z'),200)
   verify('backend group gone after stop',!existsSync(`/proc/${runtime.backend_pid}`)||field(status(runtime.backend_pid),'State')?.startsWith('Z'))
   verify('desktop host survives Agent stop',!!host&&existsSync(`/proc/${host}`))
-  report({ok:true,checks});core.close()
+  report({ok:true,checks,change_id:change.change_id});core.close()
 }catch(error){report({ok:false,checks,error:String(error)});process.exitCode=1}

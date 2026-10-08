@@ -60,6 +60,59 @@
       ],
       "type": "object"
     },
+    "ChangeState": {
+      "enum": [
+        "draft",
+        "validated",
+        "rejected",
+        "prepared",
+        "aborted",
+        "applying",
+        "verifying",
+        "committed",
+        "rolling_back",
+        "rolled_back",
+        "partially_applied",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "DiffItem": {
+      "additionalProperties": false,
+      "description": "One line of a change card. The label is a translation key so Core never\nemits locale-specific text; the Shell renders it in the Profile's language.",
+      "properties": {
+        "after": true,
+        "before": true,
+        "kind": {
+          "$ref": "#/$defs/DiffKind"
+        },
+        "label_args": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "label_key": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "label_key"
+      ],
+      "type": "object"
+    },
+    "DiffKind": {
+      "enum": [
+        "added",
+        "removed",
+        "changed"
+      ],
+      "type": "string"
+    },
     "ProviderAuthentication": {
       "oneOf": [
         {
@@ -95,6 +148,61 @@
             "credential_ref"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "RecentChange": {
+      "additionalProperties": false,
+      "properties": {
+        "change_id": {
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DiffItem"
+          },
+          "type": "array"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResultKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/ChangeState"
+        },
+        "turn_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "turn_id",
+        "state",
+        "items"
+      ],
+      "type": "object"
+    },
+    "ResultKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "succeeded",
+            "failed",
+            "partial",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "scheduled",
+          "description": "Committed as a revision, but nothing took effect yet: every item is\n`scheduled` (session-restart level: at the next login; in rescue mode:\nwhen the normal mode returns). Never presented as \"applied\".",
+          "type": "string"
         }
       ]
     },
@@ -169,6 +277,14 @@
       "format": "uint64",
       "minimum": 0,
       "type": "integer"
+    },
+    "recent_changes": {
+      "default": [],
+      "description": "The latest ChangeSets this conversation produced, newest first, as\nCore recorded them: what \"that\", \"it\" or \"a bit more\" can refer to.",
+      "items": {
+        "$ref": "#/$defs/RecentChange"
+      },
+      "type": "array"
     },
     "settings": {
       "$ref": "#/$defs/AgentPreferences"

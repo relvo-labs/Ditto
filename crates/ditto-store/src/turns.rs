@@ -128,6 +128,7 @@ pub fn claim(store: &mut Store, id: &str, owner: &str) -> StoreResult<TurnClaimO
         .and_then(|v| v.as_str())
         .ok_or_else(|| StoreError::Corrupt("message is missing from conversation".into()))?
         .to_string();
+    let recent_changes = recent_changes(store.connection(), &turn.session_id, 5)?;
     turn.state = TurnState::Running;
     turn.settings_revision = settings.revision;
     update(store, &turn, Some(owner))?;
@@ -136,7 +137,45 @@ pub fn claim(store: &mut Store, id: &str, owner: &str) -> StoreResult<TurnClaimO
         text,
         message_seq: seq as u64,
         settings,
+        recent_changes,
     })
+}
+
+/// The latest changes a conversation's tool calls produced, newest first,
+/// from Core's own change records (never from the model's account of them).
+pub fn recent_changes(
+    connection: &Connection,
+    session_id: &str,
+    limit: usize,
+) -> StoreResult<Vec<RecentChange>> {
+    let rows: Vec<(String, String)> = {
+        let mut query = connection.prepare(
+            "SELECT i.change_id, i.turn_id FROM agent_tool_intents i JOIN agent_turns t ON t.turn_id=i.turn_id
+             WHERE t.session_id=?1 AND i.change_id IS NOT NULL ORDER BY i.rowid DESC",
+        )?;
+        let rows = query
+            .query_map([session_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::new();
+    for (change_id, turn_id) in rows {
+        if out.len() >= limit || !seen.insert(change_id.clone()) {
+            continue;
+        }
+        let Ok(stored) = crate::changes::get(connection, &change_id) else {
+            continue;
+        };
+        out.push(RecentChange {
+            change_id,
+            turn_id,
+            state: stored.record.state,
+            result: stored.record.result,
+            items: stored.record.card.items,
+        });
+    }
+    Ok(out)
 }
 pub fn owner(connection: &Connection, id: &str, expected: &str) -> StoreResult<Turn> {
     let turn = get(connection, id)?;

@@ -31,6 +31,7 @@ const findEntry=(value,pkg)=>{
 }
 const provider=await startProvider(body=>{
   const outputs=toolOutputs(body)
+  if(userText(body).includes('follow-up'))return [say('好的。')]
   if(!userText(body).includes(canary))return [say('unexpected request')]
   if(!outputs.has('read-profile'))return [
     call('exec_command',{cmd:'touch /tmp/ditto-g2-escape'},'builtin-exec'),
@@ -89,12 +90,14 @@ try{
   // request_user_input* are refused by Ditto's adapter as server requests.
   const builtins=[...names].filter(n=>!n.startsWith('desktop__')&&!n.startsWith('request_user_input'))
   verify('no built-in Codex tool offered to the model: '+JSON.stringify(builtins),builtins.length===0)
-  const last=toolOutputs(sent.at(-1))
+  const last=toolOutputs(sent.filter(b=>toolOutputs(b).has('builtin-exec')).at(-1))
   verify('built-in exec refused by backend',/unsupported call/.test(last.get('builtin-exec')??''))
   verify('built-in search refused by backend',/unsupported call/.test(last.get('builtin-search')??''))
   verify('no file escaped the boundary',!existsSync('/tmp/ditto-g2-escape'))
   const leaks=grep(join(root,'store'),canary).filter(p=>!p.includes('/conversations/'))
   verify('canary only in Core conversation store: '+JSON.stringify(leaks),leaks.length===0)
+  const followUp=sent.find(b=>userText(b).includes('follow-up'))
+  verify('a follow-up turn carries the verified change it can refer to',!!followUp&&JSON.stringify(followUp.input).includes(result.change_id)&&JSON.stringify(followUp.input).includes('Recent verified changes'))
   const pss=existsSync(env.DITTO_G2_TEST_OUT+'.pss')?JSON.parse(readFileSync(env.DITTO_G2_TEST_OUT+'.pss','utf8')):null
   console.log(JSON.stringify({ok:true,checks,warm_pss_kib_development:pss,model_requests:sent.length,codex_version:pin.version,evidence_class:process.env.DITTO_ENVIRONMENT_LABEL??'development-host',model:'scripted-loopback',subscription:false}))
 }catch(error){

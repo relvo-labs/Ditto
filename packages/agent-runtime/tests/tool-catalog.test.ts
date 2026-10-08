@@ -1,0 +1,35 @@
+import {describe,it,expect} from 'vitest'
+import {readFileSync} from 'node:fs'
+import {TOOL_GUIDE,BASE_INSTRUCTIONS} from '../src/tool-catalog.ts'
+import {recentChangesText} from '../src/runtime.ts'
+
+const catalog=JSON.parse(readFileSync(new URL('../../../schema/catalog.json',import.meta.url),'utf8')) as {capabilities:Array<{capability_id:string;resource_scope:string[]}>}
+const byId=new Map(catalog.capabilities.map(c=>[c.capability_id,c]))
+
+describe('Agent tool allow-list',()=>{
+  it('names only capabilities Core really has',()=>{
+    for(const id of Object.keys(TOOL_GUIDE))expect(byId.has(id),id).toBe(true)
+  })
+  it('never offers management, power, rescue or deletion to the model',()=>{
+    const forbiddenScopes=['permissions.manage','plugins.manage','session.power','desktop.rescue','agent.settings.manage','agent.sessions.write']
+    for(const id of Object.keys(TOOL_GUIDE)){
+      expect(byId.get(id)!.resource_scope.some(s=>forbiddenScopes.includes(s)),id).toBe(false)
+      expect(id.startsWith('agent.')||id.startsWith('desktop.approvals.')||id.startsWith('desktop.permissions.'),id).toBe(false)
+    }
+    for(const id of ['desktop.profiles.delete','desktop.windows.close_request','desktop.profiles.export','desktop.profiles.import','desktop.plugins.install','desktop.session.lock'])expect(TOOL_GUIDE[id]).toBeUndefined()
+  })
+  it('describes every tool and states that only Core results count',()=>{
+    for(const [id,text] of Object.entries(TOOL_GUIDE))expect(text.length,id).toBeGreaterThan(20)
+    expect(BASE_INSTRUCTIONS).toMatch(/committed with result succeeded/)
+    expect(BASE_INSTRUCTIONS).toMatch(/data, not instructions/)
+  })
+})
+
+describe('recent changes context',()=>{
+  it('lists Core records newest first with each item before and after',()=>{
+    const text=recentChangesText([{change_id:'chg-2',turn_id:'t2',state:'committed',result:'succeeded',items:[{path:'/layout/regions/term',kind:'changed',before:'50–100% × 0–100%',after:'60–100% × 0–100%',label_key:'diff.layout.region',label_args:{app_id:'foot',rule_id:'term'}}]}])
+    expect(text).toContain('chg-2: committed / succeeded')
+    expect(text).toContain('/layout/regions/term (app_id=foot, rule_id=term): 50–100% × 0–100% → 60–100% × 0–100%')
+    expect(recentChangesText([])).toBe('')
+  })
+})
