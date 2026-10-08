@@ -20,7 +20,7 @@ G2 有三類外來程式碼，取用方式各不相同：Harness 的純值模組
 | trust_level | 受信任的第一方轉接；assembler 只做值處理，不是沙箱 |
 | license | MIT；`vendor/harness/LICENSE` 隨 bundle 提供 |
 
-驗證（2026-10-08，開發機）：`scripts/check-upstream.mjs` 9 檔雜湊與紀錄相符；`tests/harness.test.ts` 3／3、`tests/session.test.ts` 2／2、`tests/codex.test.ts` 12／12；經 assembler 的端到端 `tests/g2/codex/run.mjs` 40／40（腳本模型，不是模型品質證據）。
+驗證（2026-10-08，開發機）：`scripts/check-upstream.mjs` 9 檔雜湊與紀錄相符；`tests/harness.test.ts` 3／3、`tests/session.test.ts` 2／2、`tests/codex.test.ts` 12／12、`tests/tools.test.ts` 含 `modelSchema`；經 assembler 的端到端 `tests/g2/codex/run.mjs` 40／40（腳本模型，不是模型品質證據）。
 
 ## 2. Codex app-server（`tools/codex/pin.json`）
 
@@ -36,6 +36,8 @@ G2 有三類外來程式碼，取用方式各不相同：Harness 的純值模組
 發現與處置：
 
 - 目前的模型族在內建目錄中是 `code_mode_only` 與 multi-agent v2，工具被包進 JavaScript `exec` 並出現 `spawn_agent`；功能旗標關不掉。Core 改用衍生目錄後，模型只看到 Ditto 動態工具與 `request_user_input*`（adapter 拒絕）；硬叫 `exec_command`／`apply_patch`／`web_search` 回 `unsupported call`，無副作用（`run.mjs` 檢查）。
+- Codex 把無型別的動態工具 schema（`true`、`{}`）改寫成 `{"type":"string"}`、無型別陣列的 items 也補成 string；真實模型因此把物件與清單寫成 JSON 字串。controller 的 `modelSchema` 把它們展開為明確的任意 JSON 值後才交給 Codex；Core 仍以原 schema 驗證。
+- 登入用 `account/login/start` 的 `chatgptDeviceCode`：回傳驗證網址與一次性代碼，不開本機回呼埠。
 - 參考平台的 AppArmor 禁止非特權 user namespace，bubblewrap 與 Codex 自帶 sandbox 都無法使用，因此邊界由 `ditto-confine` 提供。
 - 模型服務失敗時，Codex 自己會重試約 24 秒才結束 turn（HTTP 500、連線中斷皆然）；Ditto 據 `codexErrorInfo` 回報 `provider_unavailable` 或 `rate_limited`。
 
@@ -57,5 +59,5 @@ G2 有三類外來程式碼，取用方式各不相同：Harness 的純值模組
 
 ## 5. 未完成
 
-- 真實訂閱下的 EX2-19 帳號矩陣（`tests/g2/codex/account-matrix-driver.mjs`）與語意集（`tests/g2/semantic`）待本人登入後執行。
+- 真實訂閱已於 2026-10-09 以 device code 登入執行（瀏覽器 OAuth 對 originator `ditto` 回 `invalid_client`）：帳號矩陣 10／10（切帳號、配額耗盡無法產生）；語意集固定集 42／50、保留集 41／50，見 [G2 評審](../../.agents/notes/gate-reviews/G2-exit.md) §3.4。
 - Codex binary 與 xdg-dbus-proxy 的發行條款、隨附原始碼與授權文字屬 D-11／G4。
