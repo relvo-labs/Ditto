@@ -356,6 +356,45 @@ pub struct Turn {
 pub struct TurnIdInput {
     pub turn_id: String,
 }
+/// What became of one tool call, as Core can prove it (G2-CORE-10).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolOutcome {
+    /// Reserved but never dispatched.
+    NotDispatched,
+    /// Dispatched and still running.
+    Pending,
+    Returned,
+    Failed,
+    /// Dispatched, and Core cannot prove whether it took effect. It is never
+    /// retried; the person decides.
+    Unknown,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ToolTrace {
+    /// Also the `_meta.operation_id` the tool's request carried.
+    pub intent_id: String,
+    pub call_id: String,
+    pub capability_id: String,
+    pub outcome: ToolOutcome,
+    /// The ChangeSet the call produced, found by its operation id even when
+    /// the result was lost.
+    pub change_id: Option<String>,
+    pub change_state: Option<crate::change::ChangeState>,
+    pub committed_revision: Option<String>,
+    /// Boot recovery, not the live call, recorded this outcome.
+    pub recovered: bool,
+}
+/// session → turn → tool → operation → ChangeSet → revision, read in one
+/// snapshot: what a reconnecting client or a new Agent generation consults
+/// instead of repeating anything.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TurnTraceOutput {
+    pub turn: Turn,
+    pub tools: Vec<ToolTrace>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct TurnCompleteInput {

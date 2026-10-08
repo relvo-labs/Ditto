@@ -1042,6 +1042,12 @@ fn agent_definitions() -> Vec<Definition> {
             &[s::AGENT_READ],
         ),
         def(
+            "agent.turns.trace",
+            schema::<TurnIdInput>,
+            schema::<TurnTraceOutput>,
+            &[s::AGENT_READ],
+        ),
+        def(
             "agent.turns.cancel",
             schema::<TurnIdInput>,
             schema::<Turn>,

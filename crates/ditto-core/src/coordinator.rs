@@ -275,6 +275,19 @@ impl Coordinator {
             self.core.hosts.ensure_started();
         }
         self.recover();
+        // Every in-flight ChangeSet now has its outcome: settle the tool
+        // calls whose result was lost with what Core can prove, never by
+        // running them again (G2-AGENT-10).
+        match ditto_store::turns::reconcile_dispatched(&mut self.store) {
+            Ok(0) => {}
+            Ok(count) => {
+                crate::log::event("agent.tools_reconciled", &[("count", &count.to_string())])
+            }
+            Err(error) => crate::log::event(
+                "agent.tools_reconcile_failed",
+                &[("reason", &error.to_string())],
+            ),
+        }
         self.core.finish_recovery();
         self.booted = true;
         sdnotify::ready();

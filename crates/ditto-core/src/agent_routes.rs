@@ -255,6 +255,10 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             let input: TurnIdInput = call.input()?;
             ok(core.read(|c| turns::get(c, &input.turn_id))?)
         }
+        "agent.turns.trace" => {
+            let input: TurnIdInput = call.input()?;
+            ok(core.read(|c| turns::trace(c, &input.turn_id))?)
+        }
         "agent.turns.cancel" => {
             let input: TurnIdInput = call.input()?;
             let turn = write(core, call, move |s| turns::cancel(s, &input.turn_id))?;

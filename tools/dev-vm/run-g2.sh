@@ -53,7 +53,8 @@ fi
 step dbus-proxy 'bash tools/dbus-proxy/build.sh debug' || true
 label='DITTO_ENVIRONMENT_LABEL=development-vm'
 step confine "cargo test --locked -p ditto-confine" || true
-for suite in codex/run codex/faults codex/injection jobs/run lifecycle/run; do
+step fault-build 'cargo build --locked -p ditto-core -p ditto-confine --features ditto-core/fault-injection --target-dir target/fault-injection' || true
+for suite in codex/run codex/faults codex/crash codex/injection jobs/run lifecycle/run; do
   name="$(echo "$suite" | tr / -)"
   args=""; [[ "$suite" == lifecycle/run ]] && args="quick"
   step "$name" "$label node tests/g2/$suite.mjs $args" || true

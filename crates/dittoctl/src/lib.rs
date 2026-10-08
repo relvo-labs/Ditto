@@ -93,6 +93,7 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     "agent.settings.patch",
     "agent.turns.submit",
     "agent.turns.get",
+    "agent.turns.trace",
     "agent.turns.cancel",
     "agent.runtime.get",
     "agent.runtime.ensure",

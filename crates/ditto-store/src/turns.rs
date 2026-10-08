@@ -1,7 +1,7 @@
 //! Durable message acceptance and tool intent correlation. Historical tool
 //! calls are queryable data, never an execution queue after a crash.
 use crate::{conversations, preferences, time, Store, StoreError, StoreResult};
-use ditto_protocol::{agent::*, ids, jcs};
+use ditto_protocol::{agent::*, change::ChangeState, ids, jcs};
 use rusqlite::{Connection, OptionalExtension};
 use serde_json::json;
 
@@ -519,6 +519,99 @@ pub fn begin_execution(
         }Ok(())
     })
 }
+/// The proven outcome for a dispatched call whose result never reached the
+/// store: the ChangeSet its operation id produced, decided by boot recovery,
+/// or `unknown_outcome`. It records; it never executes (G2-AGENT-10).
+pub fn reconcile_dispatched(store: &mut Store) -> StoreResult<u32> {
+    let mut query = store.connection().prepare(
+        "SELECT intent_id FROM agent_tool_intents WHERE execution_started=1 AND result_json IS NULL",
+    )?;
+    let ids = query
+        .query_map([], |r| r.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(query);
+    let mut settled = 0;
+    for id in ids {
+        let change = crate::changes::by_operation(store.connection(), &id)?.map(|c| c.record);
+        let result = match change {
+            Some(change) if change.state == ChangeState::Committed => json!({
+                "result": {"change_id": change.change_id, "state": "committed", "committed_revision": change.committed_revision},
+                "verified": true,
+                "recovered": true,
+            }),
+            Some(change)
+                if !matches!(
+                    change.state,
+                    ChangeState::Unknown | ChangeState::PartiallyApplied
+                ) =>
+            {
+                json!({
+                    "error": {"name": "not_applied", "message": "the change did not take effect", "data": {"change_id": change.change_id, "state": change.state}},
+                    "recovered": true,
+                })
+            }
+            change => json!({
+                "error": {"name": "unknown_outcome", "message": "Core cannot tell whether this call took effect; it is not retried", "data": {"executed": "unknown", "change_id": change.map(|c| c.change_id)}},
+                "recovered": true,
+            }),
+        };
+        record_result(store, &id, &result)?;
+        settled += 1;
+    }
+    Ok(settled)
+}
+
+/// One consistent snapshot of a turn and every tool call it made, each
+/// with the ChangeSet and revision its operation id correlates to.
+pub fn trace(connection: &Connection, id: &str) -> StoreResult<TurnTraceOutput> {
+    let turn = get(connection, id)?;
+    let mut query = connection.prepare(
+        "SELECT intent_id,call_id,capability_id,execution_started,result_json FROM agent_tool_intents WHERE turn_id=?1 ORDER BY rowid",
+    )?;
+    let rows = query
+        .query_map([id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, bool>(3)?,
+                r.get::<_, Option<String>>(4)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut tools = Vec::with_capacity(rows.len());
+    for (intent_id, call_id, capability_id, started, result) in rows {
+        let result: Option<serde_json::Value> =
+            result.map(|s| serde_json::from_str(&s)).transpose()?;
+        let change = crate::changes::by_operation(connection, &intent_id)?.map(|c| c.record);
+        let outcome = match &result {
+            None if !started => ToolOutcome::NotDispatched,
+            None => ToolOutcome::Pending,
+            Some(r)
+                if r.pointer("/error/name").and_then(|v| v.as_str()) == Some("unknown_outcome") =>
+            {
+                ToolOutcome::Unknown
+            }
+            Some(r) if r.get("error").is_some() => ToolOutcome::Failed,
+            Some(_) => ToolOutcome::Returned,
+        };
+        tools.push(ToolTrace {
+            recovered: result
+                .as_ref()
+                .and_then(|r| r.get("recovered"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            change_id: change.as_ref().map(|c| c.change_id.clone()),
+            change_state: change.as_ref().map(|c| c.state),
+            committed_revision: change.and_then(|c| c.committed_revision),
+            intent_id,
+            call_id,
+            capability_id,
+            outcome,
+        });
+    }
+    Ok(TurnTraceOutput { turn, tools })
+}
 pub fn interrupt_connection(store: &mut Store, owner_id: Option<&str>) -> StoreResult<()> {
     let mut query=store.connection().prepare("SELECT turn_id FROM agent_turns WHERE state IN ('running','awaiting_approval','cancelling') AND (?1 IS NULL OR owner_connection=?1)")?;
     let ids = query
@@ -591,6 +684,139 @@ mod tests {
             },
         )
         .unwrap()
+    }
+    fn second_tool(store: &mut Store, turn: &Turn, call: &str) -> ToolIntent {
+        let intent = intent(
+            store,
+            "agent",
+            &ToolIntentInput {
+                turn_id: turn.turn_id.clone(),
+                tool_call_id: call.into(),
+                capability_id: "desktop.appearance.set".into(),
+                arguments: json!({"call": call}),
+            },
+        )
+        .unwrap();
+        begin_execution(
+            store,
+            &intent.intent_id,
+            "agent",
+            "desktop.appearance.set",
+            &json!({"call": call}),
+        )
+        .unwrap();
+        intent
+    }
+    #[test]
+    fn lost_results_are_settled_from_the_correlated_change_and_never_rerun() {
+        use ditto_protocol::change::{ChangeCard, ChangeMode, ChangeOrigin, HotSwapLevel};
+        let (mut t, turn) = active("reconcile");
+        let committed = second_tool(&mut t.store, &turn, "committed");
+        let rolled_back = second_tool(&mut t.store, &turn, "rolled-back");
+        let lost = second_tool(&mut t.store, &turn, "lost");
+        let reserved = tool(&mut t.store, &turn, "desktop.appearance.get");
+        let card = ChangeCard {
+            kind: "appearance".into(),
+            title_key: "change.appearance".into(),
+            title_args: Default::default(),
+            items: vec![],
+            footnote_key: None,
+        };
+        let mut path = vec![
+            (ChangeState::Draft, ChangeState::Validated),
+            (ChangeState::Validated, ChangeState::Prepared),
+            (ChangeState::Prepared, ChangeState::Applying),
+            (ChangeState::Applying, ChangeState::Verifying),
+        ];
+        for (intent, last) in [
+            (&committed, ChangeState::Committed),
+            (&rolled_back, ChangeState::RollingBack),
+        ] {
+            let change = t
+                .store
+                .write(|tx| {
+                    crate::changes::insert(
+                        tx,
+                        &crate::changes::NewChange {
+                            profile_id: "prf-x",
+                            base_revision: "rev-x",
+                            ops: &[],
+                            mode: ChangeMode::Apply,
+                            origin: &ChangeOrigin::Cli,
+                            subject: "agent",
+                            idempotency_key: None,
+                            request_operation_id: Some(&intent.intent_id),
+                            card: &card,
+                            hot_swap_level: HotSwapLevel::Instant,
+                        },
+                    )
+                })
+                .unwrap();
+            let id = change.record.change_id;
+            path.push((ChangeState::Verifying, last));
+            if last == ChangeState::RollingBack {
+                path.push((ChangeState::RollingBack, ChangeState::RolledBack));
+            }
+            for (from, to) in &path {
+                t.store
+                    .write(|tx| crate::changes::transition(tx, &id, *from, *to))
+                    .unwrap();
+            }
+            if last == ChangeState::Committed {
+                t.store
+                    .write(|tx| crate::changes::set_committed_revision(tx, &id, "rev-after"))
+                    .unwrap();
+            }
+            path.truncate(4);
+        }
+        // Core died with all three in flight: the turn becomes unknown.
+        interrupt_connection(&mut t.store, None).unwrap();
+        assert_eq!(reconcile_dispatched(&mut t.store).unwrap(), 3);
+        assert_eq!(reconcile_dispatched(&mut t.store).unwrap(), 0);
+        let trace = trace(t.store.connection(), &turn.turn_id).unwrap();
+        assert_eq!(trace.turn.state, TurnState::Unknown);
+        let by_call = |call: &str| {
+            trace
+                .tools
+                .iter()
+                .find(|tool| tool.call_id == call)
+                .unwrap()
+                .clone()
+        };
+        let c = by_call("committed");
+        assert_eq!(
+            (
+                c.outcome,
+                c.recovered,
+                c.change_state,
+                c.committed_revision.as_deref()
+            ),
+            (
+                ToolOutcome::Returned,
+                true,
+                Some(ChangeState::Committed),
+                Some("rev-after")
+            )
+        );
+        let r = by_call("rolled-back");
+        assert_eq!(
+            (r.outcome, r.change_state),
+            (ToolOutcome::Failed, Some(ChangeState::RolledBack))
+        );
+        let l = by_call("lost");
+        assert_eq!((l.outcome, l.change_id), (ToolOutcome::Unknown, None));
+        assert_eq!(by_call("call").outcome, ToolOutcome::NotDispatched);
+        assert_eq!(c.intent_id, committed.intent_id);
+        let _ = (lost, reserved);
+        // Settled calls stay settled: no new generation may dispatch them.
+        assert!(begin_execution(
+            &mut t.store,
+            &c.intent_id,
+            "agent",
+            "desktop.appearance.set",
+            &json!({"call":"committed"})
+        )
+        .is_err());
     }
     #[test]
     fn dispatched_tools_cannot_be_repeated_or_reported_unexecuted() {

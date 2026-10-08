@@ -19494,6 +19494,235 @@
         "kind": "always"
       },
       "cancellable": false,
+      "capability_id": "agent.turns.trace",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "turn_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id"
+        ],
+        "title": "TurnIdInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ChangeState": {
+            "enum": [
+              "draft",
+              "validated",
+              "rejected",
+              "prepared",
+              "aborted",
+              "applying",
+              "verifying",
+              "committed",
+              "rolling_back",
+              "rolled_back",
+              "partially_applied",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "ToolOutcome": {
+            "description": "What became of one tool call, as Core can prove it (G2-CORE-10).",
+            "oneOf": [
+              {
+                "enum": [
+                  "returned",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "not_dispatched",
+                "description": "Reserved but never dispatched.",
+                "type": "string"
+              },
+              {
+                "const": "pending",
+                "description": "Dispatched and still running.",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "description": "Dispatched, and Core cannot prove whether it took effect. It is never\nretried; the person decides.",
+                "type": "string"
+              }
+            ]
+          },
+          "ToolTrace": {
+            "additionalProperties": false,
+            "properties": {
+              "call_id": {
+                "type": "string"
+              },
+              "capability_id": {
+                "type": "string"
+              },
+              "change_id": {
+                "description": "The ChangeSet the call produced, found by its operation id even when\nthe result was lost.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "change_state": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ChangeState"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "committed_revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "intent_id": {
+                "description": "Also the `_meta.operation_id` the tool's request carried.",
+                "type": "string"
+              },
+              "outcome": {
+                "$ref": "#/$defs/ToolOutcome"
+              },
+              "recovered": {
+                "description": "Boot recovery, not the live call, recorded this outcome.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "intent_id",
+              "call_id",
+              "capability_id",
+              "outcome",
+              "recovered"
+            ],
+            "type": "object"
+          },
+          "Turn": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "type": "string"
+              },
+              "error_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "operation_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "settings_revision": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "state": {
+                "$ref": "#/$defs/TurnState"
+              },
+              "tool_calls": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "turn_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "turn_id",
+              "session_id",
+              "state",
+              "created_at",
+              "settings_revision",
+              "tool_calls",
+              "operation_ids"
+            ],
+            "type": "object"
+          },
+          "TurnState": {
+            "enum": [
+              "queued",
+              "running",
+              "awaiting_approval",
+              "cancelling",
+              "succeeded",
+              "failed",
+              "partial",
+              "unknown",
+              "cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "session → turn → tool → operation → ChangeSet → revision, read in one\nsnapshot: what a reconnecting client or a new Agent generation consults\ninstead of repeating anything.",
+        "properties": {
+          "tools": {
+            "items": {
+              "$ref": "#/$defs/ToolTrace"
+            },
+            "type": "array"
+          },
+          "turn": {
+            "$ref": "#/$defs/Turn"
+          }
+        },
+        "required": [
+          "turn",
+          "tools"
+        ],
+        "title": "TurnTraceOutput",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "agent.sessions.read"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
       "capability_id": "agent.turns.cancel",
       "claimable": false,
       "errors": [
