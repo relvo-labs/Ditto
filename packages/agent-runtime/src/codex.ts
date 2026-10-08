@@ -63,7 +63,7 @@ export class CodexBackend {
   private active?:Active
   private alive=true
   private busy=false
-  private login?:{login_id:string;auth_url:string;expires_at_ms:number}
+  private login?:{login_id:string;auth_url:string;user_code:string;expires_at_ms:number}
   /** `testProvider` is set only by Core for its loopback test endpoint
    * (fixture compositor); a desktop session always uses the subscription. */
   constructor(private peer:BackendTransport,private options:{modelProvider:string;testProvider:boolean}={modelProvider:'openai',testProvider:false}){
@@ -121,13 +121,18 @@ export class CodexBackend {
     }
     return {available:true,provider:'codex-app-server',authenticated,account_label:this.options.testProvider?'loopback test model':authenticated&&typeof identity?.email==='string'?identity.email:null,models,rate_limits:limits}
   }
-  async startLogin():Promise<{login_id:string;auth_url:string;expires_at_ms:number}>{
+  /** Device-code sign-in: the person opens the verification page on any
+   * browser and enters the one-time code. No local callback port is opened. */
+  async startLogin():Promise<{login_id:string;auth_url:string;user_code:string;expires_at_ms:number}>{
     if(this.login&&this.login.expires_at_ms>Date.now())return this.login
-    const result=object(await this.peer.request('account/login/start',{type:'chatgpt'}))
-    if(result.type!=='chatgpt')throw new Error('unsupported subscription login response')
-    const url=new URL(string(result.authUrl))
+    const result=object(await this.peer.request('account/login/start',{type:'chatgptDeviceCode'}))
+    if(result.type!=='chatgptDeviceCode')throw new Error('unsupported subscription login response')
+    const url=new URL(string(result.verificationUrl))
     if(url.protocol!=='https:'||url.hostname!=='auth.openai.com'||url.username||url.password)throw new Error('invalid authentication destination')
-    this.login={login_id:string(result.loginId),auth_url:url.href,expires_at_ms:Date.now()+300000}
+    const code=string(result.userCode)
+    if(!/^[A-Z0-9-]{4,16}$/.test(code))throw new Error('invalid sign-in code')
+    // Device codes live 15 minutes upstream; Core accepts at most 10.
+    this.login={login_id:string(result.loginId),auth_url:url.href,user_code:code,expires_at_ms:Date.now()+540000}
     return this.login
   }
   async cancelLogin(id:string):Promise<{completed:boolean}>{

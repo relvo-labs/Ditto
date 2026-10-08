@@ -79,7 +79,7 @@ Flickable {
             tokens: page.tokens
             visible: !page.direct
             title: page.t(qsTr("Codex 訂閱"))
-            note: page.t(qsTr("在瀏覽器以官方頁面登入。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。"))
+            note: page.t(qsTr("在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。"))
 
             Text {
                 width: parent.width
@@ -87,7 +87,7 @@ Flickable {
                 text: !page.provider ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
-                        : page.conversation.login ? page.t(qsTr("請在瀏覽器完成登入。")) : page.t(qsTr("尚未登入"))
+                        : page.conversation.login ? page.t(qsTr("在瀏覽器開啟的頁面登入，並輸入代碼：%1")).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
                 color: page.tokens.foreground
                 font.pixelSize: page.tokens.fontBody
             }

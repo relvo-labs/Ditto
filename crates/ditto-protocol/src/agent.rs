@@ -500,7 +500,10 @@ pub struct ProviderCancelLoginInput {
 #[serde(deny_unknown_fields)]
 pub struct ProviderLoginOutput {
     pub login_id: String,
+    /// The device-code verification page the person opens in a browser.
     pub auth_url: String,
+    /// The one-time code the person enters on that page.
+    pub user_code: String,
     pub expires_at_ms: u64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

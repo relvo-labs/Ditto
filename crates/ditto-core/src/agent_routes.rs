@@ -381,6 +381,11 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
                         .map_err(|_| CoreError::internal("invalid login response"))?;
                     if !login.auth_url.starts_with("https://auth.openai.com/")
                         || login.auth_url.len() > 4096
+                        || !(4..=16).contains(&login.user_code.len())
+                        || !login
+                            .user_code
+                            .bytes()
+                            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'-')
                         || login.expires_at_ms
                             > ditto_store::time::unix_millis_now().max(0) as u64 + 600_000
                     {

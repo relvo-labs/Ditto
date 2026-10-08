@@ -11,6 +11,32 @@ const permitted=new Set(Object.keys(TOOL_GUIDE))
 export interface DynamicTool {type:'function';name:string;description:string;inputSchema:unknown}
 export interface ToolReply {contentItems:Array<{type:'inputText';text:string}>;success:boolean}
 
+const SCALARS=[{type:'string'},{type:'number'},{type:'boolean'},{type:'null'},{type:'object',additionalProperties:true}]
+/** Any JSON value, spelled out. Codex rewrites an untyped schema (`true`,
+ * `{}`) to `{"type":"string"}` and an untyped array to string items before
+ * the model sees it, so a model then JSON-encodes objects and lists into
+ * strings that Core rightly refuses. Lists of lists stay unsupported. */
+const ANY_VALUE={anyOf:[...SCALARS,{type:'array',items:{anyOf:SCALARS}}]}
+const SHAPE_KEYS=['type','anyOf','oneOf','allOf','$ref','enum','const','properties','items','not']
+/** The schema shown to the model. Core and `execute` still validate the
+ * call against the discovered schema; this only states its types. */
+export function modelSchema(schema:unknown):unknown{
+  if(schema===true||schema&&typeof schema==='object'&&!Array.isArray(schema)&&!SHAPE_KEYS.some(k=>k in schema)){
+    const {description}=schema===true?{description:undefined}:schema as {description?:unknown}
+    return typeof description==='string'?{...ANY_VALUE,description}:ANY_VALUE
+  }
+  if(Array.isArray(schema))return schema.map(modelSchema)
+  if(!schema||typeof schema!=='object')return schema
+  const out:Record<string,unknown>={}
+  for(const [key,value] of Object.entries(schema)){
+    // Maps from names to schemas; everything else is a schema or a keyword value.
+    if(key==='properties'||key==='$defs'||key==='definitions')out[key]=value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,modelSchema(v)])):value
+    else if(['items','additionalProperties','anyOf','oneOf','allOf','not'].includes(key)&&value!==true&&value!==false)out[key]=modelSchema(value)
+    else out[key]=value
+  }
+  return out
+}
+
 /** Native dispatch only: preflight → Core-correlated execute → immutable
  * outcome. Harness PTC/run_code, arbitrary JS, SDK generation and direct
  * provider APIs are deliberately outside this G2 adapter's tool surface. */
@@ -32,7 +58,7 @@ export class DesktopTools {
       const name=descriptor.capability_id.replaceAll('.','__')
       if(this.entries.has(name))throw new Error('duplicate capability tool name')
       this.entries.set(name,descriptor)
-      tools.push({type:'function',name,description:TOOL_GUIDE[descriptor.capability_id]!,inputSchema:descriptor.input_schema})
+      tools.push({type:'function',name,description:TOOL_GUIDE[descriptor.capability_id]!,inputSchema:modelSchema(descriptor.input_schema)})
     }
     return tools
   }

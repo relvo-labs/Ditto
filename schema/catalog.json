@@ -3858,7 +3858,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -4155,7 +4159,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -5004,7 +5012,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -6243,7 +6255,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -7094,7 +7110,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -7944,7 +7964,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -11378,7 +11402,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -15409,7 +15437,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -16260,7 +16292,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -17174,7 +17210,11 @@
               {
                 "additionalProperties": false,
                 "properties": {
-                  "after": true,
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
                   "before": true,
                   "entry_id": {
                     "type": "string"
@@ -21231,6 +21271,7 @@
         "additionalProperties": false,
         "properties": {
           "auth_url": {
+            "description": "The device-code verification page the person opens in a browser.",
             "type": "string"
           },
           "expires_at_ms": {
@@ -21240,11 +21281,16 @@
           },
           "login_id": {
             "type": "string"
+          },
+          "user_code": {
+            "description": "The one-time code the person enters on that page.",
+            "type": "string"
           }
         },
         "required": [
           "login_id",
           "auth_url",
+          "user_code",
           "expires_at_ms"
         ],
         "title": "ProviderLoginOutput",

@@ -49,7 +49,14 @@ export type ChangeOp =
       op: 'remove_entry';
     }
   | {
-      after: unknown;
+      /**
+       * The whole new config. Preflight accepts only an object, and the
+       * schema says so, so a model is not left to guess (a JSON-encoded
+       * string is rejected, never parsed).
+       */
+      after: {
+        [k: string]: unknown;
+      };
       before?: unknown;
       entry_id: string;
       op: 'set_entry_config';

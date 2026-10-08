@@ -409,13 +409,11 @@ pub fn launch(
         "/dev/null".into(),
         "--write".into(),
         root.to_string_lossy().into_owned(),
-        // HTTPS to the provider and DNS. The ChatGPT login callback listens
-        // on loopback port 1455 while a browser sign-in is pending.
+        // HTTPS to the provider and DNS. Sign-in is by device code, so the
+        // backend listens on nothing (no browser callback port).
         "--tcp".into(),
         "443".into(),
         "--udp-dns".into(),
-        "--bind-tcp".into(),
-        "1455".into(),
         "--cwd".into(),
         work.to_string_lossy().into_owned(),
     ]);

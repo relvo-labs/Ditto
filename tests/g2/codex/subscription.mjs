@@ -47,7 +47,7 @@ try{
       announced=true
       const login=JSON.parse(readFileSync(loginFile,'utf8'))
       if(process.env.DITTO_G2_OPEN_BROWSER)spawn('xdg-open',[login.auth_url],{stdio:'ignore',detached:true}).unref()
-      console.log('SIGN-IN REQUIRED: open this address in your browser and sign in with your ChatGPT account:\n'+login.auth_url+`\n(waiting up to ${waitMinutes} minutes)`)
+      console.log('SIGN-IN REQUIRED: open '+login.auth_url+' in any browser, sign in with your ChatGPT account and enter the code\n\n    '+login.user_code+`\n\n(the code expires in about 9 minutes; waiting up to ${waitMinutes} minutes)`)
     }
     await sleep(100)
   }

@@ -82,7 +82,11 @@
         {
           "additionalProperties": false,
           "properties": {
-            "after": true,
+            "after": {
+              "additionalProperties": true,
+              "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+              "type": "object"
+            },
             "before": true,
             "entry_id": {
               "type": "string"

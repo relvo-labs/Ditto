@@ -1,7 +1,7 @@
 import {it,expect} from 'vitest'
 import type {CoreChannel} from '../../host-runtime/src/bridge/core-link.ts'
 import {DittoError} from '../../host-runtime/src/errors.ts'
-import {DesktopTools} from '../src/tools.ts'
+import {DesktopTools,modelSchema} from '../src/tools.ts'
 
 const descriptor={capability_id:'desktop.appearance.get',version:'0.3.0',availability:{kind:'always'},input_schema:{type:'object',properties:{},additionalProperties:false},resource_scope:['read'],timeout_ms:{max_ms:1000}}
 function fixture(operation:(params:Record<string,unknown>)=>unknown|Promise<unknown>,previous?:unknown){
@@ -52,4 +52,13 @@ it('does not retry lost acknowledgements, and abandons only definitively unexecu
   expect((await refused.tools.execute('turn-one','call-one','desktop__appearance__get',{},new AbortController().signal)).success).toBe(false)
   expect(refused.calls.filter(c=>c.method===descriptor.capability_id)).toHaveLength(1)
   expect(refused.calls.at(-1)).toMatchObject({method:'agent.tools.abandon',params:{reason:'permission_denied'}})
+})
+it('spells out untyped values for the model, since Codex turns an untyped schema into a string',()=>{
+  const shown=modelSchema({type:'object',properties:{after:true,before:{description:'old'},config:{},path:{type:'string'},list:{type:'array',items:{}}},$defs:{Op:{oneOf:[{type:'object',properties:{after:true}}]}},additionalProperties:false}) as any
+  for(const value of [shown.properties.after,shown.properties.before,shown.properties.config,shown.properties.list.items,shown.$defs.Op.oneOf[0].properties.after]){
+    expect(value.anyOf.map((s:any)=>s.type)).toEqual(['string','number','boolean','null','object','array'])
+  }
+  expect(shown.properties.before.description).toBe('old')
+  expect(shown.properties.path).toEqual({type:'string'})
+  expect(shown.additionalProperties).toBe(false)
 })

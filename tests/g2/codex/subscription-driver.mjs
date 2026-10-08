@@ -1,5 +1,5 @@
 // Inside Core: enable AI, sign in if needed (the person does it in a
-// browser), run one real-model turn, verify through Core, undo.
+// browser with a device code), run one real-model turn, verify through Core, undo.
 import {writeFileSync,readFileSync,existsSync,readdirSync} from 'node:fs'
 import {join} from 'node:path'
 import {connect,sleep} from '../../g1/lib/core-client.mjs'
@@ -26,9 +26,9 @@ try{
   let status=await core.must('agent.providers.status',{provider:'codex-app-server'})
   if(!status.authenticated){
     const login=await core.must('agent.providers.login',{provider:'codex-app-server'})
-    writeFileSync(process.env.DITTO_G2_LOGIN_FILE,JSON.stringify({auth_url:login.auth_url}))
+    writeFileSync(process.env.DITTO_G2_LOGIN_FILE,JSON.stringify({auth_url:login.auth_url,user_code:login.user_code}))
     status=await eventually(async()=>{const s=await core.must('agent.providers.status',{provider:'codex-app-server'});return s.authenticated?s:false},Math.ceil(Number(process.env.DITTO_G2_LOGIN_WAIT_MIN??15)*20),3000)
-    verify('signed in through the browser',!!status)
+    verify('signed in with the device code',!!status)
     checks.push('sign-in performed this run')
   }else checks.push('sign-in reused from the keyring')
   facts.models=status.models.map(m=>m.id)

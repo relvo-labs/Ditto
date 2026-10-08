@@ -18,7 +18,7 @@ class Peer implements BackendTransport {
     if(method==='account/read')result={account:this.authenticated?{type:'chatgpt',email:'test@example.invalid',planType:'plus'}:null,requiresOpenaiAuth:true}
     else if(method==='model/list')result={data:[{id:'example-model',model:'example-model',displayName:'Example',description:'Example model',isDefault:true,hidden:false,supportedReasoningEfforts:[{reasoningEffort:'medium',description:'Medium'}],defaultReasoningEffort:'medium',inputModalities:['text']}],nextCursor:null}
     else if(method==='account/rateLimits/read')result={rateLimits:{primary:{usedPercent:this.limit,resetsAt:1234567890,windowDurationMins:300},secondary:null}}
-    else if(method==='account/login/start')result={type:'chatgpt',loginId:'login-test',authUrl:'https://auth.openai.com/oauth/authorize?state=test'}
+    else if(method==='account/login/start')result={type:'chatgptDeviceCode',loginId:'login-test',verificationUrl:'https://auth.openai.com/codex/device',userCode:'ABCD-1234'}
     else if(method==='thread/start')result={thread:{id:'thread-1'}}
     else if(method==='turn/start')return (this.start?.()??Promise.resolve({turn:{id:'turn-1'}})) as Promise<T>
     return Promise.resolve(result as T)
@@ -37,14 +37,18 @@ describe('Codex delegated-turn adapter',()=>{
     expect(status.rate_limits?.primary?.used_percent).toBe(20)
     expect(status).not.toHaveProperty('price');expect(JSON.stringify(status)).not.toContain('token')
   })
-  it('deduplicates pending managed browser login and never accepts another origin',async()=>{
+  it('deduplicates a pending device-code login and never accepts another origin or a malformed code',async()=>{
     const peer=new Peer(),backend=new CodexBackend(peer)
     const first=await backend.startLogin();expect(await backend.startLogin()).toBe(first)
+    expect(peer.calls.find(c=>c.method==='account/login/start')?.params).toEqual({type:'chatgptDeviceCode'})
+    expect(first).toMatchObject({auth_url:'https://auth.openai.com/codex/device',user_code:'ABCD-1234'})
     expect(peer.calls.filter(c=>c.method==='account/login/start')).toHaveLength(1)
     expect(await backend.cancelLogin('other')).toEqual({completed:false})
     await backend.cancelLogin(first.login_id)
-    const bad=new Peer();bad.request=async<T>()=>({type:'chatgpt',loginId:'x',authUrl:'https://auth.openai.com.evil.invalid/'} as T)
+    const bad=new Peer();bad.request=async<T>()=>({type:'chatgptDeviceCode',loginId:'x',verificationUrl:'https://auth.openai.com.evil.invalid/',userCode:'ABCD-1234'} as T)
     await expect(new CodexBackend(bad).startLogin()).rejects.toThrow('destination')
+    const odd=new Peer();odd.request=async<T>()=>({type:'chatgptDeviceCode',loginId:'x',verificationUrl:'https://auth.openai.com/codex/device',userCode:'<a href>'} as T)
+    await expect(new CodexBackend(odd).startLogin()).rejects.toThrow('code')
   })
   it('assembles early notifications, reports provider usage and exposes only discovered dynamic tools',async()=>{
     const peer=new Peer(),backend=new CodexBackend(peer),deltas:string[]=[]

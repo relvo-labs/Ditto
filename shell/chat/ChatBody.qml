@@ -179,7 +179,7 @@ Item {
                 }
             }
 
-            // Signed out: the official browser sign-in of the Codex
+            // Signed out: the official device-code sign-in of the Codex
             // subscription. No API key field on this path.
             Column {
                 visible: window.conversation.enabled && !window.conversation.connected
@@ -190,10 +190,22 @@ Item {
                     width: parent.width
                     wrapMode: Text.WordWrap
                     text: window.conversation.login
-                        ? window.t(qsTr("請在瀏覽器完成登入。完成後這裡會自動更新。"))
+                        ? window.t(qsTr("在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。"))
                         : window.t(qsTr("使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。"))
                     color: window.tokens.foregroundMuted
                     font.pixelSize: window.tokens.fontBody
+                }
+                TextEdit {
+                    visible: !!window.conversation.login
+                    readOnly: true
+                    selectByMouse: true
+                    text: window.conversation.login ? window.conversation.login.user_code : ""
+                    color: window.tokens.foreground
+                    font.pixelSize: window.tokens.fontTitle
+                    font.family: "monospace"
+                    font.letterSpacing: 2
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: window.t(qsTr("登入代碼")) + " " + text
                 }
                 Row {
                     spacing: window.tokens.space

@@ -25,7 +25,7 @@ controller 不選擇二進位、參數、帳號儲存方式或 OS 邊界。後�
 | 機制 | 內容 |
 | --- | --- |
 | Landlock 檔案 | 只讀：Codex 二進位目錄、`/etc/ssl`、CA、`resolv.conf`、hosts、`/dev/urandom`、衍生模型目錄。可寫：後端私有目錄、`/dev/null`。家目錄、`/proc`、`/usr` 皆不可見 |
-| Landlock 網路 | TCP bind 只有 1455（瀏覽器登入回呼）；TCP connect 全交給下列代理 |
+| Landlock 網路 | 不允許任何 TCP bind（登入用 device code，沒有回呼埠）；TCP connect 全交給下列代理 |
 | Landlock scope | 抽象 Unix socket 與 signal 限於自身程序樹 |
 | seccomp socket | 只能建立 IPv4、IPv6 與 **stream** Unix socket；netlink、packet、datagram Unix 一律 `EAFNOSUPPORT` |
 | seccomp connect 代理 | 每個 `connect()` 交給 supervisor：以 `pidfd_getfd` 取得同一個 socket 物件、檢查**物件本身**的 family，由 supervisor 自己連到允許的端點；從不回覆 continue，因此改寫位址或替換 fd 的競態到不了別處 |
@@ -49,7 +49,7 @@ controller 不選擇二進位、參數、帳號儲存方式或 OS 邊界。後�
 | --- | --- | --- |
 | `node tests/g2/codex/run.mjs` | Core（fixture）→ controller → 隔離的 app-server → loopback 腳本模型 → Ditto 工具 → ChangeSet → 回讀 → undo → 停止；22 項檢查，含工具面、內建工具拒絕、canary 只在 Core 對話儲存 | development-host |
 | `bash tests/g2/codex/desktop.sh` | headless Wayfire＋真 Shell＋hostd：開聊天、合成鍵盤輸入、Shell 顯示 Core 變更卡、Esc 不取消、undo、Agent 退出 Shell／hostd 存活；9 項 | development headless desktop |
-| `node tests/g2/codex/subscription.mjs` | 真實 Codex 訂閱：本人在瀏覽器登入、一個真模型 turn、Core 回讀與 undo | development-host-real-subscription |
+| `node tests/g2/codex/subscription.mjs` | 真實 Codex 訂閱：本人以 device code 在瀏覽器登入、一個真模型 turn、Core 回讀與 undo | development-host-real-subscription |
 
 腳本模型只證明接線與邊界，不證明模型品質或帳號可用性。
 

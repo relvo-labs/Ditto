@@ -48,8 +48,12 @@
         <translation>啟用 AI 對話</translation>
     </message>
     <message>
-        <source>在瀏覽器以官方頁面登入。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</source>
-        <translation>在瀏覽器以官方頁面登入。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</translation>
+        <source>在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</source>
+        <translation>在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</translation>
+    </message>
+    <message>
+        <source>在瀏覽器開啟的頁面登入，並輸入代碼：%1</source>
+        <translation>在瀏覽器開啟的頁面登入，並輸入代碼：%1</translation>
     </message>
     <message>
         <source>尚未登入</source>
@@ -110,10 +114,6 @@
     <message>
         <source>詢問我</source>
         <translation>詢問我</translation>
-    </message>
-    <message>
-        <source>請在瀏覽器完成登入。</source>
-        <translation>請在瀏覽器完成登入。</translation>
     </message>
     <message>
         <source>連接方式</source>
@@ -622,6 +622,10 @@
         <translation>可以試試：</translation>
     </message>
     <message>
+        <source>在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。</source>
+        <translation>在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。</translation>
+    </message>
+    <message>
         <source>對話</source>
         <translation>對話</translation>
     </message>
@@ -694,6 +698,10 @@
         <translation>歷史</translation>
     </message>
     <message>
+        <source>登入代碼</source>
+        <translation>登入代碼</translation>
+    </message>
+    <message>
         <source>目前無法建立組合</source>
         <translation>目前無法建立組合</translation>
     </message>
@@ -716,10 +724,6 @@
     <message>
         <source>診斷</source>
         <translation>診斷</translation>
-    </message>
-    <message>
-        <source>請在瀏覽器完成登入。完成後這裡會自動更新。</source>
-        <translation>請在瀏覽器完成登入。完成後這裡會自動更新。</translation>
     </message>
     <message>
         <source>載入較早的訊息</source>

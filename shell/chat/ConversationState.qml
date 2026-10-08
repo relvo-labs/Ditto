@@ -260,8 +260,9 @@ QtObject {
     }
 
     // ---- sign-in ------------------------------------------------------------------------
-    /// The official browser sign-in, run by the Agent's backend. The browser
-    /// gets the authorization address; no token ever reaches the Shell.
+    /// The official device-code sign-in, run by the Agent's backend. The
+    /// browser gets the verification page and the person types the one-time
+    /// code shown here; no token ever reaches the Shell.
     function startLogin() {
         client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
             login = result;
