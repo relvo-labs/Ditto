@@ -6,7 +6,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use ditto_compositor::AdapterError;
@@ -332,7 +332,45 @@ impl CompositorParticipant {
             }
             items.push(item);
         }
+        if !placed.is_empty() {
+            self.settle(&placed);
+        }
         (items, placed)
+    }
+
+    /// A configure is only a request: the client answers with the size it
+    /// commits, which may differ (a floating window may keep its own width).
+    /// The readback waits until the placed windows' geometry has stopped
+    /// changing, so it judges what the client committed, not what was asked.
+    fn settle(&self, placed: &[(String, String)]) {
+        const MIN: Duration = Duration::from_millis(150);
+        const MAX: Duration = Duration::from_millis(1500);
+        const STEP: Duration = Duration::from_millis(50);
+        let geometry = || -> Vec<(Option<i32>, Option<i32>, Option<u32>, Option<u32>)> {
+            let windows = self.placement();
+            placed
+                .iter()
+                .map(|(_, id)| {
+                    windows
+                        .iter()
+                        .find(|w| &w.id.0 == id)
+                        .map(|w| (w.x, w.y, w.width, w.height))
+                        .unwrap_or_default()
+                })
+                .collect()
+        };
+        // Unchanged for MIN in a row, or MAX in all.
+        let started = Instant::now();
+        let mut stable_since = started;
+        let mut last = geometry();
+        while stable_since.elapsed() < MIN && started.elapsed() < MAX {
+            std::thread::sleep(STEP);
+            let now = geometry();
+            if now != last {
+                stable_since = Instant::now();
+                last = now;
+            }
+        }
     }
 
     /// The last commit's placements, as the compositor reports them now.
