@@ -41,6 +41,10 @@ Environment=DITTO_LAUNCH_SCOPE_PREFIX=ditto
 # script would be refused (packages/host-runtime/bin/ditto-hostd). Its Node
 # flags sit between node and the bundle (packages/host-runtime/hostd.node-flags).
 # The rescue UI and the lock client are only started when Core needs them.
+# The Agent (G2) is started on demand, never at login; Core launches the
+# pinned Codex app-server confined (ditto-confine, next to ditto-core) only
+# when the installer found that exact binary, and otherwise runs without it
+# (the direct-model path still works).
 #
 # $DITTO_CORE_MODE_ARGS (unquoted: split into words, and zero words when unset
 # or empty) is how a measurement login starts Core in rescue mode: the login
@@ -55,6 +59,8 @@ ExecStart=@DITTO_WORKSPACE@/target/release/ditto-core serve --compositor wayfire
     --hostd "hostd 0.2.0 @DITTO_NODE@ @DITTO_HOSTD_NODE_FLAGS@ @DITTO_WORKSPACE@/packages/host-runtime/dist/ditto-hostd.mjs" \
     --rescue-ui "rescue-shell 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/rescue/shell.qml" \
     --lock "lock 0.3.1 @DITTO_QT_PREFIX@/bin/quickshell --no-color -p @DITTO_WORKSPACE@/shell/lock/shell.qml" \
+    --agent "agent 0.3.0 @DITTO_NODE@ @DITTO_WORKSPACE@/packages/agent-runtime/dist/ditto-agentd.mjs" \
+    @DITTO_AGENT_BACKEND_ARGS@ \
     $DITTO_CORE_MODE_ARGS
 
 [Install]
