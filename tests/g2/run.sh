@@ -39,6 +39,13 @@ if [[ "${1:-}" == desktop ]]; then
   suite layout timeout -k 15 1800 bash tests/g2/layout/run.sh
   suite codex-desktop timeout -k 15 1800 bash tests/g2/codex/desktop.sh
   suite shell timeout -k 15 1800 bash tests/g2/shell/run.sh
+  # The semantic oracle itself (no model): reference solutions pass, the
+  # null control fails. Chrome stands in for the browser where it exists.
+  command -v google-chrome >/dev/null && export DITTO_SEMANTIC_BROWSER=chrome
+  for set in fixed holdout; do
+    suite "semantic-$set-self-test" timeout -k 15 3600 bash tests/g2/semantic/run.sh --tasks "$set" --self-test
+    suite "semantic-$set-null" timeout -k 15 3600 bash tests/g2/semantic/run.sh --tasks "$set" --null
+  done
 fi
 echo "G2 run: $out"
 ! jq -e 'select(.status == "fail")' "$out/summary.jsonl" >/dev/null
