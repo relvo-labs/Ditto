@@ -106,6 +106,21 @@ Scope {
         WlrLayershell.keyboardFocus: provider.isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
         WlrLayershell.namespace: "ditto-launcher-grid"
 
+        // NFR-02: the first frame after opening, marked on the Shell's
+        // counter (when it traces) so input → visible can be measured.
+        property bool framed: false
+        onVisibleChanged: if (!visible) framed = false
+        Connections {
+            target: body.Window.window
+            function onFrameSwapped() {
+                if (surface.visible && !surface.framed) {
+                    surface.framed = true;
+                    if (provider.client && provider.client.counter)
+                        provider.client.counter.mark("launcher.frame");
+                }
+            }
+        }
+
         MouseArea {
             anchors.fill: parent
             onClicked: provider.close()

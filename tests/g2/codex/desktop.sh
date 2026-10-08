@@ -48,6 +48,7 @@ port="$(head -n1 "$evidence/provider.port")"
 start_compositor >/dev/null
 export DITTO_TEST_FIXTURE=1
 if ! shell_fixture_start --hostd \
+    --lock "lock 0.3.1 $(readlink -f "$(command -v quickshell)") -p $WORKSPACE/shell/lock/shell.qml" \
     --agent "agent 0.3.0 $(readlink -f "$(command -v node)") $WORKSPACE/packages/agent-runtime/dist/ditto-agentd.mjs" \
     --agent-backend "codex-app-server $pin_version $pin_sha $codex" \
     --agent-backend-test-provider "http://127.0.0.1:$port/v1"; then
@@ -55,7 +56,7 @@ if ! shell_fixture_start --hostd \
   check fixture fail "the desktop fixture did not come up; log in $evidence/core.log"
   g1_finish
 fi
-shell_pid="$(core_child quickshell)"
+shell_pid="$(core_child "$WORKSPACE/shell/shell.qml")"
 host_pid="$(core_child ditto-hostd)"
 
 chat() { shell_line chat; }
@@ -232,15 +233,34 @@ else
   check context-private pass "the clipboard text is in no Core log line"
 fi
 
+# ⑪ locked: nobody can see a prompt, so an approval is unavailable at once
+# and the call is refused. (The fixture is not unlocked afterwards.)
+relay desktop.session.lock '{}' >/dev/null
+for _ in $(seq 1 100); do [[ "$(relay desktop.session.state '{}' | jq -r .result.locked)" == true ]] && break; sleep 0.1; done
+locked_session="$(relay agent.sessions.create '{"title":"locked","idempotency_key":"g2-locked"}' | jq -r .result.session_id)"
+locked_turn="$(relay agent.turns.submit "{\"session_id\":\"$locked_session\",\"client_message_id\":\"g2-locked-1\",\"text\":\"列出視窗\",\"contexts\":[]}" | jq -r .result.turn_id)"
+for _ in $(seq 1 240); do
+  state="$(relay agent.turns.get "{\"turn_id\":\"$locked_turn\"}" | jq -r .result.state)"
+  case "$state" in succeeded|failed|cancelled|unknown|partial) break ;; esac
+  sleep 0.5
+done
+approvals="$(relay agent.sessions.read "{\"session_id\":\"$locked_session\",\"offset\":0,\"limit\":50}" | jq -c '[.result.events[] | select(.type=="approval/decided") | .data.decision]')"
+answer="$(relay agent.sessions.read "{\"session_id\":\"$locked_session\",\"offset\":0,\"limit\":50}" | jq -r '[.result.events[] | select(.type=="assistant/message") | .data.text] | last')"
+if [[ "$(relay desktop.session.state '{}' | jq -r .result.locked)" == true ]] && jq -e 'length > 0 and all(. == "unavailable")' <<<"$approvals" >/dev/null && [[ "$answer" == *沒有取得* ]]; then
+  check approval-locked pass "locked: the request was recorded unavailable and the call refused" "$(jq -cn --argjson a "$approvals" --arg s "$state" --arg x "$answer" '{approvals:$a,turn:$s,answer:$x}')"
+else
+  check approval-locked fail "locked: approvals $approvals, turn $state, answer $answer"
+fi
+
 # ⑤ the Agent goes; the desktop stays
 backend_pid="$(jq -r .backend_pid <<<"$runtime")"
 relay agent.runtime.stop '{}' >/dev/null
 for _ in $(seq 1 100); do [[ "$(relay agent.runtime.get '{}' | jq -r .result.phase)" == stopped ]] && break; sleep 0.1; done
 if [[ "$(relay agent.runtime.get '{}' | jq -r .result.phase)" == stopped && ! -d "/proc/$backend_pid" \
-  && "$(core_child quickshell)" == "$shell_pid" && "$(core_child ditto-hostd)" == "$host_pid" ]]; then
+  && "$(core_child "$WORKSPACE/shell/shell.qml")" == "$shell_pid" && "$(core_child ditto-hostd)" == "$host_pid" ]]; then
   check agent-exit pass "Agent and backend stopped; Shell $shell_pid and hostd $host_pid kept running"
 else
-  check agent-exit fail "after stopping the Agent: shell $(core_child quickshell) (was $shell_pid), hostd $(core_child ditto-hostd) (was $host_pid), backend $backend_pid present=$([[ -d /proc/$backend_pid ]] && echo yes || echo no)"
+  check agent-exit fail "after stopping the Agent: shell $(core_child "$WORKSPACE/shell/shell.qml") (was $shell_pid), hostd $(core_child ditto-hostd) (was $host_pid), backend $backend_pid present=$([[ -d /proc/$backend_pid ]] && echo yes || echo no)"
 fi
 
 tools="$(jq -s '[.[] | ((.tools // []) + ([.input[]? | select(.type=="additional_tools") | .tools[]]) ) | .. | objects | select(has("name") and (has("tools") | not)) | .name] | unique' "$evidence/model-requests.jsonl")"

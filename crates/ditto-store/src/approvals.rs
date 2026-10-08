@@ -78,6 +78,12 @@ pub fn request(
     };
     store.write(|tx|{tx.execute("INSERT INTO agent_approvals(request_id,approval_json,principal,owner_connection,expires_at_ms,decided) VALUES(?1,?2,?3,?4,?5,?6)",
         rusqlite::params![approval.request_id,serde_json::to_string(&approval)?,principal,owner,approval.expires_at_ms as i64,approval.decision.is_some()])?;Ok(())})?;
+    // The conversation keeps the ask and its answer beside the tool call
+    // they belong to (session → turn → tool → approval); ids only.
+    record(store, &approval, SessionEventKind::ApprovalAsked)?;
+    if approval.decision.is_some() {
+        record(store, &approval, SessionEventKind::ApprovalDecided)?;
+    }
     if approval.decision.is_none() {
         turns::set_awaiting(store, &approval.request.turn_id, owner, true)?;
     }
@@ -113,6 +119,7 @@ pub fn decide(
     );
     store.write(|tx|{tx.execute("UPDATE agent_approvals SET approval_json=?2,decided=1 WHERE request_id=?1 AND decided=0",
         rusqlite::params![approval.request_id,serde_json::to_string(&approval)?])?;Ok(())})?;
+    record(store, &approval, SessionEventKind::ApprovalDecided)?;
     if live {
         turns::set_awaiting(
             store,
@@ -122,6 +129,22 @@ pub fn decide(
         )?;
     }
     Ok(approval)
+}
+fn record(store: &mut Store, approval: &Approval, kind: SessionEventKind) -> StoreResult<()> {
+    let tag = if kind == SessionEventKind::ApprovalAsked { "asked" } else { "decided" };
+    crate::conversations::append_internal(
+        store,
+        &approval.request.session_id,
+        &format!("approval-{tag}:{}", approval.request_id),
+        kind,
+        serde_json::json!({
+            "request_id": approval.request_id,
+            "turn_id": approval.request.turn_id,
+            "capability_id": approval.request.capability_id,
+            "decision": approval.decision,
+        }),
+    )?;
+    Ok(())
 }
 /// Called only in Core's common authorization path after identity, policy and
 /// tool-intent validation. Revocation/lock checks happen immediately before it.
@@ -271,6 +294,36 @@ mod tests {
             &intent.payload_hash
         )
         .unwrap());
+        // The conversation keeps the ask and the answer once each, ids only.
+        let paths = store.paths().clone();
+        let events = conversations::read(
+            store.connection(),
+            &paths,
+            &SessionReadInput {
+                session_id: turn.session_id.clone(),
+                offset: 0,
+                limit: 50,
+            },
+        )
+        .unwrap()
+        .events;
+        let approvals: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e.kind,
+                    SessionEventKind::ApprovalAsked | SessionEventKind::ApprovalDecided
+                )
+            })
+            .map(|e| (e.kind, e.data["request_id"].clone(), e.data["decision"].clone()))
+            .collect();
+        assert_eq!(
+            approvals,
+            vec![
+                (SessionEventKind::ApprovalAsked, json!(approval.request_id), json!(null)),
+                (SessionEventKind::ApprovalDecided, json!(approval.request_id), json!("allowed-once")),
+            ]
+        );
     }
 
     #[test]
