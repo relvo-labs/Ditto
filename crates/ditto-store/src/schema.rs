@@ -456,3 +456,47 @@ mod tests {
         assert!(!conversations);
     }
 }
+
+#[cfg(test)]
+mod migration_failure {
+    use super::*;
+
+    #[test]
+    fn a_failed_migration_rolls_back_and_a_later_start_completes_it() {
+        let root = crate::testing::temp_root("migration-failure");
+        let paths = crate::Paths::under(&root);
+        paths.create().unwrap();
+        let mut db = Connection::open(paths.database()).unwrap();
+        configure(&db).unwrap();
+        for version in 1..=2 {
+            let tx = db.transaction().unwrap();
+            apply(&tx, version).unwrap();
+            tx.commit().unwrap();
+        }
+        db.execute(
+            "INSERT INTO jobs (job_id, kind, state, created_at, updated_at) VALUES ('job-1','plugins.install','succeeded','t','t')",
+            [],
+        )
+        .unwrap();
+        // Something in the way of v3 (a crash leftover, say): it fails whole.
+        db.execute_batch("CREATE TABLE jobs_v3 (x INTEGER);")
+            .unwrap();
+        assert!(migrate(&mut db).is_err());
+        assert_eq!(user_version(&db).unwrap(), 2);
+        let kept: i64 = db
+            .query_row("SELECT count(*) FROM jobs WHERE job_id='job-1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(kept, 1, "the old table is untouched");
+        db.execute_batch("DROP TABLE jobs_v3;").unwrap();
+        assert_eq!(migrate(&mut db).unwrap(), 2);
+        assert_eq!(user_version(&db).unwrap(), CURRENT_VERSION);
+        let state: String = db
+            .query_row("SELECT state FROM jobs WHERE job_id='job-1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(state, "succeeded");
+    }
+}

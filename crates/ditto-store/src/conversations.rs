@@ -529,6 +529,17 @@ pub fn recover(store: &mut Store) -> StoreResult<()> {
             }
             let dir = Dir::root(store.paths())?.session(&id, false)?;
             if !entry.path().join("header.json").exists() {
+                // A create that crashed before its header was renamed into
+                // place never answered: nothing refers to it. Remove it,
+                // unless the index knows the id (then it is real damage).
+                let known: bool = store.connection().query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversations WHERE session_id=?1)",
+                    [&id],
+                    |r| r.get(0),
+                )?;
+                if !known {
+                    purge_files(store.paths(), &id)?;
+                }
                 continue;
             }
             let h = header(&dir)?;
@@ -705,5 +716,190 @@ mod tests {
         std::fs::remove_file(&log).unwrap();
         std::os::unix::fs::symlink("/etc/passwd", log).unwrap();
         assert!(stat(t.store.connection(), t.store.paths(), &b.session_id).is_err());
+    }
+
+    fn read_all(t: &crate::testing::TempStore, id: &str) -> Vec<SessionEvent> {
+        read(
+            t.store.connection(),
+            t.store.paths(),
+            &SessionReadInput {
+                session_id: id.into(),
+                offset: 0,
+                limit: 200,
+            },
+        )
+        .unwrap()
+        .events
+    }
+
+    #[test]
+    fn skipped_or_out_of_order_sequences_are_refused() {
+        let (mut t, h) = setup();
+        let mut b = batch(&h);
+        b.expected_next_seq = 5;
+        b.events[0].seq = 5;
+        assert!(append(&mut t.store, "conn-1", &b).is_err());
+        let mut gap = batch(&h);
+        gap.events.push(SessionEvent {
+            seq: 2,
+            kind: SessionEventKind::AssistantMessage,
+            data: serde_json::json!({"text":"skipped one"}),
+        });
+        assert!(append(&mut t.store, "conn-1", &gap).is_err());
+        assert!(read_all(&t, &h.session.session_id).is_empty());
+    }
+
+    #[test]
+    fn an_unknown_event_inside_a_committed_batch_refuses_reading() {
+        let (mut t, h) = setup();
+        append(&mut t.store, "conn-1", &batch(&h)).unwrap();
+        let path = t
+            .store
+            .paths()
+            .state
+            .join("conversations")
+            .join(&h.session.session_id)
+            .join("events.jsonl");
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, text.replace("user/message", "tool/exec")).unwrap();
+        assert!(stat(t.store.connection(), t.store.paths(), &h.session.session_id).is_err());
+    }
+
+    #[test]
+    fn a_create_that_crashed_before_its_rename_is_cleaned_up() {
+        let mut t = crate::testing::open("conversation-orphan");
+        let orphan = t
+            .store
+            .paths()
+            .state
+            .join("conversations")
+            .join("ses-01ORPHAN0000000000000000000");
+        std::fs::create_dir_all(&orphan).unwrap();
+        std::fs::write(orphan.join("header.partial"), b"{}").unwrap();
+        recover(&mut t.store).unwrap();
+        assert!(!orphan.exists());
+        assert!(list(t.store.connection()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_index_row_lost_after_the_rename_is_restored_from_the_header() {
+        let (mut t, h) = setup();
+        append(&mut t.store, "conn-1", &batch(&h)).unwrap();
+        let id = h.session.session_id.clone();
+        t.store
+            .write(|tx| {
+                tx.execute("DELETE FROM conversations WHERE session_id=?1", [&id])?;
+                Ok(())
+            })
+            .unwrap();
+        recover(&mut t.store).unwrap();
+        let back = stat(t.store.connection(), t.store.paths(), &id).unwrap();
+        assert_eq!(back.next_seq, 1);
+        assert_eq!(read_all(&t, &id).len(), 1);
+    }
+
+    #[test]
+    fn the_event_file_wins_when_the_index_disagrees() {
+        let (mut t, h) = setup();
+        append(&mut t.store, "conn-1", &batch(&h)).unwrap();
+        let id = h.session.session_id.clone();
+        for wrong in [0i64, 99] {
+            t.store
+                .write(|tx| {
+                    tx.execute(
+                        "UPDATE conversations SET next_seq=?2, durable_seq=?2 WHERE session_id=?1",
+                        rusqlite::params![id, wrong],
+                    )?;
+                    Ok(())
+                })
+                .unwrap();
+            // Never claims events the file does not hold, nor loses those it does.
+            assert_eq!(
+                stat(t.store.connection(), t.store.paths(), &id)
+                    .unwrap()
+                    .next_seq,
+                1
+            );
+            recover(&mut t.store).unwrap();
+            assert_eq!(
+                stat(t.store.connection(), t.store.paths(), &id)
+                    .unwrap()
+                    .durable_seq,
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn a_full_disk_fails_the_append_and_keeps_the_log_readable() {
+        let (mut t, h) = setup();
+        append(&mut t.store, "conn-1", &batch(&h)).unwrap();
+        let path = t
+            .store
+            .paths()
+            .state
+            .join("conversations")
+            .join(&h.session.session_id)
+            .join("events.jsonl");
+        let size = std::fs::metadata(&path).unwrap().len();
+        let mut big = batch(&h);
+        big.batch_id = "big".into();
+        big.expected_next_seq = 1;
+        big.events[0].seq = 1;
+        big.events[0].data = serde_json::json!({"text": "滿".repeat(4000)});
+        // The process may write no file past this size: like a full disk for
+        // the event log (EFBIG instead of SIGXFSZ, which is ignored here).
+        let mut old = libc::rlimit {
+            rlim_cur: 0,
+            rlim_max: 0,
+        };
+        unsafe {
+            libc::signal(libc::SIGXFSZ, libc::SIG_IGN);
+            libc::getrlimit(libc::RLIMIT_FSIZE, &mut old);
+            let limit = libc::rlimit {
+                rlim_cur: size + 200,
+                rlim_max: old.rlim_max,
+            };
+            libc::setrlimit(libc::RLIMIT_FSIZE, &limit);
+        }
+        let result = append(&mut t.store, "conn-1", &big);
+        unsafe { libc::setrlimit(libc::RLIMIT_FSIZE, &old) };
+        assert!(
+            result.is_err(),
+            "the append must fail when the file cannot grow"
+        );
+        // Whatever happened, what is readable is a valid prefix.
+        let events = read_all(&t, &h.session.session_id);
+        assert!(!events.is_empty() && events.iter().enumerate().all(|(i, e)| e.seq == i as u64));
+        // And the log takes appends again once there is room.
+        let next = stat(t.store.connection(), t.store.paths(), &h.session.session_id)
+            .unwrap()
+            .next_seq;
+        let mut again = batch(&h);
+        again.batch_id = "after".into();
+        again.expected_next_seq = next;
+        again.events[0].seq = next;
+        append(&mut t.store, "conn-1", &again).unwrap();
+    }
+
+    #[test]
+    fn a_delete_interrupted_after_its_tombstone_finishes_at_recovery() {
+        let (mut t, h) = setup();
+        append(&mut t.store, "conn-1", &batch(&h)).unwrap();
+        let id = h.session.session_id.clone();
+        t.store
+            .write(|tx| {
+                tx.execute(
+                    "UPDATE conversations SET deleted_at='now' WHERE session_id=?1",
+                    [&id],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let dir = t.store.paths().state.join("conversations").join(&id);
+        assert!(dir.exists());
+        recover(&mut t.store).unwrap();
+        assert!(!dir.exists());
+        assert!(list(t.store.connection()).unwrap().is_empty());
     }
 }
