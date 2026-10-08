@@ -2844,3 +2844,26 @@ fn region_rules_are_validated_and_need_floating_geometry() {
         "{both}"
     );
 }
+
+#[test]
+fn a_profile_cannot_bind_core_reserved_chords() {
+    let harness = harness("reserved-chords");
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    for chord in crate::preflight::RESERVED_CHORDS {
+        let response = cli.call(
+            catalog::CHANGES_PROPOSE,
+            json!({"base_revision": head(&cli), "ops": [
+                {"op": "set_value", "path": "/shortcuts", "after": [{"chord": chord, "command": "launcher.toggle"}]}
+            ]}),
+        );
+        assert_eq!(
+            response["error"]["name"],
+            json!("preflight_rejected"),
+            "{chord}: {response}"
+        );
+        assert!(
+            response.to_string().contains("shortcut_conflict"),
+            "{response}"
+        );
+    }
+}

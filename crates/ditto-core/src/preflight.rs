@@ -475,6 +475,15 @@ fn check_all(
     let mut command_owner: HashMap<&str, &str> = HashMap::new();
     let mut chord_owner: HashMap<&str, (&str, &str)> = HashMap::new();
     for shortcut in &target.shortcuts {
+        // Core's own chords (rescue, lock) belong to no Profile either: a
+        // composition, or an Agent writing one, must not shadow the way out.
+        if RESERVED_CHORDS.contains(&shortcut.chord.as_str()) {
+            reasons.push(reason(
+                PreflightCode::ShortcutConflict,
+                None,
+                json!({"chord": shortcut.chord, "why": "reserved"}),
+            ));
+        }
         if let Some((_, previous)) = chord_owner.insert(
             shortcut.chord.as_str(),
             ("profile", shortcut.command.as_str()),
