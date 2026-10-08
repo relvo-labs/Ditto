@@ -1,7 +1,7 @@
 // Runs inside Core as a launched CLI client and drives one Agent turn the
 // way the Shell would: settings, a message, Core's verified result, undo.
 import assert from 'node:assert/strict'
-import {readFileSync,writeFileSync,existsSync,readdirSync} from 'node:fs'
+import {readFileSync,writeFileSync,existsSync,readdirSync,statSync} from 'node:fs'
 import {connect,sleep} from '../../g1/lib/core-client.mjs'
 
 const checks=[]
@@ -112,5 +112,14 @@ try{
   await eventually(async()=>!existsSync(`/proc/${runtime.backend_pid}`)||field(status(runtime.backend_pid),'State')?.startsWith('Z'),200)
   verify('backend group gone after stop',!existsSync(`/proc/${runtime.backend_pid}`)||field(status(runtime.backend_pid),'State')?.startsWith('Z'))
   verify('desktop host survives Agent stop',!!host&&existsSync(`/proc/${host}`))
+  // Deleting the conversation removes its text from Core's storage: the
+  // canary was only in the conversation files, and afterwards is nowhere.
+  const holding=()=>{const found=[];const walk=p=>{let st;try{st=statSync(p)}catch{return}if(st.isDirectory()){for(const n of readdirSync(p))walk(p+'/'+n)}else if(st.isFile()&&readFileSync(p).includes(canary))found.push(p)};walk(process.env.DITTO_DATA_DIR);return found}
+  const before=holding()
+  verify('before deletion the text is only in conversation files: '+JSON.stringify(before),before.length>0&&before.every(p=>p.includes('/conversations/')))
+  await core.must('agent.sessions.delete',{session_id:session.session_id})
+  const listed=await core.must('agent.sessions.list',{})
+  verify('the deleted conversation is not listed',!JSON.stringify(listed).includes(session.session_id))
+  verify('after deletion the text is nowhere in Core storage: '+JSON.stringify(holding()),holding().length===0)
   report({ok:true,checks,change_id:change.change_id});core.close()
 }catch(error){report({ok:false,checks,error:String(error)});process.exitCode=1}

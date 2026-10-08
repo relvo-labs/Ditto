@@ -108,8 +108,9 @@ try{
   verify('built-in exec refused by backend',/unsupported call/.test(last.get('builtin-exec')??''))
   verify('built-in search refused by backend',/unsupported call/.test(last.get('builtin-search')??''))
   verify('no file escaped the boundary',!existsSync('/tmp/ditto-g2-escape'))
-  const leaks=grep(join(root,'store'),canary).filter(p=>!p.includes('/conversations/'))
-  verify('canary only in Core conversation store: '+JSON.stringify(leaks),leaks.length===0)
+  const leaks=[...grep(join(root,'store'),canary),...grep(join(root,'run'),canary)]
+  verify('after the conversation was deleted the canary is nowhere in Ditto state: '+JSON.stringify(leaks),leaks.length===0)
+  verify('the canary is in no Core, Agent or backend log line',!readFileSync(root+'/core.log','utf8').includes(canary))
   verify('attached file content reached the model',sent.some(b=>userText(b).includes(fileCanary)))
   const fileLeaks=[...grep(join(root,'store'),fileCanary),...grep(join(root,'run'),fileCanary)]
   verify('attached content stored nowhere (only its reference): '+JSON.stringify(fileLeaks),fileLeaks.length===0&&!readFileSync(root+'/core.log','utf8').includes(fileCanary))
