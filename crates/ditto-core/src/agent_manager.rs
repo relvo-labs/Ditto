@@ -180,7 +180,13 @@ impl AgentManager {
             &environment,
             channel.as_ref(),
         ) {
-            Ok(child) => s.child = Some(child),
+            Ok(child) => {
+                s.child = Some(child);
+                // The startup deadline is the controller's: checking and
+                // starting the backend (hashing a large binary on a slow
+                // machine) does not eat into it.
+                s.last_activity = Instant::now();
+            }
             Err(e) => {
                 Self::stop_backend(&mut s);
                 s.phase = RuntimePhase::Failed;

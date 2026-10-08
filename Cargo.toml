@@ -10,3 +10,10 @@ license = "UNLICENSED"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = "1"
+
+# Core hashes and scans the pinned Codex binary (~290 MB) before launching
+# it; unoptimized, that takes seconds in a debug build.
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.memchr]
+opt-level = 3

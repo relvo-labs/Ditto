@@ -146,9 +146,7 @@ const STRIPPED_MODEL_FIELDS: &[&str] = &[
 /// keeping every model, instruction and limit, minus the fields above.
 pub fn derive_catalog(binary: &[u8]) -> Option<serde_json::Value> {
     let slug = find(binary, b"\"slug\": \"")?;
-    let models = binary[..slug]
-        .windows(8)
-        .rposition(|w| w == b"\"models\"")?;
+    let models = memchr::memmem::rfind(&binary[..slug], b"\"models\"")?;
     let start = binary[..models].iter().rposition(|b| *b == b'{')?;
     let mut stream =
         serde_json::Deserializer::from_slice(&binary[start..]).into_iter::<serde_json::Value>();
@@ -169,7 +167,7 @@ pub fn derive_catalog(binary: &[u8]) -> Option<serde_json::Value> {
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack.windows(needle.len()).position(|w| w == needle)
+    memchr::memmem::find(haystack, needle)
 }
 
 /// The derived catalog for this binary, written once per pinned hash.

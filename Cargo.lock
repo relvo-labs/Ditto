@@ -292,6 +292,7 @@ dependencies = [
  "ditto-system",
  "dittoctl",
  "libc",
+ "memchr",
  "rusqlite",
  "semver",
  "serde",
