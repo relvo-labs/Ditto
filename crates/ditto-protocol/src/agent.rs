@@ -147,6 +147,24 @@ pub struct AgentPreferences {
     pub max_tool_calls: u32,
     pub turn_timeout_ms: u64,
     pub retain_conversations: bool,
+    /// `ask`: an Agent call outside its grants asks the person once.
+    /// `never`: nobody is asked; such calls are refused (existing grants
+    /// still apply). Never an automatic yes.
+    #[serde(default)]
+    pub approval_mode: ApprovalMode,
+}
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalMode {
+    #[default]
+    Ask,
+    Never,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ApprovalsListOutput {
+    /// Undecided, unexpired requests the caller may see.
+    pub approvals: Vec<Approval>,
 }
 impl Default for AgentPreferences {
     fn default() -> Self {
@@ -160,6 +178,7 @@ impl Default for AgentPreferences {
             max_tool_calls: 24,
             turn_timeout_ms: 120_000,
             retain_conversations: true,
+            approval_mode: ApprovalMode::Ask,
         }
     }
 }

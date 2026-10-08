@@ -160,6 +160,51 @@ else
   check approval-refused fail "the second approval request did not reach the Shell" "$(cat "$evidence/focus.json" 2>/dev/null || echo null)"
 fi
 
+# ⑧ approval mode "never": nobody is asked, the call is refused
+patch_settings() { # <jq filter on settings>
+  local current; current="$(relay agent.settings.describe '{}' | jq -c .result)"
+  relay agent.settings.patch "$(jq -c "{expected_revision:.revision, settings:(del(._meta) | $1)}" <<<"$current")" >/dev/null
+}
+ask_quiet() { # <message> → no approval window may appear; waits for the turn
+  shell_line "command chat.open" >/dev/null 2>&1 || true
+  sleep 1
+  "${G1_GUI[@]}" paste "$1"; "${G1_GUI[@]}" press enter
+  local saw=""
+  for _ in $(seq 1 60); do
+    "${G1_GUI[@]}" focus >"$evidence/focus.json" 2>/dev/null || true
+    jq -e '.focused.name == "拒絕"' "$evidence/focus.json" >/dev/null 2>&1 && saw=1
+    chat >"$evidence/chat.json" 2>/dev/null || true
+    jq -e '(.state == "done" or .state == "failed") and (.answer|type=="string")' "$evidence/chat.json" >/dev/null 2>&1 && [[ "$(jq -r .events[-1] "$evidence/chat.json")" == "turn/end" ]] && break
+    sleep 0.5
+  done
+  [[ -z "$saw" ]]
+}
+patch_settings '.approval_mode="never"'
+if ask_quiet "列出視窗（不要問我）" && jq -e '.answer|test("沒有取得")' "$evidence/chat.json" >/dev/null; then
+  check approval-never pass "mode never: no prompt, the call was refused" "$(jq -c '{state,answer}' "$evidence/chat.json")"
+else
+  check approval-never fail "mode never did not refuse silently" "$(cat "$evidence/chat.json")"
+fi
+patch_settings '.approval_mode="ask"'
+
+# ⑨ a standing grant: no prompt, allowed; ⑩ revoked: asked again
+grant="$(relay desktop.permissions.grant '{"subject":"agent","scope":"desktop.windows.read","idempotency_key":"g2-grant-windows"}')"
+echo "$grant" >"$evidence/grant.json"
+if ask_quiet "列出現在的視窗" && jq -e '.answer|test("個視窗")' "$evidence/chat.json" >/dev/null; then
+  check approval-granted pass "with a standing grant the Agent read windows without a prompt" "$(jq -c '{state,answer}' "$evidence/chat.json")"
+else
+  check approval-granted fail "the grant did not apply" "$(jq -c . "$evidence/grant.json"; cat "$evidence/chat.json")"
+fi
+grant_id="$(jq -r '.result.grant_id // .result.grant.grant_id // empty' "$evidence/grant.json")"
+relay desktop.permissions.revoke "{\"grant_id\":\"$grant_id\"}" >"$evidence/revoke.json"
+if ask "再看一次視窗"; then
+  "${G1_GUI[@]}" key KEY_ESC
+  wait_chat '.state == "done" or .state == "failed"' 60 || true
+  check approval-revoked pass "after revoking, the Agent had to ask again" "$(jq -c "{grant_id:.result.grant_id,revoked_at:.result.revoked_at}" "$evidence/revoke.json")"
+else
+  check approval-revoked fail "no prompt after revoke" "$(cat "$evidence/revoke.json")"
+fi
+
 # ⑤ the Agent goes; the desktop stays
 backend_pid="$(jq -r .backend_pid <<<"$runtime")"
 relay agent.runtime.stop '{}' >/dev/null
@@ -172,7 +217,7 @@ else
 fi
 
 tools="$(jq -s '[.[] | ((.tools // []) + ([.input[]? | select(.type=="additional_tools") | .tools[]]) ) | .. | objects | select(has("name") and (has("tools") | not)) | .name] | unique' "$evidence/model-requests.jsonl")"
-if jq -e 'map(select(startswith("desktop__") or startswith("request_user_input") | not)) | length == 0' <<<"$tools" >/dev/null; then
+if jq -e 'map(select(type=="string")) | map(select(startswith("desktop__") or startswith("request_user_input") | not)) | length == 0' <<<"$tools" >/dev/null; then
   check tool-surface pass "the model was offered only Ditto tools (and refused user-input requests)" "$tools"
 else
   check tool-surface fail "built-in tools reached the model" "$tools"

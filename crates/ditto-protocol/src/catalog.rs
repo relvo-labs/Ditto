@@ -1133,6 +1133,12 @@ fn agent_definitions() -> Vec<Definition> {
             &[s::AGENT_READ],
         ),
         def(
+            "desktop.approvals.list",
+            schema::<Empty>,
+            schema::<ApprovalsListOutput>,
+            &[s::AGENT_READ],
+        ),
+        def(
             "desktop.approvals.decide",
             schema::<ApprovalDecideInput>,
             schema::<Approval>,

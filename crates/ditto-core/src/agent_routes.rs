@@ -362,10 +362,17 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             // Only a Shell that reported an approval surface can answer; a
             // bare Shell connection, or a locked session, means nobody would
             // see the prompt, so the request is recorded unavailable at once.
-            let available = core.shell.approval_responder() && !core.session_locked();
+            let mode = core.read(preferences::get)?.approval_mode;
+            let preset = if mode == ApprovalMode::Never {
+                Some(ApprovalDecision::Rejected)
+            } else if !core.shell.approval_responder() || core.session_locked() {
+                Some(ApprovalDecision::Unavailable)
+            } else {
+                None
+            };
             let principal = caller.subject.0.clone();
             let approval = write(core, call, move |s| {
-                approvals::request(s, &principal, &owner, input, available)
+                approvals::request(s, &principal, &owner, input, preset)
             })?;
             if approval.decision.is_none() {
                 if let Some(peer) = core.shell.peer() {
@@ -374,6 +381,15 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             }
             announce_turn(core, &approval.request.turn_id);
             written(approval)
+        }
+        "desktop.approvals.list" => {
+            empty(call)?;
+            let mut pending = core.read(approvals::pending)?;
+            // An Agent sees only its own generation's requests.
+            if caller.subject.as_str() == Subject::AGENT {
+                pending.retain(|a| a.generation == owner);
+            }
+            ok(ApprovalsListOutput { approvals: pending })
         }
         "desktop.approvals.get" => {
             let input: ApprovalIdInput = call.input()?;

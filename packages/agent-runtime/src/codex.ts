@@ -139,11 +139,19 @@ export class CodexBackend {
     const completed=new Promise<void>((yes,no)=>{resolve=yes;reject=no})
     void completed.catch(()=>{}) // early notifications may finish before the start acknowledgement
     // Register before turn/start: notifications may precede its response.
-    const active:Active={threadId,assembler:new BlockAssembler(),bytes:0,indices:new Map(),execute,resolve,reject,signal,waiting:[],onText}
+    // The turn deadline counts model time. While a Ditto tool runs (which
+    // may include a person deciding an approval) the clock stops; the tool
+    // has its own bounds (Core timeouts, approval expiry).
+    let remaining=Math.max(1,deadline-Date.now()),armedAt=Date.now(),timer:NodeJS.Timeout|undefined,running=0
+    const arm=()=>{armedAt=Date.now();timer=setTimeout(()=>{void this.interrupt();reject(new Error('provider_timeout'))},Math.max(1,remaining));timer.unref()}
+    const pause=()=>{if(running++===0&&timer){clearTimeout(timer);timer=undefined;remaining-=Date.now()-armedAt}}
+    const resume=()=>{if(--running===0)arm()}
+    const timed:Active['execute']=async(callId,name,args)=>{pause();try{return await execute(callId,name,args)}finally{resume()}}
+    const active:Active={threadId,assembler:new BlockAssembler(),bytes:0,indices:new Map(),execute:timed,resolve,reject,signal,waiting:[],onText}
     this.active=active
     const onAbort=()=>{if(active.turnId)void this.peer.request('turn/interrupt',{threadId,turnId:active.turnId}).catch(()=>{});active.reject(new Error('cancelled'))}
     signal.addEventListener('abort',onAbort,{once:true})
-    const timer=setTimeout(()=>{void this.interrupt();reject(new Error('provider_timeout'))},Math.max(1,deadline-Date.now()));timer.unref()
+    arm()
     try{
       const result=object(await this.bounded('turn/start',{threadId,input:[{type:'text',text}],...(settings.reasoning_effort?{effort:settings.reasoning_effort}:{})},budget))
       const id=string(object(result.turn).id)
@@ -158,7 +166,7 @@ export class CodexBackend {
       if(signal.aborted)return {text:active.assembler.interruptedBlocks().filter(b=>b.type==='text').map(b=>b.text).join('\n'),usage:active.assembler.usage,model:selected.id,interrupted:true}
       throw error
     }finally{
-      clearTimeout(timer);signal.removeEventListener('abort',onAbort);this.active=undefined
+      if(timer)clearTimeout(timer);signal.removeEventListener('abort',onAbort);this.active=undefined
       // An ephemeral thread must not remain as a second history store.
       void this.peer.request('thread/unsubscribe',{threadId}).catch(()=>{})
     }

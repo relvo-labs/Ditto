@@ -102,5 +102,6 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     "agent.providers.cancel_login",
     "agent.providers.logout",
     "desktop.approvals.get",
+    "desktop.approvals.list",
     "desktop.approvals.decide",
 ];

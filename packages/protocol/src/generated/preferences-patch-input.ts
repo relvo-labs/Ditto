@@ -15,6 +15,12 @@ export interface PreferencesPatchInput {
   settings: AgentPreferences;
 }
 export interface AgentPreferences {
+  /**
+   * `ask`: an Agent call outside its grants asks the person once.
+   * `never`: nobody is asked; such calls are refused (existing grants
+   * still apply). Never an automatic yes.
+   */
+  approval_mode?: 'ask' | 'never';
   auth?: ProviderAuthentication | null;
   enabled: boolean;
   max_tool_calls: number;

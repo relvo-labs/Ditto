@@ -63,6 +63,17 @@ describe('Codex delegated-turn adapter',()=>{
     expect(thread.params).toMatchObject({ephemeral:true,sandbox:'read-only',approvalPolicy:'never',allowProviderModelFallback:false})
     expect(peer.calls.some(c=>c.method==='thread/resume')).toBe(false)
   })
+  it('stops the model deadline while a Ditto tool (or a person) is working',async()=>{
+    const peer=new Peer(),backend=new CodexBackend(peer)
+    const slow=async()=>{await new Promise(r=>setTimeout(r,1500));return {contentItems:[{type:'inputText' as const,text:'ok'}],success:true}}
+    peer.start=async()=>{
+      // The tool takes longer than the whole 1 s turn budget.
+      void peer.onRequest('item/tool/call',{threadId:'thread-1',turnId:'turn-1',callId:'c',tool:'desktop__profiles__get',arguments:{},namespace:null}).then(()=>{peer.delta('done');peer.finish()})
+      return {turn:{id:'turn-1'}}
+    }
+    const result=await backend.run('request','',{...settings,turn_timeout_ms:1000},[{type:'function',name:'desktop__profiles__get',description:'read',inputSchema:{type:'object'}}],slow,new AbortController().signal)
+    expect(result.text).toBe('done')
+  })
   it('keeps a message that arrives whole, without counting streamed text twice',async()=>{
     const peer=new Peer(),backend=new CodexBackend(peer)
     const item=(id:string,text:string)=>peer.emit('item/completed',{threadId:'thread-1',turnId:'turn-1',item:{type:'agentMessage',id,text}})

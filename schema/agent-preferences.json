@@ -1,5 +1,12 @@
 {
   "$defs": {
+    "ApprovalMode": {
+      "enum": [
+        "ask",
+        "never"
+      ],
+      "type": "string"
+    },
     "ProviderAuthentication": {
       "oneOf": [
         {
@@ -42,6 +49,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "approval_mode": {
+      "$ref": "#/$defs/ApprovalMode",
+      "default": "ask",
+      "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+    },
     "auth": {
       "anyOf": [
         {

@@ -18571,6 +18571,13 @@
       },
       "output_schema": {
         "$defs": {
+          "ApprovalMode": {
+            "enum": [
+              "ask",
+              "never"
+            ],
+            "type": "string"
+          },
           "ProviderAuthentication": {
             "oneOf": [
               {
@@ -18613,6 +18620,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "approval_mode": {
+            "$ref": "#/$defs/ApprovalMode",
+            "default": "ask",
+            "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+          },
           "auth": {
             "anyOf": [
               {
@@ -18708,6 +18720,11 @@
           "AgentPreferences": {
             "additionalProperties": false,
             "properties": {
+              "approval_mode": {
+                "$ref": "#/$defs/ApprovalMode",
+                "default": "ask",
+                "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+              },
               "auth": {
                 "anyOf": [
                   {
@@ -18764,6 +18781,13 @@
               "retain_conversations"
             ],
             "type": "object"
+          },
+          "ApprovalMode": {
+            "enum": [
+              "ask",
+              "never"
+            ],
+            "type": "string"
           },
           "ProviderAuthentication": {
             "oneOf": [
@@ -18825,6 +18849,13 @@
       },
       "output_schema": {
         "$defs": {
+          "ApprovalMode": {
+            "enum": [
+              "ask",
+              "never"
+            ],
+            "type": "string"
+          },
           "ProviderAuthentication": {
             "oneOf": [
               {
@@ -18867,6 +18898,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "approval_mode": {
+            "$ref": "#/$defs/ApprovalMode",
+            "default": "ask",
+            "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+          },
           "auth": {
             "anyOf": [
               {
@@ -19322,6 +19358,11 @@
           "AgentPreferences": {
             "additionalProperties": false,
             "properties": {
+              "approval_mode": {
+                "$ref": "#/$defs/ApprovalMode",
+                "default": "ask",
+                "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+              },
               "auth": {
                 "anyOf": [
                   {
@@ -19378,6 +19419,13 @@
               "retain_conversations"
             ],
             "type": "object"
+          },
+          "ApprovalMode": {
+            "enum": [
+              "ask",
+              "never"
+            ],
+            "type": "string"
           },
           "ChangeState": {
             "enum": [
@@ -21000,6 +21048,148 @@
           "consumed"
         ],
         "title": "Approval",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "agent.sessions.read"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.approvals.list",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "Approval": {
+            "additionalProperties": false,
+            "properties": {
+              "consumed": {
+                "type": "boolean"
+              },
+              "decision": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ApprovalDecision"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expires_at_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "generation": {
+                "type": "string"
+              },
+              "principal": {
+                "type": "string"
+              },
+              "request": {
+                "$ref": "#/$defs/ApprovalRequestInput"
+              },
+              "request_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "request_id",
+              "principal",
+              "generation",
+              "request",
+              "expires_at_ms",
+              "consumed"
+            ],
+            "type": "object"
+          },
+          "ApprovalDecision": {
+            "enum": [
+              "allowed-once",
+              "rejected",
+              "cancelled",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "ApprovalRequestInput": {
+            "additionalProperties": false,
+            "properties": {
+              "capability_id": {
+                "type": "string"
+              },
+              "intent_hash": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "resource": {
+                "type": "string"
+              },
+              "session_id": {
+                "type": "string"
+              },
+              "turn_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "session_id",
+              "turn_id",
+              "capability_id",
+              "resource",
+              "intent_hash",
+              "purpose"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "approvals": {
+            "description": "Undecided, unexpired requests the caller may see.",
+            "items": {
+              "$ref": "#/$defs/Approval"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "approvals"
+        ],
+        "title": "ApprovalsListOutput",
         "type": "object"
       },
       "provider": "core",

@@ -15,12 +15,30 @@ pub fn get(connection: &Connection, id: &str) -> StoreResult<Approval> {
     serde_json::from_str(&text.ok_or_else(|| StoreError::NotFound("approval".into()))?)
         .map_err(Into::into)
 }
+/// Undecided, unexpired requests, oldest first.
+pub fn pending(connection: &Connection) -> StoreResult<Vec<Approval>> {
+    let mut query = connection.prepare(
+        "SELECT approval_json FROM agent_approvals WHERE decided=0 AND expires_at_ms>?1 ORDER BY rowid",
+    )?;
+    let rows = query
+        .query_map([time::unix_millis_now()], |r| r.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    rows.iter()
+        .map(|text| serde_json::from_str(text).map_err(Into::into))
+        .collect()
+}
+
+/// How long a person has to answer (plan/04/04 §1, D-39 proposal).
+pub const EXPIRY_MS: u64 = 300_000;
+
+/// `preset` decides at once instead of asking: `unavailable` when nobody can
+/// answer, `rejected` when the person chose never to be asked.
 pub fn request(
     store: &mut Store,
     principal: &str,
     owner: &str,
     input: ApprovalRequestInput,
-    available: bool,
+    preset: Option<ApprovalDecision>,
 ) -> StoreResult<Approval> {
     let turn = turns::owner(store.connection(), &input.turn_id, owner)?;
     if turn.session_id != input.session_id
@@ -54,8 +72,8 @@ pub fn request(
         principal: principal.into(),
         generation: owner.into(),
         request: input,
-        expires_at_ms: time::unix_millis_now().max(0) as u64 + 120_000,
-        decision: (!available).then_some(ApprovalDecision::Unavailable),
+        expires_at_ms: time::unix_millis_now().max(0) as u64 + EXPIRY_MS,
+        decision: preset,
         consumed: false,
     };
     store.write(|tx|{tx.execute("INSERT INTO agent_approvals(request_id,approval_json,principal,owner_connection,expires_at_ms,decided) VALUES(?1,?2,?3,?4,?5,?6)",
@@ -187,7 +205,7 @@ mod tests {
             intent_hash: intent.payload_hash.clone(),
             purpose: "Arrange windows".into(),
         };
-        let approval = request(store, "agent", "generation-1", input.clone(), true).unwrap();
+        let approval = request(store, "agent", "generation-1", input.clone(), None).unwrap();
         // A pending approval is visible as the turn waiting for a person; a
         // repeated request for the same intent returns the same approval.
         assert_eq!(
@@ -195,7 +213,7 @@ mod tests {
             TurnState::AwaitingApproval
         );
         assert_eq!(
-            request(store, "agent", "generation-1", input, true)
+            request(store, "agent", "generation-1", input, None)
                 .unwrap()
                 .request_id,
             approval.request_id
@@ -243,6 +261,102 @@ mod tests {
             &intent.payload_hash
         )
         .unwrap());
+        assert!(!consume(
+            store,
+            "generation-1",
+            &turn.turn_id,
+            &intent.capability_id,
+            &intent.payload_hash
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn a_late_answer_is_unavailable_and_never_consumable() {
+        let mut tmp = crate::testing::open("approval-late");
+        let store = &mut tmp.store;
+        let session = conversations::create(
+            store,
+            &SessionCreateInput {
+                title: "chat".into(),
+                idempotency_key: "late".into(),
+            },
+        )
+        .unwrap();
+        let mut settings = preferences::get(store.connection()).unwrap();
+        settings.enabled = true;
+        store
+            .write(|tx| {
+                preferences::patch(
+                    tx,
+                    &PreferencesPatchInput {
+                        expected_revision: settings.revision,
+                        settings: settings.clone(),
+                    },
+                )
+            })
+            .unwrap();
+        let turn = turns::submit(
+            store,
+            &TurnSubmitInput {
+                session_id: session.session_id.clone(),
+                client_message_id: "late".into(),
+                text: "windows".into(),
+            },
+        )
+        .unwrap();
+        turns::claim(store, &turn.turn_id, "generation-1").unwrap();
+        let intent = turns::intent(
+            store,
+            "generation-1",
+            &ToolIntentInput {
+                turn_id: turn.turn_id.clone(),
+                tool_call_id: "late".into(),
+                capability_id: "desktop.windows.list".into(),
+                arguments: json!({}),
+            },
+        )
+        .unwrap();
+        let approval = request(
+            store,
+            "agent",
+            "generation-1",
+            ApprovalRequestInput {
+                session_id: session.session_id,
+                turn_id: turn.turn_id.clone(),
+                capability_id: intent.capability_id.clone(),
+                resource: "desktop.windows.read".into(),
+                intent_hash: intent.payload_hash.clone(),
+                purpose: "List windows".into(),
+            },
+            None,
+        )
+        .unwrap();
+        assert_eq!(pending(store.connection()).unwrap().len(), 1);
+        // The person answers after the request expired.
+        let mut expired = approval.clone();
+        expired.expires_at_ms = 1;
+        store
+            .write(|tx| {
+                tx.execute(
+                    "UPDATE agent_approvals SET approval_json=?2, expires_at_ms=1 WHERE request_id=?1",
+                    rusqlite::params![approval.request_id, serde_json::to_string(&expired)?],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(pending(store.connection()).unwrap().is_empty());
+        let decided = decide(
+            store,
+            &ApprovalDecideInput {
+                request_id: approval.request_id,
+                decision: ApprovalDecision::AllowedOnce,
+                intent_hash: intent.payload_hash.clone(),
+            },
+            true,
+        )
+        .unwrap();
+        assert_eq!(decided.decision, Some(ApprovalDecision::Unavailable));
         assert!(!consume(
             store,
             "generation-1",

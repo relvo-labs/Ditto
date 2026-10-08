@@ -393,6 +393,25 @@ ShellRoot {
         function onApprovalRequested(approval) {
             approvals.add(approval);
         }
+        /// After a (re)connect or a resync, requests still waiting are read
+        /// back from Core: a notification sent while the Shell was away is
+        /// not lost.
+        function onOnlineChanged() {
+            if (client.online) {
+                root.refreshApprovals();
+            }
+        }
+        function onResynced() {
+            root.refreshApprovals();
+        }
+    }
+
+    function refreshApprovals() {
+        client.capability("desktop.approvals.list", {}, function (result) {
+            for (const approval of result.approvals || []) {
+                approvals.add(approval);
+            }
+        });
     }
 
     LazyLoader {

@@ -55,7 +55,8 @@ export class DesktopTools {
     return new Promise<boolean>(resolve=>{
       const finish=(decision:string)=>{clearTimeout(timer);signal.removeEventListener('abort',cancel);this.approvals.delete(request.request_id);this.decided.delete(request.request_id);resolve(decision==='allowed-once')}
       const cancel=()=>finish('cancelled')
-      const timer=setTimeout(()=>finish('unavailable'),Math.max(1,Math.min(request.expires_at_ms-Date.now(),90000)));timer.unref()
+      // Wait as long as Core gives the person; Core refuses a late answer.
+      const timer=setTimeout(()=>finish('unavailable'),Math.max(1,request.expires_at_ms-Date.now()));timer.unref()
       this.approvals.set(request.request_id,{resolve:finish});signal.addEventListener('abort',cancel,{once:true})
       if(signal.aborted){cancel();return}
       const early=this.decided.get(request.request_id);if(early)finish(early)
