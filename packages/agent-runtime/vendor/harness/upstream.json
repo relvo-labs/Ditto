@@ -9,9 +9,11 @@
   "trust_level": "trusted first-party adapter; assembler is pure value processing, not a sandbox",
   "license": "MIT; vendor/harness/LICENSE must accompany bundles",
   "test_matrix": [
-    "tests/harness.test.ts: pending execution",
-    "tests/session.test.ts: pending execution",
-    "tests/codex.test.ts: pending execution"
+    "tests/harness.test.ts: 3/3 (2026-10-08, development host)",
+    "tests/session.test.ts: 2/2 (2026-10-08, development host)",
+    "tests/codex.test.ts: 12/12 (2026-10-08, development host)",
+    "scripts/check-upstream.mjs: 9 unchanged files verified against their recorded sha256",
+    "end to end through the assembler: tests/g2/codex/run.mjs 40/40 with a scripted loopback model (not a real-model result)"
   ],
   "files": [
     {
