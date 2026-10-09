@@ -185,6 +185,10 @@ install -d -m 0700 "$fcitx_config_home/fcitx5"
 fcitx_profile="$workspace/tests/g0/input-method/fcitx5-profile"
 [[ -r /etc/ditto/fcitx5-profile ]] && fcitx_profile=/etc/ditto/fcitx5-profile
 install -m 0600 "$fcitx_profile" "$fcitx_config_home/fcitx5/profile"
+# Global fcitx5 options (hotkeys) likewise come from the machine when set.
+if [[ -r /etc/ditto/fcitx5-config ]]; then
+  install -m 0600 /etc/ditto/fcitx5-config "$fcitx_config_home/fcitx5/config"
+fi
 systemd-run --user --scope --quiet --collect --unit=ditto-fcitx -- \
   env XDG_CONFIG_HOME="$fcitx_config_home" fcitx5 -d --replace
 
