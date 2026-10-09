@@ -179,8 +179,12 @@ dbus-update-activation-environment --systemd \
   QT_QPA_PLATFORM QT_IM_MODULE QT_IM_MODULES XMODIFIERS
 
 install -d -m 0700 "$fcitx_config_home/fcitx5"
-install -m 0600 "$workspace/tests/g0/input-method/fcitx5-profile" \
-  "$fcitx_config_home/fcitx5/profile"
+# The input methods are the G0 fixture's (English + Pinyin) unless this
+# machine sets its own in /etc/ditto/fcitx5-profile; either is copied fresh at
+# every login, so changes made in fcitx5's settings do not persist.
+fcitx_profile="$workspace/tests/g0/input-method/fcitx5-profile"
+[[ -r /etc/ditto/fcitx5-profile ]] && fcitx_profile=/etc/ditto/fcitx5-profile
+install -m 0600 "$fcitx_profile" "$fcitx_config_home/fcitx5/profile"
 systemd-run --user --scope --quiet --collect --unit=ditto-fcitx -- \
   env XDG_CONFIG_HOME="$fcitx_config_home" fcitx5 -d --replace
 
