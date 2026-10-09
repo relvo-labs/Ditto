@@ -14,7 +14,7 @@
     "cpu": "AMD Ryzen 9 7945HX with Radeon Graphics",
     "physical_cores": 16,
     "logical_cpus": 32,
-    "memory_kib": 63468948,
+    "memory_kib": 63468952,
     "storage": "CT2000P3PSSD8",
     "gpu": "NVIDIA GeForce RTX 4060",
     "gpu_memory_mib": 8188,

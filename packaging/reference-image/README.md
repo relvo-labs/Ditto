@@ -15,6 +15,8 @@ G0 的主要參考機識別為 `ditto-ref-ws-rtx4060-01`。同一項三次重複
 
 完整且機械可讀的值見 [`reference-machine.lock.json`](reference-machine.lock.json)。
 
+鎖定值變更紀錄：2026-10-09 `memory_kib` 63468948→63468952（`MemTotal` 多 4 KiB，同一硬體與核心；核心保留的記憶體隨韌體／開機變動）。owner 核准後更新。
+
 ## 重建與驗證
 
 1. 安裝 Ubuntu 24.04.2 LTS，套用 [`apt-packages.txt`](apt-packages.txt) 的套件集合。
