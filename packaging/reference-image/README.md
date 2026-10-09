@@ -37,7 +37,7 @@ Wayfire 工作階段的 xdg-desktop-portal 原本只有 GTK 後端，沒有 Scre
 
 取捨：遠端連線時座位上沒有人可以按同意，所以不設選擇器；代價是這個工作階段裡任何程式要求擷取螢幕都會直接得到畫面。owner 於 2026-10-09 為了遠端存取接受。RustDesk 的輸入走它自己的 uinput，不經 portal。
 
-畫面曾經全黑：參考機的螢幕接在 NVIDIA（`card1`），wlroots 卻預設用開機 VGA（AMD iGPU）繪圖再跨 GPU 複製；當時 RustDesk 拿到 portal 串流後不歸還緩衝區（xdpw 連續 `out of buffers`）、畫面全黑，而本機的 portal 測試客戶端與 `grim` 都拿得到畫面。`ditto-session` 因此讓 Wayfire 只用 `DITTO_DRM_VENDOR`（預設 NVIDIA `0x10de`）的 GPU；在那張卡上起不來時退回 wlroots 自己的選擇，不讓桌面因此消失。這項變更在下一次登入生效，是否解決黑畫面要在新的工作階段裡確認。
+畫面曾經全黑：RustDesk 拿到 portal 串流後不歸還緩衝區（xdpw 連續 `out of buffers`），本機的 portal 測試客戶端與 `grim` 卻都拿得到畫面；重啟 xdpw 後重連就有畫面了（同一個工作階段，GPU 尚未更換），真正原因未確定。另外，參考機的螢幕接在 NVIDIA（`card1`），wlroots 卻預設用開機 VGA（AMD iGPU）繪圖再跨 GPU 複製；`ditto-session` 因此讓 Wayfire 只用 `DITTO_DRM_VENDOR`（預設 NVIDIA `0x10de`）的 GPU，在那張卡上起不來時退回 wlroots 自己的選擇。再遇到黑畫面，先重啟 `xdg-desktop-portal-wlr`。
 
 ## G1 工作階段：從 G0 搬到哪裡
 
