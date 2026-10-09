@@ -19,7 +19,7 @@
 | D-43 | **新增待決**：保留集50題、同≥90%且較固定集下降≤5pp；G2驗收重複run提案 | M2語意評分前／QA＋AGENT＋owner | 先報raw比較；未核定不能宣稱「不明顯下跌」 |
 | D-44 | **Codex 新增待決**：≤1 controller＋≤1 app-server 的實際程序架構、OS 工具／keyring 最小邊界與整組 cgroup hard limit；暖態 PSS 仍合計≤150MiB | M0 probe、M1 可寫之前／CORE＋PLAT＋AGENT＋owner | app-server 接入方向已決；未默認改 RUN-02 或放寬 PSS，限制不成立則拒絕桌面写入 |
 
-D-39～44 是本計畫新增待決編號，回寫 milestones/01/05 為提案；定案才在`.agents/notes/decisions/`建立帶日期紀錄與連結。D-09a 已有 [使用者方向決策](../../.agents/notes/decisions/2026-10-07-d09a-codex-subscription-app-server.md)，不包含模型／數字或實測結果核定。routine code choice 可由工作包 owner 自行落地；只有改權威契約、門檻／預算或長期選型才用此流程。這份計畫完成不需把所有提案先裁定，正式實作依各最晚點處理。
+**2026-10-09：owner 依 G2 評審 §5 的提案核定 D-39～D-44**（D-43 另定「詢問」不限問號、刪除設定檔經 approval 詢問後依本人決定放行），紀錄見 `.agents/notes/decisions/2026-10-09-d39`～`d44`；下表保留提案原文。D-39～44 是本計畫新增待決編號，回寫 milestones/01/05 為提案；定案才在`.agents/notes/decisions/`建立帶日期紀錄與連結。D-09a 已有 [使用者方向決策](../../.agents/notes/decisions/2026-10-07-d09a-codex-subscription-app-server.md)，不包含模型／數字或實測結果核定。routine code choice 可由工作包 owner 自行落地；只有改權威契約、門檻／預算或長期選型才用此流程。這份計畫完成不需把所有提案先裁定，正式實作依各最晚點處理。
 
 ### 1.1 待確認項目的實際意義與建議
 

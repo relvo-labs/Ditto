@@ -37,7 +37,7 @@
 
 ## 專案現況
 
-**G0、G1 已完成（2026-10-07 owner 實際使用裁定 [D-38](.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)），G2 實作中。** 原生 Core、交易與儲存、Cordis hostd、可替換 QML 供應者、管理中心、救援與鎖定均已落地。G2 在分支 `codex/g2-agent-foundation`：Agent 與 `ditto-confine` 內的 Codex app-server、對話、approval、context、工作池、區域布局與語意任務集已有開發證據；真實訂閱已執行（語意集 oracle v2 固定集 45／50、保留集 46／50；v1 為 42／41），參考機量測與評審未完成，逐項見 [G2 評審紀錄](.agents/notes/gate-reviews/G2-exit.md)。
+**G0、G1 已完成（2026-10-07 owner 實際使用裁定 [D-38](.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)），G2 實作中。** 原生 Core、交易與儲存、Cordis hostd、可替換 QML 供應者、管理中心、救援與鎖定均已落地。G2 在分支 `codex/g2-agent-foundation`：Agent 與 `ditto-confine` 內的 Codex app-server、對話、approval、context、工作池、區域布局與語意任務集已有開發證據；真實訂閱已執行（語意集 oracle v3 固定集 48／50、保留集 47／50；v2 為 45／46、v1 為 42／41），D-39～D-44 已於 2026-10-09 核定，參考機量測與評審未完成，逐項見 [G2 評審紀錄](.agents/notes/gate-reviews/G2-exit.md)。
 
 主要開發機同時是主要[參考機](docs/platform/support-matrix.md) `ditto-ref-ws-rtx4060-01`；其他機器仍可開發，效能數字不可跨機混算。**合成器是 Wayfire（D-02 已於 2026-09-22 決定方向），Sway 支援已遺棄**——`sway.rs` 與開發容器保留為決策對照。參考機 runner、原生應用回讀、Shell 重啟存活、身分負例與三次冷登入資源量測已有紀錄。
 

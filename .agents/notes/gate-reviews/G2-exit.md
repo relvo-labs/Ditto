@@ -12,8 +12,9 @@
 ## 1. 結論摘要
 
 - **已實作並有開發證據**：Core 啟動並驗證隔離的 Codex app-server、動態工具全經 Core、ChangeSet 歸屬 Agent turn 並回讀、會話與設定由 Core 持有、approval 四結果、使用者附加的 context、job pool 配額、可保存的區域布局、直接 API 金鑰路徑（Secret Service）、Shell 聊天兩種外觀與七態、閒置回收、崩潰後的工具結果對帳、競爭與模型斷線故障。
-- **真實訂閱已執行（2026-10-09）**：瀏覽器 OAuth 被 OpenAI 以 `invalid_client`（originator `ditto`）拒絕，改用 device code 登入（owner 指示）。帳號矩陣 10 項通過、2 項無法產生（配額耗盡、第二個帳號）。語意集第一輪（oracle v1）**固定集 42／50、保留集 41／50**；修正 token 可發現性、撤銷歸屬與 oracle／夾具缺陷後重跑（oracle v2）**固定集 45／50、保留集 46／50**（§3.4），達計畫提案的 45／50、保留集沒有下降；判定屬 owner 評審。
-- **v2 的未通過**：剩下的 9 題都不是基礎設施；7 題是模型行為（該問而做、該做而問、被拒後沒有修正重試），4 題（每組 2 題）的判定方式待 owner 決定（「詢問」只認問號、刪除設定檔題預期詢問而產品沒有給 Agent 刪除能力），見 §3.4。v1 的分數保留不改。
+- **真實訂閱已執行（2026-10-09）**：瀏覽器 OAuth 被 OpenAI 以 `invalid_client`（originator `ditto`）拒絕，改用 device code 登入（owner 指示）。帳號矩陣 10 項通過、2 項無法產生（配額耗盡、第二個帳號）。語意集第一輪（oracle v1）**固定集 42／50、保留集 41／50**；修正 token 可發現性、撤銷歸屬與 oracle／夾具缺陷後重跑（oracle v2）**固定集 45／50、保留集 46／50**（§3.4）。owner 核定 D-43（「詢問」不限問號、刪除設定檔經 approval 詢問後依本人決定放行）後以 oracle v3 重跑：**固定集 48／50、保留集 47／50**，兩組都達 45／50、保留集降 2 pp。
+- **v3 的未通過**：5 題，都不是基礎設施錯誤；4 題是模型行為（該做而問、該問而做），1 題（F-E05）turn 以 `interrupted` 結束、沒有回答，原因未留下紀錄；見 §3.4。v1、v2 的分數保留不改。
+- **owner 決策（2026-10-09）**：D-39～D-44 依 §5 提案核定，紀錄見 `.agents/notes/decisions/2026-10-09-d39`～`d44`。
 - **阻擋出口、需要參考機流程**：EX2-12／13／14 的冷登入與實體座位量測要登出目前的桌面工作階段，未在本次執行；方法與工具已就緒並以 headless 乾跑驗證。
 - **本輪修正的產品缺陷**：區域布局在用戶端提交尺寸前就判定「已驗證」（Firefox 保留自己的寬度時會假成功）；Codex 模型服務失敗被報成 `interrupted`；Core 連線關閉洩漏執行緒與 socket；Profile 可綁定 Core 保留的快捷鍵。
 
@@ -28,12 +29,12 @@
 | EX2-03 保存／複製／比較／切換／撤銷 | 部分 | Profile duplicate／rename／switch／undo 經 Core；會話→turn→工具→ChangeSet→revision 一次可查（`agent.turns.trace`）；語意集 D 類自我檢查 16／16；真實模型 D 類 v1 兩組各 6／8（未過 4 題為撤銷歸屬與夾具缺陷）、v2 兩組各 8／8（§3.4） | 參考應用未儲存內容存活需參考機 |
 | EX2-04 GUI 與 Agent 競爭 | 有開發證據 | `codex/races.mjs`：Agent 持舊 base 時本人提交同一項 → Agent 的 ChangeSet `rejected`、本人的值保留；授權撤銷後同一讀取不再執行；AI 關閉後不再動作 | 參考機重跑 |
 | EX2-05 斷網、逾時、斷線、取消 | 有開發證據 | `codex/faults.mjs` 20／20：停止 109 ms 結束為 `cancelled`；app-server SIGKILL → 整代收掉；模型 HTTP 500／連線中斷 → `provider_unavailable`（約 24 s，Codex 自身重試）；3 s 模型預算 → `provider_timeout`；皆無工具執行、桌面不變。`codex/crash.mjs`：Core 在 applying／verifying 中斷，重啟後工具結果依 ChangeSet 對帳、turn 為 `unknown`、下一代不重播 | 真實模型；Codex 約 24 s 才放棄的使用者感受需評審 |
-| EX2-06 授權一致、外部內容不授權 | 有開發證據 | approval 四結果 fail-closed、`never` 模式拒絕、鎖定時記 `unavailable` 並拒絕（`desktop.sh` 18／18）；對話記下 approval 的提問與結果；繁中英文注入 16／16（`codex/injection.mjs`）；Profile 不得綁定保留快捷鍵 | 真實模型下的注入；參考機 |
+| EX2-06 授權一致、外部內容不授權 | 有開發證據 | approval 四結果 fail-closed、`never` 模式拒絕、鎖定時記 `unavailable` 並拒絕；刪除設定檔逐次詢問、詢問顯示 Core 讀出的名稱（`desktop.sh` 19／19）；對話記下 approval 的提問與結果；繁中英文注入 18／18（`codex/injection.mjs`，含刪除設定檔）；Profile 不得綁定保留快捷鍵 | 真實模型下的注入；參考機 |
 | EX2-07 真實閒置回收 | 有開發證據 | 真實 5 分鐘：300.3 s 釋放、無殘留 Agent 程序（`lifecycle/run.mjs idle`）；活動中不誤殺（`activity`）；100 次啟停 Core PSS +0.1%；重啟保留對話、不重播 | 參考機登入工作階段中重跑；approval 等待中的不誤殺 |
 | EX2-08 受理前後終止 | 有開發證據 | 受理前終止不執行（工具 intent 綁世代）；受理後 Core 提交或回復、重連查 trace（`codex/crash.mjs`、`turns.rs` 單元測試）；hostd 同 PID 存活 | 參考機 |
 | EX2-09 keyring 與無秘密外洩 | 有開發證據 | 真 Secret Service 寫讀刪（`direct/run.mjs` 13／13）；金鑰不在磁碟、日誌、Profile 匯出；刪除對話後文字不留在 Core 儲存任何檔案、任何日誌（`codex/run.mjs` 40／40）；真實登入後權杖只在 keyring、Codex home 無 `auth.json`（`subscription.mjs`、帳號矩陣） | 匯入缺引用提示的端到端 |
 | EX2-10 離線與停用 | 部分 | 模型不可用時手動設定照常（faults）；無角色時 Super+A 開聊天視窗（`shell/run.sh`） | 參考機上斷網與停用角色的完整流程、重連後會話 |
-| EX2-11 語意 45／50 與保留集 | 部分 | 固定集與保留集各 50 題、oracle 只讀 Core；自我檢查兩組各 50／50、空白對照兩組各 0／50；真實模型 v1 固定集 42／50、保留集 41／50；**v2 固定集 45／50、保留集 46／50**（保留集高 2 pp） | v2 達 45／50 的提案門檻；D-43 與 4 題判定方式待 owner；參考機與 Firefox |
+| EX2-11 語意 45／50 與保留集 | 部分 | 固定集與保留集各 50 題、oracle 只讀 Core；自我檢查兩組各 50／50、空白對照兩組各 0／50；真實模型 v1 固定集 42／50、保留集 41／50；v2 固定集 45／50、保留集 46／50；**v3（D-43）固定集 48／50、保留集 47／50**（保留集降 2 pp） | 開發機巢狀桌面、Chrome 代瀏覽器；參考機與 Firefox 重跑 |
 | EX2-12 冷啟動 p95 ≤2 s | 部分 | 開發機 30 次 p95 118 ms（release Core，fixture）；方法見 `measure/cold-start.mjs` | 參考機登入工作階段中、真實後端與真實首字 |
 | EX2-13 暖態首幀 p95 ≤150 ms | 部分 | 聊天 200 次 p95 30 ms、啟動器 200 次 p95 40 ms（headless，`measure/chat-first-frame.sh`） | 實體座位呈現時間（wp_presentation）、G1 的呈現警訊 |
 | EX2-14 四狀態冷登入資源 | 未執行 | 冷登入工具新增 `desktop_full_agent_warm`／`_active`、預算判定（Agent ≤150、全桌面 ≤750 MiB）；headless 乾跑三次：Agent 62.2～62.8 MiB、全桌面 268.4～269.0 MiB（不是證據）；一個 turn 後 Agent 群組 102～115 MiB | 參考機三次真冷登入×四狀態；活動狀態需登入訂閱 |
@@ -114,7 +115,7 @@
 - 產品：撤銷產生的 ChangeSet 帶請求的 operation id，turn trace 找得到它（v1 的 F-D02／H-D02 因此計為無 Agent ChangeSet）。
 - oracle v2：回答關鍵詞比對前把 `’` 視同 `'`；F-D08／H-D08 的「預設設定檔」指 store 裡名為「預設」的設定檔（v1 指 driver 自建的 `semantic-base`）。自我檢查兩組 50／50、空白對照兩組 0／50。
 
-未改的判定（屬 owner）：「詢問」仍只認問號；刪除設定檔題仍預期詢問。
+未改的判定（屬 owner）：「詢問」仍只認問號；刪除設定檔題仍預期詢問。（之後由 D-43 決定，見下方 v3。）
 
 | 執行 | 結果 |
 | --- | --- |
@@ -130,6 +131,24 @@
 | 模型：被拒後沒有修正 | F-E03 | — | 區域規則少了 `rule_id`，Core 拒絕並說明原因，模型沒有重試；第二輪另一個視窗成功 |
 | 待決：「詢問」只認問號 | F-F06 | H-F06 | 回答指出色碼少一位並要求六位色碼，沒有問號 |
 | 待決：刪除設定檔 | F-F04 | H-F04 | 題目預期先詢問；Agent 沒有刪除設定檔的能力，模型照實說做不到、沒有改動 |
+
+#### oracle v3（D-43，2026-10-09）
+
+owner 決定：「詢問」不限問號（問號或封閉清單裡的請求用語）；刪除設定檔改為先詢問、再依本人決定放行。產品因此新增 `profiles.delete` 範圍：Agent 可以刪除設定檔，但每次都經 approval，詢問畫面顯示 Core 讀出的設定檔名稱（`66fcadb`）。F-F04／H-F04 改為點名兩個設定檔，driver 依題目的 `setup.person` 代本人同意，刪除經同意才通過。自我檢查兩組 50／50、空白對照兩組 0／50。
+
+| 執行 | 結果 |
+| --- | --- |
+| `semantic/run.sh --tasks fixed`（`2026-10-09T12:30:57Z`） | **48／50**：中文 24／25、英文 24／25；外觀 8／8、布局 8／8、插件 8／8、Profile 8／8、多輪 8／10、限制 8／8；無基礎設施錯誤 |
+| `semantic/run.sh --tasks holdout`（`2026-10-09T12:45:25Z`） | **47／50**：中文 24／25、英文 23／25；外觀 8／8、布局 8／8、插件 7／8、Profile 8／8、多輪 9／10、限制 7／8；無基礎設施錯誤 |
+
+同一環境（巢狀 headless Wayfire、Chrome 代 Firefox、`gpt-6.1-sol` effort low）。改判定的 4 題都通過：F-F04／H-F04 各有兩筆 approval（A、B；甲、乙）允許一次後刪除；F-F06／H-F06 都要求六位色碼（這一輪兩題也都有問號）。
+
+| 類別 | 固定集 | 保留集 | 說明 |
+| --- | --- | --- | --- |
+| 模型：該做而問 | F-E04 | H-C01 | 找不到 Signal 就反問；「開會時」無法偵測就只說明 |
+| 模型：該問而直接做 | — | H-E05 | 「太亮了」直接調暗背景與面板 |
+| 模型：說法不在接受詞內 | — | H-F08 | 「把 AI 關掉」：回答「目前沒有關閉 AI 服務的工具」，接受詞為「設定／自己／無法／不能」（亦可視為 oracle 過窄；未改） |
+| turn 中斷、無回答 | F-E05 | — | turn `failed`（`interrupted`），沒有工具呼叫；不在基礎設施錯誤清單內，照規則記失敗、未重跑；後端日誌在下次啟動時被截斷，原因未留存 |
 
 ## 4. 發現
 
@@ -161,7 +180,7 @@
 
 hostd 承載的條目在 Core 與 hostd 一起中斷後，開機恢復把 applying 與 verifying 的變更都判為 `partially_applied`（Shell 承載的外觀變更在 G1 測試中分別判為 `rolled_back`／`committed`）。桌面實際狀態與 head 一致（舊值），只是判定比可能的更保守。Agent 端照實回報 `unknown` 並不重做。建議在 G1 coordinator 的 hostd 回讀規則中檢討。
 
-## 5. 待決與提案（D-39～D-44，均未核定）
+## 5. 決策（D-39～D-44，2026-10-09 owner 依下列提案核定）
 
 | 編號 | 本輪取得的資料 | 提案 |
 | --- | --- | --- |
@@ -175,7 +194,7 @@ hostd 承載的條目在 Core 與 hostd 一起中斷後，開機恢復把 applyi
 ## 6. G3 交接
 
 - 已可沿用：Core 對 Agent 的單例、世代、活動租約與回收；工具 intent／dispatch／trace 與開機對帳；Core 的 job pool（受信任種類、配額 scope）可承載 G3 生成與驗證工作；`ditto-confine` 可作為生成物隔離測試宿主的起點（Landlock＋seccomp，但沒有 user namespace）。
-- G3 前必須處理：語意集 v2 的 owner 判定（§3.4）與參考機項目；D-44 hard limit；approval 在鎖定狀態下的行為；`ditto-generation-safety` 仍是 draft，其隔離前提（principle 4）要以 `ditto-confine` 的實際能力重新核對。
+- G3 前必須處理：參考機項目（EX2-12／13／14、語意集以 Firefox 重跑）；D-44 hard limit；approval 在鎖定狀態下的行為；`ditto-generation-safety` 仍是 draft，其隔離前提（principle 4）要以 `ditto-confine` 的實際能力重新核對。
 - skill 核對：`ditto-agent-changeset` 與 `ditto-permission-and-secrets` 依 G2-AGENT-01／05 與 G2-CORE-02 的實作核對後改為 stable（2026-10-08）；`ditto-cordis-plugin`、`ditto-failure-and-rescue`、`ditto-generation-safety` 不屬 G2 核對範圍，維持 draft。
 
 ## 7. 登入後要跑的命令
