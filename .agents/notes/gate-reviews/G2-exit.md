@@ -160,6 +160,10 @@
 
 hostd 承載的條目在 Core 與 hostd 一起中斷後，開機恢復把 applying 與 verifying 的變更都判為 `partially_applied`（Shell 承載的外觀變更在 G1 測試中分別判為 `rolled_back`／`committed`）。桌面實際狀態與 head 一致（舊值），只是判定比可能的更保守。Agent 端照實回報 `unknown` 並不重做。建議在 G1 coordinator 的 hostd 回讀規則中檢討。
 
+### 4.4 未修正
+
+- **測試夾具中 Core 被強制終止會留下 Codex 後端**：沒有 `DITTO_LAUNCH_SCOPE_PREFIX` 時（巢狀測試桌面），Core 以一般子程序啟動 `ditto-confine`；Core 被 SIGKILL 時 confine 變成孤兒（它的 Codex 子程序設有 PDEATHSIG，跟著 confine 活著）。2026-10-09 發現一組自 10/08 中止的語意集執行（`17:53:29Z`）存活約 15 小時，已手動結束。登入工作階段以 scope 名稱清掉舊實例，不受影響。修法須注意 `PR_SET_PDEATHSIG` 綁的是產生它的執行緒而非程序（EX2-15 清理）。
+
 ## 5. 待決與提案（D-39～D-44，均未核定）
 
 | 編號 | 本輪取得的資料 | 提案 |
