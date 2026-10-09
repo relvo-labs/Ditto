@@ -1,0 +1,12 @@
+diff --git a/src/screencast/wlr_screencast.c b/src/screencast/wlr_screencast.c
+index 0c8aad7..cea8ea2 100644
+--- a/src/screencast/wlr_screencast.c
++++ b/src/screencast/wlr_screencast.c
+@@ -6,6 +6,7 @@
+ #include "ext-image-capture-source-v1-client-protocol.h"
+ #include "ext-image-copy-capture-v1-client-protocol.h"
+ #include "ext-foreign-toplevel-list-v1-client-protocol.h"
++#include <unistd.h>
+ #include <drm_fourcc.h>
+ #include <fcntl.h>
+ #include <limits.h>

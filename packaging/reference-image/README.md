@@ -39,7 +39,9 @@ Wayfire 工作階段的 xdg-desktop-portal 原本只有 GTK 後端，沒有 Scre
 
 取捨：遠端連線時座位上沒有人可以按同意，所以不設選擇器；代價是這個工作階段裡任何程式要求擷取螢幕都會直接得到畫面。owner 於 2026-10-09 為了遠端存取接受。RustDesk 的輸入走它自己的 uinput，不經 portal。
 
-畫面曾經全黑：RustDesk 拿到 portal 串流後不歸還緩衝區（xdpw 連續 `out of buffers`），本機的 portal 測試客戶端與 `grim` 卻都拿得到畫面；重啟 xdpw 後重連就有畫面了（同一個工作階段，GPU 尚未更換），真正原因未確定。另外，參考機的螢幕接在 NVIDIA（`card1`），wlroots 卻預設用開機 VGA（AMD iGPU）繪圖再跨 GPU 複製；`ditto-session` 因此讓 Wayfire 只用 `DITTO_DRM_VENDOR`（預設 NVIDIA `0x10de`）的 GPU，在那張卡上起不來時退回 wlroots 自己的選擇。再遇到黑畫面，先重啟 `xdg-desktop-portal-wlr`。
+畫面全黑（2026-10-09 查明）：Ubuntu 24.04 的 `xdg-desktop-portal-wlr` 0.7.1 在用戶端重新連上同一個 screencast stream 時，第一個 buffer 的 `pts` 是 0；GStreamer 的 `pipewiresrc`（PipeWire 1.0.5）以 0 為起點，對下一個真實時間戳（CLOCK_MONOTONIC，開機至今數十小時）做時鐘等待，於是只交出一幀就停住，xdpw 端接著連續 `out of buffers`。RustDesk 每次連線都在一秒內對同一個 stream 重建數次擷取 pipeline（偵測螢幕、`SWITCH` 重整），所以每次都黑。不經 RustDesk 也能重現：同一個 portal session 依序開四個 pipeline，第二個以後只拿到 1 幀。上游 0.8.4 送出正確時間戳，但它的 ext-image-copy 路徑在重連時對同一 session 建第二個 frame，Wayfire 回協定錯誤、portal 退出；`tools/xdpw/` 以 0.8.4 加兩個修補建置（見 `pin.json`），`install-session.sh` 安裝到 `/usr/local/libexec` 並以 user unit drop-in（`session/xdpw-service.conf`）取代發行版的執行檔。修正後同一重現連跑五輪、每輪四次重連都持續出幀（4 秒約 238 幀），RustDesk 恢復畫面。
+
+先前排除的方向：NVIDIA 硬體編碼（改軟體 AV1 仍黑）、RustDesk 的 restore token、重啟 xdpw（偶爾因時機剛好躲過重連）。參考機的螢幕接在 NVIDIA（`card1`），wlroots 預設卻用開機 VGA（AMD iGPU）繪圖再跨 GPU 複製；`ditto-session` 讓 Wayfire 只用 `DITTO_DRM_VENDOR`（預設 NVIDIA `0x10de`）的 GPU，起不來時退回 wlroots 自己的選擇——這與黑畫面無關，是顯示路徑本身的修正。
 
 ## G1 工作階段：從 G0 搬到哪裡
 

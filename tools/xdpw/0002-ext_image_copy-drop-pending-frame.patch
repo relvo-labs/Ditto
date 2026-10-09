@@ -1,0 +1,19 @@
+diff --git a/src/screencast/ext_image_copy.c b/src/screencast/ext_image_copy.c
+index afdfcd9..f0a0b8e 100644
+--- a/src/screencast/ext_image_copy.c
++++ b/src/screencast/ext_image_copy.c
+@@ -294,6 +294,14 @@ static void ext_register_frame_cb(struct xdpw_screencast_instance *cast) {
+ 			return;
+ 		}
+ 	}
++	// A session holds one frame at a time. A capture restarted while the
++	// previous frame is still pending (a consumer reconnecting renegotiates
++	// the stream) would otherwise be a protocol error that kills the portal.
++	if (cast->ext_session.frame) {
++		logprint(DEBUG, "ext: dropping the pending frame before a new capture");
++		ext_image_copy_capture_frame_v1_destroy(cast->ext_session.frame);
++		cast->ext_session.frame = NULL;
++	}
+ 	cast->ext_session.frame = ext_image_copy_capture_session_v1_create_frame(
+ 			cast->ext_session.capture_session);
+ 	ext_image_copy_capture_frame_v1_add_listener(cast->ext_session.frame,

@@ -35,3 +35,6 @@ git
 meson
 ninja-build
 pkg-config
+# xdg-desktop-portal-wlr build (tools/xdpw/build.sh)
+libinih-dev
+libsystemd-dev

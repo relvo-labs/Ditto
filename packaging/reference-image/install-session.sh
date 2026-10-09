@@ -111,6 +111,10 @@ sudo install -D -m 0644 "$here/session/gdm-ditto.conf" /etc/systemd/system/gdm.s
 # Screen capture portal for Wayfire (RustDesk, screen sharing); see README.md.
 sudo install -D -m 0644 "$here/session/wayfire-portals.conf" /etc/xdg/xdg-desktop-portal/wayfire-portals.conf
 sudo install -D -m 0644 "$here/session/xdpw-wayfire.conf" /etc/xdg/xdg-desktop-portal-wlr/Wayfire
+# Ubuntu's xdg-desktop-portal-wlr 0.7.1 stalls a reconnecting capture after
+# one frame (RustDesk black); the session runs the pinned 0.8.4 build.
+bash "$workspace/tools/xdpw/build.sh"
+sudo install -D -m 0644 "$here/session/xdpw-service.conf" /etc/systemd/user/xdg-desktop-portal-wlr.service.d/ditto.conf
 
 for unit in "$units_source"/*; do
   name="$(basename "$unit")"
