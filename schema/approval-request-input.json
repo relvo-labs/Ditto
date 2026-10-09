@@ -2,6 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "arguments": {
+      "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+    },
     "capability_id": {
       "type": "string"
     },

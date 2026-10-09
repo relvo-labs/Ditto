@@ -16,8 +16,21 @@ export interface Approval {
   principal: string;
   request: ApprovalRequestInput;
   request_id: string;
+  /**
+   * What the call would act on, as Core reads it (a Profile's name), so
+   * the person sees the target from Core's record, not the model's words.
+   */
+  target?: string | null;
 }
 export interface ApprovalRequestInput {
+  /**
+   * The bound tool call's arguments, for a capability whose ask names its
+   * target (deleting a Profile). Core checks them against `intent_hash`,
+   * derives `Approval::target` and does not keep them.
+   */
+  arguments?: {
+    [k: string]: unknown;
+  };
   capability_id: string;
   intent_hash: string;
   purpose: string;

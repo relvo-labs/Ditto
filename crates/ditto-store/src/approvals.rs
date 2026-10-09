@@ -39,6 +39,7 @@ pub fn request(
     owner: &str,
     input: ApprovalRequestInput,
     preset: Option<ApprovalDecision>,
+    target: Option<String>,
 ) -> StoreResult<Approval> {
     let turn = turns::owner(store.connection(), &input.turn_id, owner)?;
     if turn.session_id != input.session_id
@@ -75,6 +76,7 @@ pub fn request(
         expires_at_ms: time::unix_millis_now().max(0) as u64 + EXPIRY_MS,
         decision: preset,
         consumed: false,
+        target,
     };
     store.write(|tx|{tx.execute("INSERT INTO agent_approvals(request_id,approval_json,principal,owner_connection,expires_at_ms,decided) VALUES(?1,?2,?3,?4,?5,?6)",
         rusqlite::params![approval.request_id,serde_json::to_string(&approval)?,principal,owner,approval.expires_at_ms as i64,approval.decision.is_some()])?;Ok(())})?;
@@ -233,8 +235,9 @@ mod tests {
             resource: "windows".into(),
             intent_hash: intent.payload_hash.clone(),
             purpose: "Arrange windows".into(),
+            arguments: None,
         };
-        let approval = request(store, "agent", "generation-1", input.clone(), None).unwrap();
+        let approval = request(store, "agent", "generation-1", input.clone(), None, None).unwrap();
         // A pending approval is visible as the turn waiting for a person; a
         // repeated request for the same intent returns the same approval.
         assert_eq!(
@@ -242,7 +245,7 @@ mod tests {
             TurnState::AwaitingApproval
         );
         assert_eq!(
-            request(store, "agent", "generation-1", input, None)
+            request(store, "agent", "generation-1", input, None, None)
                 .unwrap()
                 .request_id,
             approval.request_id
@@ -403,7 +406,9 @@ mod tests {
                 resource: "desktop.windows.read".into(),
                 intent_hash: intent.payload_hash.clone(),
                 purpose: "List windows".into(),
+                arguments: None,
             },
+            None,
             None,
         )
         .unwrap();

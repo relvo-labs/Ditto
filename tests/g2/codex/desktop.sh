@@ -163,6 +163,24 @@ else
   check approval-refused fail "the second approval request did not reach the Shell" "$(cat "$evidence/focus.json" 2>/dev/null || echo null)"
 fi
 
+# ⑦b deleting a Profile cannot be undone: the Agent asks every time, the ask
+#    names the Profile from Core's record, and it is gone only once allowed
+relay desktop.profiles.duplicate "$(relay desktop.profiles.get '{}' | jq -c '{profile_id:.result.profile.profile_id,name:"備用",idempotency_key:"m1-spare"}')" >/dev/null
+if ask "把另一個設定檔刪掉"; then
+  target="$(relay desktop.approvals.list '{}' | jq -r '[.result.approvals[] | select(.request.capability_id == "desktop.profiles.delete")][0].target // empty')"
+  "${G1_GUI[@]}" tab-to "允許這一次" >/dev/null
+  "${G1_GUI[@]}" press enter
+  wait_chat '.state == "done" or .state == "failed"' 60 || true
+  left="$(relay desktop.profiles.list '{}' | jq -c '[.result.profiles[].name]')"
+  if [[ "$target" == "備用" ]] && ! jq -e 'index("備用")' <<<"$left" >/dev/null && jq -e '.answer | test("已刪除")' "$evidence/chat.json" >/dev/null; then
+    check approval-delete pass "the ask named 「$target」 from Core's record; allowed once, it was deleted" "$left"
+  else
+    check approval-delete fail "target=$target profiles=$left" "$(cat "$evidence/chat.json")"
+  fi
+else
+  check approval-delete fail "deleting a Profile did not ask" "$(cat "$evidence/focus.json" 2>/dev/null || echo null)"
+fi
+
 # ⑧ approval mode "never": nobody is asked, the call is refused
 patch_settings() { # <jq filter on settings>
   local current; current="$(relay agent.settings.describe '{}' | jq -c .result)"

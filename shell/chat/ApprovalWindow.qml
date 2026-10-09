@@ -25,6 +25,13 @@ FloatingWindow {
     /// What the request would let the Agent do, by resource scope.
     function scopeText(scope) {
         switch (scope) {
+        case "desktop.config":
+            return t(qsTr("變更桌面設定"));
+        case "profiles.delete":
+            // The name is Core's reading of the bound call, not the model's.
+            return window.approval && window.approval.target
+                ? t(qsTr("永久刪除設定檔「%1」，刪除後無法復原")).arg(window.approval.target)
+                : t(qsTr("永久刪除一個設定檔，刪除後無法復原"));
         case "desktop.windows.read":
             return t(qsTr("查看目前開啟的視窗、工作區與螢幕"));
         case "desktop.windows.control":

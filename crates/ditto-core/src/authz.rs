@@ -51,6 +51,7 @@ pub fn policy(subject: &Subject, scope_name: &str) -> PolicyDefault {
         scope::JOBS_RUN => [Allow, Allow, Deny, Deny, Deny, Allow, Deny],
         scope::READ => [Allow, Allow, Allow, Allow, Allow, Allow, Deny],
         scope::CONFIG => [Allow, Allow, Deny, Deny, GrantRequired, Allow, Deny],
+        scope::PROFILES_DELETE => [Allow, Allow, Deny, Deny, Deny, GrantRequired, Deny],
         scope::WINDOWS_READ => [
             Allow,
             Allow,

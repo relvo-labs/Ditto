@@ -87,12 +87,15 @@ async function apply(specs){
     if(change.state!=='committed')throw new Error(`fixture change ${JSON.stringify(spec)} ended ${change.state}: ${JSON.stringify(change.reasons??[])}`)
   }
 }
+// Profiles a self-test's reference deleted as the CLI, which is the person.
+let cliDeletions=0
 async function act(actions){
   for(const a of actions??[]){
     const active=await activeDocument()
     if(a.duplicate)await must('desktop.profiles.duplicate',{profile_id:active.profile.profile_id,name:a.duplicate,idempotency_key:`${runId}-${a.duplicate}`})
     else if(a.rename){const p=(await profiles()).find(x=>x.name===a.rename[0]);await must('desktop.profiles.rename',{profile_id:p.profile_id,name:a.rename[1]})}
     else if(a.undo_last){const last=(await must('desktop.changes.list',{profile_id:active.profile.profile_id,limit:5})).changes.find(c=>c.state==='committed');await must('desktop.changes.undo',{change_id:last.change_id,idempotency_key:`${runId}-undo-${last.change_id}`})}
+    else if(a.delete){const p=(await profiles()).find(x=>x.name===a.delete);await must('desktop.profiles.delete',{profile_id:p.profile_id});cliDeletions++}
     else if(a.workspace){const ws=(await must('desktop.workspaces.list')).workspaces.find(w=>w.id.endsWith(`-${a.workspace.x}-${a.workspace.y}`));await must('desktop.workspaces.activate',{workspace_id:ws.id})}
     else throw new Error('unknown action '+JSON.stringify(a))
   }
@@ -145,6 +148,7 @@ async function runTask(task,baseline){
     for(const g of grants)await must('desktop.permissions.revoke',{grant_id:g.grant_id})
     revoked=grants.map(g=>g.scope)
   }
+  cliDeletions=0
   const startedAt=new Date().toISOString()
   const before=(await must('desktop.changes.list',{limit:1})).changes[0]?.change_id??''
   const snapshots=[await snapshot(task)]
@@ -163,11 +167,15 @@ async function runTask(task,baseline){
           if(Date.now()>deadline){await call('agent.turns.cancel',{turn_id:submitted.turn_id});turn={...turn,state:'timeout'};break}
           // Nobody sits at this desktop: an approval the standing grants do
           // not cover is declined at once, as an absent person's would be,
-          // and recorded with the task.
+          // unless the task says what its person decides (`setup.person`:
+          // capability → the targets they allow, by the name Core shows).
+          // Every decision is recorded with the task.
           const pending=(await call('desktop.approvals.list')).result?.approvals??[]
           for(const a of pending.filter(a=>a.request?.turn_id===submitted.turn_id)){
-            await call('desktop.approvals.decide',{request_id:a.request_id,decision:'rejected',intent_hash:a.request.intent_hash})
-            record.approvals.push({capability:a.request.capability_id,resource:a.request.resource,decision:'rejected'})
+            const allowed=setup.person?.allow?.[a.request.capability_id]?.includes(a.target)
+            const decision=allowed?'allowed-once':'rejected'
+            await call('desktop.approvals.decide',{request_id:a.request_id,decision,intent_hash:a.request.intent_hash})
+            record.approvals.push({capability:a.request.capability_id,resource:a.request.resource,target:a.target??null,decision})
           }
           await sleep(500)
         }
@@ -208,6 +216,10 @@ async function runTask(task,baseline){
     const deletedProfiles=snapshots[0].profile_ids.filter(id=>!after.profile_ids.includes(id)).length
     const closedWindows=fixtureAlive.filter(a=>!after.windows.some(w=>w.app_id===a)).length
     record.irreversible=deletedProfiles+closedWindows
+    record.deleted=deletedProfiles
+    record.approved_deletions=mode==='model'
+      ?record.approvals.filter(a=>a.capability==='desktop.profiles.delete'&&a.decision==='allowed-once').length
+      :cliDeletions
     record.answer=answer
     record.started_at=startedAt
     // Cleanup: back to the baseline, every profile this task made removed.
@@ -220,7 +232,7 @@ async function runTask(task,baseline){
     record.window_trace=[]
     for(let i=0;i<10;i++){record.window_trace.push((await must('desktop.windows.list')).windows.map(w=>`${w.app_id}:${w.x},${w.y},${w.width}x${w.height}`).join(' '));await sleep(500)}
   }
-  const verdict=evaluate(task,snapshots,answer,{committed:record.committed,irreversible:record.irreversible})
+  const verdict=evaluate(task,snapshots,answer,{committed:record.committed,irreversible:record.irreversible,deleted:record.deleted,approved_deletions:record.approved_deletions})
   record.ok=verdict.ok
   record.results=verdict.results
   // Turns that never got a model answer are the infrastructure's, not the

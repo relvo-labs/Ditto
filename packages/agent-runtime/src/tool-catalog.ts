@@ -2,8 +2,10 @@
  * is not listed here is never offered to the model, whatever the catalog
  * says; one that is listed is still offered only while Core reports it
  * available, and every call is authorized by Core again. Permission
- * management, plugin installation, session power, rescue, deletion of
- * compositions, exports/imports and closing windows are deliberately absent.
+ * management, plugin installation, session power, rescue, exports/imports
+ * and closing windows are deliberately absent. Deleting a Profile is offered
+ * but cannot be undone, so Core asks the person every time (`profiles.delete`
+ * is a grant the Agent does not hold by default).
  */
 export const TOOL_GUIDE:Readonly<Record<string,string>>=Object.freeze({
   // ---- reading the desktop ------------------------------------------------------
@@ -42,6 +44,7 @@ export const TOOL_GUIDE:Readonly<Record<string,string>>=Object.freeze({
   'desktop.profiles.create':'Save a new Profile (composition), e.g. from the current one, under a name.',
   'desktop.profiles.duplicate':'Copy an existing Profile under a new name.',
   'desktop.profiles.rename':'Rename a saved Profile (composition); content is unchanged.',
+  'desktop.profiles.delete':'Delete one saved Profile by profile_id; it cannot be undone. The active Profile cannot be deleted. Every deletion waits for the person to allow it; if they refuse, it is not deleted.',
   'desktop.workspaces.activate':'Switch to a workspace (one-off, not saved). Needs approval.',
   'desktop.windows.focus':'Focus a window (one-off, not saved). Needs approval.',
   'desktop.windows.move':'Move one window now (one-off, not saved; saved layouts use region rules). Needs approval.',

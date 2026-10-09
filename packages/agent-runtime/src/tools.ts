@@ -40,6 +40,9 @@ export function modelSchema(schema:unknown):unknown{
 /** Native dispatch only: preflight → Core-correlated execute → immutable
  * outcome. Harness PTC/run_code, arbitrary JS, SDK generation and direct
  * provider APIs are deliberately outside this G2 adapter's tool surface. */
+/** Capabilities whose approval shows what they act on (Core reads it). */
+const NAMED_TARGET=new Set(['desktop.profiles.delete'])
+
 export class DesktopTools {
   private entries=new Map<string,CapabilityDescriptor>()
   private revision=0
@@ -68,13 +71,15 @@ export class DesktopTools {
     if(pending)pending.resolve(decision)
     else {if(this.decided.size>=32)this.decided.delete(this.decided.keys().next().value!);this.decided.set(id,decision)}
   }
-  private async approval(intent:ToolIntent,descriptor:CapabilityDescriptor,signal:AbortSignal):Promise<boolean>{
+  private async approval(intent:ToolIntent,descriptor:CapabilityDescriptor,args:Record<string,unknown>,signal:AbortSignal):Promise<boolean>{
     // Read the Core-owned turn; a tool name or a model cannot choose the
     // session, principal, connection generation or grant scope.
     const turn=await this.core.request<{session_id:string}>('agent.turns.get',{turn_id:intent.turn_id})
     const request=await this.core.request<Approval>('desktop.approvals.request',{
       session_id:turn.session_id,turn_id:intent.turn_id,capability_id:intent.capability_id,
       resource:descriptor.resource_scope.join(','),intent_hash:intent.payload_hash,purpose:'This desktop operation needs your permission.',
+      // Core names the target of an ask that cannot be undone from these.
+      ...(NAMED_TARGET.has(intent.capability_id)?{arguments:args}:{}),
     })
     if(request.decision)return request.decision==='allowed-once'
     if(signal.aborted)return false
@@ -106,7 +111,7 @@ export class DesktopTools {
       try{result=await invoke()}
       catch(error){
         if(!(error instanceof DittoError)||error.errorName!=='permission_denied'||error.reason!=='approval_unavailable')throw error
-        if(!await this.approval(intent,descriptor,signal))throw error
+        if(!await this.approval(intent,descriptor,args as Record<string,unknown>,signal))throw error
         if(signal.aborted)throw new Error('cancelled')
         result=await invoke()
       }

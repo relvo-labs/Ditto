@@ -210,6 +210,9 @@ pub mod scope {
     pub const JOBS_RUN: &str = "desktop.jobs.run";
     pub const READ: &str = "desktop.read";
     pub const CONFIG: &str = "desktop.config";
+    /// Deleting a saved Profile: the one Profile operation that cannot be
+    /// undone, so the Agent asks every time unless the person granted it.
+    pub const PROFILES_DELETE: &str = "profiles.delete";
     pub const WINDOWS_READ: &str = "desktop.windows.read";
     pub const WINDOWS_CONTROL: &str = "desktop.windows.control";
     pub const RESCUE: &str = "desktop.rescue";
@@ -238,6 +241,7 @@ pub mod scope {
         JOBS_RUN,
         READ,
         CONFIG,
+        PROFILES_DELETE,
         WINDOWS_READ,
         WINDOWS_CONTROL,
         RESCUE,
@@ -568,7 +572,7 @@ fn definitions() -> Vec<Definition> {
             PROFILES_DELETE,
             schema::<ProfileIdInput>,
             schema::<ProfileSummary>,
-            &[s::CONFIG],
+            &[s::CONFIG, s::PROFILES_DELETE],
         )
         .write(Natural, PROFILES_LIST, true),
         def(

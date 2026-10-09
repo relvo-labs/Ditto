@@ -561,6 +561,11 @@ pub struct ApprovalRequestInput {
     pub resource: String,
     pub intent_hash: String,
     pub purpose: String,
+    /// The bound tool call's arguments, for a capability whose ask names its
+    /// target (deleting a Profile). Core checks them against `intent_hash`,
+    /// derives `Approval::target` and does not keep them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<serde_json::Value>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -572,6 +577,10 @@ pub struct Approval {
     pub expires_at_ms: u64,
     pub decision: Option<ApprovalDecision>,
     pub consumed: bool,
+    /// What the call would act on, as Core reads it (a Profile's name), so
+    /// the person sees the target from Core's record, not the model's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]

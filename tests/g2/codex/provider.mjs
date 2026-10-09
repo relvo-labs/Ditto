@@ -19,6 +19,15 @@ const provider=await startProvider(body=>{
     if(userText(body).includes('<ditto_context kind="clipboard"')&&userText(body).includes(process.env.DITTO_G2_CLIP??'\u0000'))return [say('收到剪貼簿。')]
     return [say('沒有看到附件。')]
   }
+  if(userText(body).includes('設定檔')){
+    // Deleting a Profile cannot be undone: Core asks the person each time.
+    if(!outputs.has('list-profiles'))return [call('desktop__profiles__list',{},'list-profiles')]
+    if(!outputs.has('delete-profile')){
+      const spare=JSON.parse(outputs.get('list-profiles')).profiles.find(p=>!p.active)
+      return [call('desktop__profiles__delete',{profile_id:spare.profile_id},'delete-profile')]
+    }
+    return [say(outputs.get('delete-profile').includes('"error"')?'設定檔沒有刪除。':'已刪除設定檔。')]
+  }
   if(userText(body).includes('視窗')){
     // Reading windows needs the person's approval for the Agent.
     if(!outputs.has('list-windows'))return [call('desktop__windows__list',{},'list-windows')]

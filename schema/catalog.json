@@ -2958,7 +2958,8 @@
       "provider": "core",
       "readback": "desktop.profiles.list",
       "resource_scope": [
-        "desktop.config"
+        "desktop.config",
+        "profiles.delete"
       ],
       "timeout_ms": {
         "default_ms": 2000,
@@ -21525,6 +21526,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
+          "arguments": {
+            "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+          },
           "capability_id": {
             "type": "string"
           },
@@ -21569,6 +21573,9 @@
           "ApprovalRequestInput": {
             "additionalProperties": false,
             "properties": {
+              "arguments": {
+                "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+              },
               "capability_id": {
                 "type": "string"
               },
@@ -21631,6 +21638,13 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "target": {
+            "description": "What the call would act on, as Core reads it (a Profile's name), so\nthe person sees the target from Core's record, not the model's words.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -21703,6 +21717,9 @@
           "ApprovalRequestInput": {
             "additionalProperties": false,
             "properties": {
+              "arguments": {
+                "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+              },
               "capability_id": {
                 "type": "string"
               },
@@ -21765,6 +21782,13 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "target": {
+            "description": "What the call would act on, as Core reads it (a Profile's name), so\nthe person sees the target from Core's record, not the model's words.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -22517,6 +22541,13 @@
               },
               "request_id": {
                 "type": "string"
+              },
+              "target": {
+                "description": "What the call would act on, as Core reads it (a Profile's name), so\nthe person sees the target from Core's record, not the model's words.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -22541,6 +22572,9 @@
           "ApprovalRequestInput": {
             "additionalProperties": false,
             "properties": {
+              "arguments": {
+                "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+              },
               "capability_id": {
                 "type": "string"
               },
@@ -22667,6 +22701,9 @@
           "ApprovalRequestInput": {
             "additionalProperties": false,
             "properties": {
+              "arguments": {
+                "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+              },
               "capability_id": {
                 "type": "string"
               },
@@ -22729,6 +22766,13 @@
           },
           "request_id": {
             "type": "string"
+          },
+          "target": {
+            "description": "What the call would act on, as Core reads it (a Profile's name), so\nthe person sees the target from Core's record, not the model's words.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [

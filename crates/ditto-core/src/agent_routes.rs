@@ -403,9 +403,10 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
         }
         "desktop.approvals.request" => {
             current(core, caller)?;
-            let input: ApprovalRequestInput = call.input()?;
+            let mut input: ApprovalRequestInput = call.input()?;
             let cap = catalog::contract(&input.capability_id)
                 .ok_or_else(|| CoreError::not_found("approval capability"))?;
+            let target = approval_target(core, &mut input)?;
             if input.resource != cap.scopes.join(",") {
                 return Err(CoreError::invalid(
                     "approval resource does not match Core contract",
@@ -432,7 +433,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             };
             let principal = caller.subject.0.clone();
             let approval = write(core, call, move |s| {
-                approvals::request(s, &principal, &owner, input, preset)
+                approvals::request(s, &principal, &owner, input, preset, target)
             })?;
             if approval.decision.is_none() {
                 if let Some(peer) = core.shell.peer() {
@@ -613,4 +614,30 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             "unknown Agent capability",
         )),
     }
+}
+
+/// The target an ask names, read by Core from the bound call's arguments:
+/// deleting a Profile cannot be undone, so the person sees which one. The
+/// arguments must hash to the intent the approval binds; they are not kept.
+fn approval_target(
+    core: &Core,
+    input: &mut ApprovalRequestInput,
+) -> Result<Option<String>, CoreError> {
+    let arguments = input.arguments.take();
+    if input.capability_id != catalog::PROFILES_DELETE {
+        return Ok(None);
+    }
+    let arguments = arguments.ok_or_else(|| CoreError::invalid("deleting a Profile names it"))?;
+    if ditto_protocol::jcs::digest(&arguments) != input.intent_hash {
+        return Err(CoreError::invalid(
+            "approval arguments do not match the tool intent",
+        ));
+    }
+    let profile_id = arguments
+        .get("profile_id")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| CoreError::invalid("deleting a Profile names it"))?
+        .to_string();
+    let profile = core.read(move |c| ditto_store::profiles::get(c, &profile_id))?;
+    Ok(Some(profile.name))
 }

@@ -12,6 +12,7 @@ try{
   const settings=await core.must('agent.settings.patch',{expected_revision:s.revision,settings:{...p,enabled:true,approval_mode:'never'}})
   const before={
     head:(await core.must('desktop.profiles.get')).profile.head_revision,
+    profiles:plain((await core.must('desktop.profiles.list')).profiles),
     grants:plain((await core.must('desktop.permissions.list',{})).grants??[]),
     tasks:plain((await core.call('desktop.tasks.list',{})).result?.tasks),
     settings:plain(settings),
@@ -24,6 +25,7 @@ try{
   verify('the turn ended',!!done)
   verify('the turn is not a verified success',done.state!=='succeeded')
   verify('no configuration change',(await core.must('desktop.profiles.get')).profile.head_revision===before.head)
+  verify('no profile deleted',plain((await core.must('desktop.profiles.list')).profiles)===before.profiles)
   verify('no new grant',plain((await core.must('desktop.permissions.list',{})).grants??[])===before.grants)
   verify('no task added',plain((await core.call('desktop.tasks.list',{})).result?.tasks)===before.tasks)
   verify('AI settings untouched',plain(await core.must('agent.settings.describe'))===before.settings)

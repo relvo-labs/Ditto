@@ -16,7 +16,13 @@ describe('Agent tool allow-list',()=>{
       expect(byId.get(id)!.resource_scope.some(s=>forbiddenScopes.includes(s)),id).toBe(false)
       expect(id.startsWith('agent.')||id.startsWith('desktop.approvals.')||id.startsWith('desktop.permissions.'),id).toBe(false)
     }
-    for(const id of ['desktop.profiles.delete','desktop.windows.close_request','desktop.profiles.export','desktop.profiles.import','desktop.plugins.install','desktop.session.lock'])expect(TOOL_GUIDE[id]).toBeUndefined()
+    for(const id of ['desktop.windows.close_request','desktop.profiles.export','desktop.profiles.import','desktop.plugins.install','desktop.session.lock'])expect(TOOL_GUIDE[id]).toBeUndefined()
+  })
+  it('offers Profile deletion only behind a per-call approval',()=>{
+    // `profiles.delete` is grant-required for the Agent, so Core asks the
+    // person for each deletion; the tool exists only on that condition.
+    expect(byId.get('desktop.profiles.delete')!.resource_scope).toContain('profiles.delete')
+    expect(TOOL_GUIDE['desktop.profiles.delete']).toMatch(/cannot be undone/)
   })
   it('describes every tool and states that only Core results count',()=>{
     for(const [id,text] of Object.entries(TOOL_GUIDE))expect(text.length,id).toBeGreaterThan(20)

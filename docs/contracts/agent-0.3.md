@@ -34,4 +34,5 @@ Shell 控制 socket 新增：`chat`（唯讀 JSON：狀態、事件種類、變�
 - Shell 在 `shell.report` 帶 `approval_responder: true` 才算可回應。沒有可回應的 Shell 或工作階段鎖定時，`desktop.approvals.request` 立即記為 `unavailable`，不讓 turn 空等。
 - 待決期間 turn 為 `awaiting_approval`（角色「待確認」）；決定後回到 `running`。重複請求同一 intent 回傳同一筆 approval。
 - Core 以 `desktop.approval_requested` 通知 Shell。Shell 顯示的內容來自 Core 紀錄的能力與 resource scope；Agent 填的 `purpose` 只放在診斷並標示「未經驗證」。鍵盤預設焦點在「拒絕」，Esc 與關閉視窗都等於拒絕。
+- 刪除設定檔（`desktop.profiles.delete`）無法復原，另有 `profiles.delete` 範圍：Agent 預設沒有這項授予，所以每一次刪除都要問。請求須附上該次呼叫的 `arguments`；Core 核對它們的雜湊等於 `intent_hash`，讀出設定檔名稱放進 approval 的 `target` 給 Shell 顯示，`arguments` 本身不保存。
 - `allowed-once` 只讓 Core 在共用授權路徑放行**同一 turn、同一能力、同一參數雜湊**的一次呼叫（`approvals::consume`）；不建立持久 grant。

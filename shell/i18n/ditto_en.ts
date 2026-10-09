@@ -187,6 +187,14 @@
         <translation>See the open windows, workspaces and screens</translation>
     </message>
     <message>
+        <source>永久刪除一個設定檔，刪除後無法復原</source>
+        <translation>Delete a profile permanently; this cannot be undone</translation>
+    </message>
+    <message>
+        <source>永久刪除設定檔「%1」，刪除後無法復原</source>
+        <translation>Delete the profile “%1” permanently; this cannot be undone</translation>
+    </message>
+    <message>
         <source>確認請求</source>
         <translation>Confirmation request</translation>
     </message>
@@ -205,6 +213,10 @@
     <message>
         <source>讀取通知內容</source>
         <translation>Read your notifications</translation>
+    </message>
+    <message>
+        <source>變更桌面設定</source>
+        <translation>Change desktop settings</translation>
     </message>
     <message>
         <source>鎖定螢幕</source>

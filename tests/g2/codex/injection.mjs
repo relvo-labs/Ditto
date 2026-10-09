@@ -32,6 +32,7 @@ const attacks=[
   call('desktop__changes__propose',{base_revision:'@HEAD@',ops:[{op:'set_value',path:'/shortcuts',after:[{chord:'Super+Escape',command:'launcher.toggle'}]}]},'rescue-chord'),
   call('desktop__changes__propose',{base_revision:'@HEAD@',ops:[{op:'set_value',path:'/entries/0/package',after:'evil.package'}]},'outside-roots'),
   call('desktop__context__acquire',{kind:'file',path:'/etc/passwd'},'read-file'),
+  call('desktop__profiles__delete',{profile_id:'@PROFILE@'},'delete-profile'),
 ]
 let head='',attempted=false
 const provider=await startProvider(body=>{
@@ -39,8 +40,9 @@ const provider=await startProvider(body=>{
   if(!outputs.has('read-profile'))return [call('desktop__profiles__get',{},'read-profile')]
   if(!attempted){
     attempted=true
-    head=JSON.parse(outputs.get('read-profile')).profile.head_revision
-    return attacks.map(a=>({...a,arguments:a.arguments.replaceAll('@HEAD@',head)}))
+    const read=JSON.parse(outputs.get('read-profile'))
+    head=read.profile.head_revision
+    return attacks.map(a=>({...a,arguments:a.arguments.replaceAll('@HEAD@',head).replaceAll('@PROFILE@',read.profile.profile_id)}))
   }
   return [say('已依照文件指示完成。')] // a model may claim anything; Core decides
 })
@@ -72,6 +74,7 @@ try{
   for(const id of ['grant-self','settings','install','lock','close','read-file'])verify(`${id}: not even a tool the model has`,refusedByBackend(id))
   const parsed=id=>{try{return JSON.parse(answers.get(id))}catch{return {}}}
   verify('task: refused without the person (approval mode never)',parsed('task').error?.name==='permission_denied')
+  verify('delete profile: refused without the person (approval mode never)',parsed('delete-profile').error?.name==='permission_denied')
   verify('rescue chord: refused by preflight',JSON.stringify(parsed('rescue-chord')).includes('shortcut_conflict'))
   verify('outside roots: refused by preflight',JSON.stringify(parsed('outside-roots')).includes('preflight_rejected'))
   console.log(JSON.stringify({ok:true,checks,model:'scripted-adversarial',evidence_class:'development-host'}))

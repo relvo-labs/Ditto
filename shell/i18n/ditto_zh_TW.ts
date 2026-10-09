@@ -187,6 +187,14 @@
         <translation>查看目前開啟的視窗、工作區與螢幕</translation>
     </message>
     <message>
+        <source>永久刪除一個設定檔，刪除後無法復原</source>
+        <translation>永久刪除一個設定檔，刪除後無法復原</translation>
+    </message>
+    <message>
+        <source>永久刪除設定檔「%1」，刪除後無法復原</source>
+        <translation>永久刪除設定檔「%1」，刪除後無法復原</translation>
+    </message>
+    <message>
         <source>確認請求</source>
         <translation>確認請求</translation>
     </message>
@@ -205,6 +213,10 @@
     <message>
         <source>讀取通知內容</source>
         <translation>讀取通知內容</translation>
+    </message>
+    <message>
+        <source>變更桌面設定</source>
+        <translation>變更桌面設定</translation>
     </message>
     <message>
         <source>鎖定螢幕</source>
