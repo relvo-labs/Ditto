@@ -64,6 +64,22 @@ export QT_IM_MODULE=wayland
 export XMODIFIERS=@im=fcitx
 export _WAYFIRE_SOCKET="$XDG_RUNTIME_DIR/ditto-wayfire-ipc.sock"
 export WAYFIRE_SOCKET="$_WAYFIRE_SOCKET"
+# The reference machine's display hangs off the NVIDIA GPU, but wlroots takes
+# the boot VGA device (the AMD iGPU), renders there and copies every frame
+# across (RustDesk received black frames in that setup). Wayfire gets the
+# GPU of DITTO_DRM_VENDOR (default NVIDIA) only; an empty value, a preset
+# WLR_DRM_DEVICES or no such GPU leaves wlroots' own choice.
+drm_vendor="${DITTO_DRM_VENDOR-0x10de}"
+if [[ -z "${WLR_DRM_DEVICES:-}" && -n "$drm_vendor" ]]; then
+  for card in /sys/class/drm/card[0-9]*; do
+    [[ "${card##*/}" == *-* ]] && continue
+    if [[ "$(cat "$card/device/vendor" 2>/dev/null)" == "$drm_vendor" ]]; then
+      export WLR_DRM_DEVICES="/dev/dri/${card##*/}"
+      drm_chosen=1
+      break
+    fi
+  done
+fi
 unset DISPLAY SWAYSOCK
 # A previous login can leave the fixed IPC pathname behind after an abort.
 # Wayfire must create a fresh socket before Core starts probing it.
@@ -90,11 +106,23 @@ start_wayfire() {
   rm -f -- "$marker"
   [[ -n "$socket" ]]
 }
-if ! start_wayfire systemd-run --user --scope --quiet --collect --unit=ditto-wayfire --; then
-  echo 'Wayfire did not start in its own scope; starting it in the login session instead' >&2
+abandon_wayfire() {
   kill "$wayfire_pid" 2>/dev/null || true
   systemctl --user stop ditto-wayfire.scope >/dev/null 2>&1 || true
   rm -f -- "$WAYFIRE_SOCKET"
+}
+started=""
+start_wayfire systemd-run --user --scope --quiet --collect --unit=ditto-wayfire -- && started=1
+# A GPU this script chose must never cost the person their desktop.
+if [[ -z "$started" && -n "${drm_chosen:-}" ]]; then
+  echo "Wayfire did not start on $WLR_DRM_DEVICES; starting it on wlroots' own GPU choice" >&2
+  abandon_wayfire
+  unset WLR_DRM_DEVICES
+  start_wayfire systemd-run --user --scope --quiet --collect --unit=ditto-wayfire -- && started=1
+fi
+if [[ -z "$started" ]]; then
+  echo 'Wayfire did not start in its own scope; starting it in the login session instead' >&2
+  abandon_wayfire
   start_wayfire || { echo 'Wayfire stopped during login' >&2; exit 1; }
 fi
 export WAYLAND_DISPLAY="${socket##*/}"
