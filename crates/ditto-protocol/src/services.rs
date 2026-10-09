@@ -336,6 +336,9 @@ pub struct AppearanceGetOutput {
     /// What the Shell last reported as applied; `null` when no Shell reported.
     pub shell_applied: Option<Appearance>,
     pub profile_revision: String,
+    /// Every token `desktop.appearance.set` accepts, with its kind, the
+    /// default in effect while `appearance.tokens` has no value, and range.
+    pub tokens_available: Vec<crate::profile::AppearanceToken>,
 }
 
 /// Every field optional; the ones given become `set_value` ops of one
@@ -346,6 +349,10 @@ pub struct AppearanceSetInput {
     pub base_revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
+    /// Token name → value, as a string: `#RRGGBB` for colours, a decimal
+    /// such as `"1.2"` for numbers. `desktop.appearance.get` lists every
+    /// token (corner roundness `radius_scale`, text size `font_scale`,
+    /// spacing, blur, opacity, colours) with its default and range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tokens: Option<BTreeMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

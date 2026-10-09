@@ -579,8 +579,16 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
         catalog::CHANGES_UNDO => {
             let input: ChangeIdInput = call.input()?;
             let subject = caller.subject.0.clone();
+            // The undo's ChangeSet carries the request's operation id, so a
+            // turn trace finds it like any other change the Agent made.
+            let operation_id = call.operation_id.clone();
             let record = coordinate(core, &call, move |c| {
-                c.undo(&input.change_id, &subject, input.idempotency_key)
+                c.undo(
+                    &input.change_id,
+                    &subject,
+                    input.idempotency_key,
+                    operation_id,
+                )
             })?;
             change_outcome(record?)
         }
@@ -1585,6 +1593,7 @@ fn appearance_get(core: &Core) -> Handled {
         avatar: document.avatar,
         shell_applied: observation.and_then(|observation| observation.appearance),
         profile_revision: revision.revision_id,
+        tokens_available: ditto_protocol::profile::appearance_tokens(),
     })
 }
 

@@ -793,6 +793,18 @@ fn an_appearance_change_commits_only_after_the_shell_reads_back() {
     );
     let applied = cli.result(catalog::APPEARANCE_GET, json!({}));
     assert_eq!(applied["appearance"]["tokens"]["accent"], "#9d7bff");
+    // Tokens the Profile does not set are still listed, so a caller can
+    // find corner roundness or text size without guessing names.
+    let radius = applied["tokens_available"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "radius_scale")
+        .unwrap();
+    assert_eq!(
+        (radius["kind"].as_str(), radius["default"].as_str()),
+        (Some("number"), Some("1"))
+    );
     // Undo goes back to the base content, as a new change.
     let undone = record(&cli.result(
         catalog::CHANGES_UNDO,
@@ -1667,6 +1679,11 @@ fn preflight_refuses_every_problem_at_once_and_changes_nothing() {
             json!([{"op": "set_value", "path": "/appearance/tokens/font_scale", "after": "large"}]),
             "schema_invalid",
         ),
+        // The Shell would clamp it to 2 and the change would read back as 9.
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/radius_scale", "after": "9"}]),
+            "schema_invalid",
+        ),
     ];
     for (ops, code) in cases {
         let response = cli.call(
@@ -2258,6 +2275,20 @@ fn a_client_operation_id_finds_its_change_after_a_lost_connection() {
         found.origin,
         ditto_protocol::change::ChangeOrigin::AgentStandin
     );
+    // An undo is found by its own operation id too: a turn trace finds the
+    // ChangeSet an Agent's undo made the same way as any other.
+    let mut params = json!({"change_id": found.change_id});
+    params["_meta"] = json!({"protocol_version": PROTOCOL_VERSION, "operation_id": "op-standin-undo", "deadline_ms": 15000});
+    let _ = second.raw(catalog::CHANGES_UNDO, params);
+    let undone = record(&second.result(
+        catalog::CHANGES_GET,
+        json!({"operation_id": "op-standin-undo"}),
+    ));
+    assert_eq!(undone.state, ChangeState::Committed);
+    assert!(matches!(
+        undone.origin,
+        ditto_protocol::change::ChangeOrigin::Undo { ref undoes } if undoes == &found.change_id
+    ));
 }
 
 /// Leave a change in `state` the way a crash would: every row written up to

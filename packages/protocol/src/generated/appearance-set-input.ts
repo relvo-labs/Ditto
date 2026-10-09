@@ -12,6 +12,12 @@ export interface AppearanceSetInput {
   reduced_motion?: boolean | null;
   reduced_transparency?: boolean | null;
   theme?: string | null;
+  /**
+   * Token name → value, as a string: `#RRGGBB` for colours, a decimal
+   * such as `"1.2"` for numbers. `desktop.appearance.get` lists every
+   * token (corner roundness `radius_scale`, text size `font_scale`,
+   * spacing, blur, opacity, colours) with its default and range.
+   */
   tokens?: {
     [k: string]: string;
   } | null;

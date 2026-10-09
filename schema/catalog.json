@@ -11126,6 +11126,46 @@
             ],
             "type": "object"
           },
+          "AppearanceToken": {
+            "additionalProperties": false,
+            "description": "One appearance token the Shell reads (`shell/jelly/Tokens.qml`).",
+            "properties": {
+              "default": {
+                "description": "What the Shell uses while the Profile sets no value.",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "kind": {
+                "$ref": "#/$defs/TokenKind"
+              },
+              "max": {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "min": {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "kind",
+              "default",
+              "description"
+            ],
+            "type": "object"
+          },
           "AvatarCorner": {
             "description": "Where on its output the character sits.",
             "enum": [
@@ -11171,6 +11211,26 @@
               "scale"
             ],
             "type": "object"
+          },
+          "TokenKind": {
+            "description": "What an appearance token holds. Every token is stored as a string.",
+            "oneOf": [
+              {
+                "const": "color",
+                "description": "`#RRGGBB` or `#RRGGBBAA`.",
+                "type": "string"
+              },
+              {
+                "const": "number",
+                "description": "A decimal number within `min`..=`max`, e.g. `\"1.2\"`.",
+                "type": "string"
+              },
+              {
+                "const": "text",
+                "description": "Free text.",
+                "type": "string"
+              }
+            ]
           }
         },
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -11195,12 +11255,20 @@
               }
             ],
             "description": "What the Shell last reported as applied; `null` when no Shell reported."
+          },
+          "tokens_available": {
+            "description": "Every token `desktop.appearance.set` accepts, with its kind, the\ndefault in effect while `appearance.tokens` has no value, and range.",
+            "items": {
+              "$ref": "#/$defs/AppearanceToken"
+            },
+            "type": "array"
           }
         },
         "required": [
           "appearance",
           "avatar",
-          "profile_revision"
+          "profile_revision",
+          "tokens_available"
         ],
         "title": "AppearanceGetOutput",
         "type": "object"
@@ -11286,6 +11354,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "Token name → value, as a string: `#RRGGBB` for colours, a decimal\nsuch as `\"1.2\"` for numbers. `desktop.appearance.get` lists every\ntoken (corner roundness `radius_scale`, text size `font_scale`,\nspacing, blur, opacity, colours) with its default and range.",
             "type": [
               "object",
               "null"

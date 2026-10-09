@@ -505,6 +505,40 @@ mod tests {
         }
     }
 
+    /// The token table and the Shell's `Tokens.qml` name the same tokens,
+    /// defaults and ranges.
+    #[test]
+    fn appearance_tokens_match_the_shell() {
+        let qml = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../shell/jelly/Tokens.qml"
+        ))
+        .unwrap();
+        for (name, kind, default, range, _) in profile::APPEARANCE_TOKENS {
+            let found = match kind {
+                profile::TokenKind::Color => {
+                    qml.contains(&format!("colorToken(\"{name}\", \"{default}\")"))
+                        || qml.contains(&format!("colorToken(\"{name}\", reducedTransparency ? "))
+                            && qml.contains(&format!(": \"{default}\")"))
+                }
+                profile::TokenKind::Number => {
+                    // numberToken("name", default, min, max), compared as numbers.
+                    let start = format!("numberToken(\"{name}\", ");
+                    qml.split(&start).nth(1).is_some_and(|rest| {
+                        let args: Vec<f64> = rest[..rest.find(')').unwrap()]
+                            .split(", ")
+                            .map(|a| a.parse().unwrap())
+                            .collect();
+                        let (lo, hi) = range.unwrap();
+                        args == [default.parse::<f64>().unwrap(), lo, hi]
+                    })
+                }
+                profile::TokenKind::Text => qml.contains(&format!("overrides.{name}")),
+            };
+            assert!(found, "{name} differs from shell/jelly/Tokens.qml");
+        }
+    }
+
     #[test]
     fn session_id_is_wire_string() {
         let id = WindowSessionId("session-1/window-2".into());

@@ -10,7 +10,7 @@ use ditto_protocol::{
     change::{ChangeCard, ChangeOp, ChangeOrigin, HotSwapLevel, PreflightCode, PreflightReason},
     manifest::{Manifest, TrustLevel},
     participant::ParticipantRole,
-    profile::{is_area, HostKind, ProfileDocument},
+    profile::{is_area, HostKind, ProfileDocument, TokenKind, APPEARANCE_TOKENS},
     PROTOCOL_VERSION,
 };
 use serde_json::json;
@@ -64,29 +64,6 @@ fn origin_may_change_while_locked(origin: &ChangeOrigin) -> bool {
         ChangeOrigin::Rescue | ChangeOrigin::Supervisor { .. } | ChangeOrigin::TimedRevert { .. }
     )
 }
-
-const COLOR_TOKENS: &[&str] = &[
-    "accent",
-    "on_accent",
-    "background",
-    "surface",
-    "surface_strong",
-    "foreground",
-    "foreground_muted",
-    "border",
-    "focus",
-    "warning",
-    "danger",
-    "success",
-];
-const NUMBER_TOKENS: &[&str] = &[
-    "blur_radius",
-    "surface_opacity",
-    "shadow_radius",
-    "radius_scale",
-    "font_scale",
-    "space_scale",
-];
 
 /// `#rrggbb` or `#rrggbbaa`, as the Shell accepts.
 fn is_color(value: &str) -> bool {
@@ -208,14 +185,16 @@ fn check_all(
         if base.appearance.tokens.get(token) == Some(value) {
             continue;
         }
-        let why = if COLOR_TOKENS.contains(&token.as_str()) && !is_color(value) {
-            Some("token_not_a_color")
-        } else if NUMBER_TOKENS.contains(&token.as_str())
-            && !value.trim().parse::<f64>().is_ok_and(f64::is_finite)
-        {
-            Some("token_not_a_number")
-        } else {
-            None
+        let spec = APPEARANCE_TOKENS.iter().find(|spec| spec.0 == token);
+        let why = match spec {
+            Some((_, TokenKind::Color, ..)) if !is_color(value) => Some("token_not_a_color"),
+            Some((_, TokenKind::Number, _, range, _)) => match value.trim().parse::<f64>() {
+                Ok(n) if n.is_finite() => range
+                    .filter(|(lo, hi)| n < *lo || n > *hi)
+                    .map(|_| "token_out_of_range"),
+                _ => Some("token_not_a_number"),
+            },
+            _ => None,
         };
         if let Some(why) = why {
             reasons.push(reason(

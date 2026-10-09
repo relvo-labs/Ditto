@@ -1,5 +1,10 @@
 /* Generated from schema/appearance-get-output.json; do not edit. */
 
+/**
+ * What an appearance token holds. Every token is stored as a string.
+ */
+export type TokenKind = 'color' | 'number' | 'text';
+
 export interface AppearanceGetOutput {
   appearance: Appearance;
   avatar: AvatarSettings;
@@ -8,6 +13,11 @@ export interface AppearanceGetOutput {
    * What the Shell last reported as applied; `null` when no Shell reported.
    */
   shell_applied?: Appearance | null;
+  /**
+   * Every token `desktop.appearance.set` accepts, with its kind, the
+   * default in effect while `appearance.tokens` has no value, and range.
+   */
+  tokens_available: AppearanceToken[];
 }
 export interface Appearance {
   locale: string;
@@ -40,4 +50,18 @@ export interface AvatarSettings {
    */
   output?: string | null;
   scale: number;
+}
+/**
+ * One appearance token the Shell reads (`shell/jelly/Tokens.qml`).
+ */
+export interface AppearanceToken {
+  /**
+   * What the Shell uses while the Profile sets no value.
+   */
+  default: string;
+  description: string;
+  kind: TokenKind;
+  max?: number | null;
+  min?: number | null;
+  name: string;
 }

@@ -159,6 +159,192 @@ pub struct Appearance {
     pub locale: String,
 }
 
+/// What an appearance token holds. Every token is stored as a string.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenKind {
+    /// `#RRGGBB` or `#RRGGBBAA`.
+    Color,
+    /// A decimal number within `min`..=`max`, e.g. `"1.2"`.
+    Number,
+    /// Free text.
+    Text,
+}
+
+/// One appearance token the Shell reads (`shell/jelly/Tokens.qml`).
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AppearanceToken {
+    pub name: String,
+    pub kind: TokenKind,
+    /// What the Shell uses while the Profile sets no value.
+    pub default: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    pub description: String,
+}
+
+/// The tokens the Shell reads: name, kind, default, range, description.
+/// Shell and Core share this list; preflight refuses a value the Shell
+/// could not use.
+/// Name, kind, default, `(min, max)` and description of one token.
+pub type TokenSpec = (
+    &'static str,
+    TokenKind,
+    &'static str,
+    Option<(f64, f64)>,
+    &'static str,
+);
+
+pub const APPEARANCE_TOKENS: &[TokenSpec] = &[
+    (
+        "accent",
+        TokenKind::Color,
+        "#b9a4ff",
+        None,
+        "accent colour: highlights, selection, the avatar's glow",
+    ),
+    (
+        "on_accent",
+        TokenKind::Color,
+        "#1a1626",
+        None,
+        "text and icons drawn on the accent colour",
+    ),
+    (
+        "background",
+        TokenKind::Color,
+        "#12121a",
+        None,
+        "desktop background behind every surface",
+    ),
+    (
+        "surface",
+        TokenKind::Color,
+        "#1d1f2b",
+        None,
+        "panels, dock and windows of the desktop",
+    ),
+    (
+        "surface_strong",
+        TokenKind::Color,
+        "#242739",
+        None,
+        "raised surfaces: menus, hovered rows",
+    ),
+    (
+        "foreground",
+        TokenKind::Color,
+        "#f2f3f8",
+        None,
+        "main text colour",
+    ),
+    (
+        "foreground_muted",
+        TokenKind::Color,
+        "#a9aec4",
+        None,
+        "secondary text colour",
+    ),
+    (
+        "border",
+        TokenKind::Color,
+        "#3a3f55",
+        None,
+        "outline of surfaces",
+    ),
+    (
+        "focus",
+        TokenKind::Color,
+        "#f2f3f8",
+        None,
+        "keyboard focus ring",
+    ),
+    ("warning", TokenKind::Color, "#ffcf8b", None, "warnings"),
+    (
+        "danger",
+        TokenKind::Color,
+        "#ff9b9b",
+        None,
+        "errors and destructive actions",
+    ),
+    (
+        "success",
+        TokenKind::Color,
+        "#9be3b4",
+        None,
+        "success states",
+    ),
+    (
+        "blur_radius",
+        TokenKind::Number,
+        "18",
+        Some((0.0, 64.0)),
+        "background blur of translucent surfaces, in pixels",
+    ),
+    (
+        "surface_opacity",
+        TokenKind::Number,
+        "0.94",
+        Some((0.5, 1.0)),
+        "opacity of surfaces; lower is more see-through",
+    ),
+    (
+        "shadow_radius",
+        TokenKind::Number,
+        "14",
+        Some((0.0, 48.0)),
+        "shadow size under surfaces, in pixels",
+    ),
+    (
+        "radius_scale",
+        TokenKind::Number,
+        "1",
+        Some((0.0, 2.0)),
+        "corner roundness of every surface and control; 0 is square, 2 is twice as round",
+    ),
+    (
+        "font_scale",
+        TokenKind::Number,
+        "1",
+        Some((0.75, 2.0)),
+        "text size of the whole desktop; 1.2 is 20% larger",
+    ),
+    (
+        "space_scale",
+        TokenKind::Number,
+        "1",
+        Some((0.5, 2.0)),
+        "spacing between and inside controls",
+    ),
+    (
+        "font_family",
+        TokenKind::Text,
+        "",
+        None,
+        "font family of the desktop's text; empty is the system font",
+    ),
+];
+
+/// [`APPEARANCE_TOKENS`] as values.
+pub fn appearance_tokens() -> Vec<AppearanceToken> {
+    APPEARANCE_TOKENS
+        .iter()
+        .map(
+            |(name, kind, default, range, description)| AppearanceToken {
+                name: (*name).into(),
+                kind: *kind,
+                default: (*default).into(),
+                min: range.map(|r| r.0),
+                max: range.map(|r| r.1),
+                description: (*description).into(),
+            },
+        )
+        .collect()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AvatarSettings {
