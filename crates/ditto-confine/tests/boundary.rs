@@ -259,6 +259,49 @@ fn session_bus_proxy_reaches_only_the_secret_service() {
     let _ = std::fs::remove_dir_all(&root);
 }
 
+/// A launcher that dies (a Core killed outright) must not leave the program
+/// running: the helper sees itself reparented and stops it.
+#[test]
+fn the_program_stops_when_the_launcher_dies() {
+    if !landlock_ready() {
+        return;
+    }
+    let marker = format!(
+        "{}.{}",
+        40 + std::process::id() % 50,
+        std::process::id() % 1000
+    );
+    let script = format!(
+        "{} --read /usr -- /usr/bin/sleep {marker} >/dev/null 2>&1 & echo $!; sleep 1",
+        env!("CARGO_BIN_EXE_ditto-confine")
+    );
+    let output = Command::new("/bin/sh")
+        .args(["-c", &script])
+        .output()
+        .unwrap();
+    let helper: i32 = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .unwrap();
+    let program_alive = || {
+        std::fs::read_dir("/proc").unwrap().flatten().any(|entry| {
+            std::fs::read(entry.path().join("cmdline"))
+                .is_ok_and(|c| c == format!("/usr/bin/sleep\0{marker}\0").as_bytes())
+        })
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while (Path::new(&format!("/proc/{helper}")).exists() || program_alive())
+        && std::time::Instant::now() < deadline
+    {
+        thread::sleep(std::time::Duration::from_millis(100));
+    }
+    assert!(
+        !Path::new(&format!("/proc/{helper}")).exists(),
+        "the helper outlived its launcher"
+    );
+    assert!(!program_alive(), "the program outlived its launcher");
+}
+
 extern "C" {
     fn syscall(number: i64, ...) -> i64;
     #[link_name = "pipe"]

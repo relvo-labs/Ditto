@@ -145,6 +145,7 @@
 | 瀏覽器 OAuth 被 OpenAI 拒絕（`invalid_client`，originator `ditto`） | 無法以瀏覽器登入訂閱 | 改用 Codex 的 device code 登入；Shell 顯示一次性代碼；Core 驗證代碼格式；後端不再允許 bind 1455 |
 | Codex 把無型別的 schema（`true`、`{}`）改寫成 `{"type":"string"}` | 真實模型把物件、清單、色碼寫成 JSON 字串：設定與布局被拒、強調色寫成 `"\"#22C55E\""` | controller 把無型別值展開為明確的任意 JSON 值；`set_entry_config.after` 在契約中標為 object |
 | preflight 不檢查外觀 token 的值 | 帶引號的色碼被 commit、回讀「已變更」但畫面不變（Shell 回退預設色） | 變更的色彩 token 須為 `#RRGGBB`／`#RRGGBBAA`、數值 token 須為數字 |
+| 測試夾具中 Core 被強制終止會留下 Codex 後端 | 沒有 scope 時 `ditto-confine` 是 Core 的一般子程序；Core 被 SIGKILL 後它被 reparent 而續存（10/08 一次中止的語意集留下的後端存活約 15 小時） | confine 記下啟動它的程序，發現自己被 reparent 時照收到 SIGTERM 處理（3 秒後 SIGKILL）；不用 `PR_SET_PDEATHSIG`（它綁執行緒而非程序）。`boundary.rs` 新增測試，未修正時失敗 |
 | 外觀 token 只在 Profile 有設定時才看得到 | 模型找不到圓角、字級（`radius_scale`／`font_scale`），照實說不支援（v1 的 A02／A07） | `appearance.get` 列出 `tokens_available`（protocol 一份清單，測試比對 `Tokens.qml`）；超出 Shell 範圍的數值被 preflight 拒絕 |
 | 撤銷的 ChangeSet 不帶請求的 operation id | Agent 的撤銷在 turn trace 中沒有 change id，歸屬遺失 | `changes.undo` 把 operation id 傳給產生的 ChangeSet；單元測試以 operation id 查到撤銷 |
 | 量測乾跑的 `prepare` 會連到登入中的工作階段的 relay | 2026-10-08 一次嘗試在使用中的 Profile 建立了一筆 `aborted` 的 ChangeSet（無任何套用，head 不變） | 乾跑在登入前把 relay 指向不存在的路徑（`c9f3b5a`） |
@@ -159,10 +160,6 @@
 ### 4.3 交 G1 範圍追蹤
 
 hostd 承載的條目在 Core 與 hostd 一起中斷後，開機恢復把 applying 與 verifying 的變更都判為 `partially_applied`（Shell 承載的外觀變更在 G1 測試中分別判為 `rolled_back`／`committed`）。桌面實際狀態與 head 一致（舊值），只是判定比可能的更保守。Agent 端照實回報 `unknown` 並不重做。建議在 G1 coordinator 的 hostd 回讀規則中檢討。
-
-### 4.4 未修正
-
-- **測試夾具中 Core 被強制終止會留下 Codex 後端**：沒有 `DITTO_LAUNCH_SCOPE_PREFIX` 時（巢狀測試桌面），Core 以一般子程序啟動 `ditto-confine`；Core 被 SIGKILL 時 confine 變成孤兒（它的 Codex 子程序設有 PDEATHSIG，跟著 confine 活著）。2026-10-09 發現一組自 10/08 中止的語意集執行（`17:53:29Z`）存活約 15 小時，已手動結束。登入工作階段以 scope 名稱清掉舊實例，不受影響。修法須注意 `PR_SET_PDEATHSIG` 綁的是產生它的執行緒而非程序（EX2-15 清理）。
 
 ## 5. 待決與提案（D-39～D-44，均未核定）
 

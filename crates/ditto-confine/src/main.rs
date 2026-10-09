@@ -611,6 +611,11 @@ fn main() {
         eprintln!("ditto-confine: {reason}");
         std::process::exit(70);
     };
+    // The process that started this helper (Core). When it is gone this
+    // helper has been reparented, and the program it holds must not outlive
+    // it: a Core that is killed cannot stop its backend.
+    // SAFETY: getppid has no preconditions.
+    let launcher = unsafe { libc::getppid() };
     let abi = landlock::abi();
     if abi < landlock::MINIMUM_ABI {
         report_failure(status, "landlock_unavailable");
@@ -667,7 +672,7 @@ fn main() {
             libc::sigaction(signal, &action, std::ptr::null_mut());
         }
     }
-    let code = supervise(&policy, listener, pid);
+    let code = supervise(&policy, listener, pid, launcher);
     // SAFETY: remove anything the program left in its process group.
     unsafe {
         libc::kill(-pid, libc::SIGKILL);
@@ -680,12 +685,17 @@ fn main() {
     std::process::exit(code);
 }
 
-fn supervise(policy: &Policy, listener: OwnedFd, pid: libc::pid_t) -> i32 {
+fn supervise(policy: &Policy, listener: OwnedFd, pid: libc::pid_t, launcher: libc::pid_t) -> i32 {
     let policy = Arc::new(Endpoints::from(policy));
     let listener = Arc::new(listener);
     let in_flight = Arc::new(AtomicUsize::new(0));
     let mut kill_at: Option<Instant> = None;
     loop {
+        // A parent change means the launcher exited: stop as if told to.
+        // SAFETY: getppid has no preconditions.
+        if unsafe { libc::getppid() } != launcher {
+            TERMINATE.store(true, Ordering::SeqCst);
+        }
         if TERMINATE.load(Ordering::SeqCst) && kill_at.is_none() {
             // SAFETY: signal the program's own process group.
             unsafe { libc::kill(-pid, libc::SIGTERM) };
