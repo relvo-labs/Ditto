@@ -52,8 +52,8 @@
         <translation>Sign in on the official page in your browser and enter the code. Your sign-in is kept in the system keyring; Ditto does not read or show it. When your quota runs out, Ditto waits for it to reset and never switches to the paid API.</translation>
     </message>
     <message>
-        <source>在瀏覽器開啟的頁面登入，並輸入代碼：%1</source>
-        <translation>Sign in on the page that opened in your browser and enter this code: %1</translation>
+        <source>在瀏覽器開啟 %1 登入，並輸入代碼：%2</source>
+        <translation>Open %1 in a browser, sign in and enter this code: %2</translation>
     </message>
     <message>
         <source>尚未登入</source>
@@ -696,6 +696,10 @@
     <message>
         <source>歷史</source>
         <translation>History</translation>
+    </message>
+    <message>
+        <source>沒有開啟瀏覽器時，可在任何裝置開啟：%1</source>
+        <translation>If no browser opened, open this on any device: %1</translation>
     </message>
     <message>
         <source>登入代碼</source>

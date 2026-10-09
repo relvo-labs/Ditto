@@ -52,8 +52,8 @@
         <translation>在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</translation>
     </message>
     <message>
-        <source>在瀏覽器開啟的頁面登入，並輸入代碼：%1</source>
-        <translation>在瀏覽器開啟的頁面登入，並輸入代碼：%1</translation>
+        <source>在瀏覽器開啟 %1 登入，並輸入代碼：%2</source>
+        <translation>在瀏覽器開啟 %1 登入，並輸入代碼：%2</translation>
     </message>
     <message>
         <source>尚未登入</source>
@@ -696,6 +696,10 @@
     <message>
         <source>歷史</source>
         <translation>歷史</translation>
+    </message>
+    <message>
+        <source>沒有開啟瀏覽器時，可在任何裝置開啟：%1</source>
+        <translation>沒有開啟瀏覽器時，可在任何裝置開啟：%1</translation>
     </message>
     <message>
         <source>登入代碼</source>

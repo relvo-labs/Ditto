@@ -207,6 +207,19 @@ Item {
                     Accessible.role: Accessible.StaticText
                     Accessible.name: window.t(qsTr("登入代碼")) + " " + text
                 }
+                // When no browser opens here (none installed, a remote seat), the
+                // page works from any device's browser.
+                TextEdit {
+                    visible: !!window.conversation.login
+                    width: parent.width
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.Wrap
+                    text: window.conversation.login
+                        ? window.t(qsTr("沒有開啟瀏覽器時，可在任何裝置開啟：%1")).arg(window.conversation.login.auth_url) : ""
+                    color: window.tokens.foregroundMuted
+                    font.pixelSize: window.tokens.fontSmall
+                }
                 Row {
                     spacing: window.tokens.space
                     Button {

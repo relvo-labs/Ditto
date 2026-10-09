@@ -87,7 +87,7 @@ Flickable {
                 text: !page.provider ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
-                        : page.conversation.login ? page.t(qsTr("在瀏覽器開啟的頁面登入，並輸入代碼：%1")).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
+                        : page.conversation.login ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg(page.conversation.login.auth_url).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
                 color: page.tokens.foreground
                 font.pixelSize: page.tokens.fontBody
             }
