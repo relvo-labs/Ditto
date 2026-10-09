@@ -58,6 +58,10 @@ export PATH="$wayfire_prefix/bin:$qt_prefix/bin:$HOME/.cargo/bin:$PATH"
 export LD_LIBRARY_PATH="$wayfire_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export XDG_CURRENT_DESKTOP=Wayfire
 export XDG_SESSION_DESKTOP=ditto
+# Chromium-based browsers pick Wayland only when this says so; without it
+# they try X11, find no $DISPLAY and exit, so a link the Shell opens (the
+# Codex sign-in page) never appears.
+export XDG_SESSION_TYPE=wayland
 export QT_QPA_PLATFORM=wayland
 export QT_IM_MODULES=wayland
 export QT_IM_MODULE=wayland
@@ -171,7 +175,7 @@ chmod 0600 "$session_env"
 # they fail, and every portal client — the Firefox snap forces GTK_USE_PORTAL=1
 # — stalls on timeouts. XDG_SESSION_ID lets Core find this logind session.
 dbus-update-activation-environment --systemd \
-  WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_ID \
+  WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE XDG_SESSION_ID \
   QT_QPA_PLATFORM QT_IM_MODULE QT_IM_MODULES XMODIFIERS
 
 install -d -m 0700 "$fcitx_config_home/fcitx5"
