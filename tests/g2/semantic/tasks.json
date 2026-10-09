@@ -1,7 +1,7 @@
 {
  "set": "tasks",
- "version": 1,
- "oracle_version": 1,
+ "version": 2,
+ "oracle_version": 2,
  "tasks": [
   {
    "id": "F-A01",
@@ -1420,7 +1420,7 @@
   },
   {
    "id": "F-D08",
-   "version": 1,
+   "version": 2,
    "lang": "en",
    "category": "profiles",
    "turns": [
@@ -1448,7 +1448,7 @@
     "outcome": "change",
     "checks": [
      {
-      "active_profile": "semantic-base"
+      "active_profile": "預設"
      },
      {
       "window": "foot",
@@ -1466,7 +1466,7 @@
    "reference": {
     "ops": [
      {
-      "switch": "semantic-base"
+      "switch": "預設"
      }
     ]
    }

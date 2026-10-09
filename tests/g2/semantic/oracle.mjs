@@ -4,7 +4,12 @@
 // to say no. It never reads the model's own claims about success.
 import {createHash} from 'node:crypto'
 
-export const ORACLE_VERSION = 1
+// 2: answer words match whatever apostrophe the model typed ("can’t" is
+// "can't"); the profile tasks name the store's default profile.
+export const ORACLE_VERSION = 2
+
+/** Answer text as compared: lower case, typographic apostrophes as ASCII. */
+export const plain=text=>String(text).replace(/[\u2018\u2019\u02bc]/g,"'").toLowerCase()
 
 /** The Profile document in a form that does not depend on entry ids:
  * entries keyed by package, slots naming packages. */
@@ -103,7 +108,7 @@ export function evaluate(task,snapshots,answer,extra={}){
     if(c.profile_missing!==undefined)return !after.profile_names.includes(c.profile_missing)
     if(c.profile_count==='unchanged')return after.profile_names.length===before.profile_names.length
     if(c.agent_changes){const n=extra.committed??0;return 'eq' in c?n===c.eq:n>=c.gte}
-    if(c.answer_any)return c.answer_any.some(word=>answer.toLowerCase().includes(word.toLowerCase()))
+    if(c.answer_any)return c.answer_any.some(word=>plain(answer).includes(plain(word)))
     if(c.asks)return /[?？]/.test(answer)
     throw new Error('unknown check '+JSON.stringify(c))
   }
