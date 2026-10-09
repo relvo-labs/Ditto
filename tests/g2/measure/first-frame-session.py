@@ -19,9 +19,10 @@ Development hosts and the headless fixture use chat-first-frame.sh instead.
 import json
 import math
 import os
-import selectors
+import queue
 import subprocess
 import sys
+import threading
 import time
 
 here = os.path.dirname(os.path.abspath(__file__))
@@ -52,8 +53,19 @@ earlier = subprocess.run(["journalctl", "--user", "-o", "cat", "--since", since,
 earlier_opens = sum(1 for line in earlier.splitlines() if "ditto-mark" in line and line.endswith(mark))
 
 journal = subprocess.Popen(["journalctl", "--user", "-f", "-n", "0", "-o", "cat"], stdout=subprocess.PIPE, text=True, bufsize=1)
-selector = selectors.DefaultSelector()
-selector.register(journal.stdout, selectors.EVENT_READ)
+frames: "queue.Queue[int]" = queue.Queue()
+
+
+def read_journal() -> None:
+    # One reader owns the pipe; select() on a buffered text stream would miss
+    # lines already read ahead into the buffer.
+    for line in journal.stdout:
+        line = line.strip()
+        if "ditto-mark" in line and line.endswith(mark):
+            frames.put(int(line.split("ditto-mark ", 1)[1].split()[0]))
+
+
+threading.Thread(target=read_journal, daemon=True).start()
 time.sleep(1.0)  # journalctl -f is following before the first press
 client = Client()
 
@@ -73,13 +85,10 @@ def press_chord() -> int:
 
 
 def next_frame(timeout: float = 3.0) -> int | None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        for _ in selector.select(max(0.0, deadline - time.monotonic())):
-            line = journal.stdout.readline().strip()
-            if "ditto-mark" in line and line.endswith(mark):
-                return int(line.split("ditto-mark ", 1)[1].split()[0])
-    return None
+    try:
+        return frames.get(timeout=timeout)
+    except queue.Empty:
+        return None
 
 
 samples = []
@@ -87,6 +96,11 @@ try:
     for i in range(1, runs + 6):
         t0 = press_chord()
         frame = next_frame()
+        if frame is None and i == 1:
+            # The surface was already open and the chord closed it.
+            time.sleep(0.4)
+            t0 = press_chord()
+            frame = next_frame()
         if frame is None:
             raise SystemExit(f"run {i}: no {surface} frame after the shortcut")
         samples.append({"run": i, "warmup": i <= 5, "ms": frame - t0})
@@ -110,7 +124,7 @@ report = {
     "first_sample_cold": earlier_opens == 0,
     "earlier_opens_in_login": earlier_opens,
     "clock": "key press fed to Wayfire (stipc) → Shell frameSwapped mark; presentation is up to one refresh later",
-    "environment": "reference machine, logged-in Ditto seat",
+    "environment": os.environ.get("DITTO_MEASURE_ENVIRONMENT", "reference machine, logged-in Ditto seat"),
     "samples": samples,
 }
 out_dir = os.path.join(workspace, "artifacts", "g2")

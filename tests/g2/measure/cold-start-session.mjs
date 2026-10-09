@@ -38,7 +38,10 @@ function agentPids(){
   for(const pid of readdirSync('/proc').filter(n=>/^\d+$/.test(n))){
     try{
       if(!readFileSync(`/proc/${pid}/status`,'utf8').match(new RegExp(`^Uid:\\s+${uid}\\b`,'m')))continue
-      if(/ditto-agentd|ditto-confine|app-server/.test(readFileSync(`/proc/${pid}/cmdline`,'utf8')))out.push(Number(pid))
+      // By program, not by command line: Core's own arguments name the Agent.
+      const argv=readFileSync(`/proc/${pid}/cmdline`,'utf8').split('\0')
+      const program=argv[0].split('/').at(-1)
+      if(['ditto-confine','codex','xdg-dbus-proxy','ditto-dbus-proxy'].includes(program)||argv[1]?.endsWith('ditto-agentd.mjs'))out.push(Number(pid))
     }catch{}
   }
   return out
@@ -46,6 +49,8 @@ function agentPids(){
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.min(s.length-1,Math.ceil(p*s.length)-1)]}
 async function stopCold(i){
   await must('agent.runtime.stop')
+  // An ensure while Core is still stopping the generation starts nothing.
+  for(let w=0;w<400;w++){if((await must('agent.runtime.get')).phase==='stopped')break;await sleep(25)}
   for(let w=0;w<400&&agentPids().length;w++)await sleep(25)
   if(agentPids().length)throw new Error(`run ${i}: an Agent process survived the stop: ${agentPids()}`)
 }
@@ -53,8 +58,13 @@ async function ready(){
   for(;;){const r=await must('agent.runtime.get');if(r.phase==='ready')return r;if(r.phase==='failed')throw new Error('failed: '+r.failure_reason);await sleep(5)}
 }
 
+// The person's choice stands: an Agent turned off is not turned on here,
+// unless DITTO_MEASURE_ENABLE_AGENT=1 (a disposable VM).
 const settings=await must('agent.settings.describe')
-if(!settings.enabled){console.log(JSON.stringify({ok:false,not_run:'the Agent is turned off in AI settings'}));process.exit(2)}
+if(!settings.enabled){
+  if(process.env.DITTO_MEASURE_ENABLE_AGENT!=='1'){console.log(JSON.stringify({ok:false,not_run:'the Agent is turned off in AI settings'}));process.exit(2)}
+  const {_meta,...p}=settings;await must('agent.settings.patch',{expected_revision:settings.revision,settings:{...p,enabled:true}})
+}
 await must('agent.runtime.ensure');await ready()
 if(!(await must('agent.providers.status',{provider:'codex-app-server'})).authenticated){console.log(JSON.stringify({ok:false,not_run:'the Codex subscription is not signed in'}));process.exit(2)}
 
@@ -90,6 +100,6 @@ const sha=execFileSync('git',['-C',workspace,'rev-parse','HEAD'],{encoding:'utf8
 const out=resolve(workspace,`artifacts/g2/cold-start-session-${stamp}.json`)
 mkdirSync(resolve(workspace,'artifacts/g2'),{recursive:true})
 writeFileSync(out,JSON.stringify({ok:summary.authenticated_p95_ms<=2000,summary,samples,answers,git:sha,
-  environment:'reference machine, logged-in Ditto session, real signed-in Codex backend',
+  environment:process.env.DITTO_MEASURE_ENVIRONMENT??'reference machine, logged-in Ditto session, real signed-in Codex backend',
   clock:'agent.runtime.ensure → ready + provider authenticated (relay round trips included); answers: ensure → turn succeeded, whole answer'},null,1))
 console.log(JSON.stringify({ok:summary.authenticated_p95_ms<=2000,summary,artifact:out}))

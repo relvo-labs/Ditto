@@ -15,7 +15,7 @@
 - **真實訂閱已執行（2026-10-09）**：瀏覽器 OAuth 被 OpenAI 以 `invalid_client`（originator `ditto`）拒絕，改用 device code 登入（owner 指示）。帳號矩陣 10 項通過、2 項無法產生（配額耗盡、第二個帳號）。語意集第一輪（oracle v1）**固定集 42／50、保留集 41／50**；修正 token 可發現性、撤銷歸屬與 oracle／夾具缺陷後重跑（oracle v2）**固定集 45／50、保留集 46／50**（§3.4）。owner 核定 D-43（「詢問」不限問號、刪除設定檔經 approval 詢問後依本人決定放行）後以 oracle v3 重跑：**固定集 48／50、保留集 47／50**，兩組都達 45／50、保留集降 2 pp。
 - **v3 的未通過**：5 題，都不是基礎設施錯誤；4 題是模型行為（該做而問、該問而做），1 題（F-E05）turn 以 `interrupted` 結束、沒有回答，原因未留下紀錄；見 §3.4。v1、v2 的分數保留不改。
 - **owner 決策（2026-10-09）**：D-39～D-44 依 §5 提案核定，紀錄見 `.agents/notes/decisions/2026-10-09-d39`～`d44`。
-- **阻擋出口、需要參考機流程**：EX2-12／13／14 的冷登入與實體座位量測要登出目前的桌面工作階段，未在本次執行；方法與工具已就緒並以 headless 乾跑驗證。
+- **阻擋出口、需要參考機流程**：EX2-12／13／14 的冷登入與實體座位量測要登出目前的桌面工作階段，參考機上未執行。工具已在 VM 以真 GDM 自動登入完整跑過一輪（四狀態各三次、暖機 300 秒、採樣 600 秒；§3.5），數字是 development-vm 證據、不判定。**VM 上 Agent 暖態 PSS 三次 p95 168.5～171.6 MiB，超過 150 MiB 預算**，其中 Codex app-server 約 150 MiB；參考機量測若同樣超出，依原則 5 提出數據與調整提案，不調高門檻。
 - **本輪修正的產品缺陷**：區域布局在用戶端提交尺寸前就判定「已驗證」（Firefox 保留自己的寬度時會假成功）；Codex 模型服務失敗被報成 `interrupted`；Core 連線關閉洩漏執行緒與 socket；Profile 可綁定 Core 保留的快捷鍵。
 
 ## 2. 十九項出口逐項
@@ -35,9 +35,9 @@
 | EX2-09 keyring 與無秘密外洩 | 有開發證據 | 真 Secret Service 寫讀刪（`direct/run.mjs` 13／13）；金鑰不在磁碟、日誌、Profile 匯出；刪除對話後文字不留在 Core 儲存任何檔案、任何日誌（`codex/run.mjs` 40／40）；真實登入後權杖只在 keyring、Codex home 無 `auth.json`（`subscription.mjs`、帳號矩陣） | 匯入缺引用提示的端到端 |
 | EX2-10 離線與停用 | 部分 | 模型不可用時手動設定照常（faults）；無角色時 Super+A 開聊天視窗（`shell/run.sh`） | 參考機上斷網與停用角色的完整流程、重連後會話 |
 | EX2-11 語意 45／50 與保留集 | 部分 | 固定集與保留集各 50 題、oracle 只讀 Core；自我檢查兩組各 50／50、空白對照兩組各 0／50；真實模型 v1 固定集 42／50、保留集 41／50；v2 固定集 45／50、保留集 46／50；**v3（D-43）固定集 48／50、保留集 47／50**（保留集降 2 pp） | 開發機巢狀桌面、Chrome 代瀏覽器；參考機與 Firefox 重跑 |
-| EX2-12 冷啟動 p95 ≤2 s | 部分 | 開發機 30 次 p95 118 ms（release Core，fixture）；方法見 `measure/cold-start.mjs` | 參考機登入工作階段中、真實後端與真實首字 |
-| EX2-13 暖態首幀 p95 ≤150 ms | 部分 | 聊天 200 次 p95 30 ms、啟動器 200 次 p95 40 ms（headless，`measure/chat-first-frame.sh`） | 實體座位呈現時間（wp_presentation）、G1 的呈現警訊 |
-| EX2-14 四狀態冷登入資源 | 未執行 | 冷登入工具新增 `desktop_full_agent_warm`／`_active`、預算判定（Agent ≤150、全桌面 ≤750 MiB）；headless 乾跑三次：Agent 62.2～62.8 MiB、全桌面 268.4～269.0 MiB（不是證據）；一個 turn 後 Agent 群組 102～115 MiB | 參考機三次真冷登入×四狀態；活動狀態需登入訂閱 |
+| EX2-12 冷啟動 p95 ≤2 s | 部分 | 開發機 30 次 p95 118 ms（release Core，fixture）；方法見 `measure/cold-start.mjs`。VM 登入工作階段（§3.5）：30 次 ensure→ready＋已驗證 p95 150 ms；從冷到完整回答 5／5，中位數 2863 ms（環回模型約 2.6 s 串流） | 參考機登入工作階段中、真實後端與真實首字 |
+| EX2-13 暖態首幀 p95 ≤150 ms | 部分 | 聊天 200 次 p95 30 ms、啟動器 200 次 p95 40 ms（headless，`measure/chat-first-frame.sh`）。VM 登入座位（§3.5，按鍵送入 Wayfire→frameSwapped）：聊天 p95 74 ms、啟動器 p95 74 ms，冷首次 90／84 ms | 實體座位呈現時間（wp_presentation）、G1 的呈現警訊 |
+| EX2-14 四狀態冷登入資源 | 未執行（參考機） | 冷登入工具新增 `desktop_full_agent_warm`／`_active`、預算判定（Agent ≤150、全桌面 ≤750 MiB）。VM 真冷登入四狀態各三次（§3.5，不判定）：無 Agent 全桌面 p95 545.3～565.8 MiB；Agent 暖態全桌面 718.9～730.6 MiB、**Agent 168.5～171.6 MiB（超過 150）**；活動中 Agent 171.8～173.2 MiB | 參考機三次真冷登入×四狀態；活動狀態需登入訂閱 |
 | EX2-15 程序上限、工作池、清理 | 有開發證據 | ≤1 controller＋≤1 app-server（Core 單例）；工作池兩個並行、第三個排隊、取消、逾時、OOM（256 MiB 範圍內 512 MiB 被殺）、CPU 0.50 核（`jobs/run.mjs` 17／17）；100 次清理 | D-44 的後端 cgroup 硬限制尚未設定 |
 | EX2-16 兩種聊天外觀與七態 | 部分 | 角色旁面板↔完整視窗、草稿與串流 20 次切換不丟、七態文字、無角色入口、AI 設定鍵盤操作（`shell/run.sh`）；第一次使用的三個例子依能力啟用 | 實體鍵盤中文輸入（D-38 追蹤項）、reduced motion 實機 |
 | EX2-17 Core 持有會話與設定 | 有開發證據 | 單 writer、append／flush、torn tail、中段損毀、磁碟滿、遷移回滾、刪除中斷（`ditto-store` conversations 故障套件）；刪對話不撤銷配置 | 參考機 |
@@ -149,6 +149,26 @@ owner 決定：「詢問」不限問號（問號或封閉清單裡的請求用�
 | 模型：該問而直接做 | — | H-E05 | 「太亮了」直接調暗背景與面板 |
 | 模型：說法不在接受詞內 | — | H-F08 | 「把 AI 關掉」：回答「目前沒有關閉 AI 服務的工具」，接受詞為「設定／自己／無法／不能」（亦可視為 oracle 過窄；未改） |
 | turn 中斷、無回答 | F-E05 | — | turn `failed`（`interrupted`），沒有工具呼叫；不在基礎設施錯誤清單內，照規則記失敗、未重跑；後端日誌在下次啟動時被截斷，原因未留存 |
+
+### 3.5 VM 量測（`tools/dev-vm/run-g2-measure.sh`，2026-10-09，development-vm，不是出口證據）
+
+run `2026-10-09T14:50:29Z-33ab`（`33ab768` 加上本節的工具修正），快照 `ditto-g2`：核心 7.0.0-38、無 GPU、8 GiB；`install-session.sh --development --verification-relay`；每次一個真的 GDM 自動登入進 Ditto（Wayfire），暖機 300 秒、採樣 600 秒、每 5 秒一點，以 `DITTO_FORMAT_CHECK=1` 執行，報告自己標明「不判定」。VM 沒有訂閱，Core 以 `DITTO_TEST_FIXTURE=1` 與 `--agent-backend-test-provider` 接到環回模型（`measure-model.mjs`，每次回答約 130 字、2.6 秒串流）；Codex app-server 仍是真的 binary、在 `ditto-confine` 內。系統單元 12 項全數通過。
+
+| 狀態 | 每次 p95（MiB） | 分層（第三次 p95） |
+| --- | --- | --- |
+| `rescue_no_node`（救援，不作全桌面） | 547.4、527.5、532.8 | Shell 298.1、合成器 162.8、Fcitx 49.6、Core 21.7 |
+| `desktop_full_no_agent`（預算 600） | 565.8、545.3、553.7 | hostd 39.9 |
+| `desktop_full_agent_warm`（預算：全桌面 750、Agent 150） | 全桌面 719.2、730.6、718.9；Agent 171.6、170.0、168.5 | Shell 270.2、合成器 166.7、Agent 168.5（app-server 約 150、controller 約 17、confine 與 proxy 各約 0.6）、Core 27.5、hostd 36.4 |
+| `desktop_full_agent_active`（不判定） | 全桌面 719.3、702.0、725.7；Agent 172.7、171.8、173.2 | — |
+
+| 量測 | 結果 |
+| --- | --- |
+| EX2-13 聊天（Super+A）暖態 200 次 | p50 72、p95 74、最大 77 ms；冷首次 90 ms |
+| EX2-13 啟動器（Super+Space）暖態 200 次 | p50 71、p95 74、最大 86 ms；冷首次 84 ms |
+| EX2-12 冷啟動 30 次（ensure→ready＋已驗證） | p50 141、p95 150、最大 151 ms |
+| EX2-12 從冷到完整回答 5 次 | 5／5 成功，中位數 2863、最大 2889 ms |
+
+解讀限制：VM 以軟體算繪，合成器與 Shell 的數字與有 GPU 的參考機不同；首幀時鐘停在 frameSwapped，畫面呈現最多晚一個更新週期。Agent 層 168～173 MiB 高於 D-44 資料中真實登入後一個 turn 的 102～115 MiB（app-server 87～95 MiB），差異來源未查明（環回 provider 設定、VM 環境或量測時點不同都可能），需以參考機數字為準。這一輪的 `first-frame-session-*.json`、`cold-start-session-*.json` 的 `environment` 欄位仍是工具預設的「reference machine」，是標記錯誤；工具已改為由 `DITTO_MEASURE_ENVIRONMENT` 指定，VM 流程會設定。量測過程修正的工具缺陷：pipefail 下 `awk … exit` 的 SIGPIPE 讓取樣靜默結束、AccountsService 快取使第一次自動登入不進 Ditto、首幀讀日誌漏行、冷啟動把 Core 當成 Agent 程序、Core 停止中呼叫 ensure 會卡住。
 
 ## 4. 發現
 

@@ -98,7 +98,7 @@ relay_call() {
 }
 
 relay_up() {
-  [[ -S "$DITTO_G1_RELAY" ]] && relay_call desktop.capabilities.list '{}' 2>/dev/null | grep -q '"result"'
+  [[ -S "$DITTO_G1_RELAY" ]] && grep -q '"result"' <<<"$(relay_call desktop.capabilities.list '{}' 2>/dev/null)"
 }
 
 # The D-34 set: "<package> <version> <host> <place>" per line, five QML,
@@ -170,7 +170,10 @@ unit_main_pid() {
   if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then echo "$pid"; else unit_pids "$1" | head -1; fi
 }
 
-# Active Ditto units as "<unit> <layer>" lines.
+# Active Ditto units as "<unit> <layer>" lines. Read them whole (or from a
+# variable): under pipefail a consumer that stops early (`awk … exit`,
+# `grep -q`) makes the producer's SIGPIPE fail the pipeline, and set -e then
+# ends the run without a message.
 ditto_units() {
   local unit
   systemctl --user list-units --plain --no-legend --state=active --type=scope,service "$prefix-*" 2>/dev/null |
@@ -343,7 +346,7 @@ start_app() {
   compositor_wait_for_window "$app_id" || { echo "$app_id did not map in the login session" >&2; return 1; }
   if [[ "$role" == editor ]]; then
     local kate
-    kate="$(qdbus | awk '/org\.kde\.kate-[0-9]+/{print $1; exit}')"
+    kate="$(qdbus | awk '/org\.kde\.kate-[0-9]+/ && !seen {print $1; seen = 1}')"
     [[ -n "$kate" && "$(qdbus "$kate" /MainApplication org.kde.Kate.Application.openInput \
       'Ditto G1 cold-login fixture: unsaved buffer' UTF-8)" == true ]] ||
       { echo 'could not open the fixed Kate content' >&2; return 1; }
@@ -519,14 +522,15 @@ sample() {
   local why agent_status=""
   if [[ "$state" == desktop_full_agent_* ]]; then
     relay_up || { echo "the verification relay does not answer at $DITTO_G1_RELAY" >&2; exit 1; }
+    agent_status="$(agent_up)" || exit 1
+    agent_started=1
+    # The provider answers only once the Agent is up.
     if [[ "$state" == desktop_full_agent_active ]]; then
       [[ "$(relay_call agent.providers.status '{"provider":"codex-app-server"}' | jq -r .result.authenticated)" == true ]] || {
         echo 'desktop_full_agent_active runs real model turns: sign in to the subscription first (AI 設定)' >&2
         exit 2
       }
     fi
-    agent_status="$(agent_up)" || exit 1
-    agent_started=1
   fi
   why="$(session_ready "$state")" || { echo "not a session in state $state: $why" >&2; exit 1; }
 
@@ -545,8 +549,8 @@ sample() {
 
   # The session must really be in the state, not just have been asked to be.
   local core_pid shell_unit shell_env node_list
-  core_pid="$(unit_main_pid "$(ditto_units | awk '$2 == "core" {print $1; exit}')")"
-  if tr '\0' ' ' <"/proc/$core_pid/cmdline" | grep -q -- '--mode rescue'; then core_mode=rescue; else core_mode=normal; fi
+  core_pid="$(unit_main_pid "$(ditto_units | awk '$2 == "core" && !seen {print $1; seen = 1}')")"
+  if [[ "$(tr '\0' ' ' <"/proc/$core_pid/cmdline")" == *'--mode rescue'* ]]; then core_mode=rescue; else core_mode=normal; fi
   if [[ "$state" == rescue_no_node ]]; then
     [[ "$core_mode" == rescue ]] || { echo 'Core is not in rescue mode; check the installed units and measure-conditions.json' >&2; exit 1; }
   else
@@ -558,7 +562,7 @@ sample() {
     echo "$node_list" >&2
     exit 1
   fi
-  shell_unit="$(ditto_units | awk '$2 == "shell" {print $1; exit}')"
+  shell_unit="$(ditto_units | awk '$2 == "shell" && !seen {print $1; seen = 1}')"
   if [[ "$state" != rescue_no_node ]]; then
     shell_env="$(tr '\0' '\n' <"/proc/$(unit_main_pid "$shell_unit")/environ")"
     case "$state" in
@@ -572,7 +576,7 @@ sample() {
     if [[ "$state" == desktop_full_plus10 ]]; then
       local package missing=()
       while read -r package _; do
-        relay_call desktop.plugins.get "{\"package_id\":\"$package\"}" | grep -q '"result"' || missing+=("$package")
+        grep -q '"result"' <<<"$(relay_call desktop.plugins.get "{\"package_id\":\"$package\"}")" || missing+=("$package")
       done < <(d34_packages)
       (( ${#missing[@]} == 0 )) || { echo "not built-ins of this session: ${missing[*]} (install with --verification-relay)" >&2; exit 1; }
     fi

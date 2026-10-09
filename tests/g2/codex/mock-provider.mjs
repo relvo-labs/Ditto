@@ -13,8 +13,9 @@ const call=(name,args,id)=>({type:'function_call',name,arguments:JSON.stringify(
 const slowSay=(pieces,delay)=>({type:'message',role:'assistant',id:'msg-'+Math.random().toString(36).slice(2),_stream:pieces,_delay:delay})
 const say=text=>({type:'message',role:'assistant',id:'msg-'+Math.random().toString(36).slice(2),content:[{type:'output_text',text}]})
 
-/** `decide(body)` returns the output items of one model response. */
-export async function startProvider(decide){
+/** `decide(body)` returns the output items of one model response. `port` 0
+ * picks a free one. */
+export async function startProvider(decide,port=0){
   const requests=[],hanging=new Set(),closed=[]
   let count=0
   const server=http.createServer((req,res)=>{
@@ -62,7 +63,7 @@ export async function startProvider(decide){
         {type:'response.completed',response:{id,usage:{input_tokens:100,input_tokens_details:null,output_tokens:20,output_tokens_details:null,total_tokens:120}}}])
     })
   })
-  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+  await new Promise(resolve=>server.listen(port,'127.0.0.1',resolve))
   return {port:server.address().port,requests,closed,hanging:()=>hanging.size,
     close:()=>new Promise(resolve=>{for(const res of hanging)res.destroy();server.close(resolve)})}
 }
