@@ -59,5 +59,5 @@ G2 有三類外來程式碼，取用方式各不相同：Harness 的純值模組
 
 ## 5. 未完成
 
-- 真實訂閱已於 2026-10-09 以 device code 登入執行（瀏覽器 OAuth 對 originator `ditto` 回 `invalid_client`）：帳號矩陣 10／10（切帳號、配額耗盡無法產生）；語意集固定集 42／50、保留集 41／50，見 [G2 評審](../../.agents/notes/gate-reviews/G2-exit.md) §3.4。
+- 真實訂閱已於 2026-10-09 以 device code 登入執行（瀏覽器 OAuth 對 originator `ditto` 回 `invalid_client`）：帳號矩陣 10／10（切帳號、配額耗盡無法產生）；語意集 v1 固定集 42／50、保留集 41／50，修正 token 可發現性與 oracle 後 v2 固定集 45／50、保留集 46／50，見 [G2 評審](../../.agents/notes/gate-reviews/G2-exit.md) §3.4。
 - Codex binary 與 xdg-dbus-proxy 的發行條款、隨附原始碼與授權文字屬 D-11／G4。
