@@ -28,6 +28,15 @@ G0 的主要參考機識別為 `ditto-ref-ws-rtx4060-01`。同一項三次重複
 
 這不是整個產品的安裝包。G0 沒有 Profile、Cordis、Agent 或救援模式；此目錄只重建 G0 原生可行性與出口量測環境。
 
+## 畫面分享與遠端存取
+
+Wayfire 工作階段的 xdg-desktop-portal 原本只有 GTK 後端，沒有 ScreenCast，RustDesk 登入時報 `No such interface "org.freedesktop.portal.ScreenCast"`。`install-session.sh` 安裝兩個設定：
+
+- `session/wayfire-portals.conf` → `/etc/xdg/xdg-desktop-portal/wayfire-portals.conf`：ScreenCast 與 Screenshot 交給 `xdg-desktop-portal-wlr`（讀 Wayfire 的 wlr-screencopy），其餘維持 GTK。
+- `session/xdpw-wayfire.conf` → `/etc/xdg/xdg-desktop-portal-wlr/Wayfire`：`chooser_type=none`，不跳選擇視窗，直接分享第一個輸出。
+
+取捨：遠端連線時座位上沒有人可以按同意，所以不設選擇器；代價是這個工作階段裡任何程式要求擷取螢幕都會直接得到畫面。owner 於 2026-10-09 為了遠端存取接受。RustDesk 的輸入走它自己的 uinput，不經 portal。
+
 ## G1 工作階段：從 G0 搬到哪裡
 
 G1-PLAT-02 把登入 script 從 `ditto-g0-session` 改為 `ditto-session`，並由它啟動 `ditto-session.target`，不再直接啟動 Core。Core、supervisor 與救援介面改為常駐的 systemd user unit（[`packaging/systemd/user/`](../systemd/user/)），因為 transient scope 沒有 `Restart=`、`StartLimit*`、`WatchdogSec` 與 `OnFailure=`（[plan/03/05 §2](../../plan/03/05-platform-supervision-and-rescue.md#2-systemd-user-unitg1-plat-02)）。

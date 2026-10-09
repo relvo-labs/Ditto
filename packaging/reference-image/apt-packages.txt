@@ -22,6 +22,7 @@ slurp
 wayland-utils
 wl-clipboard
 x11-apps
+xdg-desktop-portal-wlr
 xterm
 xwayland
 

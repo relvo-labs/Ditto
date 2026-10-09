@@ -108,6 +108,9 @@ for script in ditto-end-sessions ditto-relogin ditto-logout ditto-rescue-ui; do
   sudo install -D -m 0755 "$here/session/$script" "$libexec/$script"
 done
 sudo install -D -m 0644 "$here/session/gdm-ditto.conf" /etc/systemd/system/gdm.service.d/ditto.conf
+# Screen capture portal for Wayfire (RustDesk, screen sharing); see README.md.
+sudo install -D -m 0644 "$here/session/wayfire-portals.conf" /etc/xdg/xdg-desktop-portal/wayfire-portals.conf
+sudo install -D -m 0644 "$here/session/xdpw-wayfire.conf" /etc/xdg/xdg-desktop-portal-wlr/Wayfire
 
 for unit in "$units_source"/*; do
   name="$(basename "$unit")"
