@@ -18,6 +18,12 @@ import "chat"
 ShellRoot {
     id: root
 
+    /// Core launches the Shell with a single-use token. A reload on a source
+    /// change comes back without one and cannot reach Core again, leaving the
+    /// desktop with no panel or dock (2026-10-09, the live session ran from a
+    /// working tree being edited). Development opts in with DITTO_SHELL_WATCH=1.
+    settings.watchFiles: Quickshell.env("DITTO_SHELL_WATCH") === "1"
+
     Tr {
         id: translator
         locale: providers.appearance && providers.appearance.locale
