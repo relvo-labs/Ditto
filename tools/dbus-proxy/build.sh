@@ -14,8 +14,9 @@ if [[ ! -d "$work/.git" ]] || [[ "$(git -C "$work" rev-parse HEAD)" != "$commit"
   git -c advice.detachedHead=false clone -q --depth 1 --branch "$tag" https://github.com/flatpak/xdg-dbus-proxy "$work"
 fi
 [[ "$(git -C "$work" rev-parse HEAD)" == "$commit" ]] || { echo "tag $tag is not the pinned commit" >&2; exit 1; }
-[[ -d "$work/build" ]] || meson setup "$work/build" "$work" -Dman=disabled >/dev/null
-ninja -C "$work/build" >/dev/null
+# Build output goes to stderr: meson reports a missing dependency on stdout.
+[[ -d "$work/build" ]] || meson setup "$work/build" "$work" -Dman=disabled >&2
+ninja -C "$work/build" >&2
 mkdir -p "$workspace/target/$profile"
 install -m 0755 "$work/build/xdg-dbus-proxy" "$workspace/target/$profile/ditto-dbus-proxy"
 "$workspace/target/$profile/ditto-dbus-proxy" --version

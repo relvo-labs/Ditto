@@ -35,6 +35,13 @@ git
 meson
 ninja-build
 pkg-config
-# xdg-desktop-portal-wlr build (tools/xdpw/build.sh)
+# Pinned source builds. xdg-dbus-proxy (tools/dbus-proxy/build.sh):
+libglib2.0-dev
+# xdg-desktop-portal-wlr (tools/xdpw/build.sh):
+libdrm-dev
+libgbm-dev
 libinih-dev
+libpipewire-0.3-dev
 libsystemd-dev
+libwayland-dev
+wayland-protocols

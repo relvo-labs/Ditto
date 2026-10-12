@@ -38,6 +38,7 @@ record restore pass
 vm_ssh 'sudo systemctl restart systemd-timesyncd >/dev/null 2>&1' || true
 vm_sync_workspace >"$out/sync.log" 2>&1
 record sync pass
+vm_build_packages >"$out/packages.log" 2>&1 && record packages pass || record packages fail
 step build 'pnpm install --frozen-lockfile && cargo build --locked --workspace --bins && pnpm -r build && bash scripts/build-builtin-packages.sh'
 step rust 'cargo test --locked --workspace' || true
 step node 'pnpm -r typecheck && pnpm -r test && pnpm --filter @ditto/agent-runtime check:upstream' || true

@@ -24,6 +24,13 @@ trap 'rm -rf -- "$temporary"' EXIT
 for command in cargo sed sudo install jq sha256sum; do
   command -v "$command" >/dev/null || { echo "missing installer dependency: $command" >&2; exit 1; }
 done
+# The pinned D-Bus proxy and screencast portal are built from source here.
+for command in meson ninja pkg-config; do
+  command -v "$command" >/dev/null || { echo "missing installer dependency: $command (apt-packages.txt)" >&2; exit 1; }
+done
+for module in gio-2.0 libpipewire-0.3 wayland-client wayland-protocols gbm libdrm inih libsystemd; do
+  pkg-config --exists "$module" || { echo "missing build library: $module (apt-packages.txt)" >&2; exit 1; }
+done
 
 # `--development` installs the same session on a development machine or VM.
 # It skips the reference-machine preflight, so nothing measured there can enter

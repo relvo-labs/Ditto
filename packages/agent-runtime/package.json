@@ -10,6 +10,7 @@
     "check:upstream": "node scripts/check-upstream.mjs"
   },
   "devDependencies": {
+    "@ditto/host-runtime": "workspace:*",
     "@types/node": "22.18.6",
     "tsdown": "0.22.2",
     "typescript": "5.9.3",

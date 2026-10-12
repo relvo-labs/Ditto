@@ -56,6 +56,14 @@ vm_wait_desktop() {
   return 1
 }
 
+# Snapshots older than the package list lack its newer build packages;
+# install its build section (everything after the "Build" header).
+vm_build_packages() {
+  local packages
+  packages="$(sed -n '/^# Build and diagnostic tools/,$p' "$WORKSPACE/packaging/reference-image/apt-packages.txt" | grep -vE '^[[:space:]]*(#|$)' | tr '\n' ' ')"
+  vm_ssh "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q $packages"
+}
+
 vm_sync_workspace() {
   vm_rsync --delete --exclude target --exclude artifacts --exclude node_modules \
     "$WORKSPACE/" neil@"$(vm_ip)":funlab/Ditto/

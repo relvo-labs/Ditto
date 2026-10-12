@@ -57,8 +57,9 @@ codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}")"
 vm_ssh "mkdir -p '$(dirname "$codex")' ~/.local/bin" && vm_rsync "$codex" "neil@$(vm_ip):$codex" && vm_ssh "ln -sf '$codex' ~/.local/bin/codex"
 record setup pass
 
-# xdg-desktop-portal-wlr is built from its pin by install-session.sh.
-step packages 'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q meson ninja-build pkg-config libpipewire-0.3-dev libwayland-dev wayland-protocols libgbm-dev libdrm-dev libinih-dev libsystemd-dev'
+# install-session.sh builds the pinned D-Bus proxy and screencast portal.
+log packages
+vm_build_packages >"$out/packages.log" 2>&1 && record packages pass || { record packages fail; exit 1; }
 step install 'pnpm install --frozen-lockfile && bash scripts/build-builtin-packages.sh >/dev/null && cargo build --locked --workspace --bins && cargo build --locked --release -p ditto-measure && bash packaging/reference-image/install-session.sh --development --verification-relay'
 # The loopback model as a user service (not a ditto-* unit, so the sampler
 # leaves it out), and Core pointed at it.
