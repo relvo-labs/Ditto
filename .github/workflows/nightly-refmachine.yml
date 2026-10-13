@@ -24,11 +24,13 @@ jobs:
           git log -1 --format='HEAD %H'; git status --porcelain | head -3
           case "$WHAT" in
             probe)
-              echo "== preflight"; bash packaging/reference-image/preflight.sh; echo "preflight exit=$?"
-              echo "== settings"; r agent.settings.describe
-              echo "== lock"; r session.lock.get; r desktop.session.describe
-              echo "== windows"; r desktop.windows.list
-              ;;
+              echo "== sessions"; loginctl list-sessions --no-legend
+              echo "== keyring"; for c in login session; do printf '%s locked=' $c; busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/$c org.freedesktop.Secret.Collection Locked 2>&1; done
+              systemctl --user is-active gnome-keyring-daemon.service
+              echo "== user manager env"; systemctl --user show-environment | grep -E '^(WAYLAND_DISPLAY|XDG_SESSION_DESKTOP|XDG_CURRENT_DESKTOP|DISPLAY)='
+              echo "== ditto-mark / lock around EX2-13"; journalctl --user --since '2026-10-13 13:44' --until '2026-10-13 13:54' -o short-iso --no-pager | grep -E 'ditto-mark|lock|Lock|stipc|chat' | head -30
+              echo "== firefox troubleshoot"; ls ~/snap/firefox/common/ditto-g0-reference-profile/ 2>&1 | head -40; grep -h -E 'toolkit.startup|recent_crashes' ~/snap/firefox/common/ditto-g0-reference-profile/prefs.js 2>&1 | head
+              echo "== lock idle in shell"; grep -rn -i -E 'idle.*lock|lockAfter|lock_after' shell --include=*.qml | head -5
             phase-a)
               mark=$(mktemp); touch -d '-1 min' "$mark"
               echo "== semantic fixed (Firefox)"; bash tests/g2/semantic/run.sh --tasks fixed; echo "semantic fixed exit=$?"
