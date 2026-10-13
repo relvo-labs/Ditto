@@ -4,7 +4,7 @@
 | --- | --- |
 | 日期／狀態 | 2026-10-14；**整合實作提交審查，G3 出口尚未裁定通過** |
 | 計畫／追蹤 | [plan/05](../../../plan/05/README.md)；[#34](https://github.com/relvo-labs/Ditto/issues/34)，相關 #15～#33 已逐項閱讀 |
-| 分支 | `codex/g3-restricted-generation`；G2 PR #13 已合併，本次 PR 以 `main` 為基底 |
+| 分支 | `codex/g3-restricted-generation`；整合實作 `5ed55b8c44d94bae6e3dd70841c7961b85b25eb2`；G2 PR #13 已合併，本次 PR 以 `main` 為基底 |
 | G2 交接 | owner 依 [D-46](../decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受功能完成；未執行量測與既有警訊保留 |
 | 歷史 | 獨立基礎設施 `d77b4e7`、證據 `27abec9`；先前未接線的狀態保留於 [歷史快照](G3-foundation-2026-10-13.md) |
 | 評審者 | owner；本紀錄提供事實與缺口，不代替 owner 裁定 |
@@ -40,7 +40,7 @@ AT-26：兩個生成工作執行、第三個排隊、取消與 artifact 狀態�
 
 ## 3. 驗證與可追溯性
 
-命令與前置條件見 [tests/g3/README](../../../tests/g3/README.md)。原始 artifacts 保存在本 checkout 的 `artifacts/g3/`、`artifacts/g3-vm/`（gitignored）；提交中的摘要保存實際結果與來源指紋，其他 checkout 可依命令重跑，不能把本機摘要當成另一台機器的量測。
+命令與前置條件見 [tests/g3/README](../../../tests/g3/README.md)。原始 artifacts 保存在本 checkout 的 `artifacts/g3/`、`artifacts/g3-vm/`（gitignored）；提交中的 [證據摘要](G3-evidence-2026-10-14.json) 保存實際結果、原始檔 SHA256、來源指紋及 PID／cgroup，其他 checkout 可依命令重跑，不能把本機摘要當成另一台機器的量測。
 
 ### 3.1 開發機回歸
 
@@ -54,7 +54,14 @@ AT-26：兩個生成工作執行、第三個排隊、取消與 artifact 狀態�
 
 ### 3.2 開發 VM 與真桌面測試
 
-最終 VM／舊 ABI run、原始檔路徑、檢查數及來源 SHA256 以隨附證據摘要為準。VM 為可拋棄 `ditto-g0-vm`，只還原 shut-off 快照；沒有登出或重啟使用者目前的實體桌面。
+最終兩次 run 都來自乾淨實作 commit `5ed55b8`，來源樹 SHA256 `5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23`。後續提交只整理評審與證據，沒有更改執行程式。
+
+| run | 實際結果 |
+| --- | --- |
+| `artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8` | 12 個 runner 步驟全部通過；Core 整合 25、桌面 25、重啟 8、腳本模型 15、OS 探針 10 項通過；QtTest 5 項通過 |
+| `artifacts/g3-vm/2026-10-13T17-48-07Z-5ed55b8` | 建置／模板／拒絕／正式 Core partial 15 項通過；候選執行刻意 `not_run`，runner 退出 2；未發生測試失敗 |
+
+原始檔路徑、個別檢查、來源 SHA256 與邊界回讀見 [證據摘要](G3-evidence-2026-10-14.json)。VM 為可拋棄 `ditto-g0-vm`，只還原 shut-off 快照；沒有登出或重啟使用者目前的實體桌面。
 
 - `ditto-g2` 快照：7.0.0-38-generic、Landlock ABI 8。診斷十項 files／network／signals／spawn／spoof／memory／busy／timeout／orphan／cancel 逐項檢查實際邊界與 cgroup 清空；512 MiB、0 swap、100000/100000 CPU quota、64 tasks。這是故障證據，不是 PSS 或效能達標量測。
 - 生產 Core 整合：兩類模板原生五關、發布、缺 Shell 安全中止、相同啟用重試與不同目標衝突、不可信入口與未授權 jobs.submit 拒絕。

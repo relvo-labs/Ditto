@@ -1,0 +1,1407 @@
+{
+  "date": "2026-10-14",
+  "status": "development evidence; G3 exit not accepted",
+  "implementation_commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+  "local_regression": {
+    "rust_tests": 246,
+    "node_tests": 184,
+    "qml_tests": 5,
+    "i18n": {
+      "strings": 553,
+      "core_keys": 181,
+      "languages": 2
+    },
+    "checks_passed": [
+      "workspace clippy all-targets -D warnings",
+      "cargo fmt",
+      "workspace typecheck",
+      "Rust schema export --check",
+      "TS check:generated",
+      "fixed QML template sync --check",
+      "upstream 9-file hash check",
+      "vendor guard (0 vendored source changes)",
+      "i18n",
+      "skills lint (0 errors, existing AGENTS length warning)",
+      "git diff --check"
+    ],
+    "logs": [
+      {
+        "path": "artifacts/g3/workspace-tests.log",
+        "sha256": "c5e4e8d0b443508fce044085d21ace9f27853d283d34522b7da07aab980945a4"
+      },
+      {
+        "path": "artifacts/g3/node-tests.log",
+        "sha256": "bd9c490799ba83093b6e94f0b10d3a96c6144781f8df60abe58d4469c2efd7b7"
+      },
+      {
+        "path": "artifacts/g3/clippy.log",
+        "sha256": "f248f5e77e9abe35d3a89115462a2bf37a8269da2c26a7ec44c62e814be29c19"
+      },
+      {
+        "path": "artifacts/g3/typecheck.log",
+        "sha256": "02b0a4bbf9bdcac6d2ed65b48d27ebe6205be11ed5217c9fdccc2e35650adbfc"
+      },
+      {
+        "path": "artifacts/g3/schema-check.log",
+        "sha256": "de6df7eebf442dd93fb1da0dea6513bc556c6643f6b0bc2b3f54c620e8ac6826"
+      },
+      {
+        "path": "artifacts/g3/ts-generated-check.log",
+        "sha256": "7a38574d375d001bd59eb4eca03adb52ed4d49777e8816ea92fdf512cdaf4cae"
+      },
+      {
+        "path": "artifacts/g3/upstream.log",
+        "sha256": "987a48f8d09ff3c789e7ca9e8b8c1e67c0d4da0462b6182501d183fbeefd6a86"
+      },
+      {
+        "path": "artifacts/g3/vendor-guard.log",
+        "sha256": "d547058829924712d62325c5372489a867f99bb98cba04f9689095bb38d0926b"
+      }
+    ]
+  },
+  "full_vm": {
+    "run": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8",
+    "summary": {
+      "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/summary.jsonl",
+      "sha256": "345dd812d3ab31a92b0a599ca6b4d2785fa4aa5b2fcbdedff4e84f85435d7183"
+    },
+    "checks": [
+      {
+        "check": "restore",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "sync",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "build",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "foundation",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "rejection",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "host",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "production",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "dependencies",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "packages",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "desktop",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "restart",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "agent",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      }
+    ],
+    "records": {
+      "production": {
+        "record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/integration-vDh9FR/result.json",
+          "sha256": "ea234b134fb6fb50391f351e0f5b76474910b62384304379cdecff6b7f8c0022"
+        },
+        "ok": true,
+        "evidence_class": null,
+        "source": {
+          "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+          "dirty": false,
+          "source_tree_sha256": "5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+        },
+        "check_count": 25,
+        "checks": [
+          "official development capabilities are discoverable",
+          "tasks-summary source bundle complete",
+          "tasks-summary create idempotent",
+          "tasks-summary unvalidated publish denied",
+          "tasks-summary real isolated worker completed",
+          "tasks-summary five stages passed under full production policy",
+          "tasks-summary published after validation",
+          "tasks-summary package readback is untrusted fixed description",
+          "tasks-summary missing Shell aborts safely",
+          "tasks-summary aborted activation retry returns same record",
+          "tasks-summary activation key cannot change target",
+          "tasks-summary desktop head unchanged",
+          "workspace-actions source bundle complete",
+          "workspace-actions create idempotent",
+          "workspace-actions unvalidated publish denied",
+          "workspace-actions real isolated worker completed",
+          "workspace-actions five stages passed under full production policy",
+          "workspace-actions published after validation",
+          "workspace-actions package readback is untrusted fixed description",
+          "workspace-actions missing Shell aborts safely",
+          "workspace-actions aborted activation retry returns same record",
+          "workspace-actions activation key cannot change target",
+          "workspace-actions desktop head unchanged",
+          "arbitrary QML rejected by formal contract",
+          "generation jobs cannot bypass development authorization"
+        ],
+        "validations": [
+          {
+            "fact": "tasks-summary",
+            "job_id": "job-01M4V604VKW7ZWRKR1MDX0D49Y",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v604w3rek0qmywr2q2qfhj.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 7341,
+                "unit": "ditto-generation-01m4v604w3rek0qmywr2q2qfhj.service"
+              },
+              "bundle_sha256": "sha256:505a1a6481fcde65b47f275591e23ee1f9fa80303e93e11db0a50eccae55b5e5",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "tasks-summary-artifact",
+            "job_id": null,
+            "artifact_id": "art-01M4V604V80VEMRT56C5GTXVSK",
+            "state": "validated",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v604w3rek0qmywr2q2qfhj.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 7341,
+                "unit": "ditto-generation-01m4v604w3rek0qmywr2q2qfhj.service"
+              },
+              "bundle_sha256": "sha256:505a1a6481fcde65b47f275591e23ee1f9fa80303e93e11db0a50eccae55b5e5",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "workspace-actions",
+            "job_id": "job-01M4V605J49HV868PKAKB3F8XK",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v605jk08gk7s7p0fmsb9sq.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 7386,
+                "unit": "ditto-generation-01m4v605jk08gk7s7p0fmsb9sq.service"
+              },
+              "bundle_sha256": "sha256:7ae81116638b8f592a19e0307f6c1a1dbb6dd57dc5c5d2377b9fd0528f3284b6",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "workspace-actions-artifact",
+            "job_id": null,
+            "artifact_id": "art-01M4V605HT9V5X1QA5R0VTW41E",
+            "state": "validated",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v605jk08gk7s7p0fmsb9sq.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 7386,
+                "unit": "ditto-generation-01m4v605jk08gk7s7p0fmsb9sq.service"
+              },
+              "bundle_sha256": "sha256:7ae81116638b8f592a19e0307f6c1a1dbb6dd57dc5c5d2377b9fd0528f3284b6",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          }
+        ],
+        "source_record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/production.log",
+          "sha256": "49f84a1bf09b8d3fd6051117ddd9f86338a3f2ee20f78fb8d3bd57ffb9b9ba68"
+        }
+      },
+      "desktop": {
+        "record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/desktop-20261013T174716Z.json",
+          "sha256": "c40a68ea3643344d807af012cfc9fb33665cba25d05800314774a4ebbdc76b44"
+        },
+        "ok": true,
+        "evidence_class": "development-headless-wayfire",
+        "source": {
+          "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+          "dirty": false,
+          "source_tree_sha256": "5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+        },
+        "check_count": 25,
+        "checks": [
+          "local.generated.daily_summary 0.1.0 five isolated stages",
+          "tasks-activate committed",
+          "Core reads back mounted generated tasks panel",
+          "mounted panel reads actual tasks service",
+          "real confined Wayland preview opens",
+          "third generation job stays queued",
+          "global pool admits only two jobs",
+          "queued cancellation reconciles artifact",
+          "preview job-01M4V60D9TB3Q001351PB4Q3FR cancellation finishes",
+          "preview job-01M4V60DPT21X6XFZP09S4Y25A cancellation finishes",
+          "cancelled preview retains opening evidence",
+          "local.generated.daily_summary 0.2.0 five isolated stages",
+          "tasks-upgrade committed",
+          "data migrated with profile revision",
+          "modified panel is rendered",
+          "undo committed",
+          "old data snapshot restored",
+          "old panel restored",
+          "local.generated.workspace_actions 0.1.0 five isolated stages",
+          "workspaces-activate committed",
+          "both generated panels coexist",
+          "workspace action is enabled",
+          "actual button click activates the requested workspace",
+          "activation journal includes commit and preserved immutable source",
+          "native application survives generation and rollback"
+        ],
+        "application_pid": 8065,
+        "revisions": {
+          "initial": "rev-01M4V60C3N26R8JP08AZ2K3CTV",
+          "final": "rev-01M4V60GC0HS42B0W40A4NBKGD"
+        },
+        "changes": {
+          "tasks-activate": {
+            "change_id": "chg-01M4V60D7X559G18X2WWZ23YZQ",
+            "base_revision": "rev-01M4V60C3N26R8JP08AZ2K3CTV",
+            "committed_revision": "rev-01M4V60D95FMZNB3A8RCKHKGRH",
+            "state": "committed",
+            "result": "succeeded"
+          },
+          "tasks-upgrade": {
+            "change_id": "chg-01M4V60FK01YFBNHSSC1VPQD2Y",
+            "base_revision": "rev-01M4V60D95FMZNB3A8RCKHKGRH",
+            "committed_revision": "rev-01M4V60FKTR88E84AA99SRSHPD",
+            "state": "committed",
+            "result": "succeeded"
+          },
+          "undo": {
+            "change_id": "chg-01M4V60FM8BY1GJ9FXCRTFKHWB",
+            "base_revision": "rev-01M4V60FKTR88E84AA99SRSHPD",
+            "committed_revision": "rev-01M4V60FN1EG15EW7JCN0739KR",
+            "state": "committed",
+            "result": "succeeded"
+          },
+          "workspaces-activate": {
+            "change_id": "chg-01M4V60GB4DCRTEGS5ZDMBWS64",
+            "base_revision": "rev-01M4V60FN1EG15EW7JCN0739KR",
+            "committed_revision": "rev-01M4V60GC0HS42B0W40A4NBKGD",
+            "state": "committed",
+            "result": "succeeded"
+          }
+        },
+        "preview_opened": {
+          "job_id": "job-01M4V60D9TB3Q001351PB4Q3FR",
+          "state": "running",
+          "phase": "preview_opened"
+        },
+        "validations": [
+          {
+            "fact": "art-01M4V60CHW5RWNZM6XK021QHRD-validation",
+            "job_id": "job-01M4V60CJ376XTVYBQQHVD6Q22",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v60cjjfgyhy0sn3zjq03st.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 8113,
+                "unit": "ditto-generation-01m4v60cjjfgyhy0sn3zjq03st.service"
+              },
+              "bundle_sha256": "sha256:46685843adf318e0b8d6e4d938b69a2d7f3edc7790a1bae6870126f4b8ddb5ad",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "art-01M4V60EX6E9H3BPKNDEB3JKN5-validation",
+            "job_id": "job-01M4V60EXCRVNGQ4GAG4V255PH",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v60exw5yejm6re27jb3dpv.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 8235,
+                "unit": "ditto-generation-01m4v60exw5yejm6re27jb3dpv.service"
+              },
+              "bundle_sha256": "sha256:7574084a9af4b3c4f198fb1f92f9005a33cd84e10dba8bb5f6cae60c159083ce",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "art-01M4V60FNCQH43F12NS9V2VZPJ-validation",
+            "job_id": "job-01M4V60FNJTZQFE7BN78DQ2NDC",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v60fp2chz892ec20kbm0m0.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "full",
+                "files": true,
+                "landlock_abi": 8,
+                "memory_max": 536870912,
+                "network": true,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": true,
+                "reasons": [],
+                "runner_pid": 8277,
+                "unit": "ditto-generation-01m4v60fp2chz892ec20kbm0m0.service"
+              },
+              "bundle_sha256": "sha256:a5014d2fd7917c5450085d922c0c95fc66a3d28bbd3eb4985ce40ea637628e86",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "fixed_template_compilation",
+                  "result": "passed",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "fixed_template_contract",
+                  "result": "passed",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "provider_health",
+                  "result": "passed",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "keyboard_focus",
+                  "result": "passed",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "fixture_data_and_keyboard_action",
+                  "result": "passed",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          }
+        ]
+      },
+      "restart": {
+        "record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/restart-nKKbs0/result.json",
+          "sha256": "86abd8a53223636526028d53015e442f86fa7ad4030438f38f5c9c4ef05e6ac9"
+        },
+        "ok": true,
+        "evidence_class": "development-headless-wayfire",
+        "source": {
+          "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+          "dirty": false,
+          "source_tree_sha256": "5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+        },
+        "check_count": 8,
+        "checks": [
+          "both previews have separate native cgroups",
+          "interrupted preview job-01M4V60J3RAG44V57Q1BNWTMQ8 is not replayed",
+          "interrupted preview job-01M4V60JH0T9T0HT4YN1A2VNT8 is not replayed",
+          "old worker and candidate cgroups are empty before replacement admission",
+          "preview opening history survives restart",
+          "a new preview can use the recovered pool",
+          "profile revision survives the Core crash",
+          "compositor survives candidate and Core restart"
+        ],
+        "recovery": {
+          "source": {
+            "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+            "dirty": false,
+            "source_tree_sha256": "5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+          },
+          "jobs": [
+            "job-01M4V60J3RAG44V57Q1BNWTMQ8",
+            "job-01M4V60JH0T9T0HT4YN1A2VNT8"
+          ],
+          "old_groups": [
+            "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-job-job-01m4v60j3rag44v57q1bnwtmq8.scope",
+            "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-job-job-01m4v60jh0t9t0ht4yn1a2vnt8.scope"
+          ],
+          "native_groups": [
+            "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v60j49cbcn5d2szdfhdxfb.service",
+            "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v60jhedsjnzj5fk4sqqrcv.service"
+          ]
+        }
+      },
+      "agent": {
+        "record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/agent-20261013T174725Z.json",
+          "sha256": "6d3dc69a347e5c9a55e6823292c3f8c39dad7f262030ea14acdf921cfc898498"
+        },
+        "ok": true,
+        "evidence_class": "development-headless-scripted-model",
+        "source": {
+          "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+          "dirty": false,
+          "source_tree_sha256": "5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+        },
+        "check_count": 15,
+        "checks": [
+          "g3-denied turn outcome follows Core",
+          "denied generation reaches the shared Core authorization path",
+          "ungranted generation is refused before artifact creation",
+          "g3-tasks turn outcome follows Core",
+          "Agent source is bound to actual turn",
+          "Agent-generated tasks passed real native validation and activation",
+          "g3-workspaces turn outcome follows Core",
+          "g3-modify turn outcome follows Core",
+          "g3-workspaces-modify turn outcome follows Core",
+          "follow-up creates validated new version",
+          "workspace follow-up creates a new validated version",
+          "original version remains immutable",
+          "both generated kinds are enabled in actual Profile",
+          "conversation deletion redacts durable generation source",
+          "desktop remains after Agent exits"
+        ]
+      },
+      "diagnostic": {
+        "record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/summary.json",
+          "sha256": "2c60146104ce2717c77e5dce6d3fc75e3fdefefea4b6c6df2b48868f85d85d50"
+        },
+        "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+        "dirty": false,
+        "kernel": "7.0.0-38-generic",
+        "witness_pid": 6997,
+        "policy": "diagnostic-v1",
+        "desktop_acceptance": "not_run",
+        "checks": [
+          {
+            "check": "files",
+            "status": "pass"
+          },
+          {
+            "check": "network",
+            "status": "pass"
+          },
+          {
+            "check": "signals",
+            "status": "pass"
+          },
+          {
+            "check": "spawn",
+            "status": "pass"
+          },
+          {
+            "check": "spoof",
+            "status": "pass"
+          },
+          {
+            "check": "memory",
+            "status": "pass"
+          },
+          {
+            "check": "busy",
+            "status": "pass"
+          },
+          {
+            "check": "timeout",
+            "status": "pass"
+          },
+          {
+            "check": "orphan",
+            "status": "pass"
+          },
+          {
+            "check": "cancel",
+            "status": "pass"
+          }
+        ],
+        "probes": [
+          {
+            "probe": "files",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/files.json",
+              "sha256": "a5261c974d749756806ed8163dcbd32f4d33e9cf2fb189b0cec2546f6319e949"
+            },
+            "outcome": "succeeded",
+            "service_result": "success",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-1c132446b873b87a52c29463.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "network",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/network.json",
+              "sha256": "6813dfeb1a1bc24a330751a46871cce35888f89b202c6ccd79b7b15c74f7c1ab"
+            },
+            "outcome": "succeeded",
+            "service_result": "success",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-84e20dbba4796e979ce86e35.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "signals",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/signals.json",
+              "sha256": "cc3ec260086dda61653d9857217177545ea97c56b571e85b03dd097c863d86e1"
+            },
+            "outcome": "succeeded",
+            "service_result": "success",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-e494041141e2a3b0e175b630.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "spawn",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/spawn.json",
+              "sha256": "393e0b1053dda919a13d976d0fd6cc2989470dff58da1067dbc3989f334a6a6e"
+            },
+            "outcome": "succeeded",
+            "service_result": "success",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-8471c70def293e449eab657b.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "spoof",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/spoof.json",
+              "sha256": "5f5480dfb0b860b15c4075446c34ec45afa70033ba3d03722779b0e533cbe0ae"
+            },
+            "outcome": "succeeded",
+            "service_result": "success",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-7b6c882fddd76a58c33938d0.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "memory",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/memory.json",
+              "sha256": "1cb3db1cb7ae2e7825b4b6c4ca1f825b1df540298a216fada6569cc3d411e1fc"
+            },
+            "outcome": "oom",
+            "service_result": "oom-kill",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-e982bc309d232d35083fd8e6.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "busy",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/busy.json",
+              "sha256": "0689839cbc2912e4e7e9ed7215d70099b711e39dc5d946dad26f27a49bdccf8f"
+            },
+            "outcome": "timed_out",
+            "service_result": "timeout",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-e458618b5befbd1c72f090d5.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "timeout",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/timeout.json",
+              "sha256": "287d0e86b2ca871051a229b83ecdd652f6e831b1c7d6c8878a0497f809e69680"
+            },
+            "outcome": "timed_out",
+            "service_result": "timeout",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-b23aec214cf812a2e91ebbd3.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "orphan",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/orphan.json",
+              "sha256": "54f9832148684d7f57d34ba6e5372130dc748176314ff763569b64c48e208a90"
+            },
+            "outcome": "timed_out",
+            "service_result": "timeout",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-3ddc23f5cda5f7c855310365.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          },
+          {
+            "probe": "cancel",
+            "record": {
+              "path": "artifacts/g3-vm/2026-10-13T17-46-09Z-5ed55b8/suite-records/host-2026-10-13T17-46-56Z-6997/cancel.json",
+              "sha256": "a9b6b43fa560c01f2f83bf5cd59166e07fa37030053fdc1c445736ba97bafca8"
+            },
+            "outcome": "cancelled",
+            "service_result": "signal",
+            "boundary": {
+              "policy": "diagnostic-v1",
+              "enforcement": "full",
+              "landlock_abi": 8,
+              "files": true,
+              "network": true,
+              "processes": true,
+              "time": true,
+              "resources": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-247c14913a873b49379f26a4.service",
+                "memory_max": "536870912",
+                "memory_swap_max": "0",
+                "cpu_max": "100000 100000",
+                "pids_max": "64"
+              },
+              "reasons": []
+            },
+            "cleanup_complete": true,
+            "candidate_activation_available": false
+          }
+        ]
+      }
+    }
+  },
+  "old_abi_vm": {
+    "run": "artifacts/g3-vm/2026-10-13T17-48-07Z-5ed55b8",
+    "summary": {
+      "path": "artifacts/g3-vm/2026-10-13T17-48-07Z-5ed55b8/summary.jsonl",
+      "sha256": "ea7958fa9e867f22d029afc8586b38c7caba2b0fc248e9ee452b047781653c7e"
+    },
+    "checks": [
+      {
+        "check": "restore",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "sync",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "build",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "foundation",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "rejection",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "production-partial",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "candidate-execution",
+        "status": "not_run",
+        "evidence_class": "development-vm"
+      }
+    ],
+    "records": {
+      "production": {
+        "record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-48-07Z-5ed55b8/suite-records/integration-c48fXc/result.json",
+          "sha256": "658166a51cf84502aa517cc083fa2dfbbb0e8f0bccd669dec6fa0ebe84b8213a"
+        },
+        "ok": true,
+        "evidence_class": null,
+        "source": {
+          "commit": "5ed55b8c44d94bae6e3dd70841c7961b85b25eb2",
+          "dirty": false,
+          "source_tree_sha256": "5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23",
+          "kernel": "6.8.0-139-generic",
+          "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+        },
+        "check_count": 15,
+        "checks": [
+          "official development capabilities are discoverable",
+          "tasks-summary source bundle complete",
+          "tasks-summary create idempotent",
+          "tasks-summary unvalidated publish denied",
+          "tasks-summary real isolated worker completed",
+          "tasks-summary old kernel is inspection only",
+          "tasks-summary partial isolation cannot publish",
+          "workspace-actions source bundle complete",
+          "workspace-actions create idempotent",
+          "workspace-actions unvalidated publish denied",
+          "workspace-actions real isolated worker completed",
+          "workspace-actions old kernel is inspection only",
+          "workspace-actions partial isolation cannot publish",
+          "arbitrary QML rejected by formal contract",
+          "generation jobs cannot bypass development authorization"
+        ],
+        "validations": [
+          {
+            "fact": "tasks-summary",
+            "job_id": "job-01M4V63F7ZM4WZGQ2R6KGE6P6M",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v63f8hy00wjnw4evvc5k3a.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "partial",
+                "files": false,
+                "landlock_abi": 4,
+                "memory_max": 536870912,
+                "network": false,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": false,
+                "reasons": [
+                  "landlock_abi_below_6"
+                ],
+                "runner_pid": null,
+                "unit": "ditto-generation-01m4v63f8hy00wjnw4evvc5k3a.service"
+              },
+              "bundle_sha256": "sha256:505a1a6481fcde65b47f275591e23ee1f9fa80303e93e11db0a50eccae55b5e5",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "tasks-summary-artifact",
+            "job_id": null,
+            "artifact_id": "art-01M4V63F7N61Y70WSRVRMKJPEH",
+            "state": "inspect_only",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v63f8hy00wjnw4evvc5k3a.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "partial",
+                "files": false,
+                "landlock_abi": 4,
+                "memory_max": 536870912,
+                "network": false,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": false,
+                "reasons": [
+                  "landlock_abi_below_6"
+                ],
+                "runner_pid": null,
+                "unit": "ditto-generation-01m4v63f8hy00wjnw4evvc5k3a.service"
+              },
+              "bundle_sha256": "sha256:505a1a6481fcde65b47f275591e23ee1f9fa80303e93e11db0a50eccae55b5e5",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "workspace-actions",
+            "job_id": "job-01M4V63FGKWHKVZNNQHSPCJ5S0",
+            "artifact_id": null,
+            "state": "succeeded",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v63fh7xnd201fwc112kndb.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "partial",
+                "files": false,
+                "landlock_abi": 4,
+                "memory_max": 536870912,
+                "network": false,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": false,
+                "reasons": [
+                  "landlock_abi_below_6"
+                ],
+                "runner_pid": null,
+                "unit": "ditto-generation-01m4v63fh7xnd201fwc112kndb.service"
+              },
+              "bundle_sha256": "sha256:7ae81116638b8f592a19e0307f6c1a1dbb6dd57dc5c5d2377b9fd0528f3284b6",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          },
+          {
+            "fact": "workspace-actions-artifact",
+            "job_id": null,
+            "artifact_id": "art-01M4V63FG71TEZRVDZBPN52N29",
+            "state": "inspect_only",
+            "validation": {
+              "boundary": {
+                "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4v63fh7xnd201fwc112kndb.service",
+                "cleanup_complete": true,
+                "cpu_max": "100000 100000",
+                "deadline_ms": 15000,
+                "enforcement": "partial",
+                "files": false,
+                "landlock_abi": 4,
+                "memory_max": 536870912,
+                "network": false,
+                "pids_max": 64,
+                "policy": "generated-templates-v1",
+                "process_exec_blocked": false,
+                "reasons": [
+                  "landlock_abi_below_6"
+                ],
+                "runner_pid": null,
+                "unit": "ditto-generation-01m4v63fh7xnd201fwc112kndb.service"
+              },
+              "bundle_sha256": "sha256:7ae81116638b8f592a19e0307f6c1a1dbb6dd57dc5c5d2377b9fd0528f3284b6",
+              "diagnostics": [],
+              "preview_opened": false,
+              "stages": [
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "syntax"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "contract"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "load"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "focus"
+                },
+                {
+                  "diagnostic": "host_unavailable",
+                  "result": "not_run",
+                  "stage": "interaction"
+                }
+              ],
+              "test_data": true
+            }
+          }
+        ],
+        "source_record": {
+          "path": "artifacts/g3-vm/2026-10-13T17-48-07Z-5ed55b8/production-partial.log",
+          "sha256": "dc6bcb15bbadf6ccaede7d6726e1cbb4208892512a0c29abbd93bf9153c35cb0"
+        }
+      }
+    }
+  },
+  "not_run": [
+    "real subscription/model G3 generation (automatic approval review rejected external disclosure/account side effects; opt-in harness authored only)",
+    "physical reference-seat G3 acceptance matrix",
+    "three cold-login four-state resource runs and frame-time measurement",
+    "physical Chinese keyboard and dual monitor",
+    "100-cycle teardown measurement",
+    "five-night nightly"
+  ],
+  "limitations": [
+    "scripted model does not establish model quality",
+    "headless VM graphics are development evidence only",
+    "diagnostic-v1 is never eligible for activation",
+    "raw QML/JS/native remain unsupported",
+    "raw artifacts are checkout-local and gitignored; paths and hashes identify the original records"
+  ]
+}
