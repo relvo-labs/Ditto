@@ -9,7 +9,7 @@ on:
 jobs:
   run:
     runs-on: [self-hosted, ditto-refmachine]
-    timeout-minutes: 330
+    timeout-minutes: 420
     steps:
       - uses: actions/checkout@v4
       - name: Phase
@@ -42,7 +42,7 @@ jobs:
               # series, so no CI job runs on it while it is measured.
               bash "$GITHUB_WORKSPACE/.hermes-probe/phase-b.sh"; echo "phase-b exit=$?"
               st=$HOME/.local/state/ditto-g2-exit; cat "$st/phase-b.log"
-              tar -czf "$GITHUB_WORKSPACE/phase-b.tar.gz" artifacts/g2-ref-exit "$st/phase-b.log"
+              find artifacts -newermt "-7 hours" -type f > /tmp/pb-files.txt; tar -czf "$GITHUB_WORKSPACE/phase-b.tar.gz" -T /tmp/pb-files.txt "$st/phase-b.log"
               ;;
             phase-b-status)
               st=$HOME/.local/state/ditto-g2-exit
@@ -53,7 +53,7 @@ jobs:
             phase-b-collect)
               st=$HOME/.local/state/ditto-g2-exit
               cat "$st/phase-b.log"; sudo -n cmp "$st/custom.conf.orig" /etc/gdm3/custom.conf && echo gdm-identical
-              tar -czf "$GITHUB_WORKSPACE/phase-b.tar.gz" artifacts/g2-ref-exit "$st/phase-b.log" "$st/phase-b.sh"
+              find artifacts -newermt "-7 hours" -type f > /tmp/pb-files.txt; tar -czf "$GITHUB_WORKSPACE/phase-b.tar.gz" -T /tmp/pb-files.txt "$st/phase-b.log" "$st/phase-b.sh"
               ;;
           esac
       - uses: actions/upload-artifact@v4
