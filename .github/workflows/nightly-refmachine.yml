@@ -11,15 +11,15 @@ jobs:
       - name: Read-only reference machine state
         run: |
           set +e
-          echo "== cgroups of long-lived user work"
-          for c in tmux claude codex agentd node foot rustdesk Runner.Listener; do for pid in $(pgrep -u "$(id -u)" -x "$c" 2>/dev/null | head -5); do printf '%s %s %s :: %s\n' "$c" "$pid" "$(ps -o etime= -p $pid | tr -d ' ')" "$(cat /proc/$pid/cgroup)"; done; done
-          echo "== tmux sessions"; tmux ls 2>&1
-          for s in $(tmux ls -F '#S' 2>/dev/null); do echo "-- $s"; tmux list-panes -s -t "$s" -F '#{pane_current_command} #{pane_current_path}' 2>&1 | head; done
-          echo "== logind"; grep -E -i '^\s*KillUserProcesses' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>&1; loginctl show-user neil -p Linger -p KillUserProcesses 2>&1
-          echo "== session scope"; loginctl show-session 994 -p Scope -p Service -p Leader 2>&1
-          echo "== subscription"; ls -la ~/.cache/ditto-g2-subscription/store 2>&1 | head; ls ~/.cache/ditto-g2-subscription | tail -3
-          echo "== rustdesk connections"; ss -tnp 2>/dev/null | grep -i rustdesk | head; sudo -n ss -tnp state established 2>/dev/null | grep -i -E 'rustdesk|21118|21119' | head
-          echo "== input idle"; sudo -n cat /proc/interrupts 2>/dev/null | grep -i -E 'i8042|xhci' | head -3
-          echo "== firefox"; snap list firefox 2>&1 | tail -1
-          echo "== measure artifacts"; ls ~/funlab/Ditto/artifacts/ 2>&1 | head -30; ls ~/funlab/Ditto/artifacts/g1 2>/dev/null | grep -E 'agent|series' | tail -20
-          echo "== repo dirty"; git -C ~/funlab/Ditto status --porcelain | head
+          echo "== tmux"
+          for pid in $(pgrep -u "$(id -u)" -f '^tmux'); do printf '%s etime=%s :: %s :: %s\n' "$pid" "$(ps -o etime= -p $pid|tr -d ' ')" "$(tr '\0' ' ' </proc/$pid/cmdline)" "$(cat /proc/$pid/cgroup)"; done
+          srv=$(pgrep -u "$(id -u)" -f '^tmux: server' | head -1)
+          sock=$(sudo -n ls -la /proc/$srv/fd 2>/dev/null | grep -o 'socket:.*' | head -1); echo "server fds: $sock"
+          sudo -n cat /proc/$srv/net/unix 2>/dev/null | grep -i tmux | head -3
+          S=$(sudo -n cat /proc/$srv/net/unix 2>/dev/null | grep -o '/[^ ]*tmux[^ ]*' | head -1); echo "socket=$S"
+          sudo -n -u neil tmux -S "/proc/$srv/root$S" ls 2>&1 | head; sudo -n -u neil tmux -S "/proc/$srv/root$S" list-panes -a -F '#S:#I.#P #{pane_current_command} #{pane_current_path} active=#{session_activity}' 2>&1 | head -20
+          echo "== session scope members"; for p in $(cat /sys/fs/cgroup/user.slice/user-1000.slice/session-994.scope/cgroup.procs); do printf '%s %s\n' $p "$(ps -o comm=,etime= -p $p)"; done | head -40
+          echo "== app scopes"; ls /sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/ | grep -v -E '^cgroup|^memory|^cpu|^io|^pids|^misc|^rdma|^hugetlb' | head -40
+          echo "== input delta 45s"; a=$(grep -E 'xhci|i8042' /proc/interrupts | awk '{s=0; for(i=2;i<=33;i++) s+=$i; print s}' | paste -sd+ | bc); sleep 45; b=$(grep -E 'xhci|i8042' /proc/interrupts | awk '{s=0; for(i=2;i<=33;i++) s+=$i; print s}' | paste -sd+ | bc); echo "usb/ps2 irq delta: $((b-a))"
+          echo "== rustdesk active conn"; sudo -n ss -tnp state established 2>/dev/null | grep rustdesk
+          echo "== last input by wayfire"; sudo -n cat /proc/$(pgrep -x wayfire)/io 2>/dev/null | head -2
