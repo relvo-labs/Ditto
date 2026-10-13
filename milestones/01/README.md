@@ -51,7 +51,7 @@ PRD 是需求的唯一權威；本計畫是實作順序的權威。兩者衝突�
 
 - `docs/product/Ditto-PRD-v0.4.0.md`：需求來源，本計畫每項交付物都回指其需求 ID。
 - `apps/desktop-prototype/`：**凍結為互動契約參考**，不作為實作起點。可沿用與不可沿用的界線見 [00-findings.md](00-findings.md#3-前端原型的可沿用資產)。
-- `../deepseek-harness`：Cordis 底座與 Agent 能力的移植來源。沿用範圍、鎖定 commit 與修改集見 [02-cordis-adoption.md](02-cordis-adoption.md)。
+- `../deepseek-harness`：Cordis 底座與 Agent 能力的移植來源。沿用範圍、鎖定 commit 與修改集見 [02-cordis-adoption.md](02-cordis-adoption.md)；設計啟發與署名見 [DeepSeek Harness 參考與啟發紀錄](../../docs/upstream/deepseek-harness.md)。
 
 ## 維護規則
 
