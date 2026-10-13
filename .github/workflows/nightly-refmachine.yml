@@ -1,23 +1,49 @@
 name: nightly-refmachine
-# TEMPORARY probe branch (hermes/g2-ref-probe): read-only state of the
-# reference machine before G2 exit runs. Not for merge.
+# TEMPORARY branch hermes/g2-ref-probe: G2 exit runs on the reference machine
+# (phase A: in the current password login). Not for merge.
 on:
   workflow_dispatch:
+    inputs:
+      what:
+        default: probe
 jobs:
-  probe:
+  run:
     runs-on: [self-hosted, ditto-refmachine]
-    timeout-minutes: 10
+    timeout-minutes: 240
     steps:
-      - name: Read-only reference machine state
+      - name: Phase
+        env:
+          WHAT: ${{ inputs.what }}
         run: |
           set +e
           cd ~/funlab/Ditto
+          export PATH="$HOME/.cargo/bin:$HOME/.nvm/versions/node/v22.23.2/bin:$HOME/Qt/6.10.2/gcc_64/bin:$HOME/wayfire/bin:$PATH"
+          export LD_LIBRARY_PATH="$HOME/wayfire/lib"
           export XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus DITTO_G1_RELAY=/run/user/1000/ditto/verify-relay.sock
-          r() { timeout 30 python3 tests/g1/lib/gui.py relay "$1" "${2:-{\}}" 2>&1 | head -c 1500; echo; }
-          echo "== ensure"; r agent.runtime.ensure
-          for i in $(seq 1 30); do p=$(timeout 10 python3 tests/g1/lib/gui.py relay agent.runtime.get '{}' | jq -r .result.phase); [ "$p" = ready ] && break; sleep 1; done; echo "phase=$p after ${i}s"
-          r agent.runtime.get
-          echo "== provider"; r agent.providers.status '{"provider":"codex-app-server"}'
-          echo "== keyring collections"; busctl --user call org.freedesktop.secrets /org/freedesktop/secrets org.freedesktop.DBus.Properties Get ss org.freedesktop.Secret.Service Collections 2>&1
-          for c in login default session; do printf '%s locked=' $c; busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/$c org.freedesktop.Secret.Collection Locked 2>&1; done
-          echo "== docs on keyring + autologin"; grep -rn -i -E 'keyring.*(autologin|自動登入|unlock|解鎖)|(autologin|自動登入).*keyring' plan .agents docs tests/g1 tests/g2 2>/dev/null | head -10
+          r() { timeout 30 python3 tests/g1/lib/gui.py relay "$1" "${2:-{\}}" 2>&1 | head -c 1200; echo; }
+          git log -1 --format='HEAD %H'; git status --porcelain | head -3
+          case "$WHAT" in
+            probe)
+              echo "== preflight"; bash packaging/reference-image/preflight.sh; echo "preflight exit=$?"
+              echo "== settings"; r agent.settings.describe
+              echo "== lock"; r session.lock.get; r desktop.session.describe
+              echo "== windows"; r desktop.windows.list
+              ;;
+            phase-a)
+              mark=$(mktemp); touch -d '-1 min' "$mark"
+              echo "== semantic fixed (Firefox)"; bash tests/g2/semantic/run.sh --tasks fixed; echo "semantic fixed exit=$?"
+              echo "== semantic holdout (Firefox)"; bash tests/g2/semantic/run.sh --tasks holdout; echo "semantic holdout exit=$?"
+              echo "== EX2-13 chat"; python3 tests/g2/measure/first-frame-session.py 200 chat; echo "ff chat exit=$?"
+              echo "== EX2-13 launcher"; python3 tests/g2/measure/first-frame-session.py 200 launcher; echo "ff launcher exit=$?"
+              echo "== EX2-12"; node tests/g2/measure/cold-start-session.mjs 30 5; echo "cold-start exit=$?"
+              find artifacts -newer "$mark" -type f | tee /tmp/phase-a-files.txt | wc -l
+              tar -czf "$GITHUB_WORKSPACE/phase-a.tar.gz" -T /tmp/phase-a-files.txt
+              ;;
+          esac
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g2-exit-${{ inputs.what }}-${{ github.run_id }}
+          path: phase-*.tar.gz
+          if-no-files-found: ignore
+          retention-days: 30
