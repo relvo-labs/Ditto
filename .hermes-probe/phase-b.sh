@@ -40,7 +40,7 @@ old=$(bash tests/g1/measure/cold-login.sh login-id 2>/dev/null)
 sudo -n /usr/local/libexec/ditto-relogin
 for i in $(seq 1 120); do
   cur=$(bash tests/g1/measure/cold-login.sh login-id 2>/dev/null)
-  [[ -n "$cur" && "$cur" != "$old" ]] && r desktop.capabilities.list >/dev/null 2>&1 && break
+  [[ -n "$cur" && "$cur" != "$old" ]] && bash tests/g1/measure/cold-login.sh ready desktop_full_no_agent >/dev/null 2>&1 && break
   sleep 5
 done
 log "setup login: ${cur:-none}"; sleep 20
@@ -55,14 +55,14 @@ here="$(cd "$(dirname "$0")" && pwd)"
 plan=$(r desktop.profiles.get | python3 "$here/plan.py" ~/.local/share/ditto/core.db) || { log "plan failed"; exit 1; }
 log "profile plan: $(jq -c .notes <<<"$plan")"
 if [[ "$(jq '.ops|length' <<<"$plan")" != 0 ]]; then
-  res=$(r desktop.changes.propose "$(jq -cn --arg b "$head" --argjson ops "$(jq -c .ops <<<"$plan")" '{base_revision:$b, ops:$ops, idempotency_key:"g2-exit-profile-0.3-2026-10-13"}')")
+  res=$(r desktop.changes.propose "$(jq -cn --arg b "$head" --argjson ops "$(jq -c .ops <<<"$plan")" '{base_revision:$b, ops:$ops, idempotency_key:"g2-exit-profile-0.3-'"$ts"'"}')")
   log "profile change: $(jq -c 'if .result then (.result|{change_id,state,reasons}) else .error end' <<<"$res" | head -c 2500)"
   [[ "$(jq -r .result.state <<<"$res")" == committed ]] || exit 1
 fi
 doc=$(r desktop.profiles.get); head=$(jq -r .result.profile.head_revision <<<"$doc")
 if ! jq -e '.result.document.shortcuts[]? | select(.chord=="Super+A")' <<<"$doc" >/dev/null; then
   after=$(jq -c '.result.document.shortcuts + [{chord:"Super+A",command:"chat.toggle"}]' <<<"$doc")
-  res=$(r desktop.changes.propose "$(jq -cn --arg b "$head" --argjson a "$after" '{base_revision:$b, idempotency_key:"g2-exit-super-a-2026-10-13", ops:[{op:"set_value",path:"/shortcuts",after:$a}]}')")
+  res=$(r desktop.changes.propose "$(jq -cn --arg b "$head" --argjson a "$after" '{base_revision:$b, idempotency_key:"g2-exit-super-a-'"$ts"'", ops:[{op:"set_value",path:"/shortcuts",after:$a}]}')")
   log "Super+A change: $(jq -c 'if .result then (.result|{change_id,state,reasons}) else .error end' <<<"$res" | head -c 800)"
   [[ "$(jq -r .result.state <<<"$res")" == committed ]] || exit 1
 fi
