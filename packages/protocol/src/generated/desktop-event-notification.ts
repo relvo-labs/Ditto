@@ -85,6 +85,22 @@ export type DesktopEventPayload =
       state: SessionState;
       type: 'session_changed';
       [k: string]: unknown;
+    }
+  | {
+      deleted?: boolean;
+      next_seq: number;
+      session_id: string;
+      turn_id?: string | null;
+      turn_state?: TurnState | null;
+      type: 'conversation_updated';
+      [k: string]: unknown;
+    }
+  | {
+      session_id: string;
+      text: string;
+      turn_id: string;
+      type: 'conversation_delta';
+      [k: string]: unknown;
     };
 /**
  * An opaque identifier valid only for the current compositor session.
@@ -127,6 +143,13 @@ export type ChangeOrigin =
       [k: string]: unknown;
     }
   | {
+      kind: 'agent';
+      session_id: string;
+      tool_call_id: string;
+      turn_id: string;
+      [k: string]: unknown;
+    }
+  | {
       kind: 'rescue';
       [k: string]: unknown;
     }
@@ -163,9 +186,19 @@ export type ChangeState =
   | 'rolled_back'
   | 'partially_applied'
   | 'unknown';
-export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type JobState = ('queued' | 'running' | 'succeeded' | 'failed' | 'cancelled') | 'cancelling';
 export type PolicyDecision = 'show' | 'merge' | 'silence';
 export type Urgency = 'low' | 'normal' | 'critical';
+export type TurnState =
+  | 'queued'
+  | 'running'
+  | 'awaiting_approval'
+  | 'cancelling'
+  | 'succeeded'
+  | 'failed'
+  | 'partial'
+  | 'unknown'
+  | 'cancelled';
 
 export interface DesktopEventNotification {
   payload: DesktopEventPayload;
@@ -243,11 +276,24 @@ export interface PanelStatus {
   visible: boolean;
 }
 export interface Job {
+  /**
+   * Whether `desktop.jobs.cancel` can stop it now.
+   */
+  cancellable?: boolean;
   created_at: string;
   error_key?: string | null;
   idempotency_key?: string | null;
   job_id: string;
   kind: string;
+  /**
+   * The subject that submitted it (`agent`, `shell`, `cli`); Core owns
+   * the job from then on, whoever leaves.
+   */
+  owner?: string | null;
+  /**
+   * What the worker reports it is doing (`hashing 3/12`, …).
+   */
+  phase?: string | null;
   progress?: number | null;
   result?: unknown;
   state: JobState;

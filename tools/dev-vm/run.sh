@@ -64,6 +64,7 @@ check restore-snapshot restore
 # A restored snapshot keeps the clock it was taken with.
 vm_ssh 'sudo systemctl restart systemd-timesyncd >/dev/null 2>&1; sudo date -s "@'"$(date +%s)"'" >/dev/null' || true
 vm_sync_workspace || exit 1
+vm_build_packages >"$out/packages.log" 2>&1 || { echo "cannot install build packages; see $out/packages.log" >&2; exit 1; }
 
 install_tree() {
   vm_ssh "$VM_ENV"' cargo build -q --locked --workspace --bins &&

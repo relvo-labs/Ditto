@@ -1,0 +1,17 @@
+{
+  "kind": "shape",
+  "description": "shape-context-reference",
+  "type": "context-reference",
+  "valid": true,
+  "value": {
+    "context_id": "ctx-1",
+    "kind": "clipboard",
+    "label": "clipboard",
+    "mime": "text/plain",
+    "bytes": 12,
+    "sha256": "00",
+    "captured_at": "2026-10-08T00:00:00Z",
+    "expires_at_ms": 1,
+    "truncated": false
+  }
+}

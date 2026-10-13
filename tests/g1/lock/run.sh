@@ -58,7 +58,7 @@ propose_dock_swap_while_locked() {
   ops="$(jq -c '.result.document as $d | ($d.slots["ui.dock"]) as $dock
     | ([$d.entries[] | select(.entry_id == $dock) | .package][0]) as $current
     | (if $current == "ditto.dock.pill" then "ditto.dock.bottom" else "ditto.dock.pill" end) as $other
-    | [{op: "add_entry", entry: {package: $other, version: "1.0.0", host: "qml"}, slot: "ui.dock"},
+    | [{op: "add_entry", entry: {package: $other, version: "1.1.0", host: "qml"}, slot: "ui.dock"},
        {op: "remove_entry", entry_id: $dock}]' <<<"$profile")"
   local work lock_pid_before lock_pid_after changed
   work="$(g1_evidence_dir)"

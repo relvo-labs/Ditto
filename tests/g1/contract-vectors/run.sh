@@ -58,11 +58,22 @@ else
   refused="$(DITTO_CORE_SOCKET="$DITTO_RUNTIME_DIR/core.sock" DITTO_DEV_TOKEN=forged-g1-token "$node" "$standin" get op-g1-identity 2>&1 || true)"
   cp "$FIXTURE_ROOT/core.log" "$evidence/standin-core.log"
   printf '%s\n' "$refused" >"$evidence/standin-without-launcher.txt"
-  if grep -q '"event":"connection.open","kind":"agent"' "$FIXTURE_ROOT/core.log" \
-    && grep -q '"id":"standin-2","error":{"code":-32002,"name":"not_found"' "$FIXTURE_ROOT/core.log"; then
-    check standin-launched pass "launched by Core, the stand-in is admitted as agent and its lookup reaches desktop.changes.get" "{\"log\": \"$evidence/standin-core.log\"}"
+  # Since G2 only Core's dedicated Agent supervisor (--agent) grants the agent
+  # identity; a production build refuses an Agent from the generic launcher.
+  # Only a fault-injection build (it reads DITTO_FAULT) still admits G1's
+  # stand-in, as a fixture.
+  if grep -q DITTO_FAULT "$BINARIES/ditto-core"; then
+    if grep -q '"event":"connection.open","kind":"agent"' "$FIXTURE_ROOT/core.log" \
+      && grep -q '"id":"standin-2","error":{"code":-32002,"name":"not_found"' "$FIXTURE_ROOT/core.log"; then
+      check standin-launched pass "fault-injection build: launched by Core, the stand-in is admitted as agent and its lookup reaches desktop.changes.get" "{\"log\": \"$evidence/standin-core.log\"}"
+    else
+      check standin-launched fail "fault-injection build: the launched stand-in did not complete a handshake and a lookup (core.log saved)" "{\"log\": \"$evidence/standin-core.log\"}"
+    fi
+  elif grep -q 'identity_rejected Agent must be started by the dedicated Core supervisor' "$FIXTURE_ROOT/core.log" \
+    && ! grep -q '"event":"connection.open","kind":"agent"' "$FIXTURE_ROOT/core.log"; then
+    check standin-launched pass "launched by Core's generic launcher, the stand-in is refused the agent identity (only the dedicated Agent supervisor grants it)" "{\"log\": \"$evidence/standin-core.log\"}"
   else
-    check standin-launched fail "the launched stand-in did not complete a handshake and a lookup (core.log saved)" "{\"log\": \"$evidence/standin-core.log\"}"
+    check standin-launched fail "a stand-in from the generic launcher was not refused the agent identity (core.log saved)" "{\"log\": \"$evidence/standin-core.log\"}"
   fi
   if grep -q 'handshake refused: identity_rejected' <<<"$refused"; then
     check standin-without-launcher pass "the same program outside the launcher, with a forged token, is refused by Core (identity_rejected)" "{\"output\": \"$evidence/standin-without-launcher.txt\"}"

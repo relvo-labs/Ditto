@@ -12,7 +12,7 @@ import type { Workspace } from './generated/workspace.js';
 import type { WorkspacesListOutput } from './generated/workspaces-list-output.js';
 import { DesktopProjection, ResyncRequired } from './events.js';
 
-export const protocolVersion = '0.2.0';
+export const protocolVersion = '0.3.0';
 const maxLineBytes = 1_048_576;
 
 type Response = {

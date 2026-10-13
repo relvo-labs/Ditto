@@ -97,6 +97,13 @@ export interface EntrySpec {
  * Layout intent. Which strategy applies is the `layout.strategy` slot.
  */
 export interface LayoutIntent {
+  /**
+   * Where windows of an application go, as a share of their output's work
+   * area (D-40). Applied to the windows open when the change commits and to
+   * those that open later; moving a window by hand afterwards is respected
+   * until the next explicit change. Floating strategy only.
+   */
+  regions?: RegionRule[];
   rules?: LayoutRule[];
   /**
    * @minItems 2
@@ -104,12 +111,34 @@ export interface LayoutIntent {
    */
   workspace_grid: [number, number];
 }
-export interface LayoutRule {
+export interface RegionRule {
   match: LayoutMatch;
-  workspace: number;
+  /**
+   * The output whose work area the region divides; absent means the
+   * output the window is on.
+   */
+  output?: string | null;
+  region: Region;
+  /**
+   * Stable within the Profile, so a later turn can name "the same rule".
+   */
+  rule_id: string;
 }
 export interface LayoutMatch {
   app_id: string;
+}
+/**
+ * A rectangle as fractions (0–1) of an output's work area.
+ */
+export interface Region {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+export interface LayoutRule {
+  match: LayoutMatch;
+  workspace: number;
 }
 export interface ShortcutBinding {
   chord: string;

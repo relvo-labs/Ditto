@@ -60,7 +60,7 @@ describe('ditto-hostd process', () => {
     const fake = await core
     await until(() => fake.requests.some(request => request.method === 'host.hello'))
     const handshake = fake.requests.find(request => request.method === 'core.handshake')!.params
-    expect(handshake).toMatchObject({ protocol_version: '0.2.0', client: { kind: 'hostd', version: '0.2.0' }, auth: { token: 'launcher-token-from-fd' } })
+    expect(handshake).toMatchObject({ protocol_version: '0.3.0', client: { kind: 'hostd', version: '0.2.0' }, auth: { token: 'launcher-token-from-fd' } })
     const hello = fake.requests.find(request => request.method === 'host.hello')!.params
     expect(hello).toMatchObject({ hostd_version: '0.2.0', cordis_version: '4.0.4', strategy: 'isolate_rebuild', vendor_fingerprint: vendorFingerprint(join(root, 'vendor')) })
     // The launcher's PID is the PID that connected: the wrapper execs node.

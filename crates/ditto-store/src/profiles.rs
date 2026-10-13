@@ -393,6 +393,7 @@ mod tests {
             layout: LayoutIntent {
                 workspace_grid: [3, 3],
                 rules: vec![],
+                regions: vec![],
             },
             appearance: Appearance {
                 theme: "soft-jelly".into(),

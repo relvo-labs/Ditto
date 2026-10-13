@@ -129,6 +129,10 @@ ditto-core serve --development --compositor wayfire --builtin-packages target/di
 # 2. Shell（同一個 DITTO_DEV_TOKEN）
 quickshell -p shell/shell.qml
 
+# 存檔即重載（只在開發時）：Shell 預設不監看檔案，因為 Core 交給它的 token
+# 只能用一次，重載後的 Shell 連不回 Core，桌面會失去面板與 Dock
+DITTO_SHELL_WATCH=1 quickshell -p shell/shell.qml
+
 # 供應者直接從來源樹載入（只在開發時；登入工作階段不會設）
 DITTO_SHELL_DEV_PROVIDERS=$PWD/shell/providers quickshell -p shell/shell.qml
 

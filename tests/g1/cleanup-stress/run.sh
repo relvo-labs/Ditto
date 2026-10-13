@@ -71,7 +71,7 @@ stress_group() {
   g1_fixture_stop
 }
 
-if [[ -z "$node" || ! -f "$hostd" || ! -f "$packages/ditto.svc.tasks-1.0.0.dittopkg" ]]; then
+if [[ -z "$node" || ! -f "$hostd" || ! -f "$packages/ditto.svc.tasks-1.1.0.dittopkg" ]]; then
   needs="needs node, $hostd (pnpm --filter @ditto/host-runtime build) and $packages (scripts/build-builtin-packages.sh)"
   check tasks-toggle fail "$needs"
   check realm-cycle fail "$needs"

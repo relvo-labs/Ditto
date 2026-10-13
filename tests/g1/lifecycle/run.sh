@@ -104,9 +104,9 @@ if ! (cd "$WORKSPACE" && DITTO_HOST_FAULT_ENABLE=1 pnpm --filter @ditto/host-run
   g1_finish
 fi
 packages="${DITTO_BUILTIN_PACKAGES:-$WORKSPACE/target/ditto-packages}"
-if [[ ! -f "$packages/ditto.svc.tasks-1.0.0.dittopkg" ]]; then
+if [[ ! -f "$packages/ditto.svc.tasks-1.1.0.dittopkg" ]]; then
   for id in L-05 L-06 L-07 L-09 L-10; do
-    check "$id" fail "build first: $packages/ditto.svc.tasks-1.0.0.dittopkg (scripts/build-builtin-packages.sh)"
+    check "$id" fail "build first: $packages/ditto.svc.tasks-1.1.0.dittopkg (scripts/build-builtin-packages.sh)"
   done
   g1_finish
 fi

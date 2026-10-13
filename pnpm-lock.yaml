@@ -8,6 +8,24 @@ importers:
 
   .: {}
 
+  packages/agent-runtime:
+    devDependencies:
+      '@ditto/host-runtime':
+        specifier: workspace:*
+        version: link:../host-runtime
+      '@types/node':
+        specifier: 22.18.6
+        version: 22.18.6
+      tsdown:
+        specifier: 0.22.2
+        version: 0.22.2(typescript@5.9.3)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.18.6)
+
   packages/host-runtime:
     devDependencies:
       '@standard-schema/spec':

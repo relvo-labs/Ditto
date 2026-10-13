@@ -1,0 +1,10 @@
+{
+  "component": "codex-app-server",
+  "version": "0.160.0",
+  "target": "x86_64-unknown-linux-musl",
+  "sha256": "12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad",
+  "obtained_from": "Codex CLI standalone release 0.160.0 as installed by the official installer (~/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex)",
+  "licence": "Apache-2.0 (openai/codex); redistribution terms of the standalone build to be confirmed before any Ditto release (D-11/G4)",
+  "use": "Development and reference-machine backend only. Ditto does not bundle this binary; Core verifies the hash above before every launch and runs it inside ditto-confine.",
+  "inspected_protocol": "plan/04/10-codex-app-server.md §2; experimental app-server schema generated from this exact binary"
+}

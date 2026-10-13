@@ -36,6 +36,13 @@ export type ChangeOrigin =
       [k: string]: unknown;
     }
   | {
+      kind: 'agent';
+      session_id: string;
+      tool_call_id: string;
+      turn_id: string;
+      [k: string]: unknown;
+    }
+  | {
       kind: 'rescue';
       [k: string]: unknown;
     }

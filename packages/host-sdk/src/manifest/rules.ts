@@ -57,7 +57,7 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
   const warnings: ManifestIssue[] = []
   const error = (path: string, code: string, message: string) => errors.push({ path, code, message })
   const warn = (path: string, code: string, message: string) => warnings.push({ path, code, message })
-  const protocol = options.hostProtocolVersion ?? '0.2.0'
+  const protocol = options.hostProtocolVersion ?? '0.3.0'
   const node = options.nodeVersion ?? '22.23.2'
 
   if (options.schema !== undefined) {

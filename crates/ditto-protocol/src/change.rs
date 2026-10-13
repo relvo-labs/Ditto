@@ -53,11 +53,20 @@ pub enum ChangeOp {
         entry_id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         before: Option<Value>,
+        /// The whole new config. Preflight accepts only an object, and the
+        /// schema says so, so a model is not left to guess (a JSON-encoded
+        /// string is rejected, never parsed).
+        #[schemars(with = "serde_json::Map<String, Value>")]
         after: Value,
     },
     SetEntryDisabled {
         entry_id: String,
         disabled: bool,
+    },
+    UpgradeEntry {
+        entry_id: String,
+        from_version: String,
+        to_version: String,
     },
     BindSlot {
         slot: String,
@@ -243,6 +252,11 @@ pub enum ChangeOrigin {
     },
     Cli,
     AgentStandin,
+    Agent {
+        session_id: String,
+        turn_id: String,
+        tool_call_id: String,
+    },
     Rescue,
     Supervisor {
         reason: String,

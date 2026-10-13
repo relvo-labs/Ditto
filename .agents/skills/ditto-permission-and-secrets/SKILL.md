@@ -10,7 +10,7 @@ description: >-
 metadata:
   type: skill
   category: architecture
-  status: draft
+  status: stable
   language: zh-Hant
   related:
     - ditto-authority-boundaries
@@ -21,7 +21,7 @@ metadata:
 
 > 權限分項授權、信任分級、外部內容視為資料，以及秘密只存引用。
 
-> **status: draft** — 授權應答鏈的實際形狀在 approval seam 移植完成後（G2-CORE-02）確定，屆時須回頭核對第 4 步的結果詞彙並改為 stable。
+> **status: stable** — 2026-10-08 依 G2-CORE-02 核對：第 4 步的四個結果即 `ApprovalDecision`（`allowed-once`、`rejected`、`cancelled`、`unavailable`），`unavailable` 與 `never` 模式都按拒絕處理；同一授權入口由 Core 的 `authz` 給 GUI 與 Agent 共用（`tests/g2/codex/desktop.sh`、`races.mjs`）。秘密只以引用存在 Core，值在 Secret Service（`ditto-system/src/secrets.rs`；`tests/g2/direct` 以真 keyring 驗證）。
 
 ## Overview
 

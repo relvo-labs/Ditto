@@ -141,6 +141,18 @@ impl ShellManager {
         inner.reported_at = Some(ditto_store::time::now());
     }
 
+    /// A connected Shell that said it answers approval requests.
+    pub fn approval_responder(&self) -> bool {
+        self.is_connected()
+            && self
+                .inner
+                .lock()
+                .expect("shell state")
+                .observation
+                .as_ref()
+                .is_some_and(|o| o.approval_responder)
+    }
+
     pub fn observation(&self) -> (Option<ShellObservation>, Option<String>) {
         let inner = self.inner.lock().expect("shell state");
         (inner.observation.clone(), inner.reported_at.clone())

@@ -40,8 +40,18 @@ pub fn policy(subject: &Subject, scope_name: &str) -> PolicyDefault {
     };
     // Rows: shell, cli, cli:rescue, rescue_ui, host:<entry>, agent, lock.
     let row: [PolicyDefault; 7] = match scope_name {
+        scope::AGENT_INTERACT | scope::AGENT_READ => [Allow, Allow, Deny, Deny, Deny, Allow, Deny],
+        scope::AGENT_WRITE => [Deny, Deny, Deny, Deny, Deny, Allow, Deny],
+        scope::AGENT_MANAGE => [Allow, Allow, Deny, Deny, Deny, Deny, Deny],
+        // Only a person's own surface (or the CLI they run) takes private
+        // context; the Agent and plugins never fetch it themselves.
+        scope::CONTEXT => [Allow, Allow, Deny, Deny, Deny, Deny, Deny],
+        // Trusted kinds only, whoever submits; plugins have no pool of their
+        // own through this door.
+        scope::JOBS_RUN => [Allow, Allow, Deny, Deny, Deny, Allow, Deny],
         scope::READ => [Allow, Allow, Allow, Allow, Allow, Allow, Deny],
         scope::CONFIG => [Allow, Allow, Deny, Deny, GrantRequired, Allow, Deny],
+        scope::PROFILES_DELETE => [Allow, Allow, Deny, Deny, Deny, GrantRequired, Deny],
         scope::WINDOWS_READ => [
             Allow,
             Allow,

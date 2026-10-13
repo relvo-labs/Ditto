@@ -96,6 +96,29 @@ impl FixtureCompositor {
     }
 
     /// Drop the compositor connection, as a compositor restart would.
+    /// A window opens, as an application mapping a toplevel would. It floats
+    /// unless the tiling strategy is active.
+    pub fn open_window(&mut self, id: &str, app_id: &str, output: &str) {
+        let window = Window {
+            id: WindowSessionId(id.into()),
+            title: app_id.into(),
+            app_id: app_id.into(),
+            workspace_id: Some("1".into()),
+            output: Some(output.into()),
+            x: Some(200),
+            y: Some(200),
+            width: Some(800),
+            height: Some(600),
+            focused: false,
+            state: WindowState::Normal,
+        };
+        if self.strategy != "simple-tile" {
+            self.floating.push(window.id.clone());
+        }
+        self.windows.push(window);
+        self.announce(CompositorChange::Windows);
+    }
+
     pub fn disconnect(&mut self) {
         self.connected = false;
     }
@@ -309,6 +332,18 @@ impl CompositorAdapter for FixtureCompositor {
         window.height = Some(height);
         self.announce(CompositorChange::Windows);
         Ok(())
+    }
+
+    /// A 40-pixel top panel's exclusive zone, so region maths is exercised
+    /// against an area that is not the whole output.
+    fn workarea(&mut self, output: &str) -> AdapterResult<(i32, i32, u32, u32)> {
+        self.online()?;
+        let found = self
+            .outputs
+            .iter()
+            .find(|known| known.name == output && known.enabled)
+            .ok_or_else(|| AdapterError::NotFound(format!("no output {output}")))?;
+        Ok((0, 40, found.width, found.height.saturating_sub(40)))
     }
 
     fn set_window_state(

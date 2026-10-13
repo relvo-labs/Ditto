@@ -2,6 +2,232 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_TW" sourcelanguage="zh_TW">
 <context>
+    <name>AISettings</name>
+    <message>
+        <source>AI 對話</source>
+        <translation>AI 對話</translation>
+    </message>
+    <message>
+        <source>AI 設定</source>
+        <translation>AI 設定</translation>
+    </message>
+    <message>
+        <source>API 金鑰</source>
+        <translation>API 金鑰</translation>
+    </message>
+    <message>
+        <source>API 金鑰連線</source>
+        <translation>API 金鑰連線</translation>
+    </message>
+    <message>
+        <source>Codex 訂閱</source>
+        <translation>Codex 訂閱</translation>
+    </message>
+    <message>
+        <source>Ditto 想用尚未授權的能力（例如讀取視窗清單）時：詢問你一次，或一律不詢問並拒絕。可逆的桌面設定不會每次詢問。</source>
+        <translation>Ditto 想用尚未授權的能力（例如讀取視窗清單）時：詢問你一次，或一律不詢問並拒絕。可逆的桌面設定不會每次詢問。</translation>
+    </message>
+    <message>
+        <source>不要詢問，直接拒絕</source>
+        <translation>不要詢問，直接拒絕</translation>
+    </message>
+    <message>
+        <source>使用 Codex 訂閱登入</source>
+        <translation>使用 Codex 訂閱登入</translation>
+    </message>
+    <message>
+        <source>儲存並使用</source>
+        <translation>儲存並使用</translation>
+    </message>
+    <message>
+        <source>取消登入</source>
+        <translation>取消登入</translation>
+    </message>
+    <message>
+        <source>啟用 AI 對話</source>
+        <translation>啟用 AI 對話</translation>
+    </message>
+    <message>
+        <source>在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</source>
+        <translation>在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。</translation>
+    </message>
+    <message>
+        <source>在瀏覽器開啟 %1 登入，並輸入代碼：%2</source>
+        <translation>在瀏覽器開啟 %1 登入，並輸入代碼：%2</translation>
+    </message>
+    <message>
+        <source>尚未登入</source>
+        <translation>尚未登入</translation>
+    </message>
+    <message>
+        <source>尚未連線；開啟 AI 對話後會在需要時啟動。</source>
+        <translation>尚未連線；開啟 AI 對話後會在需要時啟動。</translation>
+    </message>
+    <message>
+        <source>尚無配額資料</source>
+        <translation>尚無配額資料</translation>
+    </message>
+    <message>
+        <source>已儲存；輸入新金鑰以更換</source>
+        <translation>已儲存；輸入新金鑰以更換</translation>
+    </message>
+    <message>
+        <source>已存入鑰匙圈。</source>
+        <translation>已存入鑰匙圈。</translation>
+    </message>
+    <message>
+        <source>已登入：%1</source>
+        <translation>已登入：%1</translation>
+    </message>
+    <message>
+        <source>思考深度</source>
+        <translation>思考深度</translation>
+    </message>
+    <message>
+        <source>未知</source>
+        <translation>未知</translation>
+    </message>
+    <message>
+        <source>模型</source>
+        <translation>模型</translation>
+    </message>
+    <message>
+        <source>模型名稱</source>
+        <translation>模型名稱</translation>
+    </message>
+    <message>
+        <source>登出</source>
+        <translation>登出</translation>
+    </message>
+    <message>
+        <source>確認方式</source>
+        <translation>確認方式</translation>
+    </message>
+    <message>
+        <source>端點</source>
+        <translation>端點</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>詢問我</source>
+        <translation>詢問我</translation>
+    </message>
+    <message>
+        <source>連接方式</source>
+        <translation>連接方式</translation>
+    </message>
+    <message>
+        <source>金鑰直接存進系統鑰匙圈，設定裡只留它的代號；端點必須是 HTTPS（本機除外）。費用依供應商計價，Ditto 尚無費率資料。</source>
+        <translation>金鑰直接存進系統鑰匙圈，設定裡只留它的代號；端點必須是 HTTPS（本機除外）。費用依供應商計價，Ditto 尚無費率資料。</translation>
+    </message>
+    <message>
+        <source>開</source>
+        <translation>開</translation>
+    </message>
+    <message>
+        <source>關</source>
+        <translation>關</translation>
+    </message>
+    <message>
+        <source>關閉時不連接模型；桌面、設定中心與救援照常使用。</source>
+        <translation>關閉時不連接模型；桌面、設定中心與救援照常使用。</translation>
+    </message>
+    <message>
+        <source>額度已用 %1%，%2 重設</source>
+        <translation>額度已用 %1%，%2 重設</translation>
+    </message>
+    <message>
+        <source>（未提供帳號名稱）</source>
+        <translation>（未提供帳號名稱）</translation>
+    </message>
+</context>
+<context>
+    <name>ApprovalWindow</name>
+    <message>
+        <source>Agent 的說明（未經驗證）：</source>
+        <translation>Agent 的說明（未經驗證）：</translation>
+    </message>
+    <message>
+        <source>Ditto 想在這次對話中做一件需要你同意的事：</source>
+        <translation>Ditto 想在這次對話中做一件需要你同意的事：</translation>
+    </message>
+    <message>
+        <source>Ditto 需要你的確認</source>
+        <translation>Ditto 需要你的確認</translation>
+    </message>
+    <message>
+        <source>使用一項桌面能力</source>
+        <translation>使用一項桌面能力</translation>
+    </message>
+    <message>
+        <source>允許這一次</source>
+        <translation>允許這一次</translation>
+    </message>
+    <message>
+        <source>只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。</source>
+        <translation>只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。</translation>
+    </message>
+    <message>
+        <source>安裝或管理插件</source>
+        <translation>安裝或管理插件</translation>
+    </message>
+    <message>
+        <source>拒絕</source>
+        <translation>拒絕</translation>
+    </message>
+    <message>
+        <source>新增或完成待辦事項</source>
+        <translation>新增或完成待辦事項</translation>
+    </message>
+    <message>
+        <source>查看目前開啟的視窗、工作區與螢幕</source>
+        <translation>查看目前開啟的視窗、工作區與螢幕</translation>
+    </message>
+    <message>
+        <source>永久刪除一個設定檔，刪除後無法復原</source>
+        <translation>永久刪除一個設定檔，刪除後無法復原</translation>
+    </message>
+    <message>
+        <source>永久刪除設定檔「%1」，刪除後無法復原</source>
+        <translation>永久刪除設定檔「%1」，刪除後無法復原</translation>
+    </message>
+    <message>
+        <source>確認請求</source>
+        <translation>確認請求</translation>
+    </message>
+    <message>
+        <source>移動、調整大小、切換或要求關閉視窗</source>
+        <translation>移動、調整大小、切換或要求關閉視窗</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>讀取待辦事項</source>
+        <translation>讀取待辦事項</translation>
+    </message>
+    <message>
+        <source>讀取通知內容</source>
+        <translation>讀取通知內容</translation>
+    </message>
+    <message>
+        <source>變更桌面設定</source>
+        <translation>變更桌面設定</translation>
+    </message>
+    <message>
+        <source>鎖定螢幕</source>
+        <translation>鎖定螢幕</translation>
+    </message>
+    <message>
+        <source>開啟應用程式</source>
+        <translation>開啟應用程式</translation>
+    </message>
+</context>
+<context>
     <name>Avatar</name>
     <message>
         <source>待命中</source>
@@ -10,6 +236,10 @@
 </context>
 <context>
     <name>Centers</name>
+    <message>
+        <source>AI 設定</source>
+        <translation>AI 設定</translation>
+    </message>
     <message>
         <source>Ditto 設定</source>
         <translation>Ditto 設定</translation>
@@ -338,6 +568,248 @@
     </message>
 </context>
 <context>
+    <name>ChatBody</name>
+    <message>
+        <source>%1（%2）</source>
+        <translation>%1（%2）</translation>
+    </message>
+    <message>
+        <source>%1：%2</source>
+        <translation>%1：%2</translation>
+    </message>
+    <message>
+        <source>AI 對話目前關閉。開啟後才會連接模型。</source>
+        <translation>AI 對話目前關閉。開啟後才會連接模型。</translation>
+    </message>
+    <message>
+        <source>AI 設定</source>
+        <translation>AI 設定</translation>
+    </message>
+    <message>
+        <source>Ditto 對話</source>
+        <translation>Ditto 對話</translation>
+    </message>
+    <message>
+        <source>Ditto 正在回答：</source>
+        <translation>Ditto 正在回答：</translation>
+    </message>
+    <message>
+        <source>Ditto：</source>
+        <translation>Ditto：</translation>
+    </message>
+    <message>
+        <source>你：</source>
+        <translation>你：</translation>
+    </message>
+    <message>
+        <source>使用 Codex 訂閱登入</source>
+        <translation>使用 Codex 訂閱登入</translation>
+    </message>
+    <message>
+        <source>使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。</source>
+        <translation>使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。</translation>
+    </message>
+    <message>
+        <source>停止</source>
+        <translation>停止</translation>
+    </message>
+    <message>
+        <source>先不要</source>
+        <translation>先不要</translation>
+    </message>
+    <message>
+        <source>刪除這段對話（桌面維持原樣）</source>
+        <translation>刪除這段對話（桌面維持原樣）</translation>
+    </message>
+    <message>
+        <source>剪貼簿</source>
+        <translation>剪貼簿</translation>
+    </message>
+    <message>
+        <source>取消登入</source>
+        <translation>取消登入</translation>
+    </message>
+    <message>
+        <source>可以試試：</source>
+        <translation>可以試試：</translation>
+    </message>
+    <message>
+        <source>在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。</source>
+        <translation>在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。</translation>
+    </message>
+    <message>
+        <source>對話</source>
+        <translation>對話</translation>
+    </message>
+    <message>
+        <source>對話內容</source>
+        <translation>對話內容</translation>
+    </message>
+    <message>
+        <source>尚無配額資料</source>
+        <translation>尚無配額資料</translation>
+    </message>
+    <message>
+        <source>展開</source>
+        <translation>展開</translation>
+    </message>
+    <message>
+        <source>展開成完整視窗</source>
+        <translation>展開成完整視窗</translation>
+    </message>
+    <message>
+        <source>已登入</source>
+        <translation>已登入</translation>
+    </message>
+    <message>
+        <source>幫我做專注工作區，通知安靜一點</source>
+        <translation>幫我做專注工作區，通知安靜一點</translation>
+    </message>
+    <message>
+        <source>所有檔案 (*)</source>
+        <translation>所有檔案 (*)</translation>
+    </message>
+    <message>
+        <source>把 Dock 移到左邊</source>
+        <translation>把 Dock 移到左邊</translation>
+    </message>
+    <message>
+        <source>把現在的桌面保存成一個新組合</source>
+        <translation>把現在的桌面保存成一個新組合</translation>
+    </message>
+    <message>
+        <source>描述想調整的桌面，例如「開啟通知專注模式」</source>
+        <translation>描述想調整的桌面，例如「開啟通知專注模式」</translation>
+    </message>
+    <message>
+        <source>撤銷這項變更</source>
+        <translation>撤銷這項變更</translation>
+    </message>
+    <message>
+        <source>收合</source>
+        <translation>收合</translation>
+    </message>
+    <message>
+        <source>收合到角色旁</source>
+        <translation>收合到角色旁</translation>
+    </message>
+    <message>
+        <source>文字檔 (*.txt *.md *.json *.csv *.log)</source>
+        <translation>文字檔 (*.txt *.md *.json *.csv *.log)</translation>
+    </message>
+    <message>
+        <source>新對話</source>
+        <translation>新對話</translation>
+    </message>
+    <message>
+        <source>檔案</source>
+        <translation>檔案</translation>
+    </message>
+    <message>
+        <source>歷史</source>
+        <translation>歷史</translation>
+    </message>
+    <message>
+        <source>沒有開啟瀏覽器時，可在任何裝置開啟：%1</source>
+        <translation>沒有開啟瀏覽器時，可在任何裝置開啟：%1</translation>
+    </message>
+    <message>
+        <source>登入代碼</source>
+        <translation>登入代碼</translation>
+    </message>
+    <message>
+        <source>目前無法建立組合</source>
+        <translation>目前無法建立組合</translation>
+    </message>
+    <message>
+        <source>移除附加內容：%1</source>
+        <translation>移除附加內容：%1</translation>
+    </message>
+    <message>
+        <source>螢幕畫面</source>
+        <translation>螢幕畫面</translation>
+    </message>
+    <message>
+        <source>螢幕畫面 %1×%2，只在送出時傳給模型</source>
+        <translation>螢幕畫面 %1×%2，只在送出時傳給模型</translation>
+    </message>
+    <message>
+        <source>訊息</source>
+        <translation>訊息</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>載入較早的訊息</source>
+        <translation>載入較早的訊息</translation>
+    </message>
+    <message>
+        <source>送出</source>
+        <translation>送出</translation>
+    </message>
+    <message>
+        <source>送出中</source>
+        <translation>送出中</translation>
+    </message>
+    <message>
+        <source>通知規則服務目前不可用</source>
+        <translation>通知規則服務目前不可用</translation>
+    </message>
+    <message>
+        <source>選擇要附加的文字檔</source>
+        <translation>選擇要附加的文字檔</translation>
+    </message>
+    <message>
+        <source>重新開啟登入頁</source>
+        <translation>重新開啟登入頁</translation>
+    </message>
+    <message>
+        <source>開啟 AI 對話</source>
+        <translation>開啟 AI 對話</translation>
+    </message>
+    <message>
+        <source>附加內容</source>
+        <translation>附加內容</translation>
+    </message>
+    <message>
+        <source>附加剪貼簿</source>
+        <translation>附加剪貼簿</translation>
+    </message>
+    <message>
+        <source>附加檔案…</source>
+        <translation>附加檔案…</translation>
+    </message>
+    <message>
+        <source>附加螢幕畫面</source>
+        <translation>附加螢幕畫面</translation>
+    </message>
+    <message>
+        <source>需要已安裝的膠囊 Dock</source>
+        <translation>需要已安裝的膠囊 Dock</translation>
+    </message>
+    <message>
+        <source>預覽：</source>
+        <translation>預覽：</translation>
+    </message>
+    <message>
+        <source>額度已用 %1%</source>
+        <translation>額度已用 %1%</translation>
+    </message>
+    <message>
+        <source>（已截斷）</source>
+        <translation>（已截斷）</translation>
+    </message>
+</context>
+<context>
+    <name>ChatWindow</name>
+    <message>
+        <source>Ditto 對話</source>
+        <translation>Ditto 對話</translation>
+    </message>
+</context>
+<context>
     <name>CompositionCenter</name>
     <message>
         <source>「%1」的版本</source>
@@ -601,6 +1073,81 @@
     </message>
 </context>
 <context>
+    <name>ConversationState</name>
+    <message>
+        <source>AI 對話已關閉；桌面仍可照常操作</source>
+        <translation>AI 對話已關閉；桌面仍可照常操作</translation>
+    </message>
+    <message>
+        <source>只完成了一部分；請查看變更卡</source>
+        <translation>只完成了一部分；請查看變更卡</translation>
+    </message>
+    <message>
+        <source>可以描述想調整的桌面</source>
+        <translation>可以描述想調整的桌面</translation>
+    </message>
+    <message>
+        <source>完成；可以在變更紀錄撤銷</source>
+        <translation>完成；可以在變更紀錄撤銷</translation>
+    </message>
+    <message>
+        <source>已停止</source>
+        <translation>已停止</translation>
+    </message>
+    <message>
+        <source>桌面服務未連線</source>
+        <translation>桌面服務未連線</translation>
+    </message>
+    <message>
+        <source>桌面變更沒有完成；請查看變更卡</source>
+        <translation>桌面變更沒有完成；請查看變更卡</translation>
+    </message>
+    <message>
+        <source>模型尚未連接；桌面仍可照常操作</source>
+        <translation>模型尚未連接；桌面仍可照常操作</translation>
+    </message>
+    <message>
+        <source>模型後端無法使用</source>
+        <translation>模型後端無法使用</translation>
+    </message>
+    <message>
+        <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
+        <translation>模型沒有回應；桌面沒有被改動，可以再試一次</translation>
+    </message>
+    <message>
+        <source>正在停止</source>
+        <translation>正在停止</translation>
+    </message>
+    <message>
+        <source>正在啟動對話</source>
+        <translation>正在啟動對話</translation>
+    </message>
+    <message>
+        <source>正在套用並確認桌面變更</source>
+        <translation>正在套用並確認桌面變更</translation>
+    </message>
+    <message>
+        <source>正在理解需求；可停止</source>
+        <translation>正在理解需求；可停止</translation>
+    </message>
+    <message>
+        <source>沒有完成；可以再試一次</source>
+        <translation>沒有完成；可以再試一次</translation>
+    </message>
+    <message>
+        <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
+        <translation>結果尚未確認；不要重複送出，請查看變更紀錄</translation>
+    </message>
+    <message>
+        <source>訂閱額度已用完；等額度重設後再試</source>
+        <translation>訂閱額度已用完；等額度重設後再試</translation>
+    </message>
+    <message>
+        <source>需要你的確認</source>
+        <translation>需要你的確認</translation>
+    </message>
+</context>
+<context>
     <name>DittoClient</name>
     <message>
         <source>、</source>
@@ -770,6 +1317,14 @@
         <translation>更換桌面元件</translation>
     </message>
     <message>
+        <source>command.ai_settings.open</source>
+        <translation>開啟 AI 設定</translation>
+    </message>
+    <message>
+        <source>command.chat.toggle</source>
+        <translation>開關 Ditto 對話</translation>
+    </message>
+    <message>
         <source>command.composition.open</source>
         <translation>開啟組合中心</translation>
     </message>
@@ -908,6 +1463,10 @@
     <message>
         <source>diff.entry.version</source>
         <translation>「{package}」的版本</translation>
+    </message>
+    <message>
+        <source>diff.layout.region</source>
+        <translation>{app_id} 的視窗位置</translation>
     </message>
     <message>
         <source>diff.layout.rules</source>

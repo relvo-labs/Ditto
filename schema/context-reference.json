@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "ContextKind": {
+      "enum": [
+        "file",
+        "clipboard",
+        "capture"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "What a piece of context is, without its content. This is what a\nconversation keeps; the content lives in Core's memory until released.",
+  "properties": {
+    "bytes": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "captured_at": {
+      "type": "string"
+    },
+    "context_id": {
+      "type": "string"
+    },
+    "expires_at_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "kind": {
+      "$ref": "#/$defs/ContextKind"
+    },
+    "label": {
+      "description": "A file name (never its path), \"clipboard\" or an output name.",
+      "type": "string"
+    },
+    "mime": {
+      "type": "string"
+    },
+    "sha256": {
+      "type": "string"
+    },
+    "truncated": {
+      "description": "The content was cut at the size limit.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "context_id",
+    "kind",
+    "label",
+    "mime",
+    "bytes",
+    "sha256",
+    "captured_at",
+    "expires_at_ms",
+    "truncated"
+  ],
+  "title": "ContextReference",
+  "type": "object"
+}

@@ -12,6 +12,9 @@ Rectangle {
     property string placeholder: ""
     property string accessibleName: placeholder
     property bool readOnly: false
+    /// A secret (an API key): shown as dots, never kept by the field after
+    /// its form is done (the form clears `text`).
+    property bool secret: false
     signal accepted()
 
     implicitWidth: 240
@@ -38,6 +41,7 @@ Rectangle {
             value: field.tokens.fontFamily
         }
         selectByMouse: true
+        echoMode: field.secret ? TextInput.Password : TextInput.Normal
         readOnly: field.readOnly
         clip: true
         activeFocusOnTab: true

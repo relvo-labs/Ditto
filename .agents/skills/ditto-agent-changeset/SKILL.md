@@ -10,7 +10,7 @@ description: >-
 metadata:
   type: skill
   category: agent
-  status: draft
+  status: stable
   language: zh-Hant
   related:
     - ditto-changeset-transaction
@@ -21,7 +21,7 @@ metadata:
 
 > Agent 從自然語言到結構化 ChangeSet 的規劃行為。
 
-> **status: draft** — Agent Runtime 的工具介面在 G2-AGENT-01／05 才定型，屆時須回頭核對第 2 步的能力取得方式並改為 stable。
+> **status: stable** — 2026-10-08 依 G2-AGENT-01／05 核對：Agent 每個 turn 從 `desktop.capabilities.list` 取可用能力，只開放有 Ditto 工具說明的那些（`packages/agent-runtime/src/tools.ts`、`tool-catalog.ts`），目錄外的呼叫回 `unsupported call`；Codex 內建工具由 Core 衍生的模型目錄關閉。第 6 步的最近目標由 Core 在 claim 時附上（`recent_changes`），第 10 步的恢復以 turn trace 與開機對帳實作（`agent.turns.trace`、`turns::reconcile_dispatched`）。語意行為仍待真實模型的 QA-01 評分。
 
 ## Overview
 

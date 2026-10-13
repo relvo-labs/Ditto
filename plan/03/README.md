@@ -1,5 +1,7 @@
 # G1 執行計畫（plan/03）
 
+**階段狀態（2026-10-07）：G1 已完成，依 owner 實際使用裁定 [D-38](../../.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)。** 本文保留原執行計畫，逐項接受與剩餘追蹤見 [G1 評審 §8](../../.agents/notes/gate-reviews/G1-exit.md#8-2026-10-07-owner-階段接受)，下一開發階段為 G2。
+
 | 文件屬性 | 內容 |
 | --- | --- |
 | 文件編號 | DITTO-PLAN-003 |

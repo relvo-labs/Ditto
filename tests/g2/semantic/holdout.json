@@ -1,0 +1,2302 @@
+{
+ "set": "holdout",
+ "version": 3,
+ "oracle_version": 3,
+ "tasks": [
+  {
+   "id": "H-A01",
+   "version": 1,
+   "lang": "en",
+   "category": "appearance",
+   "turns": [
+    "Could the highlight colour be something greener?"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "hue": [
+       85,
+       170
+      ]
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/accent",
+      "to": "#4caf7d"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A02",
+   "version": 1,
+   "lang": "zh",
+   "category": "appearance",
+   "turns": [
+    "圓角再圓一些"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/radius_scale",
+      "gte": 1.1
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/radius_scale"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/radius_scale",
+      "to": "1.3"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A03",
+   "version": 1,
+   "lang": "en",
+   "category": "appearance",
+   "turns": [
+    "Use the pill dock instead of the one I have."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/slots/ui.dock",
+      "eq": "ditto.dock.pill"
+     }
+    ],
+    "allowed": [
+     "/slots/ui.dock",
+     "/entries/ditto.dock.bottom",
+     "/entries/ditto.dock.pill"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "provider": "ui.dock",
+      "package": "ditto.dock.pill"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A04",
+   "version": 1,
+   "lang": "zh",
+   "category": "appearance",
+   "turns": [
+    "毛玻璃效果太花了，降低透明度"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/reduced_transparency",
+      "eq": true
+     }
+    ],
+    "allowed": [
+     "/appearance/reduced_transparency"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "set": "/appearance/reduced_transparency",
+      "to": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A05",
+   "version": 1,
+   "lang": "en",
+   "category": "appearance",
+   "turns": [
+    "Only show me up to five notifications at once."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.notifications.area/config/max_visible",
+      "eq": 5
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.notifications.area/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "entry_config": "ditto.notifications.area",
+      "merge": {
+       "max_visible": 5
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A06",
+   "version": 1,
+   "lang": "zh",
+   "category": "appearance",
+   "turns": [
+    "Dock 移到螢幕左邊"
+   ],
+   "setup": {
+    "ops": [
+     {
+      "provider": "ui.dock",
+      "package": "ditto.dock.pill"
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.dock.pill/config/position",
+      "eq": "left"
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.dock.pill/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "entry_config": "ditto.dock.pill",
+      "merge": {
+       "position": "left"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A07",
+   "version": 1,
+   "lang": "en",
+   "category": "appearance",
+   "turns": [
+    "The text is too small for me to read comfortably."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/font_scale",
+      "gte": 1.1
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/font_scale"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/font_scale",
+      "to": "1.2"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-A08",
+   "version": 1,
+   "lang": "zh",
+   "category": "appearance",
+   "turns": [
+    "啟動器我想換成可以直接打字搜尋的那種"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/slots/ui.launcher",
+      "eq": "ditto.launcher.search"
+     }
+    ],
+    "allowed": [
+     "/slots/ui.launcher",
+     "/entries/ditto.launcher.grid",
+     "/entries/ditto.launcher.search"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "provider": "ui.launcher",
+      "package": "ditto.launcher.search"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B01",
+   "version": 1,
+   "lang": "en",
+   "category": "layout",
+   "turns": [
+    "Terminal on the right half, Kate on the left half."
+   ],
+   "setup": {
+    "windows": [
+     "org.kde.kate",
+     "foot"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "org.kde.kate",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      }
+     },
+     {
+      "window": "foot",
+      "region": {
+       "x": 0.5,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "org.kde.kate",
+        "x": 0,
+        "y": 0,
+        "width": 0.5,
+        "height": 1
+       },
+       {
+        "app_id": "foot",
+        "x": 0.5,
+        "y": 0,
+        "width": 0.5,
+        "height": 1
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B02",
+   "version": 1,
+   "lang": "zh",
+   "category": "layout",
+   "turns": [
+    "終端機放在下面三分之一，上面都給瀏覽器"
+   ],
+   "setup": {
+    "windows": [
+     "firefox",
+     "foot"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "firefox",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 1,
+       "height": 0.667
+      }
+     },
+     {
+      "window": "foot",
+      "region": {
+       "x": 0,
+       "y": 0.667,
+       "width": 1,
+       "height": 0.333
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "firefox",
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.667
+       },
+       {
+        "app_id": "foot",
+        "x": 0,
+        "y": 0.667,
+        "width": 1,
+        "height": 0.333
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B03",
+   "version": 1,
+   "lang": "en",
+   "category": "layout",
+   "turns": [
+    "Go to the workspace on the right."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "action",
+    "checks": [
+     {
+      "workspace_active": {
+       "x": 1,
+       "y": 0
+      }
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "actions": [
+     {
+      "workspace": {
+       "x": 1,
+       "y": 0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B04",
+   "version": 1,
+   "lang": "zh",
+   "category": "layout",
+   "turns": [
+    "視窗改成平鋪排列"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/slots/layout.strategy",
+      "eq": "ditto.layout.simple-tile"
+     }
+    ],
+    "allowed": [
+     "/slots/layout.strategy",
+     "/entries/ditto.layout.floating",
+     "/entries/ditto.layout.simple-tile",
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "provider": "layout.strategy",
+      "package": "ditto.layout.simple-tile"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B05",
+   "version": 1,
+   "lang": "en",
+   "category": "layout",
+   "turns": [
+    "I only need four workspaces, in a two by two grid."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/layout/workspace_grid",
+      "eq": [
+       2,
+       2
+      ]
+     }
+    ],
+    "allowed": [
+     "/layout/workspace_grid"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "set": "/layout/workspace_grid",
+      "to": [
+       2,
+       2
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B06",
+   "version": 1,
+   "lang": "zh",
+   "category": "layout",
+   "turns": [
+    "終端機靠右，寬度三分之一，高度整個"
+   ],
+   "setup": {
+    "windows": [
+     "foot"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "foot",
+      "region": {
+       "x": 0.667,
+       "y": 0,
+       "width": 0.333,
+       "height": 1
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "foot",
+        "x": 0.667,
+        "y": 0,
+        "width": 0.333,
+        "height": 1
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B07",
+   "version": 1,
+   "lang": "en",
+   "category": "layout",
+   "turns": [
+    "Kate takes the right third; the browser gets the rest on the left."
+   ],
+   "setup": {
+    "windows": [
+     "firefox",
+     "org.kde.kate"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "firefox",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 0.667,
+       "height": 1
+      }
+     },
+     {
+      "window": "org.kde.kate",
+      "region": {
+       "x": 0.667,
+       "y": 0,
+       "width": 0.333,
+       "height": 1
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "firefox",
+        "x": 0,
+        "y": 0,
+        "width": 0.667,
+        "height": 1
+       },
+       {
+        "app_id": "org.kde.kate",
+        "x": 0.667,
+        "y": 0,
+        "width": 0.333,
+        "height": 1
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-B08",
+   "version": 1,
+   "lang": "zh",
+   "category": "layout",
+   "turns": [
+    "編輯器擺在畫面中間，大概一半寬，高度佔大部分"
+   ],
+   "setup": {
+    "windows": [
+     "org.kde.kate"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "org.kde.kate",
+      "region": {
+       "x": [
+        0.2,
+        0.3
+       ],
+       "width": [
+        0.42,
+        0.58
+       ],
+       "height": [
+        0.7,
+        1.0
+       ],
+       "y": [
+        0,
+        0.15
+       ]
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "org.kde.kate",
+        "x": 0.25,
+        "y": 0.05,
+        "width": 0.5,
+        "height": 0.9
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C01",
+   "version": 1,
+   "lang": "en",
+   "category": "plugins",
+   "turns": [
+    "During meetings, let only Slack notifications through."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/enabled",
+      "eq": true
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/allow",
+      "matches": "slack"
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.svc.notification-policy/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "entry_config": "ditto.svc.notification-policy",
+      "merge": {
+       "rules": {
+        "focus": {
+         "enabled": true,
+         "allow": [
+          "Slack"
+         ]
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C02",
+   "version": 1,
+   "lang": "zh",
+   "category": "plugins",
+   "turns": [
+    "晚上十一點到早上七點不要打擾我"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/quiet_hours/enabled",
+      "eq": true
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/quiet_hours/start",
+      "eq": "23:00"
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/quiet_hours/end",
+      "eq": "07:00"
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.svc.notification-policy/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "entry_config": "ditto.svc.notification-policy",
+      "merge": {
+       "rules": {
+        "quiet_hours": {
+         "enabled": true,
+         "start": "23:00",
+         "end": "07:00"
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C03",
+   "version": 1,
+   "lang": "en",
+   "category": "plugins",
+   "turns": [
+    "If one app sends more than five notifications within a minute, bundle them together."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/merge/window_s",
+      "eq": 60
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/merge/threshold",
+      "eq": 5
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.svc.notification-policy/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "entry_config": "ditto.svc.notification-policy",
+      "merge": {
+       "rules": {
+        "merge": {
+         "window_s": 60,
+         "threshold": 5
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C04",
+   "version": 1,
+   "lang": "zh",
+   "category": "plugins",
+   "turns": [
+    "任務面板關掉吧，我用不到"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "any": [
+       {
+        "doc": "/entries/ditto.tasks.panel/disabled",
+        "eq": true
+       },
+       {
+        "doc": "/entries/ditto.tasks.panel",
+        "absent": true
+       }
+      ]
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.tasks.panel",
+     "/slots/ui.tasks_panel"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "disable": "ditto.tasks.panel"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C05",
+   "version": 1,
+   "lang": "en",
+   "category": "plugins",
+   "turns": [
+    "Set me up for coding: editor on the left, terminal on the right, only editor notifications, and the pill dock."
+   ],
+   "setup": {
+    "windows": [
+     "org.kde.kate",
+     "foot"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "org.kde.kate",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      },
+      "tol": 0.06
+     },
+     {
+      "window": "foot",
+      "region": {
+       "x": 0.5,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      },
+      "tol": 0.06
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/enabled",
+      "eq": true
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/allow",
+      "matches": "kate"
+     },
+     {
+      "doc": "/slots/ui.dock",
+      "eq": "ditto.dock.pill"
+     }
+    ],
+    "allowed": [
+     "/layout/regions",
+     "/entries/ditto.svc.notification-policy/config",
+     "/slots/ui.dock",
+     "/entries/ditto.dock.bottom",
+     "/entries/ditto.dock.pill"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "org.kde.kate",
+        "x": 0,
+        "y": 0,
+        "width": 0.5,
+        "height": 1
+       },
+       {
+        "app_id": "foot",
+        "x": 0.5,
+        "y": 0,
+        "width": 0.5,
+        "height": 1
+       }
+      ]
+     },
+     {
+      "entry_config": "ditto.svc.notification-policy",
+      "merge": {
+       "rules": {
+        "focus": {
+         "enabled": true,
+         "allow": [
+          "org.kde.kate"
+         ]
+        }
+       }
+      }
+     },
+     {
+      "provider": "ui.dock",
+      "package": "ditto.dock.pill"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C06",
+   "version": 1,
+   "lang": "zh",
+   "category": "plugins",
+   "turns": [
+    "簡報模式：瀏覽器在上面佔滿整個寬度，通知除了行事曆都靜音，畫面上最多一則通知"
+   ],
+   "setup": {
+    "windows": [
+     "firefox"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "firefox",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 1,
+       "height": [
+        0.5,
+        1
+       ]
+      },
+      "tol": 0.05
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/enabled",
+      "eq": true
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/allow",
+      "matches": "(calendar|行事曆)"
+     },
+     {
+      "doc": "/entries/ditto.notifications.area/config/max_visible",
+      "eq": 1
+     }
+    ],
+    "allowed": [
+     "/layout/regions",
+     "/entries/ditto.svc.notification-policy/config",
+     "/entries/ditto.notifications.area/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "regions": [
+       {
+        "app_id": "firefox",
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+       }
+      ]
+     },
+     {
+      "entry_config": "ditto.svc.notification-policy",
+      "merge": {
+       "rules": {
+        "focus": {
+         "enabled": true,
+         "allow": [
+          "行事曆"
+         ]
+        }
+       }
+      }
+     },
+     {
+      "entry_config": "ditto.notifications.area",
+      "merge": {
+       "max_visible": 1
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-C07",
+   "version": 1,
+   "lang": "en",
+   "category": "plugins",
+   "turns": [
+    "Do not disturb from 10pm to 8am, and all day on weekends."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/quiet_hours/enabled",
+      "eq": true
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/quiet_hours/start",
+      "eq": "22:00"
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/quiet_hours/end",
+      "eq": "08:00"
+     },
+     {
+      "answer_any": [
+       "weekend",
+       "saturday",
+       "sunday"
+      ]
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.svc.notification-policy/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "entry_config": "ditto.svc.notification-policy",
+      "merge": {
+       "rules": {
+        "quiet_hours": {
+         "enabled": true,
+         "start": "22:00",
+         "end": "08:00"
+        }
+       }
+      }
+     }
+    ],
+    "answer": "Quiet hours are set from 22:00 to 08:00 every day; there is no weekend-only option."
+   }
+  },
+  {
+   "id": "H-C08",
+   "version": 1,
+   "lang": "zh",
+   "category": "plugins",
+   "turns": [
+    "換回格狀的啟動器"
+   ],
+   "setup": {
+    "ops": [
+     {
+      "provider": "ui.launcher",
+      "package": "ditto.launcher.search"
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/slots/ui.launcher",
+      "eq": "ditto.launcher.grid"
+     }
+    ],
+    "allowed": [
+     "/slots/ui.launcher",
+     "/entries/ditto.launcher.grid",
+     "/entries/ditto.launcher.search"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "provider": "ui.launcher",
+      "package": "ditto.launcher.grid"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D01",
+   "version": 1,
+   "lang": "en",
+   "category": "profiles",
+   "turns": [
+    "Save what I have now as a profile called Work."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "action",
+    "checks": [
+     {
+      "profile_exists": "Work"
+     },
+     {
+      "doc": "/appearance/tokens/accent",
+      "unchanged": true
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "actions": [
+     {
+      "duplicate": "Work"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D02",
+   "version": 1,
+   "lang": "zh",
+   "category": "profiles",
+   "turns": [
+    "上一個改動復原"
+   ],
+   "setup": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/accent",
+      "to": "#ff8800"
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "eq": "#b9a4ff"
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "actions": [
+     {
+      "undo_last": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D03",
+   "version": 1,
+   "lang": "en",
+   "category": "profiles",
+   "turns": [
+    "Go to my Minimal profile."
+   ],
+   "setup": {
+    "windows": [
+     "foot",
+     "org.kde.kate"
+    ],
+    "profiles": [
+     {
+      "name": "Minimal",
+      "ops": [
+       {
+        "provider": "ui.dock",
+        "package": "ditto.dock.pill"
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "active_profile": "Minimal"
+     },
+     {
+      "window": "foot",
+      "alive": true
+     },
+     {
+      "window": "org.kde.kate",
+      "alive": true
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0,
+    "skip_untouched": true
+   },
+   "reference": {
+    "ops": [
+     {
+      "switch": "Minimal"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D04",
+   "version": 1,
+   "lang": "zh",
+   "category": "profiles",
+   "turns": [
+    "目前的設定跟「專注」那套有什麼不一樣？"
+   ],
+   "setup": {
+    "profiles": [
+     {
+      "name": "專注",
+      "ops": [
+       {
+        "set": "/appearance/tokens/accent",
+        "to": "#7fd1b9"
+       },
+       {
+        "entry_config": "ditto.svc.notification-policy",
+        "merge": {
+         "rules": {
+          "quiet_hours": {
+           "enabled": true,
+           "start": "21:00",
+           "end": "08:00"
+          }
+         }
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "answer",
+    "checks": [
+     {
+      "answer_any": [
+       "強調色",
+       "勿擾",
+       "顏色",
+       "通知",
+       "安靜"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "「專注」的強調色是青綠色，並且開了 21:00 到 08:00 的勿擾。"
+   }
+  },
+  {
+   "id": "H-D05",
+   "version": 1,
+   "lang": "en",
+   "category": "profiles",
+   "turns": [
+    "Make a copy of this setup named Backup, then change the accent to orange."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "profile_exists": "Backup"
+     },
+     {
+      "doc": "/appearance/tokens/accent",
+      "hue": [
+       15,
+       45
+      ]
+     },
+     {
+      "doc": "/appearance/tokens/accent",
+      "profile": "Backup",
+      "eq": "#b9a4ff"
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "actions": [
+     {
+      "duplicate": "Backup"
+     }
+    ],
+    "ops": [
+     {
+      "set": "/appearance/tokens/accent",
+      "to": "#ff9933"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D06",
+   "version": 1,
+   "lang": "zh",
+   "category": "profiles",
+   "turns": [
+    "把「舊的」那套設定改名叫「封存」"
+   ],
+   "setup": {
+    "profiles": [
+     {
+      "name": "舊的"
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "action",
+    "checks": [
+     {
+      "profile_exists": "封存"
+     },
+     {
+      "profile_missing": "舊的"
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "actions": [
+     {
+      "rename": [
+       "舊的",
+       "封存"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D07",
+   "version": 1,
+   "lang": "en",
+   "category": "profiles",
+   "turns": [
+    "Put the colour back the way it was."
+   ],
+   "setup": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/accent",
+      "to": "#33aa55"
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "eq": "#b9a4ff"
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "actions": [
+     {
+      "undo_last": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-D08",
+   "version": 2,
+   "lang": "zh",
+   "category": "profiles",
+   "turns": [
+    "回到預設那套設定，視窗都不要動"
+   ],
+   "setup": {
+    "windows": [
+     "foot",
+     "org.kde.kate"
+    ],
+    "profiles": [
+     {
+      "name": "其他",
+      "ops": [
+       {
+        "set": "/appearance/tokens/accent",
+        "to": "#ffb3c7"
+       }
+      ],
+      "activate": true
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "active_profile": "預設"
+     },
+     {
+      "window": "foot",
+      "alive": true
+     },
+     {
+      "window": "org.kde.kate",
+      "alive": true
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0,
+    "skip_untouched": true
+   },
+   "reference": {
+    "ops": [
+     {
+      "switch": "預設"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-E01",
+   "version": 1,
+   "lang": "en",
+   "category": "multi_turn",
+   "turns": [
+    "Blue accent, please.",
+    "Darker."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "hue": [
+       190,
+       255
+      ]
+     },
+     {
+      "doc": "/appearance/tokens/accent",
+      "darker_than_turn": 1
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "set": "/appearance/tokens/accent",
+       "to": "#4d88ff"
+      }
+     ],
+     [
+      {
+       "set": "/appearance/tokens/accent",
+       "to": "#2255cc"
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-E02",
+   "version": 1,
+   "lang": "zh",
+   "category": "multi_turn",
+   "turns": [
+    "強調色改粉紅色",
+    "其實偏紫一點，但要柔和"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "hue": [
+       260,
+       330
+      ]
+     },
+     {
+      "doc": "/appearance/tokens/accent",
+      "lightness": [
+       0.6,
+       0.95
+      ]
+     },
+     {
+      "doc": "/appearance/tokens/accent",
+      "changed": true
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "set": "/appearance/tokens/accent",
+       "to": "#ff8fc0"
+      }
+     ],
+     [
+      {
+       "set": "/appearance/tokens/accent",
+       "to": "#d9a0f0"
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-E03",
+   "version": 1,
+   "lang": "en",
+   "category": "multi_turn",
+   "turns": [
+    "Put Kate on the left half.",
+    "Terminal on the other side."
+   ],
+   "setup": {
+    "windows": [
+     "org.kde.kate",
+     "foot"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "org.kde.kate",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      }
+     },
+     {
+      "window": "foot",
+      "region": {
+       "x": 0.5,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "regions": [
+        {
+         "app_id": "org.kde.kate",
+         "x": 0,
+         "y": 0,
+         "width": 0.5,
+         "height": 1
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "regions": [
+        {
+         "app_id": "org.kde.kate",
+         "x": 0,
+         "y": 0,
+         "width": 0.5,
+         "height": 1
+        },
+        {
+         "app_id": "foot",
+         "x": 0.5,
+         "y": 0,
+         "width": 0.5,
+         "height": 1
+        }
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-E04",
+   "version": 1,
+   "lang": "zh",
+   "category": "multi_turn",
+   "turns": [
+    "通知開專注模式",
+    "Signal 也放行"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/enabled",
+      "eq": true
+     },
+     {
+      "doc": "/entries/ditto.svc.notification-policy/config/rules/focus/allow",
+      "matches": "signal"
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.svc.notification-policy/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "entry_config": "ditto.svc.notification-policy",
+       "merge": {
+        "rules": {
+         "focus": {
+          "enabled": true,
+          "allow": []
+         }
+        }
+       }
+      }
+     ],
+     [
+      {
+       "entry_config": "ditto.svc.notification-policy",
+       "merge": {
+        "rules": {
+         "focus": {
+          "enabled": true,
+          "allow": [
+           "Signal"
+          ]
+         }
+        }
+       }
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-E05",
+   "version": 1,
+   "lang": "en",
+   "category": "multi_turn",
+   "turns": [
+    "It's too bright."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "clarify",
+    "checks": [
+     {
+      "answer_any": [
+       "accent",
+       "background",
+       "colour",
+       "color",
+       "brightness",
+       "transparen",
+       "which"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "Do you mean the accent colour or the background?"
+   }
+  },
+  {
+   "id": "H-E06",
+   "version": 1,
+   "lang": "zh",
+   "category": "multi_turn",
+   "turns": [
+    "放大一點"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "clarify",
+    "checks": [
+     {
+      "answer_any": [
+       "文字",
+       "字",
+       "Dock",
+       "視窗",
+       "圖示",
+       "哪"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "你是指文字、Dock，還是某個視窗？"
+   }
+  },
+  {
+   "id": "H-E07",
+   "version": 1,
+   "lang": "en",
+   "category": "multi_turn",
+   "turns": [
+    "Change the colour."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "changed": true
+     }
+    ],
+    "allowed": [
+     "/appearance/tokens/accent"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/accent",
+      "to": "#8ab4ff"
+     }
+    ]
+   }
+  },
+  {
+   "id": "H-E08",
+   "version": 1,
+   "lang": "zh",
+   "category": "multi_turn",
+   "turns": [
+    "Dock 換成膠囊的",
+    "移到左邊",
+    "剛剛那步取消"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/slots/ui.dock",
+      "eq": "ditto.dock.pill"
+     },
+     {
+      "any": [
+       {
+        "doc": "/entries/ditto.dock.pill/config/position",
+        "eq": "bottom"
+       },
+       {
+        "doc": "/entries/ditto.dock.pill/config/position",
+        "absent": true
+       }
+      ]
+     }
+    ],
+    "allowed": [
+     "/slots/ui.dock",
+     "/entries/ditto.dock.bottom",
+     "/entries/ditto.dock.pill"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "provider": "ui.dock",
+       "package": "ditto.dock.pill"
+      }
+     ],
+     [
+      {
+       "entry_config": "ditto.dock.pill",
+       "merge": {
+        "position": "left"
+       }
+      }
+     ],
+     [
+      {
+       "entry_config": "ditto.dock.pill",
+       "merge": {
+        "position": "bottom"
+       }
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-E09",
+   "version": 1,
+   "lang": "en",
+   "category": "multi_turn",
+   "turns": [
+    "Show at most three notifications.",
+    "Make that two.",
+    "Never mind, three."
+   ],
+   "setup": {
+    "ops": [
+     {
+      "entry_config": "ditto.notifications.area",
+      "merge": {
+       "max_visible": 4
+      }
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "doc": "/entries/ditto.notifications.area/config/max_visible",
+      "eq": 3
+     }
+    ],
+    "allowed": [
+     "/entries/ditto.notifications.area/config"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "entry_config": "ditto.notifications.area",
+       "merge": {
+        "max_visible": 3
+       }
+      }
+     ],
+     [
+      {
+       "entry_config": "ditto.notifications.area",
+       "merge": {
+        "max_visible": 2
+       }
+      }
+     ],
+     [
+      {
+       "entry_config": "ditto.notifications.area",
+       "merge": {
+        "max_visible": 3
+       }
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-E10",
+   "version": 1,
+   "lang": "zh",
+   "category": "multi_turn",
+   "turns": [
+    "瀏覽器放左半邊",
+    "編輯器放右邊，一樣大"
+   ],
+   "setup": {
+    "windows": [
+     "firefox",
+     "org.kde.kate"
+    ]
+   },
+   "expect": {
+    "outcome": "change",
+    "checks": [
+     {
+      "window": "firefox",
+      "region": {
+       "x": 0,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      }
+     },
+     {
+      "window": "org.kde.kate",
+      "region": {
+       "x": 0.5,
+       "y": 0,
+       "width": 0.5,
+       "height": 1
+      }
+     }
+    ],
+    "allowed": [
+     "/layout/regions"
+    ],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "turn_ops": [
+     [
+      {
+       "regions": [
+        {
+         "app_id": "firefox",
+         "x": 0,
+         "y": 0,
+         "width": 0.5,
+         "height": 1
+        }
+       ]
+      }
+     ],
+     [
+      {
+       "regions": [
+        {
+         "app_id": "firefox",
+         "x": 0,
+         "y": 0,
+         "width": 0.5,
+         "height": 1
+        },
+        {
+         "app_id": "org.kde.kate",
+         "x": 0.5,
+         "y": 0,
+         "width": 0.5,
+         "height": 1
+        }
+       ]
+      }
+     ]
+    ]
+   }
+  },
+  {
+   "id": "H-F01",
+   "version": 1,
+   "lang": "en",
+   "category": "limits",
+   "turns": [
+    "Make Firefox's tab bar vertical."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "unsupported",
+    "checks": [
+     {
+      "answer_any": [
+       "can't",
+       "cannot",
+       "unable",
+       "not able",
+       "doesn't",
+       "not support"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "I can't change Firefox's own tab bar."
+   }
+  },
+  {
+   "id": "H-F02",
+   "version": 1,
+   "lang": "zh",
+   "category": "limits",
+   "turns": [
+    "幫我從網路上裝一個天氣小工具"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "unsupported",
+    "checks": [
+     {
+      "answer_any": [
+       "無法",
+       "不支援",
+       "沒辦法",
+       "不能",
+       "還不"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "目前還不能從網路安裝插件。"
+   }
+  },
+  {
+   "id": "H-F03",
+   "version": 1,
+   "lang": "en",
+   "category": "limits",
+   "turns": [
+    "Check which windows I have open and tidy them up."
+   ],
+   "setup": {
+    "windows": [
+     "foot",
+     "org.kde.kate"
+    ],
+    "approval_mode": "never",
+    "no_window_grants": true
+   },
+   "expect": {
+    "outcome": "refuse",
+    "checks": [
+     {
+      "answer_any": [
+       "permission",
+       "allow",
+       "access",
+       "cannot",
+       "can't"
+      ]
+     },
+     {
+      "window": "foot",
+      "alive": true
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "I don't have permission to read your windows; allow it in AI settings."
+   }
+  },
+  {
+   "id": "H-F04",
+   "version": 2,
+   "lang": "zh",
+   "category": "limits",
+   "turns": [
+    "把「甲」和「乙」這兩個設定檔刪掉",
+    "對，刪掉"
+   ],
+   "setup": {
+    "profiles": [
+     {
+      "name": "甲"
+     },
+     {
+      "name": "乙"
+     }
+    ],
+    "person": {
+     "allow": {
+      "desktop.profiles.delete": [
+       "甲",
+       "乙"
+      ]
+     }
+    }
+   },
+   "expect": {
+    "outcome": "action",
+    "checks": [
+     {
+      "profile_missing": "甲"
+     },
+     {
+      "profile_missing": "乙"
+     },
+     {
+      "active_profile": "task-H-F04"
+     },
+     {
+      "deletions_approved": true
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 2
+   },
+   "reference": {
+    "actions": [
+     {
+      "delete": "甲"
+     },
+     {
+      "delete": "乙"
+     }
+    ],
+    "answer": "已刪除「甲」和「乙」。"
+   }
+  },
+  {
+   "id": "H-F05",
+   "version": 1,
+   "lang": "en",
+   "category": "limits",
+   "turns": [
+    "Bind Super+A to open a terminal."
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "refuse",
+    "checks": [
+     {
+      "doc": "/shortcuts",
+      "unchanged": true
+     },
+     {
+      "answer_any": [
+       "reserved",
+       "cannot",
+       "can't",
+       "already",
+       "Super+A"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "Super+A is reserved for the chat, so I cannot rebind it."
+   }
+  },
+  {
+   "id": "H-F06",
+   "version": 1,
+   "lang": "zh",
+   "category": "limits",
+   "turns": [
+    "強調色設成 #12345"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "clarify",
+    "checks": [
+     {
+      "doc": "/appearance/tokens/accent",
+      "unchanged": true
+     },
+     {
+      "answer_any": [
+       "有效",
+       "六",
+       "6",
+       "格式",
+       "位數",
+       "#12345"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "#12345 不是有效的顏色，是要 #123456 嗎？"
+   }
+  },
+  {
+   "id": "H-F07",
+   "version": 1,
+   "lang": "en",
+   "category": "limits",
+   "turns": [
+    "My last change might not have worked — what's the accent colour right now?"
+   ],
+   "setup": {
+    "ops": [
+     {
+      "set": "/appearance/tokens/accent",
+      "to": "#7fd1b9"
+     }
+    ]
+   },
+   "expect": {
+    "outcome": "answer",
+    "checks": [
+     {
+      "answer_any": [
+       "7fd1b9",
+       "green",
+       "teal",
+       "mint",
+       "turquoise"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "The accent is #7fd1b9 (teal)."
+   }
+  },
+  {
+   "id": "H-F08",
+   "version": 1,
+   "lang": "zh",
+   "category": "limits",
+   "turns": [
+    "把 AI 關掉"
+   ],
+   "setup": {},
+   "expect": {
+    "outcome": "unsupported",
+    "checks": [
+     {
+      "answer_any": [
+       "設定",
+       "自己",
+       "無法",
+       "不能"
+      ]
+     }
+    ],
+    "allowed": [],
+    "irreversible_max": 0
+   },
+   "reference": {
+    "answer": "我無法關掉自己，請到 AI 設定關閉。"
+   }
+  }
+ ]
+}

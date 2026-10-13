@@ -29,7 +29,7 @@
 
 ## 2. 待決策清單
 
-沿用 PRD 25 節並補上本計畫新增項。**最晚時點**過後仍未決者，視為阻擋該階段出口。
+沿用 PRD 25 節並補上本計畫新增項。**最晚時點**過後仍未決者，視為阻擋該階段出口。2026-10-07 owner 依 D-38 接受 G0／G1 完成，剩餘未決項轉為 D-38 後續追蹤，仍依各列保留提案或待核定狀態。
 
 | # | 議題 | 本計畫預設 | 最晚時點 | 決策者 |
 | --- | --- | --- | --- | --- |
@@ -41,7 +41,7 @@
 | D-06 | 分層資源預算與工具硬上限 | **部分已決定**：D-06b 工具三類初始配額已核定（[紀錄](../../.agents/notes/decisions/2026-09-22-d06b-tool-quotas.md)）；D-06a Core／Shell PSS：2026-10-05 已取得合格三次冷登入量測，[提案](../../.agents/notes/decisions/2026-10-05-d06a-core-shell-pss.md)待核定 | G0／G1 | 全體 |
 | D-07 | 嵌入式腳本引擎（QuickJS／Lua） | **不列入 MVP**；P1 另行選型 | P1 | Runtime |
 | D-08 | 生成執行隔離實作 | 先受限模板與隔離試載入，不直接啟用任意程式 | G1 前 | Runtime＋安全 |
-| D-09 | 模型、預算與憑證儲存 | 一供應者、可替換契約、獨立秘密引用（Secret Service 首選） | G2 前 | Agent＋產品 |
+| D-09 | 模型、預算與憑證儲存 | **2026-10-07 部分已決 D-09a**：支援 Codex 個人訂閱登入，以 app-server 為必要且優先後端（[紀錄](../../.agents/notes/decisions/2026-10-07-d09a-codex-subscription-app-server.md)）；API 可替換。模型／effort、quota、keyring 實測仍待定；不核定預算放寬 | G2 M1 真請求前 | Agent＋產品 |
 | D-10 | 套件格式與發布來源 | 核可來源＋本機包，固定版本與雜湊 | G1 | Runtime |
 | D-11 | 商業授權與角色素材 | 以實際發行包完成審查 | 公開發布前 | 產品＋法務 |
 | D-12 | 團隊、owner 與工期 | G0 結果後估算 | G0 結束 | 管理 |
@@ -70,6 +70,13 @@
 | D-34 | **10 個簡單插件的固定集合**（plan/03 提案） | 待決策提案：5 個 QML 狀態型＋5 個 Cordis 設定型，版本鎖定 | G1 W8 | QA＋Host |
 | D-35 | **協定 0.2 的凍結政策**（plan/03 提案） | 待決策提案：M3 起只允許新增選用欄位；破壞性變更升 0.3 | G1 M3 | Core＋Agent |
 | D-37 | **G0 出口評審前開始 G1 實作** | **2026-09-27 已決定（偏離 plan/03 開工條件）**：使用者判斷既有測試足以開工；G0 未通過項目帶進 G1 追蹤，G1 門檻不變（[紀錄](../../.agents/notes/decisions/2026-09-27-d37-g1-start-before-g0-exit.md)） | G1 開工 | 參考機 owner；產品 owner 於 G0 出口評審確認 |
+| D-38 | **G0／G1 階段完成裁定** | **2026-10-07 已決定**：owner 依實際使用接受 G0、G1 完成；後續重心為 G2，剩餘功能、證據與核定事項繼續追蹤，量測數字與門檻維持原樣（[紀錄](../../.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)） | G0／G1 結束 | 使用者／專案 owner Lei-k |
+| D-39 | **G2 跨程序契約與生命週期** | **2026-10-09 已決定**：協定 0.3 以目前形狀凍結，`agent.turns.trace` 與 approval 綁定（含刪除設定檔的 `profiles.delete`）列入契約（[紀錄](../../.agents/notes/decisions/2026-10-09-d39-protocol-0-3-freeze.md)） | G2 M0 契約凍結 | Core＋Agent＋Shell |
+| D-40 | **可保存的原生區域布局** | **2026-10-09 已決定**：浮動視窗的比例區域規則；依用戶端提交的幾何判定，容差 2 px、幾何穩定 150 ms（[紀錄](../../.agents/notes/decisions/2026-10-09-d40-floating-region-layout.md)） | G2 跨三類組合前 | 平台＋Core |
+| D-41 | **Core 會話與 AI 偏好持久化** | **2026-10-09 已決定**：依實作定案（事件檔＋SQLite 索引、工具前落盤、保存到使用者刪除）；30 天自動清除另議（[紀錄](../../.agents/notes/decisions/2026-10-09-d41-conversation-storage.md)） | G2 儲存遷移前 | Core＋Agent＋owner |
+| D-42 | **G2 增補與估算修正** | **2026-10-09 已決定**：保留 44 包範圍追蹤，125 人週不作承諾；剩餘工作依剩下的項目估（[紀錄](../../.agents/notes/decisions/2026-10-09-d42-g2-estimate.md)） | G2 M0 初估、M1 校正 | owner＋各工作流 |
+| D-43 | **G2 保留集與驗收重複方式** | **2026-10-09 已決定**：兩組各 ≥45／50、保留集降幅 ≤5 pp；「詢問」不限問號；刪除設定檔經 approval 詢問後依本人決定放行；oracle v3 兩組重跑（[紀錄](../../.agents/notes/decisions/2026-10-09-d43-semantic-holdout-and-judging.md)） | G2 M2 語意基線前 | QA＋Agent＋owner |
+| D-44 | **Codex app-server 程序與限制** | **2026-10-09 已決定**：1 controller＋至多 1 個 confine 內的 app-server；Agent scope 暫定 MemoryMax 256 MiB；2026-10-13 參考機活動中後端達 209 MiB，先給後端寬鬆上限 1G、收緊待 #35；暖態 ≤150 MiB 不變（[紀錄](../../.agents/notes/decisions/2026-10-09-d44-codex-process-and-limits.md)） | G2 M0 probe、M1 可寫之前 | Core＋平台＋Agent＋owner |
 
 ## 3. 團隊與估算假設
 

@@ -1,0 +1,27 @@
+{
+  "$defs": {
+    "ToolAbandonReason": {
+      "enum": [
+        "permission_denied",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "intent_id": {
+      "type": "string"
+    },
+    "reason": {
+      "$ref": "#/$defs/ToolAbandonReason"
+    }
+  },
+  "required": [
+    "intent_id",
+    "reason"
+  ],
+  "title": "ToolAbandonInput",
+  "type": "object"
+}

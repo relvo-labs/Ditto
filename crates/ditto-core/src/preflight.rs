@@ -10,7 +10,7 @@ use ditto_protocol::{
     change::{ChangeCard, ChangeOp, ChangeOrigin, HotSwapLevel, PreflightCode, PreflightReason},
     manifest::{Manifest, TrustLevel},
     participant::ParticipantRole,
-    profile::{is_area, HostKind, ProfileDocument},
+    profile::{is_area, HostKind, ProfileDocument, TokenKind, APPEARANCE_TOKENS},
     PROTOCOL_VERSION,
 };
 use serde_json::json;
@@ -63,6 +63,12 @@ fn origin_may_change_while_locked(origin: &ChangeOrigin) -> bool {
         origin,
         ChangeOrigin::Rescue | ChangeOrigin::Supervisor { .. } | ChangeOrigin::TimedRevert { .. }
     )
+}
+
+/// `#rrggbb` or `#rrggbbaa`, as the Shell accepts.
+fn is_color(value: &str) -> bool {
+    let hex = value.strip_prefix('#').unwrap_or("");
+    matches!(hex.len(), 6 | 8) && hex.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn version_matches(range: &str, version: &str) -> bool {
@@ -139,6 +145,62 @@ fn check_all(
                 PreflightCode::SchemaInvalid,
                 None,
                 json!({"entry_id": entry.entry_id, "why": "duplicate_entry_id"}),
+            ));
+        }
+    }
+    // Region rules (D-40): stable unique ids, an application to match, a
+    // rectangle inside the work area, and a bounded number of rules.
+    let mut rule_ids = BTreeSet::new();
+    if target.layout.regions.len() > 32 {
+        reasons.push(reason(
+            PreflightCode::SchemaInvalid,
+            None,
+            json!({"why": "too_many_region_rules", "limit": 32}),
+        ));
+    }
+    for rule in &target.layout.regions {
+        let why = if rule.rule_id.trim().is_empty() || rule.rule_id.len() > 64 {
+            Some("region_rule_id_invalid")
+        } else if !rule_ids.insert(&rule.rule_id) {
+            Some("duplicate_region_rule_id")
+        } else if rule.matcher.app_id.trim().is_empty() || rule.matcher.app_id.len() > 256 {
+            Some("region_match_invalid")
+        } else if !rule.region.valid() {
+            Some("region_out_of_bounds")
+        } else {
+            None
+        };
+        if let Some(why) = why {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"rule_id": rule.rule_id, "why": why}),
+            ));
+        }
+    }
+    // Appearance tokens the Shell reads (shell/jelly/Tokens.qml) must hold a
+    // value it can use: a malformed one would commit, read back as changed,
+    // and show nothing. Only changed tokens are judged.
+    for (token, value) in &target.appearance.tokens {
+        if base.appearance.tokens.get(token) == Some(value) {
+            continue;
+        }
+        let spec = APPEARANCE_TOKENS.iter().find(|spec| spec.0 == token);
+        let why = match spec {
+            Some((_, TokenKind::Color, ..)) if !is_color(value) => Some("token_not_a_color"),
+            Some((_, TokenKind::Number, _, range, _)) => match value.trim().parse::<f64>() {
+                Ok(n) if n.is_finite() => range
+                    .filter(|(lo, hi)| n < *lo || n > *hi)
+                    .map(|_| "token_out_of_range"),
+                _ => Some("token_not_a_number"),
+            },
+            _ => None,
+        };
+        if let Some(why) = why {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"token": token, "why": why}),
             ));
         }
     }
@@ -445,6 +507,15 @@ fn check_all(
     let mut command_owner: HashMap<&str, &str> = HashMap::new();
     let mut chord_owner: HashMap<&str, (&str, &str)> = HashMap::new();
     for shortcut in &target.shortcuts {
+        // Core's own chords (rescue, lock) belong to no Profile either: a
+        // composition, or an Agent writing one, must not shadow the way out.
+        if RESERVED_CHORDS.contains(&shortcut.chord.as_str()) {
+            reasons.push(reason(
+                PreflightCode::ShortcutConflict,
+                None,
+                json!({"chord": shortcut.chord, "why": "reserved"}),
+            ));
+        }
         if let Some((_, previous)) = chord_owner.insert(
             shortcut.chord.as_str(),
             ("profile", shortcut.command.as_str()),

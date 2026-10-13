@@ -86,6 +86,61 @@ pub struct LayoutIntent {
     pub workspace_grid: [u32; 2],
     #[serde(default)]
     pub rules: Vec<LayoutRule>,
+    /// Where windows of an application go, as a share of their output's work
+    /// area (D-40). Applied to the windows open when the change commits and to
+    /// those that open later; moving a window by hand afterwards is respected
+    /// until the next explicit change. Floating strategy only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<RegionRule>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegionRule {
+    /// Stable within the Profile, so a later turn can name "the same rule".
+    pub rule_id: String,
+    #[serde(rename = "match")]
+    pub matcher: LayoutMatch,
+    /// The output whose work area the region divides; absent means the
+    /// output the window is on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    pub region: Region,
+}
+
+/// A rectangle as fractions (0–1) of an output's work area.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Region {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Region {
+    /// Inside the unit square, with a usable size (at least 5% each way).
+    pub fn valid(&self) -> bool {
+        [self.x, self.y, self.width, self.height]
+            .iter()
+            .all(|v| v.is_finite())
+            && self.x >= 0.0
+            && self.y >= 0.0
+            && self.width >= 0.05
+            && self.height >= 0.05
+            && self.x + self.width <= 1.0 + 1e-9
+            && self.y + self.height <= 1.0 + 1e-9
+    }
+
+    /// The rectangle in a work area `(x, y, width, height)`.
+    pub fn resolve(&self, area: (i32, i32, u32, u32)) -> (i32, i32, u32, u32) {
+        let (ax, ay, aw, ah) = area;
+        let x = ax + (self.x * f64::from(aw)).round() as i32;
+        let y = ay + (self.y * f64::from(ah)).round() as i32;
+        let width = (self.width * f64::from(aw)).round().max(1.0) as u32;
+        let height = (self.height * f64::from(ah)).round().max(1.0) as u32;
+        (x, y, width, height)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -102,6 +157,192 @@ pub struct Appearance {
     #[serde(default)]
     pub low_power_style: bool,
     pub locale: String,
+}
+
+/// What an appearance token holds. Every token is stored as a string.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenKind {
+    /// `#RRGGBB` or `#RRGGBBAA`.
+    Color,
+    /// A decimal number within `min`..=`max`, e.g. `"1.2"`.
+    Number,
+    /// Free text.
+    Text,
+}
+
+/// One appearance token the Shell reads (`shell/jelly/Tokens.qml`).
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AppearanceToken {
+    pub name: String,
+    pub kind: TokenKind,
+    /// What the Shell uses while the Profile sets no value.
+    pub default: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    pub description: String,
+}
+
+/// The tokens the Shell reads: name, kind, default, range, description.
+/// Shell and Core share this list; preflight refuses a value the Shell
+/// could not use.
+/// Name, kind, default, `(min, max)` and description of one token.
+pub type TokenSpec = (
+    &'static str,
+    TokenKind,
+    &'static str,
+    Option<(f64, f64)>,
+    &'static str,
+);
+
+pub const APPEARANCE_TOKENS: &[TokenSpec] = &[
+    (
+        "accent",
+        TokenKind::Color,
+        "#b9a4ff",
+        None,
+        "accent colour: highlights, selection, the avatar's glow",
+    ),
+    (
+        "on_accent",
+        TokenKind::Color,
+        "#1a1626",
+        None,
+        "text and icons drawn on the accent colour",
+    ),
+    (
+        "background",
+        TokenKind::Color,
+        "#12121a",
+        None,
+        "desktop background behind every surface",
+    ),
+    (
+        "surface",
+        TokenKind::Color,
+        "#1d1f2b",
+        None,
+        "panels, dock and windows of the desktop",
+    ),
+    (
+        "surface_strong",
+        TokenKind::Color,
+        "#242739",
+        None,
+        "raised surfaces: menus, hovered rows",
+    ),
+    (
+        "foreground",
+        TokenKind::Color,
+        "#f2f3f8",
+        None,
+        "main text colour",
+    ),
+    (
+        "foreground_muted",
+        TokenKind::Color,
+        "#a9aec4",
+        None,
+        "secondary text colour",
+    ),
+    (
+        "border",
+        TokenKind::Color,
+        "#3a3f55",
+        None,
+        "outline of surfaces",
+    ),
+    (
+        "focus",
+        TokenKind::Color,
+        "#f2f3f8",
+        None,
+        "keyboard focus ring",
+    ),
+    ("warning", TokenKind::Color, "#ffcf8b", None, "warnings"),
+    (
+        "danger",
+        TokenKind::Color,
+        "#ff9b9b",
+        None,
+        "errors and destructive actions",
+    ),
+    (
+        "success",
+        TokenKind::Color,
+        "#9be3b4",
+        None,
+        "success states",
+    ),
+    (
+        "blur_radius",
+        TokenKind::Number,
+        "18",
+        Some((0.0, 64.0)),
+        "background blur of translucent surfaces, in pixels",
+    ),
+    (
+        "surface_opacity",
+        TokenKind::Number,
+        "0.94",
+        Some((0.5, 1.0)),
+        "opacity of surfaces; lower is more see-through",
+    ),
+    (
+        "shadow_radius",
+        TokenKind::Number,
+        "14",
+        Some((0.0, 48.0)),
+        "shadow size under surfaces, in pixels",
+    ),
+    (
+        "radius_scale",
+        TokenKind::Number,
+        "1",
+        Some((0.0, 2.0)),
+        "corner roundness of every surface and control; 0 is square, 2 is twice as round",
+    ),
+    (
+        "font_scale",
+        TokenKind::Number,
+        "1",
+        Some((0.75, 2.0)),
+        "text size of the whole desktop; 1.2 is 20% larger",
+    ),
+    (
+        "space_scale",
+        TokenKind::Number,
+        "1",
+        Some((0.5, 2.0)),
+        "spacing between and inside controls",
+    ),
+    (
+        "font_family",
+        TokenKind::Text,
+        "",
+        None,
+        "font family of the desktop's text; empty is the system font",
+    ),
+];
+
+/// [`APPEARANCE_TOKENS`] as values.
+pub fn appearance_tokens() -> Vec<AppearanceToken> {
+    APPEARANCE_TOKENS
+        .iter()
+        .map(
+            |(name, kind, default, range, description)| AppearanceToken {
+                name: (*name).into(),
+                kind: *kind,
+                default: (*default).into(),
+                min: range.map(|r| r.0),
+                max: range.map(|r| r.1),
+                description: (*description).into(),
+            },
+        )
+        .collect()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

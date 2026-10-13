@@ -275,6 +275,19 @@ impl Coordinator {
             self.core.hosts.ensure_started();
         }
         self.recover();
+        // Every in-flight ChangeSet now has its outcome: settle the tool
+        // calls whose result was lost with what Core can prove, never by
+        // running them again (G2-AGENT-10).
+        match ditto_store::turns::reconcile_dispatched(&mut self.store) {
+            Ok(0) => {}
+            Ok(count) => {
+                crate::log::event("agent.tools_reconciled", &[("count", &count.to_string())])
+            }
+            Err(error) => crate::log::event(
+                "agent.tools_reconcile_failed",
+                &[("reason", &error.to_string())],
+            ),
+        }
         self.core.finish_recovery();
         self.booted = true;
         sdnotify::ready();
@@ -1725,6 +1738,7 @@ impl Coordinator {
         change_id: &str,
         subject: &str,
         idempotency_key: Option<String>,
+        request_operation_id: Option<String>,
     ) -> Result<ChangeRecord, CoreError> {
         if let Some(key) = &idempotency_key {
             if let Some(existing) = changes::by_idempotency_key(self.store.connection(), key)? {
@@ -1755,7 +1769,7 @@ impl Coordinator {
                     ops: docops::ops_between(&head_document, &base_document),
                     mode: ChangeMode::Apply,
                     idempotency_key,
-                    request_operation_id: None,
+                    request_operation_id,
                     origin,
                     subject: subject.into(),
                     target: Some(Target {
@@ -1807,7 +1821,7 @@ impl Coordinator {
                 ops: inverse,
                 mode: ChangeMode::Apply,
                 idempotency_key,
-                request_operation_id: None,
+                request_operation_id,
                 origin,
                 subject: subject.into(),
                 target: None,

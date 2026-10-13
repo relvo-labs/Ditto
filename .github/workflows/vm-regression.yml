@@ -11,6 +11,7 @@ on:
       - 'shell/**'
       - 'tests/g0/**'
       - 'tests/g1/**'
+      - 'tests/g2/**'
       - 'packages/**'
       - 'schema/**'
       - 'tools/**'
@@ -61,4 +62,18 @@ jobs:
         with:
           name: g1-vm-${{ github.run_id }}
           path: g1-vm-artifacts.tar.gz
+          retention-days: 30
+      # G2 suites on the ditto-g2 snapshot (HWE kernel, so Landlock can
+      # confine the Codex backend). Development evidence, merge-blocking.
+      - name: G2 VM regression
+        if: success() || failure()
+        run: bash tools/dev-vm/run-g2.sh
+      - name: Pack G2 VM artifacts
+        if: always()
+        run: tar -czf g2-vm-artifacts.tar.gz --ignore-failed-read artifacts/g2-vm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g2-vm-${{ github.run_id }}
+          path: g2-vm-artifacts.tar.gz
           retention-days: 30

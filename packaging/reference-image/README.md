@@ -15,6 +15,8 @@ G0 的主要參考機識別為 `ditto-ref-ws-rtx4060-01`。同一項三次重複
 
 完整且機械可讀的值見 [`reference-machine.lock.json`](reference-machine.lock.json)。
 
+鎖定值變更紀錄：2026-10-09 `memory_kib` 63468948→63468952（`MemTotal` 多 4 KiB，同一硬體與核心；核心保留的記憶體隨韌體／開機變動）。owner 核准後更新。
+
 ## 重建與驗證
 
 1. 安裝 Ubuntu 24.04.2 LTS，套用 [`apt-packages.txt`](apt-packages.txt) 的套件集合。
@@ -27,6 +29,19 @@ G0 的主要參考機識別為 `ditto-ref-ws-rtx4060-01`。同一項三次重複
 `install-session.sh` 綁定執行當下的工作樹絕對路徑，所以重建者可把倉庫放在不同位置；開發機不需要安裝這個工作階段。登入後的 Wayfire 設定在 `session/wayfire.ini`，不借用使用者家目錄中的第二份配置。
 
 這不是整個產品的安裝包。G0 沒有 Profile、Cordis、Agent 或救援模式；此目錄只重建 G0 原生可行性與出口量測環境。
+
+## 畫面分享與遠端存取
+
+Wayfire 工作階段的 xdg-desktop-portal 原本只有 GTK 後端，沒有 ScreenCast，RustDesk 登入時報 `No such interface "org.freedesktop.portal.ScreenCast"`。`install-session.sh` 安裝兩個設定：
+
+- `session/wayfire-portals.conf` → `/etc/xdg/xdg-desktop-portal/wayfire-portals.conf`：ScreenCast 與 Screenshot 交給 `xdg-desktop-portal-wlr`（讀 Wayfire 的 wlr-screencopy），其餘維持 GTK。
+- `session/xdpw-wayfire.conf` → `/etc/xdg/xdg-desktop-portal-wlr/Wayfire`：`chooser_type=none`，不跳選擇視窗，直接分享第一個輸出。
+
+取捨：遠端連線時座位上沒有人可以按同意，所以不設選擇器；代價是這個工作階段裡任何程式要求擷取螢幕都會直接得到畫面。owner 於 2026-10-09 為了遠端存取接受。RustDesk 的輸入走它自己的 uinput，不經 portal。
+
+畫面全黑（2026-10-09 查明）：Ubuntu 24.04 的 `xdg-desktop-portal-wlr` 0.7.1 在用戶端重新連上同一個 screencast stream 時，第一個 buffer 的 `pts` 是 0；GStreamer 的 `pipewiresrc`（PipeWire 1.0.5）以 0 為起點，對下一個真實時間戳（CLOCK_MONOTONIC，開機至今數十小時）做時鐘等待，於是只交出一幀就停住，xdpw 端接著連續 `out of buffers`。RustDesk 每次連線都在一秒內對同一個 stream 重建數次擷取 pipeline（偵測螢幕、`SWITCH` 重整），所以每次都黑。不經 RustDesk 也能重現：同一個 portal session 依序開四個 pipeline，第二個以後只拿到 1 幀。上游 0.8.4 送出正確時間戳，但它的 ext-image-copy 路徑在重連時對同一 session 建第二個 frame，Wayfire 回協定錯誤、portal 退出；`tools/xdpw/` 以 0.8.4 加兩個修補建置（見 `pin.json`），`install-session.sh` 安裝到 `/usr/local/libexec` 並以 user unit drop-in（`session/xdpw-service.conf`）取代發行版的執行檔。修正後同一重現連跑五輪、每輪四次重連都持續出幀（4 秒約 238 幀），RustDesk 恢復畫面。
+
+先前排除的方向：NVIDIA 硬體編碼（改軟體 AV1 仍黑）、RustDesk 的 restore token、重啟 xdpw（偶爾因時機剛好躲過重連）。參考機的螢幕接在 NVIDIA（`card1`），wlroots 預設卻用開機 VGA（AMD iGPU）繪圖再跨 GPU 複製；`ditto-session` 讓 Wayfire 只用 `DITTO_DRM_VENDOR`（預設 NVIDIA `0x10de`）的 GPU，起不來時退回 wlroots 自己的選擇——這與黑畫面無關，是顯示路徑本身的修正。
 
 ## G1 工作階段：從 G0 搬到哪裡
 

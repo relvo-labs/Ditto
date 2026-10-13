@@ -2,20 +2,24 @@
 //! snapshots and the package index. It is a library so `dittoctl --offline`
 //! can use the same code, under the same lock, when Core cannot start.
 
+pub mod approvals;
 pub mod audit;
 pub mod bindings;
 pub mod changes;
+pub mod conversations;
 pub mod error;
 pub mod fault;
 pub mod grants;
 pub mod jobs;
 pub mod lock;
 pub mod packages;
+pub mod preferences;
 pub mod profiles;
 pub mod rescue;
 pub mod retention;
 pub mod schema;
 pub mod time;
+pub mod turns;
 
 use std::path::{Path, PathBuf};
 
@@ -250,6 +254,8 @@ fn backup(connection: &Connection, paths: &Paths, version: u32) -> StoreResult<P
     }
     drop(destination);
     set_mode(&target, 0o600)?;
+    std::fs::File::open(&target)?.sync_all()?;
+    std::fs::File::open(paths.backups())?.sync_all()?;
     // Keep the three most recent backups.
     let mut existing: Vec<PathBuf> = std::fs::read_dir(paths.backups())?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -263,6 +269,7 @@ fn backup(connection: &Connection, paths: &Paths, version: u32) -> StoreResult<P
     while existing.len() > 3 {
         std::fs::remove_file(existing.remove(0))?;
     }
+    std::fs::File::open(paths.backups())?.sync_all()?;
     Ok(target)
 }
 

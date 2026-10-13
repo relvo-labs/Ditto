@@ -77,7 +77,7 @@ def main():
     try:
         bottom = dock_entry()
         change = propose([{"op": "add_entry", "slot": "ui.dock",
-                           "entry": {"package": "ditto.dock.pill", "version": "1.0.0", "host": "qml", "config": {}, "disabled": False}}])
+                           "entry": {"package": "ditto.dock.pill", "version": "1.1.0", "host": "qml", "config": {}, "disabled": False}}])
         if change["state"] != "committed":
             raise RuntimeError(f"adding the pill Dock ended {change['state']}")
         pill = dock_entry()

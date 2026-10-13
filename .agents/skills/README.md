@@ -20,7 +20,7 @@
 |---|---|---|---|
 | [ditto-authority-boundaries](ditto-authority-boundaries/SKILL.md) | stable | Wave 1 | 判定一項狀態、寫入路徑或決策歸誰所有，以及跨層禁則。 |
 | [ditto-capability-contract](ditto-capability-contract/SKILL.md) | stable | Wave 1 | 新增或修改 `desktop.*` 能力時的契約設計與型別產生。 |
-| [ditto-permission-and-secrets](ditto-permission-and-secrets/SKILL.md) | draft | Wave 2 | 權限分項授權、信任分級、外部內容視為資料，以及秘密只存引用。 |
+| [ditto-permission-and-secrets](ditto-permission-and-secrets/SKILL.md) | stable | Wave 2 | 權限分項授權、信任分級、外部內容視為資料，以及秘密只存引用。 |
 | [ditto-process-budget](ditto-process-budget/SKILL.md) | stable | Wave 1 | 程序數、常駐決策、熱路徑與資源計費。 |
 
 ## Category: runtime
@@ -39,7 +39,7 @@
 
 | Skill | Status | 交付 | 職責 |
 |---|---|---|---|
-| [ditto-agent-changeset](ditto-agent-changeset/SKILL.md) | draft | Wave 2 | Agent 從自然語言到結構化 ChangeSet 的規劃行為。 |
+| [ditto-agent-changeset](ditto-agent-changeset/SKILL.md) | stable | Wave 2 | Agent 從自然語言到結構化 ChangeSet 的規劃行為。 |
 | [ditto-generation-safety](ditto-generation-safety/SKILL.md) | draft | Wave 3 | 受限生成與隔離執行：模板優先、限制能力、隔離驗證、預算與回復。 |
 
 ## Category: shell

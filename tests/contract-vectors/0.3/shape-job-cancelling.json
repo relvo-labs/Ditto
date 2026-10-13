@@ -1,0 +1,20 @@
+{
+  "kind": "shape",
+  "description": "shape-job-cancelling",
+  "type": "job",
+  "valid": true,
+  "value": {
+    "job_id": "job-1",
+    "kind": "packages.verify",
+    "state": "cancelling",
+    "progress": 0.5,
+    "result": null,
+    "error_key": null,
+    "idempotency_key": "k",
+    "created_at": "2026-10-08T00:00:00Z",
+    "updated_at": "2026-10-08T00:00:01Z",
+    "owner": "agent",
+    "phase": "hashing 3/12",
+    "cancellable": false
+  }
+}

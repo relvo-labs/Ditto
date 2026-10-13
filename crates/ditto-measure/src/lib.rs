@@ -47,12 +47,16 @@ pub struct NodeMemorySource {
 /// The measurement states of plan/03/06 §7.2. `desktop_full_plus10` is
 /// sampled twice in one login: `_a` before the ten plugins are enabled, `_b`
 /// after.
-pub const G1_STATES: [&str; 5] = [
+pub const G1_STATES: [&str; 7] = [
     "rescue_no_node",
     "desktop_full_no_agent",
     "desktop_full_plus10_a",
     "desktop_full_plus10_b",
     "desktop_full_no_avatar",
+    // G2 (plan/04/07 §4): the Agent warm (backend loaded, no active turn)
+    // and active (a model turn running).
+    "desktop_full_agent_warm",
+    "desktop_full_agent_active",
 ];
 
 pub fn is_g1_state(state: &str) -> bool {
@@ -65,6 +69,14 @@ pub fn required_layers(state: &str) -> &'static [&'static str] {
     match state {
         "desktop_full_no_agent_g0_subset" => &["core", "shell", "compositor"],
         "rescue_no_node" => &["core", "compositor", "supervisor"],
+        "desktop_full_agent_warm" | "desktop_full_agent_active" => &[
+            "core",
+            "shell",
+            "compositor",
+            "supervisor",
+            "hostd",
+            "agent",
+        ],
         state if is_g1_state(state) => &["core", "shell", "compositor", "supervisor", "hostd"],
         _ => &[],
     }

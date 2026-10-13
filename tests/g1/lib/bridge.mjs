@@ -52,7 +52,7 @@ await new Promise((resolve, reject) => {
   core.write(JSON.stringify({
     jsonrpc: '2.0', id: 'bridge-handshake', method: 'core.handshake',
     params: {
-      protocol_version: '0.2.0',
+      protocol_version: '0.3.0',
       client: { kind: process.env.DITTO_CLIENT_KIND, version: process.env.DITTO_CLIENT_VERSION ?? '0.2.0' },
       auth: { token },
     },

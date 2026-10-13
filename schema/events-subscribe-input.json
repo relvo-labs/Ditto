@@ -1,15 +1,24 @@
 {
   "$defs": {
     "EventTopic": {
-      "enum": [
-        "desktop",
-        "changes",
-        "plugins",
-        "notifications",
-        "tasks",
-        "session"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "enum": [
+            "desktop",
+            "changes",
+            "plugins",
+            "notifications",
+            "tasks",
+            "session"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "conversations",
+          "description": "Conversation and turn progress. Ids and states only: the content is\nread through `agent.sessions.read`, under that capability's own scope.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "Approval": {
+      "additionalProperties": false,
+      "properties": {
+        "consumed": {
+          "type": "boolean"
+        },
+        "decision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApprovalDecision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "string"
+        },
+        "request": {
+          "$ref": "#/$defs/ApprovalRequestInput"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "target": {
+          "description": "What the call would act on, as Core reads it (a Profile's name), so\nthe person sees the target from Core's record, not the model's words.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "request_id",
+        "principal",
+        "generation",
+        "request",
+        "expires_at_ms",
+        "consumed"
+      ],
+      "type": "object"
+    },
+    "ApprovalDecision": {
+      "enum": [
+        "allowed-once",
+        "rejected",
+        "cancelled",
+        "unavailable"
+      ],
+      "type": "string"
+    },
+    "ApprovalRequestInput": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "description": "The bound tool call's arguments, for a capability whose ask names its\ntarget (deleting a Profile). Core checks them against `intent_hash`,\nderives `Approval::target` and does not keep them."
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "intent_hash": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "turn_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "turn_id",
+        "capability_id",
+        "resource",
+        "intent_hash",
+        "purpose"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "approvals": {
+      "description": "Undecided, unexpired requests the caller may see.",
+      "items": {
+        "$ref": "#/$defs/Approval"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "approvals"
+  ],
+  "title": "ApprovalsListOutput",
+  "type": "object"
+}

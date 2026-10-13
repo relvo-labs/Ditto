@@ -1,0 +1,22 @@
+{
+  "component": "xdg-desktop-portal-wlr",
+  "version": "v0.8.4",
+  "upstream_repo": "https://github.com/emersion/xdg-desktop-portal-wlr",
+  "upstream_commit": "34153094662acd713241ca6cbbb20003ef67da5f",
+  "port_kind": "external program built from the pinned tag with two local patches",
+  "licence": "MIT",
+  "why_not_distribution": "Ubuntu 24.04 ships 0.7.1. When a consumer reconnects to a screencast stream, its first buffer carries pts 0; GStreamer's pipewiresrc (PipeWire 1.0.5) then waits on the clock for the next real timestamp (hours away) and delivers one frame only. RustDesk rebuilds its capture pipeline several times per connection, so every remote session was black. 0.8.4 sends real timestamps.",
+  "use": "ScreenCast and Screenshot portal of the Ditto (Wayfire) session: remote access and screen sharing.",
+  "modifications": [
+    {
+      "patch": "0001-wlr_screencast-include-unistd.patch",
+      "why": "v0.8.4 calls close() without <unistd.h>; -Werror stops the build"
+    },
+    {
+      "patch": "0002-ext_image_copy-drop-pending-frame.patch",
+      "why": "a capture restarted while the previous ext-image-copy frame is pending creates a second frame on the session; Wayfire rejects it with a protocol error and the portal dies. The pending frame is destroyed first.",
+      "caveat": "dropping the pending frame may leave stale damage regions (see upstream PR #340 review); not observed in 5x4 reconnects or RustDesk"
+    }
+  ],
+  "upstream_report": "Not filed. The reconnect race is known upstream: PR #340 (open; the maintainer reports damage-tracking issues with skipping the pending frame) and PR #380 (the same approach as patch 0002, withdrawn because the wlroots ecosystem does not accept AI-assisted contributions; these patches are AI-assisted too). Reproduced on master c0255d7 (2026-10-09): a consumer reconnecting to the stream crashes the portal. Patch 0001 is still needed on master. Drop 0002 when upstream fixes the race."
+}

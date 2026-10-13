@@ -30,6 +30,9 @@ pub enum Outgoing {
     /// A request or notification Core itself sends to the client
     /// (`participant.*`, `host.invoke`, `shell.command`).
     Request(Box<RpcRequest>),
+    /// The connection is over: its writer stops even while other parts of
+    /// Core still hold the connection's `Peer` (and so a sender).
+    Shutdown,
 }
 
 pub struct Session {
@@ -40,7 +43,12 @@ pub struct Session {
     offline_reason: Mutex<Option<String>>,
     shortcut_handler: Mutex<Option<ditto_compositor::ShortcutHandler>>,
     outputs_removed: Mutex<Option<OutputsRemoved>>,
+    windows_opened: Mutex<Option<WindowsOpened>>,
 }
+
+/// Called with windows that appeared since the last snapshot (Core applies
+/// the Profile's region rules to them, D-40).
+pub type WindowsOpened = std::sync::Arc<dyn Fn(Vec<Window>) + Send + Sync>;
 
 /// Called after outputs disappeared, with their names and the windows as
 /// they were before (Core's window rescue, plan/03/05 §7).
@@ -60,10 +68,15 @@ impl Session {
             offline_reason: Mutex::new(reason),
             shortcut_handler: Mutex::new(None),
             outputs_removed: Mutex::new(None),
+            windows_opened: Mutex::new(None),
         }
     }
 
     /// Who is told when an output goes away; Core sets it once at start.
+    pub fn set_windows_opened(&self, hook: WindowsOpened) {
+        *self.windows_opened.lock().expect("windows hook") = Some(hook);
+    }
+
     pub fn set_outputs_removed(&self, hook: OutputsRemoved) {
         *self.outputs_removed.lock().expect("outputs hook") = Some(hook);
     }
@@ -235,12 +248,31 @@ impl Session {
                 })
                 .collect();
             let before = (!vanished.is_empty()).then(|| broker.snapshot().windows.clone());
+            let opened: Vec<Window> = observed
+                .windows
+                .iter()
+                .filter(|w| {
+                    !broker
+                        .snapshot()
+                        .windows
+                        .iter()
+                        .any(|known| known.id == w.id)
+                })
+                .cloned()
+                .collect();
             for payload in changes {
                 broker.publish(payload, observed.clone());
             }
-            before.map(|windows| (vanished, windows))
+            (before.map(|windows| (vanished, windows)), opened)
         };
+        let (removed, opened) = removed;
         self.flush();
+        if !opened.is_empty() {
+            let hook = self.windows_opened.lock().expect("windows hook").clone();
+            if let Some(hook) = hook {
+                hook(opened);
+            }
+        }
         if let Some((vanished, windows)) = removed {
             let hook = self.outputs_removed.lock().expect("outputs hook").clone();
             if let Some(hook) = hook {

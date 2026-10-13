@@ -77,6 +77,11 @@ if ! vm_sync_workspace >"$out/sync.log" 2>&1; then
   exit 1
 fi
 record sync pass
+if ! vm_build_packages >"$out/packages.log" 2>&1; then
+  record packages fail
+  exit 1
+fi
+record packages pass
 
 if vm_ssh "$VM_ENV"' pnpm install --frozen-lockfile && cargo build --locked --workspace --bins && pnpm -r build && bash scripts/build-builtin-packages.sh' >"$out/build.log" 2>&1; then
   record build pass

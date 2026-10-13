@@ -102,7 +102,11 @@
         {
           "additionalProperties": false,
           "properties": {
-            "after": true,
+            "after": {
+              "additionalProperties": true,
+              "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+              "type": "object"
+            },
             "before": true,
             "entry_id": {
               "type": "string"
@@ -137,6 +141,31 @@
             "op",
             "entry_id",
             "disabled"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "entry_id": {
+              "type": "string"
+            },
+            "from_version": {
+              "type": "string"
+            },
+            "op": {
+              "const": "upgrade_entry",
+              "type": "string"
+            },
+            "to_version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "entry_id",
+            "from_version",
+            "to_version"
           ],
           "type": "object"
         },
@@ -233,6 +262,30 @@
           },
           "required": [
             "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "agent",
+              "type": "string"
+            },
+            "session_id": {
+              "type": "string"
+            },
+            "tool_call_id": {
+              "type": "string"
+            },
+            "turn_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "session_id",
+            "turn_id",
+            "tool_call_id"
           ],
           "type": "object"
         },

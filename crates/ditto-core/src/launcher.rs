@@ -62,6 +62,19 @@ impl Quota {
         }
     }
 
+    /// D-44's Codex app-server scope (`ditto-confine` and the app-server).
+    /// Deliberately generous while G2 verifies function: on the reference
+    /// machine the app-server peaked at 209 MiB PSS during a turn, and a
+    /// cgroup also charges page cache and kernel memory. The 150 MiB warm PSS
+    /// target is unchanged; tightening this limit is later optimisation work.
+    pub fn agent_backend() -> Self {
+        Self {
+            memory_max: "1G".into(),
+            cpu_quota: "200%".into(),
+            tasks_max: 256,
+        }
+    }
+
     pub fn properties(&self) -> Vec<String> {
         vec![
             format!("MemoryMax={}", self.memory_max),
@@ -94,7 +107,11 @@ pub fn parse(specification: &str) -> io::Result<Specification> {
 /// to its layer by cgroup. `systemd-run --scope` execs the client in place:
 /// the PID bound below, the inherited token descriptor and the executable that
 /// identity checks read from `/proc/<pid>/exe` are all the client's own.
-fn scoped_command(kind: &str, executable: &Path, quota: Option<&Quota>) -> io::Result<Command> {
+pub(crate) fn scoped_command(
+    kind: &str,
+    executable: &Path,
+    quota: Option<&Quota>,
+) -> io::Result<Command> {
     let Some(prefix) = std::env::var_os("DITTO_LAUNCH_SCOPE_PREFIX") else {
         if quota.is_some() && std::env::var_os("DITTO_REQUIRE_QUOTA").is_some() {
             // Fail closed: a quota that cannot be applied means no start.
@@ -179,7 +196,24 @@ pub fn launch_parsed(
     quota: Option<&Quota>,
     environment: &[(String, String)],
 ) -> io::Result<Child> {
+    launch_with_channel(registry, parsed, socket, quota, environment, None)
+}
+
+/// The descriptor number a client finds its private backend channel on.
+pub const CHANNEL_FD: RawFd = TOKEN_FD + 1;
+
+/// As [`launch_parsed`], also handing the client one private channel on
+/// [`CHANNEL_FD`] (the Agent controller's link to its confined backend).
+pub fn launch_with_channel(
+    registry: &Arc<IdentityRegistry>,
+    parsed: &Specification,
+    socket: &Path,
+    quota: Option<&Quota>,
+    environment: &[(String, String)],
+    channel: Option<&OwnedFd>,
+) -> io::Result<Child> {
     let parsed = parsed.clone();
+    let channel = channel.map(AsRawFd::as_raw_fd);
     let executable = parsed.executable.canonicalize()?;
     let (mut launcher_end, client_end) = UnixStream::pair()?;
     let client_fd: OwnedFd = client_end.into();
@@ -206,8 +240,25 @@ pub fn launch_parsed(
     // spawn() is not held up waiting for the child.
     unsafe {
         command.pre_exec(move || {
+            // Move the channel above both targets first, so neither dup2
+            // below can overwrite the other's source descriptor.
+            let channel = match channel {
+                Some(fd) => {
+                    let moved = libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 16);
+                    if moved < 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                    Some(moved)
+                }
+                None => None,
+            };
             if libc::dup2(inherited, TOKEN_FD) < 0 {
                 return Err(io::Error::last_os_error());
+            }
+            if let Some(channel) = channel {
+                if libc::dup2(channel, CHANNEL_FD) < 0 {
+                    return Err(io::Error::last_os_error());
+                }
             }
             Ok(())
         });
@@ -229,4 +280,20 @@ pub fn launch_parsed(
     )?;
     launcher_end.write_all(format!("{token}\n").as_bytes())?;
     Ok(child)
+}
+
+#[cfg(test)]
+mod quota_tests {
+    use super::Quota;
+
+    #[test]
+    fn the_codex_backend_has_its_own_generous_limit() {
+        let backend = Quota::agent_backend();
+        assert_eq!(
+            backend.properties(),
+            ["MemoryMax=1G", "CPUQuota=200%", "TasksMax=256"]
+        );
+        // Not the hostd/controller service class reused (D-06b, D-44).
+        assert_ne!(backend, Quota::service());
+    }
 }

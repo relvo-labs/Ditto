@@ -336,6 +336,9 @@ pub struct AppearanceGetOutput {
     /// What the Shell last reported as applied; `null` when no Shell reported.
     pub shell_applied: Option<Appearance>,
     pub profile_revision: String,
+    /// Every token `desktop.appearance.set` accepts, with its kind, the
+    /// default in effect while `appearance.tokens` has no value, and range.
+    pub tokens_available: Vec<crate::profile::AppearanceToken>,
 }
 
 /// Every field optional; the ones given become `set_value` ops of one
@@ -346,6 +349,10 @@ pub struct AppearanceSetInput {
     pub base_revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
+    /// Token name → value, as a string: `#RRGGBB` for colours, a decimal
+    /// such as `"1.2"` for numbers. `desktop.appearance.get` lists every
+    /// token (corner roundness `radius_scale`, text size `font_scale`,
+    /// spacing, blur, opacity, colours) with its default and range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tokens: Option<BTreeMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -631,8 +638,25 @@ pub struct LayoutGetOutput {
     pub available: Vec<LayoutStrategyInfo>,
     pub workspace_grid: [u32; 2],
     pub rules: Vec<crate::profile::LayoutRule>,
+    /// Region rules of the Profile (D-40), with the open windows they cover
+    /// and where those windows are now.
+    #[serde(default)]
+    pub regions: Vec<crate::profile::RegionRule>,
+    #[serde(default)]
+    pub region_windows: Vec<RegionWindow>,
     /// Session-restart changes waiting for the next login.
     pub pending_next_login: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegionWindow {
+    pub rule_id: String,
+    pub window_id: String,
+    pub app_id: String,
+    pub output: Option<String>,
+    /// `[x, y, width, height]` in output-relative logical pixels.
+    pub geometry: Option<[i64; 4]>,
 }
 
 // ---- session ----------------------------------------------------------------
@@ -660,6 +684,9 @@ pub struct SessionActionOutput {
 pub enum JobState {
     Queued,
     Running,
+    /// Cancel was asked of a running job; it ends `cancelled` once its
+    /// worker is gone (or with its real outcome if that came first).
+    Cancelling,
     Succeeded,
     Failed,
     Cancelled,
@@ -677,6 +704,27 @@ pub struct Job {
     pub idempotency_key: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// The subject that submitted it (`agent`, `shell`, `cli`); Core owns
+    /// the job from then on, whoever leaves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    /// What the worker reports it is doing (`hashing 3/12`, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    /// Whether `desktop.jobs.cancel` can stop it now.
+    #[serde(default)]
+    pub cancellable: bool,
+}
+
+/// Trusted job kinds only: the caller names a kind Core knows and gives its
+/// parameters; never an executable, arguments or code.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct JobsSubmitInput {
+    pub kind: String,
+    #[serde(default)]
+    pub params: Value,
+    pub idempotency_key: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

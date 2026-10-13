@@ -209,6 +209,47 @@
       ],
       "type": "object"
     },
+    "RegionPlacement": {
+      "additionalProperties": false,
+      "description": "One window under a region rule, read back from the compositor.",
+      "properties": {
+        "observed": {
+          "description": "Where the compositor reports it; absent when it cannot say.",
+          "items": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "rule_id": {
+          "type": "string"
+        },
+        "target": {
+          "description": "Where the rule puts it, in output-relative logical pixels.",
+          "items": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "window_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "window_id",
+        "target"
+      ],
+      "type": "object"
+    },
     "ShortcutBinding": {
       "additionalProperties": false,
       "properties": {
@@ -240,6 +281,10 @@
               "type": "null"
             }
           ]
+        },
+        "approval_responder": {
+          "description": "The Shell shows approval requests and can answer them. Without it an\nAgent's approval request is recorded as unavailable at once: nobody\nwould see it, and waiting would only stall the turn.",
+          "type": "boolean"
         },
         "avatar": {
           "anyOf": [
@@ -302,6 +347,13 @@
     {
       "additionalProperties": false,
       "properties": {
+        "regions": {
+          "description": "Each open window a region rule covers, with where it actually is.",
+          "items": {
+            "$ref": "#/$defs/RegionPlacement"
+          },
+          "type": "array"
+        },
         "role": {
           "const": "compositor",
           "type": "string"

@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "ChangeState": {
+      "enum": [
+        "draft",
+        "validated",
+        "rejected",
+        "prepared",
+        "aborted",
+        "applying",
+        "verifying",
+        "committed",
+        "rolling_back",
+        "rolled_back",
+        "partially_applied",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "ToolOutcome": {
+      "description": "What became of one tool call, as Core can prove it (G2-CORE-10).",
+      "oneOf": [
+        {
+          "enum": [
+            "returned",
+            "failed"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "not_dispatched",
+          "description": "Reserved but never dispatched.",
+          "type": "string"
+        },
+        {
+          "const": "pending",
+          "description": "Dispatched and still running.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Dispatched, and Core cannot prove whether it took effect. It is never\nretried; the person decides.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "call_id": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "change_id": {
+      "description": "The ChangeSet the call produced, found by its operation id even when\nthe result was lost.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "change_state": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChangeState"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "committed_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "intent_id": {
+      "description": "Also the `_meta.operation_id` the tool's request carried.",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/ToolOutcome"
+    },
+    "recovered": {
+      "description": "Boot recovery, not the live call, recorded this outcome.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "intent_id",
+    "call_id",
+    "capability_id",
+    "outcome",
+    "recovered"
+  ],
+  "title": "ToolTrace",
+  "type": "object"
+}

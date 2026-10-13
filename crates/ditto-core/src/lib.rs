@@ -4,7 +4,11 @@
 //! both directions: clients call `desktop.*` capabilities, Core calls its
 //! transaction participants (`participant.*`) and hostd (`host.invoke`).
 
+pub mod agent_backend;
+pub mod agent_manager;
+pub mod agent_routes;
 pub mod authz;
+pub mod context;
 pub mod coordinator;
 pub mod core;
 pub mod defaults;
@@ -17,6 +21,7 @@ pub mod exports;
 pub mod fault;
 pub mod hosts;
 pub mod identity;
+pub mod jobs_pool;
 pub mod launcher;
 pub mod log;
 pub mod outputs;
@@ -253,6 +258,23 @@ fn handshake(
     ));
     let host_generation = match input.client.kind.as_str() {
         "hostd" => Some(core.hosts.attach(Arc::clone(&peer))),
+        "agent" => {
+            let managed = core.agent.attach(Arc::clone(&peer));
+            // Production never falls back to G1's uncorrelated stand-in.
+            // Development sockets and explicit fault builds remain fixtures,
+            // and are not evidence of bound production Agent authority.
+            if !managed
+                && matches!(auth_mode, AuthMode::LauncherRegistry(_))
+                && !cfg!(feature = "fault-injection")
+            {
+                return Err(reject(
+                    id,
+                    ErrorName::IdentityRejected,
+                    "Agent must be started by the dedicated Core supervisor",
+                ));
+            }
+            None
+        }
         "quickshell" => {
             core.shell.attach(Arc::clone(&peer));
             // A (re)connected Shell mounts what is committed, never a half
@@ -625,6 +647,7 @@ fn write_message(stream: &mut UnixStream, message: Outgoing) -> io::Result<()> {
             "params": event,
         }))?,
         Outgoing::Request(request) => serde_json::to_vec(&request)?,
+        Outgoing::Shutdown => return Ok(()),
     };
     stream.write_all(&line)?;
     stream.write_all(b"\n")
@@ -647,6 +670,9 @@ fn serve_connection_with_auth(
     let mut writer_stream = stream.try_clone()?;
     let writer = thread::spawn(move || -> io::Result<()> {
         for message in outgoing {
+            if matches!(message, Outgoing::Shutdown) {
+                break;
+            }
             if let Err(error) = write_message(&mut writer_stream, message) {
                 // A client that leaves mid-stream ends the connection; it is
                 // not a service failure, and pending work still unwinds.
@@ -767,6 +793,19 @@ fn serve_connection_with_auth(
     if let Some(connection) = &connection {
         connection.gone.store(true, Ordering::SeqCst);
         connection.peer.close();
+        // Unsent context leaves with the surface that took it; a gone Agent
+        // ends its turns, so their context is released too.
+        core.contexts.release_owner(&connection.connection_id);
+        if connection.kind == "agent" {
+            core.contexts.release_bound();
+        }
+        if connection.kind == "agent" {
+            let owner = connection.connection_id.clone();
+            core.submit(move |c| {
+                let _ = ditto_store::conversations::release_connection(c.store(), &owner);
+                let _ = ditto_store::turns::interrupt_connection(c.store(), Some(&owner));
+            });
+        }
         match connection.kind.as_str() {
             "hostd" => {
                 if let Some(generation) = connection.host_generation {
@@ -804,6 +843,10 @@ fn serve_connection_with_auth(
     for worker in workers {
         let _ = worker.join();
     }
+    // A Peer of this connection may still be held elsewhere (the Agent or
+    // Shell manager until its next tick, a waiting request): its sender
+    // must not keep the writer, and with it this thread, alive forever.
+    let _ = sink.send(Outgoing::Shutdown);
     drop(sink);
     writer
         .join()

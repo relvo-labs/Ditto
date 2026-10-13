@@ -1,0 +1,21 @@
+{
+  "kind": "shape",
+  "description": "shape-unknown-provider-auth",
+  "type": "agent-preferences",
+  "valid": false,
+  "value": {
+    "revision": 0,
+    "enabled": false,
+    "provider": "codex-app-server",
+    "model": null,
+    "reasoning_effort": null,
+    "auth": {
+      "kind": "codex_subscription",
+      "connection_ref": "reference",
+      "password": "canary-not-a-real-secret"
+    },
+    "max_tool_calls": 24,
+    "turn_timeout_ms": 120000,
+    "retain_conversations": true
+  }
+}

@@ -2,6 +2,7 @@
 //! of crate versions. A required field or changed meaning needs a new contract
 //! version; an optional field does not.
 
+pub mod agent;
 pub mod catalog;
 pub mod change;
 pub mod host;
@@ -16,10 +17,10 @@ pub mod services;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// 0.2 is not wire-compatible with 0.1: `ResultMeta.revision` split in two,
-/// requests flow in both directions, and `preflight_rejected` joined the error
-/// set. A 0.1 client is refused at the handshake instead of being guessed at.
-pub const PROTOCOL_VERSION: &str = "0.2.0";
+/// Protocol 0.3 adds Core-owned Agent state, approvals and entry upgrades.
+/// Older clients are rejected at handshake; storage migration preserves
+/// immutable revisions and backs up the previous database before upgrading.
+pub const PROTOCOL_VERSION: &str = "0.3.0";
 
 /// How a controlled launcher hands a client its one-use token: on an inherited
 /// descriptor, so the secret never appears in the client's environment, which
@@ -172,16 +173,20 @@ pub enum EventTopic {
     Notifications,
     Tasks,
     Session,
+    /// Conversation and turn progress. Ids and states only: the content is
+    /// read through `agent.sessions.read`, under that capability's own scope.
+    Conversations,
 }
 
 impl EventTopic {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Desktop,
         Self::Changes,
         Self::Plugins,
         Self::Notifications,
         Self::Tasks,
         Self::Session,
+        Self::Conversations,
     ];
 }
 
@@ -262,6 +267,27 @@ pub enum DesktopEventPayload {
     SessionChanged {
         state: services::SessionState,
     },
+    /// A conversation gained accepted events, or a turn changed state.
+    /// `next_seq` is Core's cursor after the change; `deleted` marks a
+    /// conversation that no longer exists.
+    ConversationUpdated {
+        session_id: String,
+        next_seq: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        turn_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        turn_state: Option<agent::TurnState>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        deleted: bool,
+    },
+    /// Answer text as it streams. Not stored: the turn's final
+    /// `assistant/message` is the record; a surface that missed deltas waits
+    /// for it.
+    ConversationDelta {
+        session_id: String,
+        turn_id: String,
+        text: String,
+    },
 }
 
 impl DesktopEventPayload {
@@ -286,6 +312,9 @@ impl DesktopEventPayload {
             Self::HostEvent { name, .. } if name.starts_with("tasks/") => EventTopic::Tasks,
             Self::HostEvent { .. } => EventTopic::Plugins,
             Self::SessionChanged { .. } => EventTopic::Session,
+            Self::ConversationUpdated { .. } | Self::ConversationDelta { .. } => {
+                EventTopic::Conversations
+            }
         })
     }
 }
@@ -473,6 +502,40 @@ mod tests {
             assert!(codes.insert(name.code()));
             let wire = serde_json::to_string(&name).unwrap();
             assert_eq!(serde_json::from_str::<ErrorName>(&wire).unwrap(), name);
+        }
+    }
+
+    /// The token table and the Shell's `Tokens.qml` name the same tokens,
+    /// defaults and ranges.
+    #[test]
+    fn appearance_tokens_match_the_shell() {
+        let qml = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../shell/jelly/Tokens.qml"
+        ))
+        .unwrap();
+        for (name, kind, default, range, _) in profile::APPEARANCE_TOKENS {
+            let found = match kind {
+                profile::TokenKind::Color => {
+                    qml.contains(&format!("colorToken(\"{name}\", \"{default}\")"))
+                        || qml.contains(&format!("colorToken(\"{name}\", reducedTransparency ? "))
+                            && qml.contains(&format!(": \"{default}\")"))
+                }
+                profile::TokenKind::Number => {
+                    // numberToken("name", default, min, max), compared as numbers.
+                    let start = format!("numberToken(\"{name}\", ");
+                    qml.split(&start).nth(1).is_some_and(|rest| {
+                        let args: Vec<f64> = rest[..rest.find(')').unwrap()]
+                            .split(", ")
+                            .map(|a| a.parse().unwrap())
+                            .collect();
+                        let (lo, hi) = range.unwrap();
+                        args == [default.parse::<f64>().unwrap(), lo, hi]
+                    })
+                }
+                profile::TokenKind::Text => qml.contains(&format!("overrides.{name}")),
+            };
+            assert!(found, "{name} differs from shell/jelly/Tokens.qml");
         }
     }
 

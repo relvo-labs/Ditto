@@ -1,0 +1,18 @@
+{
+  "kind": "shape",
+  "description": "shape-context-reference-path",
+  "type": "context-reference",
+  "valid": false,
+  "value": {
+    "context_id": "ctx-1",
+    "kind": "file",
+    "label": "plan.txt",
+    "path": "/home/person/notes/plan.txt",
+    "mime": "text/plain",
+    "bytes": 12,
+    "sha256": "00",
+    "captured_at": "2026-10-08T00:00:00Z",
+    "expires_at_ms": 1,
+    "truncated": false
+  }
+}

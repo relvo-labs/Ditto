@@ -1,0 +1,38 @@
+{
+  "$defs": {
+    "ContextKind": {
+      "enum": [
+        "file",
+        "clipboard",
+        "capture"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "$ref": "#/$defs/ContextKind"
+    },
+    "output": {
+      "description": "`capture`: the output to capture; absent means the primary one.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "description": "`file`: a path under the person's home directory.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "ContextAcquireInput",
+  "type": "object"
+}

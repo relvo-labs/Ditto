@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "What became of one tool call, as Core can prove it (G2-CORE-10).",
+  "oneOf": [
+    {
+      "enum": [
+        "returned",
+        "failed"
+      ],
+      "type": "string"
+    },
+    {
+      "const": "not_dispatched",
+      "description": "Reserved but never dispatched.",
+      "type": "string"
+    },
+    {
+      "const": "pending",
+      "description": "Dispatched and still running.",
+      "type": "string"
+    },
+    {
+      "const": "unknown",
+      "description": "Dispatched, and Core cannot prove whether it took effect. It is never\nretried; the person decides.",
+      "type": "string"
+    }
+  ],
+  "title": "ToolOutcome"
+}

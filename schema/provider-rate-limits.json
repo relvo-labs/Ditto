@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "ProviderRateWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "resets_at_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "used_percent": {
+          "format": "double",
+          "type": "number"
+        },
+        "window_minutes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "used_percent"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "primary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderRateWindow"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "secondary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderRateWindow"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "title": "ProviderRateLimits",
+  "type": "object"
+}

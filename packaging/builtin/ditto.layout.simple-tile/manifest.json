@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.layout.simple-tile",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": { "zh-TW": "基本平鋪", "en": "Basic tiling" },
   "author": "Ditto",
   "license": "UNLICENSED",
@@ -10,7 +10,7 @@
   "plugin_kind": "declarative_bundle",
   "host_kind": "core_builtin",
   "trust_level": "trusted",
-  "required_protocol_version": "^0.2",
+  "required_protocol_version": "^0.3",
   "platform": ["linux-x86_64"],
   "slots": ["layout.strategy"],
   "hot_swap": "controlled_handoff",

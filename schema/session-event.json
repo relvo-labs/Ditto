@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "SessionEventKind": {
+      "description": "Restricted Harness vocabulary (pinned 477b4f4); unknown required events\nrefuse decoding rather than silently reconstructing a different history.",
+      "enum": [
+        "user/message",
+        "assistant/message",
+        "turn/start",
+        "turn/end",
+        "tool/call",
+        "tool/result",
+        "approval/asked",
+        "approval/decided",
+        "model/selection",
+        "compaction/summary",
+        "session/title",
+        "request/context"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "data": true,
+    "seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "type": {
+      "$ref": "#/$defs/SessionEventKind"
+    }
+  },
+  "required": [
+    "seq",
+    "type",
+    "data"
+  ],
+  "title": "SessionEvent",
+  "type": "object"
+}

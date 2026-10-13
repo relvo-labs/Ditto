@@ -12,7 +12,7 @@
   "trust_level": "trusted",
   "runtime": { "qt": ">=6.10" },
   "platform": ["linux-x86_64"],
-  "required_protocol_version": "^0.2",
+  "required_protocol_version": "^0.3",
   "slots": ["ui.dock"],
   "provides": [],
   "requires": [],

@@ -204,7 +204,7 @@ describe('bridge behaviour through the test host', () => {
     await h.core.apply(changeId(), [h.entry({ entry_id: 'ent-o', module_path: fixture('generic'), config: { tag: 'o', emit: 'fixture/changed' } })])
     await h.runtime.events.flush('ent-o')
     const event = h.core.requests.find(request => request.method === 'host.event')!
-    expect(event.params['_meta']).toMatchObject({ protocol_version: '0.2.0', on_behalf_of: 'ent-o' })
+    expect(event.params['_meta']).toMatchObject({ protocol_version: '0.3.0', on_behalf_of: 'ent-o' })
     expect(h.core.hostEvents).toEqual([expect.objectContaining({ entryId: 'ent-o', name: 'fixture/changed', coalesceKey: 'fixture/changed' })])
     await expect(h.runtime.leases.register({ instance: { entryId: 'ent-ghost', mode: 'active' } as never, definition: { id: 'x', version: '1', handler: () => {} }, revoked: false }))
       .rejects.toMatchObject({ errorName: 'identity_rejected' })

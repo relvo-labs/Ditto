@@ -166,7 +166,8 @@ QtObject {
         }
         mounts.sort((left, right) => left.slot !== right.slot ? (left.slot < right.slot ? -1 : 1) : left.rank - right.rank);
         mounts.forEach(mount => delete mount.rank);
-        const observed = { mounts: mounts, appearance: appearance, avatar: avatar };
+        // The Shell always carries the approval surface (shell/chat/ApprovalWindow).
+        const observed = { mounts: mounts, appearance: appearance, avatar: avatar, approval_responder: true };
         if (avatarPlacement) {
             observed.avatar_placement = avatarPlacement;
         }

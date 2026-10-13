@@ -1,0 +1,2 @@
+{"kind": "shape", "description": "op 不接受未知欄位", "type": "change-op", "valid": false,
+ "value": {"op": "bind_slot", "slot": "ui.dock", "to": "ent-x", "force": true}}

@@ -276,6 +276,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ditto-confine"
+version = "0.3.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "ditto-core"
 version = "0.2.0"
 dependencies = [
@@ -285,10 +292,12 @@ dependencies = [
  "ditto-system",
  "dittoctl",
  "libc",
+ "memchr",
  "rusqlite",
  "semver",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

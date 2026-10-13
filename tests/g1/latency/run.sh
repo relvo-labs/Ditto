@@ -45,7 +45,7 @@ count="${DITTO_LATENCY_COUNT:-100}"
 node="$(command -v node || true)"
 hostd="$WORKSPACE/packages/host-runtime/dist/ditto-hostd.mjs"
 packages="${DITTO_BUILTIN_PACKAGES:-$WORKSPACE/target/ditto-packages}"
-if [[ -z "$node" || ! -f "$hostd" || ! -f "$packages/ditto.svc.tasks-1.0.0.dittopkg" ]]; then
+if [[ -z "$node" || ! -f "$hostd" || ! -f "$packages/ditto.svc.tasks-1.1.0.dittopkg" ]]; then
   check cordis-service-switch fail "needs node, $hostd and $packages (scripts/build-builtin-packages.sh)"
 else
   node="$(readlink -f "$node")"
@@ -108,7 +108,7 @@ local_count="${DITTO_LATENCY_LOCAL_COUNT:-200}"
 [[ "$local_count" == 200 ]] || g1_note "DITTO_LATENCY_LOCAL_COUNT=$local_count: not the 200 the gate asks for"
 missing=()
 for tool in quickshell node wl-copy wl-paste qdbus foot kate; do command -v "$tool" >/dev/null || missing+=("$tool"); done
-[[ -f "$packages/ditto.dock.pill-1.0.0.dittopkg" ]] || missing+=("$packages/ditto.dock.pill-1.0.0.dittopkg")
+[[ -f "$packages/ditto.dock.pill-1.1.0.dittopkg" ]] || missing+=("$packages/ditto.dock.pill-1.1.0.dittopkg")
 [[ -f "$hostd" ]] || missing+=("$hostd")
 if (( ${#missing[@]} > 0 )); then
   for id in local-operations ui-plugin-switch application-survival; do check "$id" environment "missing: ${missing[*]}"; done

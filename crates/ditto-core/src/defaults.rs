@@ -89,12 +89,19 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
         layout: LayoutIntent {
             workspace_grid: [3, 3],
             rules: vec![],
+            regions: vec![],
         },
         appearance: appearance(),
-        shortcuts: vec![ShortcutBinding {
-            chord: "Super+Space".into(),
-            command: "launcher.toggle".into(),
-        }],
+        shortcuts: vec![
+            ShortcutBinding {
+                chord: "Super+Space".into(),
+                command: "launcher.toggle".into(),
+            },
+            ShortcutBinding {
+                chord: "Super+A".into(),
+                command: "chat.toggle".into(),
+            },
+        ],
         avatar: AvatarSettings::default(),
     }
 }
@@ -107,6 +114,7 @@ pub fn empty_document() -> ProfileDocument {
         layout: LayoutIntent {
             workspace_grid: [3, 3],
             rules: vec![],
+            regions: vec![],
         },
         appearance: appearance(),
         shortcuts: vec![],

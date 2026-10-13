@@ -32,9 +32,16 @@ jobs:
       - run: cargo build --locked -p ditto-core
       # Production hostd bundle; the build fails if fault-injection code is still in it.
       - run: pnpm --filter @ditto/host-runtime build
+      - run: pnpm --filter @ditto/agent-runtime build
+      - run: pnpm --filter @ditto/agent-runtime check:upstream
+      - run: pnpm --filter @ditto/agent-runtime test
       - run: pnpm --filter @ditto/host-sdk build
       - run: pnpm --filter @ditto/plugin-fixtures --filter @ditto/svc-tasks --filter @ditto/svc-notification-policy build
       - run: pnpm --filter @ditto/protocol test
       # host-runtime: lifecycle L-01…L-04/L-08 (TS half), Cordis pinning, bridge, process test of the bundle.
       - run: pnpm --filter @ditto/host-runtime test
       - run: pnpm --filter @ditto/host-sdk --filter @ditto/plugin-fixtures --filter @ditto/svc-tasks --filter @ditto/svc-notification-policy test
+      - name: G2 production launcher and persistence foundation
+        run: |
+          bash scripts/build-builtin-packages.sh
+          node tests/g2/foundation/run.mjs

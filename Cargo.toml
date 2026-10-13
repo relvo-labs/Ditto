@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/ditto-protocol", "crates/ditto-store", "crates/ditto-system", "crates/ditto-supervisor", "crates/ditto-compositor", "crates/ditto-core", "crates/dittoctl", "crates/ditto-measure"]
+members = ["crates/ditto-protocol", "crates/ditto-store", "crates/ditto-system", "crates/ditto-supervisor", "crates/ditto-compositor", "crates/ditto-core", "crates/dittoctl", "crates/ditto-measure", "crates/ditto-confine"]
 
 [workspace.package]
 edition = "2021"
@@ -10,3 +10,10 @@ license = "UNLICENSED"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = "1"
+
+# Core hashes and scans the pinned Codex binary (~290 MB) before launching
+# it; unoptimized, that takes seconds in a debug build.
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.memchr]
+opt-level = 3

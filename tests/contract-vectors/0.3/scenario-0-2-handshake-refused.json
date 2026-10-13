@@ -1,0 +1,16 @@
+{
+  "kind": "scenario",
+  "description": "0.2 client is refused by 0.3 at handshake",
+  "client": {
+    "kind": "dittoctl",
+    "protocol_version": "0.2.0"
+  },
+  "steps": [
+    {
+      "handshake": true,
+      "expect": {
+        "error_name": "protocol_version_unsupported"
+      }
+    }
+  ]
+}

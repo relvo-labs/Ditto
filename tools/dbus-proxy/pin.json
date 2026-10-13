@@ -1,0 +1,11 @@
+{
+  "component": "xdg-dbus-proxy",
+  "version": "0.1.9",
+  "upstream_repo": "https://github.com/flatpak/xdg-dbus-proxy",
+  "upstream_commit": "72b40c8f6d9d585cfbdb249690724f740d207087",
+  "port_kind": "unmodified external program, built from the pinned tag",
+  "licence": "LGPL-2.1-or-later; source and licence must accompany any shipped binary (D-11/G4)",
+  "why_not_distribution": "Ubuntu 24.04 ships 0.1.5, which drops sd-bus and zbus clients after authentication ('Invalid message header read'); Codex's keyring store uses zbus. Fixed upstream by 0.1.9.",
+  "use": "Gives the confined Codex app-server one session-bus socket that can talk only to org.freedesktop.secrets.",
+  "modifications": []
+}

@@ -31,6 +31,10 @@ use crate::{
 };
 
 pub struct CoreConfig {
+    pub agent: Option<Specification>,
+    /// The Agent's model backend, launched confined by Core (G2-PLAT-04).
+    pub agent_backend: Option<crate::agent_backend::BackendSpecification>,
+    pub agent_idle: std::time::Duration,
     pub paths: Paths,
     pub mode: CoreMode,
     pub socket: PathBuf,
@@ -56,6 +60,9 @@ pub struct CoreConfig {
 impl CoreConfig {
     pub fn new(paths: Paths, socket: PathBuf) -> Self {
         Self {
+            agent: None,
+            agent_backend: None,
+            agent_idle: crate::agent_manager::IDLE,
             paths,
             mode: CoreMode::Normal,
             socket,
@@ -99,6 +106,12 @@ pub struct SubscriptionInfo {
 }
 
 pub struct Core {
+    pub agent: Arc<crate::agent_manager::AgentManager>,
+    /// Context attached to messages; memory only (G2-CORE-03).
+    pub contexts: crate::context::ContextBroker,
+    /// Trusted background jobs (G2-CORE-05).
+    pub jobs: crate::jobs_pool::JobPool,
+    pub agent_storage_ready: bool,
     pub session: Arc<Session>,
     pub paths: Paths,
     pub mode: CoreMode,
@@ -204,7 +217,13 @@ impl Core {
         registry: Arc<IdentityRegistry>,
     ) -> StoreResult<Arc<Core>> {
         let lock = WriterLock::acquire(&config.paths.lock())?;
-        let (store, report) = Store::open_writer(&config.paths, &lock)?;
+        let (mut store, report) = Store::open_writer(&config.paths, &lock)?;
+        let agent_storage_ready = ditto_store::conversations::recover(&mut store)
+            .and_then(|_| ditto_store::turns::interrupt_connection(&mut store, None))
+            .is_ok();
+        if !agent_storage_ready {
+            crate::log::event("agent.storage_unavailable", &[]);
+        }
         let rescue = config.mode == CoreMode::Rescue;
         let hosts = Arc::new(HostManager::new(
             config.hostd.clone(),
@@ -222,6 +241,23 @@ impl Core {
         let compositor = Arc::new(CompositorParticipant::new(Arc::clone(&session)));
         let (sender, receiver) = mpsc::channel::<Work>();
         let core = Arc::new(Core {
+            agent: Arc::new(
+                crate::agent_manager::AgentManager::new(
+                    config.agent.clone(),
+                    config.agent_backend.clone(),
+                    Arc::clone(&registry),
+                    config.socket.clone(),
+                    config.paths.state.join("agent"),
+                )
+                .with_idle(config.agent_idle),
+            ),
+            contexts: crate::context::ContextBroker::default(),
+            // Fixture kinds (CPU loop, memory hog) only in test runs.
+            jobs: crate::jobs_pool::JobPool::new(
+                std::env::var("DITTO_SYSTEM").is_ok_and(|v| v == "none")
+                    || std::env::var("DITTO_TEST_FIXTURE").is_ok_and(|v| v == "1"),
+            ),
+            agent_storage_ready,
             session,
             paths: config.paths.clone(),
             mode: config.mode,
@@ -251,6 +287,20 @@ impl Core {
         });
         hosts.set_events(Arc::new(Events(Arc::downgrade(&core))));
         crate::outputs::install(&core, config.output_settle);
+        crate::jobs_pool::install(&core);
+        // Region rules follow windows that open later (D-40). On its own
+        // thread: the compositor event pump never waits on placement.
+        let compositor = Arc::clone(&core.compositor);
+        core.session.set_windows_opened(Arc::new(move |opened| {
+            let compositor = Arc::clone(&compositor);
+            let _ = std::thread::Builder::new()
+                .name("ditto-regions".into())
+                .spawn(move || {
+                    for window in &opened {
+                        compositor.window_opened(window);
+                    }
+                });
+        }));
         let coordinator_core = Arc::clone(&core);
         let builtin = config.builtin_packages.clone();
         thread::Builder::new()
@@ -451,6 +501,12 @@ impl Core {
     /// Supervision every 250 ms: hostd heartbeat and leases, Shell restarts,
     /// the lock client, subscriptions of closed connections.
     fn supervise(&self) {
+        if let Some(connection) = self.agent.tick() {
+            self.submit(move |c| {
+                let _ = ditto_store::conversations::release_connection(c.store(), &connection);
+                let _ = ditto_store::turns::interrupt_connection(c.store(), Some(&connection));
+            });
+        }
         if let Some(generation) = self.hosts.tick() {
             self.hosts.detach(generation, "heartbeat_timeout");
         }

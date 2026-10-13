@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "Conversation": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "durable_seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "format_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "next_seq": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "format_version",
+        "title",
+        "created_at",
+        "next_seq",
+        "durable_seq"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "session": {
+      "$ref": "#/$defs/Conversation"
+    },
+    "writer_lease": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "session",
+    "writer_lease"
+  ],
+  "title": "SessionOpenOutput",
+  "type": "object"
+}

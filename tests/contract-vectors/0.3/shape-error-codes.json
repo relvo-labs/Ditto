@@ -1,0 +1,3 @@
+{"kind": "shape", "description": "每個錯誤值都能以封閉集合的名稱與代碼往返", "type": "rpc-response", "valid": true,
+ "value": {"jsonrpc": "2.0", "id": "x", "error": {"code": -32010, "name": "preflight_rejected", "message": "m",
+   "data": {"reasons": [{"code": "single_provider_violation", "op_index": 0, "detail_key": "preflight.single_provider_violation", "detail": {"slot": "ui.dock"}}], "change_id": "chg-01M3H4J7EEWXXD01TR98PCQE7A"}}}}

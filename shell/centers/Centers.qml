@@ -13,6 +13,7 @@ FloatingWindow {
     property var client: null
     property var tokens: null
     property var providers: null
+    property var conversation: null
     property string page: "composition"
     signal closeRequested()
 
@@ -24,7 +25,8 @@ FloatingWindow {
         { id: "composition", label: qsTr("組合中心") },
         { id: "plugins", label: qsTr("插件中心") },
         { id: "history", label: qsTr("變更紀錄") },
-        { id: "personalization", label: qsTr("個人化設定") }
+        { id: "personalization", label: qsTr("個人化設定") },
+        { id: "ai", label: qsTr("AI 設定") }
     ]
 
     title: t(qsTr("Ditto 設定"))
@@ -158,6 +160,7 @@ FloatingWindow {
             sourceComponent: window.page === "plugins" ? pluginsPage
                 : window.page === "history" ? historyPage
                 : window.page === "personalization" ? personalizationPage
+                : window.page === "ai" && window.conversation ? aiPage
                 : compositionPage
         }
     }
@@ -183,6 +186,15 @@ FloatingWindow {
         HistoryCenter {
             client: window.client
             tokens: window.tokens
+        }
+    }
+
+    Component {
+        id: aiPage
+        AISettings {
+            client: window.client
+            tokens: window.tokens
+            conversation: window.conversation
         }
     }
 

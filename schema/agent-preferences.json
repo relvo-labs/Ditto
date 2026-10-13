@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "ApprovalMode": {
+      "enum": [
+        "ask",
+        "never"
+      ],
+      "type": "string"
+    },
+    "ProviderAuthentication": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "connection_ref": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "codex_subscription",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "connection_ref"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "credential_ref": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "api_key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "credential_ref"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "approval_mode": {
+      "$ref": "#/$defs/ApprovalMode",
+      "default": "ask",
+      "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+    },
+    "auth": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderAuthentication"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "endpoint": {
+      "description": "`direct-model` only: the OpenAI-compatible Responses endpoint\n(`https://…/v1`). Its key is the `api_key` credential reference.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "max_tool_calls": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider": {
+      "type": "string"
+    },
+    "reasoning_effort": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "retain_conversations": {
+      "type": "boolean"
+    },
+    "revision": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "turn_timeout_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "revision",
+    "enabled",
+    "provider",
+    "max_tool_calls",
+    "turn_timeout_ms",
+    "retain_conversations"
+  ],
+  "title": "AgentPreferences",
+  "type": "object"
+}

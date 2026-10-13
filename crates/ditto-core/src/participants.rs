@@ -6,17 +6,18 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use ditto_compositor::AdapterError;
 use ditto_protocol::{
+    participant::RegionPlacement,
     participant::{
         ChangePhase, CompositorObservation, CompositorProjection, ItemReport, ItemStatus,
         Observation, ParticipantPhase, ParticipantRole, PrepareParams, Projection, StateOutput,
         StepReport, ABORT, COMMIT, PREPARE, ROLLBACK, STATE,
     },
-    profile::ShortcutBinding,
+    profile::{RegionRule, ShortcutBinding},
     Window,
 };
 use serde_json::{json, Value};
@@ -147,6 +148,9 @@ pub struct CompositorParticipant {
     inner: Mutex<CompositorState>,
 }
 
+/// `(x, y, width, height)` in output-relative logical pixels.
+type Rect = (i32, i32, u32, u32);
+
 /// How many strategy switches keep the window placement they replaced.
 /// Placement is session state, not profile state: it is held in memory only,
 /// so an undo after a Core restart has nothing to put back and says nothing.
@@ -160,6 +164,10 @@ struct CompositorState {
     /// Window placement just before a committed strategy switch, by the
     /// change that switched; oldest first.
     placements: Vec<(String, Vec<Window>)>,
+    /// The windows the last commit placed by region rules, as
+    /// `(rule_id, window_id)`: what that commit's readback checks. A window
+    /// moved by hand later is not checked again until a change touches it.
+    last_placed: Vec<(String, String)>,
 }
 
 #[derive(Clone)]
@@ -233,10 +241,212 @@ impl CompositorParticipant {
             .with_adapter(|adapter| adapter.workspace_grid())
             .ok()
             .flatten();
+        let regions = self.region_readback();
         CompositorObservation {
             strategy,
             shortcuts,
             workspace_grid,
+            regions,
+        }
+    }
+
+    /// The first region rule that covers a window (by application id; the
+    /// rule's `output` is where the window goes, not a filter).
+    fn rule_for<'a>(regions: &'a [RegionRule], window: &Window) -> Option<&'a RegionRule> {
+        regions
+            .iter()
+            .find(|rule| rule.matcher.app_id == window.app_id)
+    }
+
+    /// Where a rule puts a window: the rule's output (or the window's) and
+    /// the rectangle in that output's work area.
+    fn target_of(
+        &self,
+        rule: &RegionRule,
+        window: &Window,
+    ) -> Result<(String, Rect), AdapterError> {
+        // A rule's output that is not connected falls back to the window's
+        // own output; the rule keeps its output for when it returns.
+        let connected = |name: &String| {
+            self.session
+                .with_adapter(|adapter| adapter.outputs())
+                .unwrap_or_default()
+                .iter()
+                .any(|output| &output.name == name && output.enabled)
+        };
+        let output = rule
+            .output
+            .clone()
+            .filter(connected)
+            .or_else(|| window.output.clone())
+            .ok_or_else(|| AdapterError::Unsupported("the window's output is not known".into()))?;
+        let area = self
+            .session
+            .with_adapter(|adapter| adapter.workarea(&output))?;
+        Ok((output, rule.region.resolve(area)))
+    }
+
+    /// Put one window where its rule says and read it back.
+    fn place(&self, rule: &RegionRule, window: &Window) -> ItemReport {
+        let key = format!("region:{}:{}", rule.rule_id, window.id.0);
+        let outcome = self
+            .target_of(rule, window)
+            .and_then(|(output, (x, y, width, height))| {
+                self.session.with_adapter(|adapter| {
+                    if window.output.as_deref() != Some(output.as_str()) {
+                        adapter.move_window_to_output(&window.id, &output, x, y)?;
+                    }
+                    adapter.place_window(&window.id, x, y, width, height)
+                })
+            });
+        report(&key, outcome)
+    }
+
+    /// Apply the rules that are new or changed against `previous` to every
+    /// open window they cover. Windows under unchanged rules keep where the
+    /// person may have moved them.
+    fn apply_regions(
+        &self,
+        target: &[RegionRule],
+        previous: Option<&[RegionRule]>,
+    ) -> (Vec<ItemReport>, Vec<(String, String)>) {
+        let changed: Vec<&RegionRule> = target
+            .iter()
+            .filter(|rule| previous.is_none_or(|old| !old.contains(rule)))
+            .collect();
+        if changed.is_empty() {
+            return (vec![], vec![]);
+        }
+        let mut items = Vec::new();
+        let mut placed = Vec::new();
+        for window in self.placement() {
+            let Some(rule) = Self::rule_for(target, &window) else {
+                continue;
+            };
+            if !changed.contains(&rule) {
+                continue;
+            }
+            let item = self.place(rule, &window);
+            if item.status == ItemStatus::Applied {
+                placed.push((rule.rule_id.clone(), window.id.0.clone()));
+            }
+            items.push(item);
+        }
+        if !placed.is_empty() {
+            self.settle(&placed);
+        }
+        (items, placed)
+    }
+
+    /// A configure is only a request: the client answers with the size it
+    /// commits, which may differ (a floating window may keep its own width).
+    /// The readback waits until the placed windows' geometry has stopped
+    /// changing, so it judges what the client committed, not what was asked.
+    fn settle(&self, placed: &[(String, String)]) {
+        const MIN: Duration = Duration::from_millis(150);
+        const MAX: Duration = Duration::from_millis(1500);
+        const STEP: Duration = Duration::from_millis(50);
+        type Geometry = (Option<i32>, Option<i32>, Option<u32>, Option<u32>);
+        let geometry = || -> Vec<Geometry> {
+            let windows = self.placement();
+            placed
+                .iter()
+                .map(|(_, id)| {
+                    windows
+                        .iter()
+                        .find(|w| &w.id.0 == id)
+                        .map(|w| (w.x, w.y, w.width, w.height))
+                        .unwrap_or_default()
+                })
+                .collect()
+        };
+        // Unchanged for MIN in a row, or MAX in all.
+        let started = Instant::now();
+        let mut stable_since = started;
+        let mut last = geometry();
+        while stable_since.elapsed() < MIN && started.elapsed() < MAX {
+            std::thread::sleep(STEP);
+            let now = geometry();
+            if now != last {
+                stable_since = Instant::now();
+                last = now;
+            }
+        }
+    }
+
+    /// The last commit's placements, as the compositor reports them now.
+    fn region_readback(&self) -> Vec<RegionPlacement> {
+        let (placed, regions) = {
+            let inner = self.inner.lock().expect("compositor participant");
+            let regions = inner
+                .committed
+                .as_ref()
+                .map(|c| c.layout.regions.clone())
+                .unwrap_or_default();
+            (inner.last_placed.clone(), regions)
+        };
+        if placed.is_empty() {
+            return vec![];
+        }
+        let windows = self.placement();
+        placed
+            .iter()
+            .filter_map(|(rule_id, window_id)| {
+                let rule = regions.iter().find(|r| &r.rule_id == rule_id)?;
+                let window = windows.iter().find(|w| &w.id.0 == window_id);
+                let target = window
+                    .and_then(|w| self.target_of(rule, w).ok())
+                    .map(|(_, (x, y, w, h))| {
+                        [i64::from(x), i64::from(y), i64::from(w), i64::from(h)]
+                    })
+                    .unwrap_or([0; 4]);
+                let observed = window.and_then(|w| match (w.x, w.y, w.width, w.height) {
+                    (Some(x), Some(y), Some(width), Some(height)) => Some([
+                        i64::from(x),
+                        i64::from(y),
+                        i64::from(width),
+                        i64::from(height),
+                    ]),
+                    _ => None,
+                });
+                Some(RegionPlacement {
+                    rule_id: rule_id.clone(),
+                    window_id: window_id.clone(),
+                    target,
+                    observed,
+                })
+            })
+            .collect()
+    }
+
+    /// A window opened: if a committed rule covers it, place it. This is the
+    /// event-driven half of D-40; it is not a change, so it reports to the
+    /// log only.
+    pub fn window_opened(&self, window: &Window) {
+        let rule = {
+            let inner = self.inner.lock().expect("compositor participant");
+            inner
+                .committed
+                .as_ref()
+                .and_then(|c| Self::rule_for(&c.layout.regions, window).cloned())
+        };
+        if let Some(rule) = rule {
+            let item = self.place(&rule, window);
+            crate::log::event(
+                "layout.region_applied",
+                &[
+                    ("rule_id", rule.rule_id.as_str()),
+                    ("window_id", window.id.0.as_str()),
+                    (
+                        "status",
+                        if item.status == ItemStatus::Applied {
+                            "applied"
+                        } else {
+                            "failed"
+                        },
+                    ),
+                ],
+            );
         }
     }
 
@@ -394,6 +604,42 @@ impl Participant for CompositorParticipant {
                 });
             }
         }
+        if previous.as_ref().is_none_or(|old| {
+            old.layout.regions != target.layout.regions || old.strategy != target.strategy
+        }) && !target.layout.regions.is_empty()
+        {
+            // Regions are floating geometry: a tiler owns window geometry.
+            let floating = target
+                .strategy
+                .as_deref()
+                .is_none_or(|package| strategy_name(package) == Some("floating"));
+            let outputs = self
+                .session
+                .with_adapter(|adapter| adapter.outputs())
+                .unwrap_or_default();
+            let measurable = outputs.iter().any(|output| {
+                self.session
+                    .with_adapter(|adapter| adapter.workarea(&output.name))
+                    .is_ok()
+            });
+            let reason = if !floating {
+                Some("region layout needs the floating layout strategy".to_string())
+            } else if !measurable {
+                Some("the compositor reports no work area to divide".to_string())
+            } else {
+                None
+            };
+            items.push(ItemReport {
+                key: "regions".into(),
+                status: if reason.is_none() {
+                    ItemStatus::Ready
+                } else {
+                    ItemStatus::Failed
+                },
+                reason,
+                missing: vec![],
+            });
+        }
         if previous
             .as_ref()
             .is_none_or(|old| old.shortcuts != target.shortcuts)
@@ -437,9 +683,26 @@ impl Participant for CompositorParticipant {
                 .ok_or_else(|| ParticipantError::Refused("unknown change".into()))?
         };
         let switches = Self::strategy_changes(&candidate.target, candidate.previous.as_ref());
-        let before = switches.then(|| self.placement());
+        let regions_changed = candidate
+            .previous
+            .as_ref()
+            .is_none_or(|old| old.layout.regions != candidate.target.layout.regions);
+        let moves = switches || regions_changed;
+        let before = moves.then(|| self.placement());
         let mut items = self.apply(&candidate.target, candidate.previous.as_ref());
-        let saved = match (&candidate.undoes, switches) {
+        let (region_items, placed) = if candidate.undoes.is_some() {
+            (vec![], vec![])
+        } else {
+            self.apply_regions(
+                &candidate.target.layout.regions,
+                candidate
+                    .previous
+                    .as_ref()
+                    .map(|old| old.layout.regions.as_slice()),
+            )
+        };
+        items.extend(region_items);
+        let saved = match (&candidate.undoes, moves) {
             (Some(undone), true) => {
                 let inner = self.inner.lock().expect("compositor participant");
                 inner
@@ -460,6 +723,7 @@ impl Participant for CompositorParticipant {
                 inner.placements.remove(0);
             }
         }
+        inner.last_placed = placed;
         inner.committed = Some(candidate.target);
         inner
             .phases
@@ -488,6 +752,18 @@ impl Participant for CompositorParticipant {
                 .ok_or_else(|| ParticipantError::Refused("unknown change".into()))?
         };
         let mut items = Vec::new();
+        // Geometry this change moved goes back first, then the projection.
+        let saved = {
+            let inner = self.inner.lock().expect("compositor participant");
+            inner
+                .placements
+                .iter()
+                .find(|(id, _)| id == change_id)
+                .map(|(_, windows)| windows.clone())
+        };
+        if let Some(saved) = saved {
+            items.extend(self.restore_placement(&saved));
+        }
         if let Some(previous) = &previous {
             for item in self.apply(previous, Some(&target)) {
                 items.push(ItemReport {
@@ -502,6 +778,7 @@ impl Participant for CompositorParticipant {
         }
         let mut inner = self.inner.lock().expect("compositor participant");
         inner.placements.retain(|(id, _)| id != change_id);
+        inner.last_placed.clear();
         inner.committed = previous;
         inner
             .phases

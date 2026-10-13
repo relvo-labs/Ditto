@@ -7,6 +7,7 @@ import "jelly"
 import "avatar"
 import "change"
 import "centers"
+import "chat"
 
 /// Ditto's desktop session (G1). The Shell owns what is on screen: the
 /// background, the character, the four centers, the change bar, and the
@@ -16,6 +17,12 @@ import "centers"
 /// nothing to disk.
 ShellRoot {
     id: root
+
+    /// Core launches the Shell with a single-use token. A reload on a source
+    /// change comes back without one and cannot reach Core again, leaving the
+    /// desktop with no panel or dock (2026-10-09, the live session ran from a
+    /// working tree being edited). Development opts in with DITTO_SHELL_WATCH=1.
+    settings.watchFiles: Quickshell.env("DITTO_SHELL_WATCH") === "1"
 
     Tr {
         id: translator
@@ -41,6 +48,13 @@ ShellRoot {
         commandHandler: root.runCommand
     }
 
+    /// The conversation the chat surfaces show. Idle until the chat is first
+    /// opened: no subscription, no Agent start before that.
+    ConversationState {
+        id: conversation
+        client: client
+    }
+
     ProviderHost {
         id: providers
         client: client
@@ -56,8 +70,8 @@ ShellRoot {
     /// groups it sits in, innermost first. Only names are read; nothing is
     /// pressed and nothing is sent to Core.
     function focusReport() {
-        const window = centersLoader.item;
-        if (!centers.open || !window) {
+        const window = approvalLoader.item || centersLoader.item || chatLoader.item || chatPanelLoader.item;
+        if (!window || (window === centersLoader.item && !centers.open)) {
             return { open: false };
         }
         const item = window.focusedItem;
@@ -171,11 +185,63 @@ ShellRoot {
         case "personalization.open":
             centers.show("personalization");
             return;
+        case "chat.open":
+            root.openChat();
+            return;
+        case "chat.toggle":
+            if (chat.open) {
+                chat.open = false;
+            } else {
+                rpcCounter.mark("chat.open");
+                root.openChat();
+            }
+            return;
+        case "ai_settings.open":
+            root.openAiSettings();
+            return;
         }
         console.log("ditto-shell ignored command " + commandId);
     }
 
+    /// The chat opens beside the character, or as a window when there is no
+    /// character to sit beside (AVA-07: every way in works without it).
+    function openChat(mode) {
+        conversation.open();
+        chat.mode = mode || (chat.open ? chat.mode : (avatarLoader.item && avatarLoader.item.visible ? "panel" : "window"));
+        chat.open = true;
+        // Already open: bring the keyboard back to the message field.
+        const surface = chat.mode === "panel" ? chatPanelLoader.item : chatLoader.item;
+        if (surface) {
+            surface.requestFocus();
+        }
+    }
+
+    /// What the `chat` control line answers: what the chat shows, read from
+    /// the shared conversation state. Read-only; nothing is sent to Core.
+    function chatReport() {
+        const last = conversation.events.filter(event => event.type === "assistant/message").slice(-1)[0];
+        return {
+            open: chat.open,
+            mode: chat.mode,
+            streaming: conversation.streamText.length,
+            sessions: conversation.sessions.length,
+            draft: conversation.draft,
+            state: conversation.taskState,
+            text: conversation.stateText,
+            enabled: conversation.enabled,
+            connected: conversation.connected,
+            session_id: conversation.sessionId,
+            turn_state: conversation.turn ? conversation.turn.state : null,
+            events: conversation.events.map(event => event.type),
+            changes: conversation.changeIds(),
+            answer: last && last.data ? last.data.text : null,
+            error: conversation.errorText,
+            attached: conversation.attached.map(item => ({ kind: item.kind, label: item.label, bytes: item.bytes }))
+        };
+    }
+
     readonly property var shellClient: client
+    readonly property var shellConversation: conversation
     readonly property var shellTokens: tokens
     readonly property var shellProviders: providers
     readonly property var avatarSettings: providers.avatar
@@ -289,9 +355,144 @@ ShellRoot {
             client: root.shellClient
             tokens: root.shellTokens
             providers: root.shellProviders
+            conversation: root.shellConversation
             page: centers.page
             onCloseRequested: centers.open = false
             onPageChanged: centers.page = page
+        }
+    }
+
+    QtObject {
+        id: chat
+        property bool open: false
+        /// "panel" (beside the character) or "window"; switching changes
+        /// only the presentation of the one conversation state.
+        property string mode: "panel"
+    }
+
+    function openAiSettings() {
+        centers.show("ai");
+    }
+
+    /// Agent approval requests waiting for this person, oldest first. Each is
+    /// answered once through Core (desktop.approvals.decide) and dropped; an
+    /// expired one is dropped too (Core already refuses it).
+    QtObject {
+        id: approvals
+        property var pending: []
+        property var answered: ({})
+
+        function add(approval) {
+            if (!approval.request_id || approval.decision || answered[approval.request_id]
+                || pending.some(item => item.request_id === approval.request_id)) {
+                return;
+            }
+            pending = pending.concat([approval]);
+            expiry.restart();
+        }
+
+        function decide(approval, decision) {
+            if (answered[approval.request_id]) {
+                return;
+            }
+            const table = Object.assign({}, answered);
+            table[approval.request_id] = decision;
+            answered = table;
+            pending = pending.filter(item => item.request_id !== approval.request_id);
+            client.capability("desktop.approvals.decide", {
+                request_id: approval.request_id,
+                intent_hash: approval.request.intent_hash,
+                decision: decision
+            }, null, function (error) {
+                console.log("ditto-shell approval refused: " + error.name + " " + error.message);
+            });
+        }
+
+        property Timer expiry: Timer {
+            interval: 1000
+            repeat: true
+            onTriggered: {
+                const now = Date.now();
+                approvals.pending = approvals.pending.filter(item => item.expires_at_ms > now);
+                running = approvals.pending.length > 0;
+            }
+        }
+    }
+
+    Connections {
+        target: client
+        function onApprovalRequested(approval) {
+            approvals.add(approval);
+        }
+        /// After a (re)connect or a resync, requests still waiting are read
+        /// back from Core: a notification sent while the Shell was away is
+        /// not lost.
+        function onOnlineChanged() {
+            if (client.online) {
+                root.refreshApprovals();
+            }
+        }
+        function onResynced() {
+            root.refreshApprovals();
+        }
+    }
+
+    function refreshApprovals() {
+        client.capability("desktop.approvals.list", {}, function (result) {
+            for (const approval of result.approvals || []) {
+                approvals.add(approval);
+            }
+        });
+    }
+
+    LazyLoader {
+        id: approvalLoader
+        active: approvals.pending.length > 0
+
+        ApprovalWindow {
+            client: root.shellClient
+            tokens: root.shellTokens
+            approval: approvals.pending.length > 0 ? approvals.pending[0] : null
+            onDecided: decision => {
+                if (approval) {
+                    approvals.decide(approval, decision);
+                }
+            }
+        }
+    }
+
+    /// The chat exists only while open. Closing it does not stop a running
+    /// turn: that is Core's, and only 「停止」 cancels it.
+    LazyLoader {
+        id: chatLoader
+        active: chat.open && chat.mode === "window"
+
+        ChatWindow {
+            client: root.shellClient
+            tokens: root.shellTokens
+            conversation: root.shellConversation
+            counter: rpcCounter
+            onCloseRequested: chat.open = false
+            onCollapseRequested: chat.mode = "panel"
+            onSettingsRequested: root.openAiSettings()
+        }
+    }
+
+    LazyLoader {
+        id: chatPanelLoader
+        active: chat.open && chat.mode === "panel"
+
+        ChatPanel {
+            client: root.shellClient
+            tokens: root.shellTokens
+            conversation: root.shellConversation
+            screen: root.avatarScreen
+            corner: root.avatarCorner
+            avatarHeight: avatarLoader.item ? avatarLoader.item.implicitHeight : 0
+            counter: rpcCounter
+            onCloseRequested: chat.open = false
+            onExpandRequested: chat.mode = "window"
+            onSettingsRequested: root.openAiSettings()
         }
     }
 
@@ -379,6 +580,8 @@ ShellRoot {
                 tokens: avatarSurface.desktopTokens
                 tr: translator
                 animations: !root.avatarSettings || root.avatarSettings.animations !== false
+                avatarState: conversation.wanted ? conversation.taskState : "idle"
+                onPressed: root.openChat("panel")
             }
 
             /// The character's state is readable as text from the first day, so the
@@ -388,9 +591,11 @@ ShellRoot {
                 anchors.bottom: parent.bottom
                 color: tokens.foreground
                 font.pixelSize: tokens.fontSmall
-                text: avatar.stateText
+                /// Once a conversation was opened, its task state is the
+                /// character's; before that the character is just idle.
+                text: conversation.wanted ? conversation.stateText : avatar.stateText
                 Accessible.role: Accessible.StaticText
-                Accessible.name: avatar.stateText
+                Accessible.name: text
             }
 
             FrameProbe {}
@@ -443,6 +648,13 @@ ShellRoot {
     ///                     text the surfaces show. Read-only
     ///   tasks           → one JSON line: whether a tasks panel is mounted and
     ///                     the open tasks it holds to show. Read-only
+    ///   chat            → one JSON line: the chat's task state and text, the
+    ///                     conversation's event types, change ids and last
+    ///                     answer, read from the shared state. Read-only
+    ///   chat-send <text> open the chat and send <text> as if typed and
+    ///                     submitted with Enter
+    ///   chat-attach <clipboard|capture|file PATH>
+    ///                     attach context as the chat's buttons do
     ///   status          → one JSON line: where the status items are placed
     ///                     (the panel's region or the Shell's strip) and each
     ///                     item in order, read from the items. Read-only
@@ -478,6 +690,22 @@ ShellRoot {
                     } else if (command[0] === "tasks") {
                         connection.write(JSON.stringify(root.tasksReport()) + "\n");
                         connection.flush();
+                    } else if (command[0] === "chat") {
+                        connection.write(JSON.stringify(root.chatReport()) + "\n");
+                        connection.flush();
+                    } else if (command[0] === "chat-mode" && command.length === 2) {
+                        // The same route as the 展開／收合 buttons.
+                        chat.mode = command[1] === "window" ? "window" : "panel";
+                    } else if (command[0] === "chat-send" && command.length > 1) {
+                        // The same route as typing and pressing Enter.
+                        root.openChat();
+                        conversation.draft = line.trim().slice("chat-send ".length);
+                        conversation.send();
+                    } else if (command[0] === "chat-attach" && command.length >= 2) {
+                        // The same route as the attachment buttons (and, for
+                        // a file, the path the file dialog returns).
+                        root.openChat();
+                        conversation.attach(command[1], command.length > 2 ? line.trim().split(" ").slice(2).join(" ") : "");
                     } else if (command[0] === "status") {
                         connection.write(JSON.stringify(root.statusReport()) + "\n");
                         connection.flush();

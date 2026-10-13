@@ -1,0 +1,419 @@
+{
+  "$defs": {
+    "AgentPreferences": {
+      "additionalProperties": false,
+      "properties": {
+        "approval_mode": {
+          "$ref": "#/$defs/ApprovalMode",
+          "default": "ask",
+          "description": "`ask`: an Agent call outside its grants asks the person once.\n`never`: nobody is asked; such calls are refused (existing grants\nstill apply). Never an automatic yes."
+        },
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderAuthentication"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "endpoint": {
+          "description": "`direct-model` only: the OpenAI-compatible Responses endpoint\n(`https://…/v1`). Its key is the `api_key` credential reference.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_tool_calls": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "reasoning_effort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retain_conversations": {
+          "type": "boolean"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turn_timeout_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "enabled",
+        "provider",
+        "max_tool_calls",
+        "turn_timeout_ms",
+        "retain_conversations"
+      ],
+      "type": "object"
+    },
+    "ApprovalMode": {
+      "enum": [
+        "ask",
+        "never"
+      ],
+      "type": "string"
+    },
+    "ChangeState": {
+      "enum": [
+        "draft",
+        "validated",
+        "rejected",
+        "prepared",
+        "aborted",
+        "applying",
+        "verifying",
+        "committed",
+        "rolling_back",
+        "rolled_back",
+        "partially_applied",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "ContextKind": {
+      "enum": [
+        "file",
+        "clipboard",
+        "capture"
+      ],
+      "type": "string"
+    },
+    "ContextPayload": {
+      "additionalProperties": false,
+      "description": "Context content handed to the Agent for the one turn it was attached to.",
+      "properties": {
+        "image_data_url": {
+          "description": "`data:image/png;base64,…`",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference": {
+          "$ref": "#/$defs/ContextReference"
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "reference"
+      ],
+      "type": "object"
+    },
+    "ContextReference": {
+      "additionalProperties": false,
+      "description": "What a piece of context is, without its content. This is what a\nconversation keeps; the content lives in Core's memory until released.",
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "captured_at": {
+          "type": "string"
+        },
+        "context_id": {
+          "type": "string"
+        },
+        "expires_at_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ContextKind"
+        },
+        "label": {
+          "description": "A file name (never its path), \"clipboard\" or an output name.",
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "truncated": {
+          "description": "The content was cut at the size limit.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context_id",
+        "kind",
+        "label",
+        "mime",
+        "bytes",
+        "sha256",
+        "captured_at",
+        "expires_at_ms",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "DiffItem": {
+      "additionalProperties": false,
+      "description": "One line of a change card. The label is a translation key so Core never\nemits locale-specific text; the Shell renders it in the Profile's language.",
+      "properties": {
+        "after": true,
+        "before": true,
+        "kind": {
+          "$ref": "#/$defs/DiffKind"
+        },
+        "label_args": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "label_key": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "label_key"
+      ],
+      "type": "object"
+    },
+    "DiffKind": {
+      "enum": [
+        "added",
+        "removed",
+        "changed"
+      ],
+      "type": "string"
+    },
+    "ProviderAuthentication": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "connection_ref": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "codex_subscription",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "connection_ref"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "credential_ref": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "api_key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "credential_ref"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RecentChange": {
+      "additionalProperties": false,
+      "properties": {
+        "change_id": {
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DiffItem"
+          },
+          "type": "array"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResultKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/ChangeState"
+        },
+        "turn_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "turn_id",
+        "state",
+        "items"
+      ],
+      "type": "object"
+    },
+    "ResultKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "succeeded",
+            "failed",
+            "partial",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "scheduled",
+          "description": "Committed as a revision, but nothing took effect yet: every item is\n`scheduled` (session-restart level: at the next login; in rescue mode:\nwhen the normal mode returns). Never presented as \"applied\".",
+          "type": "string"
+        }
+      ]
+    },
+    "Turn": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "error_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "settings_revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState"
+        },
+        "tool_calls": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turn_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "turn_id",
+        "session_id",
+        "state",
+        "created_at",
+        "settings_revision",
+        "tool_calls",
+        "operation_ids"
+      ],
+      "type": "object"
+    },
+    "TurnState": {
+      "enum": [
+        "queued",
+        "running",
+        "awaiting_approval",
+        "cancelling",
+        "succeeded",
+        "failed",
+        "partial",
+        "unknown",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contexts": {
+      "default": [],
+      "description": "Context attached to this turn's message and still held by Core.\nA reference whose content was released (expiry, Core restart) is\nabsent: the Agent says so instead of guessing.",
+      "items": {
+        "$ref": "#/$defs/ContextPayload"
+      },
+      "type": "array"
+    },
+    "message_seq": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "recent_changes": {
+      "default": [],
+      "description": "The latest ChangeSets this conversation produced, newest first, as\nCore recorded them: what \"that\", \"it\" or \"a bit more\" can refer to.",
+      "items": {
+        "$ref": "#/$defs/RecentChange"
+      },
+      "type": "array"
+    },
+    "settings": {
+      "$ref": "#/$defs/AgentPreferences"
+    },
+    "text": {
+      "type": "string"
+    },
+    "turn": {
+      "$ref": "#/$defs/Turn"
+    }
+  },
+  "required": [
+    "turn",
+    "text",
+    "message_seq",
+    "settings"
+  ],
+  "title": "TurnClaimOutput",
+  "type": "object"
+}

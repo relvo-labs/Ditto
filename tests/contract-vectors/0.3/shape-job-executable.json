@@ -1,0 +1,23 @@
+{
+  "kind": "shape",
+  "description": "shape-job-executable",
+  "type": "job",
+  "valid": false,
+  "value": {
+    "job_id": "job-1",
+    "kind": "packages.verify",
+    "state": "queued",
+    "progress": null,
+    "result": null,
+    "error_key": null,
+    "idempotency_key": null,
+    "created_at": "2026-10-08T00:00:00Z",
+    "updated_at": "2026-10-08T00:00:00Z",
+    "cancellable": true,
+    "command": [
+      "/bin/sh",
+      "-c",
+      "true"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "kind": "shape",
+  "description": "shape-turn-trace",
+  "type": "turn-trace-output",
+  "valid": true,
+  "value": {
+    "turn": {
+      "turn_id": "turn-1",
+      "session_id": "ses-1",
+      "state": "unknown",
+      "created_at": "2026-10-08T00:00:00Z",
+      "settings_revision": 1,
+      "tool_calls": 2,
+      "operation_ids": [
+        "intent-1",
+        "intent-2"
+      ],
+      "error_reason": "interrupted"
+    },
+    "tools": [
+      {
+        "intent_id": "intent-1",
+        "call_id": "call-1",
+        "capability_id": "desktop.changes.propose",
+        "outcome": "returned",
+        "change_id": "chg-1",
+        "change_state": "committed",
+        "committed_revision": "rev-2",
+        "recovered": true
+      },
+      {
+        "intent_id": "intent-2",
+        "call_id": "call-2",
+        "capability_id": "desktop.changes.propose",
+        "outcome": "unknown",
+        "change_id": null,
+        "change_state": null,
+        "committed_revision": null,
+        "recovered": true
+      }
+    ]
+  }
+}

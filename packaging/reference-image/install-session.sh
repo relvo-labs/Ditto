@@ -21,8 +21,15 @@ wayfire_prefix="${DITTO_WAYFIRE_PREFIX:-$HOME/wayfire}"
 temporary="$(mktemp -d /tmp/ditto-session-install.XXXXXX)"
 trap 'rm -rf -- "$temporary"' EXIT
 
-for command in cargo sed sudo install; do
+for command in cargo sed sudo install jq sha256sum; do
   command -v "$command" >/dev/null || { echo "missing installer dependency: $command" >&2; exit 1; }
+done
+# The pinned D-Bus proxy and screencast portal are built from source here.
+for command in meson ninja pkg-config; do
+  command -v "$command" >/dev/null || { echo "missing installer dependency: $command (apt-packages.txt)" >&2; exit 1; }
+done
+for module in gio-2.0 libpipewire-0.3 wayland-client wayland-protocols gbm libdrm inih libsystemd; do
+  pkg-config --exists "$module" || { echo "missing build library: $module (apt-packages.txt)" >&2; exit 1; }
 done
 
 # `--development` installs the same session on a development machine or VM.
@@ -53,7 +60,12 @@ if [[ -n "$development" ]]; then
 else
   bash "$here/preflight.sh"
 fi
-cargo build --locked --release -p ditto-core -p ditto-supervisor -p dittoctl
+# ditto-core's crate also builds ditto-worker (the job pool); ditto-confine
+# is the Codex backend's OS boundary; both must sit next to ditto-core.
+cargo build --locked --release -p ditto-core -p ditto-supervisor -p dittoctl -p ditto-confine
+# The filtering session-bus proxy for the backend's keyring access: the
+# pinned build (Ubuntu's 0.1.5 drops zbus clients).
+bash "$workspace/tools/dbus-proxy/build.sh" release >/dev/null
 
 # hostd runs on the frozen Node (.nvmrc), named by its canonical path.
 node="$(readlink -f "${DITTO_NODE:-$(command -v node || true)}")"
@@ -61,7 +73,19 @@ wanted="v$(tr -d '[:space:]' <"$workspace/.nvmrc")"
 [[ -x "$node" ]] || { echo "missing Node $wanted (set DITTO_NODE)" >&2; exit 1; }
 [[ "$("$node" --version)" == "$wanted" ]] || { echo "Node at $node is $("$node" --version), not $wanted" >&2; exit 1; }
 command -v pnpm >/dev/null || { echo "missing installer dependency: pnpm" >&2; exit 1; }
-(cd "$workspace" && pnpm install --frozen-lockfile && pnpm --filter @ditto/host-runtime build)
+(cd "$workspace" && pnpm install --frozen-lockfile && pnpm --filter @ditto/host-runtime build && pnpm --filter @ditto/agent-runtime build)
+# The Codex backend is configured only for the exact pinned binary
+# (tools/codex/pin.json); Core verifies the hash again at every launch.
+codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}" 2>/dev/null || true)"
+pin_version="$(jq -r .version "$workspace/tools/codex/pin.json")"
+pin_sha="$(jq -r .sha256 "$workspace/tools/codex/pin.json")"
+agent_backend_args=""
+if [[ -n "$codex" && -f "$codex" && "$(sha256sum "$codex" | cut -d' ' -f1)" == "$pin_sha" ]]; then
+  agent_backend_args="--agent-backend \"codex-app-server $pin_version $pin_sha $codex\""
+  echo "Codex backend: $codex (pinned $pin_version)" >&2
+else
+  echo "Codex backend: the pinned codex $pin_version binary was not found; the session runs without it" >&2
+fi
 bash "$workspace/scripts/build-builtin-packages.sh" "$workspace/target/ditto-packages" >/dev/null
 # hostd's Node/V8 flags have one source; every launch path reads the same file.
 hostd_node_flags="$(sed -e 's/#.*//' "$workspace/packages/host-runtime/hostd.node-flags" | xargs)"
@@ -73,6 +97,7 @@ substitute() {
     -e "s|@DITTO_LIBEXEC@|$libexec|g" \
     -e "s|@DITTO_NODE@|$node|g" \
     -e "s|@DITTO_HOSTD_NODE_FLAGS@|$hostd_node_flags|g" \
+    -e "s|@DITTO_AGENT_BACKEND_ARGS@|$agent_backend_args|g" \
     -e "s|@DITTO_SESSION_EXEC@|$libexec/ditto-session|g" "$1" >"$2"
   if grep -q '@DITTO_[A-Z_]*@' "$2"; then
     echo "unsubstituted placeholder in $1" >&2
@@ -90,6 +115,13 @@ for script in ditto-end-sessions ditto-relogin ditto-logout ditto-rescue-ui; do
   sudo install -D -m 0755 "$here/session/$script" "$libexec/$script"
 done
 sudo install -D -m 0644 "$here/session/gdm-ditto.conf" /etc/systemd/system/gdm.service.d/ditto.conf
+# Screen capture portal for Wayfire (RustDesk, screen sharing); see README.md.
+sudo install -D -m 0644 "$here/session/wayfire-portals.conf" /etc/xdg/xdg-desktop-portal/wayfire-portals.conf
+sudo install -D -m 0644 "$here/session/xdpw-wayfire.conf" /etc/xdg/xdg-desktop-portal-wlr/Wayfire
+# Ubuntu's xdg-desktop-portal-wlr 0.7.1 stalls a reconnecting capture after
+# one frame (RustDesk black); the session runs the pinned 0.8.4 build.
+bash "$workspace/tools/xdpw/build.sh"
+sudo install -D -m 0644 "$here/session/xdpw-service.conf" /etc/systemd/user/xdg-desktop-portal-wlr.service.d/ditto.conf
 
 for unit in "$units_source"/*; do
   name="$(basename "$unit")"

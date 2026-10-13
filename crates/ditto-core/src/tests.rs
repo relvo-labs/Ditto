@@ -32,7 +32,7 @@ fn manifest(id: &str, kind: &str, host: &str, slots: &[&str], extra: Value) -> V
     let mut manifest = json!({
         "manifest_version": 1, "id": id, "version": "1.0.0", "name": id, "author": "Ditto",
         "license": "UNLICENSED", "source": "builtin", "plugin_kind": kind, "host_kind": host,
-        "trust_level": "trusted", "required_protocol_version": "^0.2", "slots": slots,
+        "trust_level": "trusted", "required_protocol_version": "^0.3", "slots": slots,
         "hot_swap": if host == "qml" { "instant" } else { "controlled_handoff" },
         "health": {"timeout_ms": 2000}, "cleanup": {"timeout_ms": 2000}, "idle_policy": "resident"
     });
@@ -709,6 +709,30 @@ fn every_catalog_entry_has_a_handler_and_a_consumer() {
     let mut consumers: Vec<&str> = dittoctl::CONSUMED_CAPABILITIES.to_vec();
     // Core's notification server is the consumer of the policy decision.
     consumers.push(catalog::NOTIFICATIONS_POLICY_DECIDE);
+    let agent_source = concat!(
+        include_str!("../../../packages/agent-runtime/src/runtime.ts"),
+        include_str!("../../../packages/agent-runtime/src/session.ts"),
+        include_str!("../../../packages/agent-runtime/src/tools.ts"),
+        include_str!("../../../packages/agent-runtime/src/main.ts"),
+        include_str!("../../../packages/agent-runtime/src/direct.ts")
+    );
+    for contract in ditto_protocol::catalog::contracts()
+        .into_iter()
+        .filter(|contract| {
+            contract
+                .scopes
+                .contains(&ditto_protocol::catalog::scope::AGENT_WRITE)
+        })
+    {
+        assert!(
+            agent_source.contains(&format!("'{}'", contract.capability_id)),
+            "{} has no Agent consumer",
+            contract.capability_id
+        );
+        consumers.push(contract.capability_id);
+    }
+    assert!(agent_source.contains("'desktop.approvals.request'"));
+    consumers.push("desktop.approvals.request");
     catalog::validate_catalog(&catalog.capabilities, &handlers, &consumers).unwrap();
 }
 
@@ -769,6 +793,18 @@ fn an_appearance_change_commits_only_after_the_shell_reads_back() {
     );
     let applied = cli.result(catalog::APPEARANCE_GET, json!({}));
     assert_eq!(applied["appearance"]["tokens"]["accent"], "#9d7bff");
+    // Tokens the Profile does not set are still listed, so a caller can
+    // find corner roundness or text size without guessing names.
+    let radius = applied["tokens_available"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "radius_scale")
+        .unwrap();
+    assert_eq!(
+        (radius["kind"].as_str(), radius["default"].as_str()),
+        (Some("number"), Some("1"))
+    );
     // Undo goes back to the base content, as a new change.
     let undone = record(&cli.result(
         catalog::CHANGES_UNDO,
@@ -780,6 +816,124 @@ fn an_appearance_change_commits_only_after_the_shell_reads_back() {
     let history = cli.result(catalog::CHANGES_LIST, json!({}));
     assert_eq!(history["changes"][0]["change_id"], json!(undone.change_id));
     assert_eq!(history["changes"][1]["change_id"], json!(change.change_id));
+}
+
+#[test]
+fn a_legacy_builtin_upgrades_by_changeset_without_rewriting_its_revision() {
+    use ditto_protocol::profile::{EntrySpec, HostKind};
+    let root = root("protocol-upgrade");
+    let builtin = root.join("builtin");
+    builtin_packages(&builtin);
+    pack(
+        &builtin,
+        &manifest(
+            "ditto.layout.floating",
+            "declarative_bundle",
+            "core_builtin",
+            &["layout.strategy"],
+            json!({"required_protocol_version":"^0.2"}),
+        ),
+    );
+    pack(
+        &builtin,
+        &manifest(
+            "ditto.layout.floating",
+            "declarative_bundle",
+            "core_builtin",
+            &["layout.strategy"],
+            json!({"version":"1.1.0"}),
+        ),
+    );
+    let mut legacy = plain_document("#123456");
+    legacy.entries.push(EntrySpec {
+        entry_id: "ent-preserved".into(),
+        package: "ditto.layout.floating".into(),
+        version: "1.0.0".into(),
+        host: HostKind::CoreBuiltin,
+        config: json!({"user_setting":"preserved"}),
+        disabled: false,
+        area: None,
+    });
+    legacy
+        .slots
+        .insert("layout.strategy".into(), "ent-preserved".into());
+    seed_store(&root, &legacy, &legacy, |_, _, _, _| Ok(()));
+    let harness = Harness {
+        core: start_at(&root, false),
+        root,
+    };
+    let _shell = fake_shell(&harness.core, Arc::new(Mutex::new(ShellState::default())));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    let before = head(&cli);
+    assert_eq!(document(&cli), json!(legacy));
+    let input = json!({"base_revision":before,"idempotency_key":"upgrade-once"});
+    let upgraded = record(&cli.result("desktop.profiles.upgrade", input.clone()));
+    assert_eq!(upgraded.state, ChangeState::Committed);
+    assert_eq!(
+        record(&cli.result("desktop.profiles.upgrade", input)).change_id,
+        upgraded.change_id
+    );
+    let mut expected = legacy.clone();
+    expected.entries[0].version = "1.1.0".into();
+    assert_eq!(document(&cli), json!(expected));
+    let old = cli.result(catalog::PROFILES_GET, json!({"revision_id":before}));
+    assert_eq!(old["document"], json!(legacy));
+    // Restoring an incompatible package is explicitly rejected by 0.3. The
+    // old revision/package and pre-migration DB backup remain available for
+    // an operator restoring the old application build.
+    let current = head(&cli);
+    let undo = cli.call(
+        catalog::CHANGES_UNDO,
+        json!({"change_id":upgraded.change_id}),
+    );
+    assert_eq!(undo["error"]["name"], "preflight_rejected");
+    assert_eq!(head(&cli), current);
+}
+
+#[test]
+fn public_agent_state_and_internal_writers_have_distinct_authorization() {
+    let harness = harness("agent-authority");
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    let standin = TestPeer::connect(&harness.core, "agent", None);
+    let session = cli.result(
+        "agent.sessions.create",
+        json!({"title":"chat","idempotency_key":"new"}),
+    );
+    for peer in [&cli, &standin] {
+        let response = peer.call(
+            "agent.sessions.open",
+            json!({"session_id":session["session_id"]}),
+        );
+        assert!(
+            response["error"]["name"] == "permission_denied"
+                || response["error"]["name"] == "identity_rejected"
+        );
+    }
+    assert_eq!(
+        standin.call("agent.settings.patch", json!({}))["error"]["name"],
+        "permission_denied"
+    );
+    let status = cli.result("agent.runtime.get", json!({}));
+    assert_eq!(status["installed"], false);
+    let catalog = cli.result(catalog::CAPABILITIES_LIST, json!({}));
+    let capability = catalog["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["capability_id"] == "agent.providers.login")
+        .unwrap();
+    assert_eq!(capability["availability"]["available"], false);
+    assert_eq!(
+        cli.call(
+            "agent.providers.login",
+            json!({"provider":"codex-app-server"})
+        )["error"]["name"],
+        "unavailable"
+    );
+    cli.result(
+        "agent.sessions.delete",
+        json!({"session_id":session["session_id"]}),
+    );
 }
 
 #[test]
@@ -1516,6 +1670,20 @@ fn preflight_refuses_every_problem_at_once_and_changes_nothing() {
             json!([{"op": "add_entry", "entry": {"package": "ditto.test.greedy", "version": "1.0.0", "host": "cordis"}}]),
             "budget_exceeded",
         ),
+        // A JSON-encoded colour would commit and show nothing.
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/accent", "after": "\"#22C55E\""}]),
+            "schema_invalid",
+        ),
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/font_scale", "after": "large"}]),
+            "schema_invalid",
+        ),
+        // The Shell would clamp it to 2 and the change would read back as 9.
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/radius_scale", "after": "9"}]),
+            "schema_invalid",
+        ),
     ];
     for (ops, code) in cases {
         let response = cli.call(
@@ -2107,6 +2275,20 @@ fn a_client_operation_id_finds_its_change_after_a_lost_connection() {
         found.origin,
         ditto_protocol::change::ChangeOrigin::AgentStandin
     );
+    // An undo is found by its own operation id too: a turn trace finds the
+    // ChangeSet an Agent's undo made the same way as any other.
+    let mut params = json!({"change_id": found.change_id});
+    params["_meta"] = json!({"protocol_version": PROTOCOL_VERSION, "operation_id": "op-standin-undo", "deadline_ms": 15000});
+    let _ = second.raw(catalog::CHANGES_UNDO, params);
+    let undone = record(&second.result(
+        catalog::CHANGES_GET,
+        json!({"operation_id": "op-standin-undo"}),
+    ));
+    assert_eq!(undone.state, ChangeState::Committed);
+    assert!(matches!(
+        undone.origin,
+        ditto_protocol::change::ChangeOrigin::Undo { ref undoes } if undoes == &found.change_id
+    ));
 }
 
 /// Leave a change in `state` the way a crash would: every row written up to
@@ -2333,7 +2515,7 @@ fn a_full_disk_refuses_before_the_protected_revision_is_touched() {
 // ---- shared contract vectors (G1-QA-01) ----------------------------------------
 
 fn vectors() -> Vec<(String, Value)> {
-    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/contract-vectors/0.2");
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/contract-vectors/0.3");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&directory)
         .expect("vector directory")
         .flatten()
@@ -2370,6 +2552,14 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
         "result-meta" => through::<ditto_protocol::ResultMeta>(value),
         "request-meta" => through::<ditto_protocol::RequestMeta>(value),
         "change-op" => through::<change::ChangeOp>(value),
+        "session-event" => through::<ditto_protocol::agent::SessionEvent>(value),
+        "turn" => through::<ditto_protocol::agent::Turn>(value),
+        "agent-preferences" => through::<ditto_protocol::agent::AgentPreferences>(value),
+        "turn-trace-output" => through::<ditto_protocol::agent::TurnTraceOutput>(value),
+        "tool-trace" => through::<ditto_protocol::agent::ToolTrace>(value),
+        "context-reference" => through::<ditto_protocol::agent::ContextReference>(value),
+        "credential-status" => through::<ditto_protocol::agent::CredentialStatus>(value),
+        "job" => through::<ditto_protocol::services::Job>(value),
         "change-record" => through::<change::ChangeRecord>(value),
         "participant-prepare-params" => through::<participant::PrepareParams>(value),
         "shell-report-input" => through::<participant::ShellObservation>(value),
@@ -2521,5 +2711,205 @@ fn contract_vectors_scenarios_hold_against_the_rust_core() {
             check_expectation(&name, &response, &step["expect"], &previous);
             previous = response["result"].clone();
         }
+    }
+}
+
+// ---- region layout (D-40, G2-PLAT-01) --------------------------------------------
+
+fn geometry(peer: &TestPeer, id: &str) -> [i64; 4] {
+    let window = peer.result(catalog::WINDOWS_GET, json!({"window_id": id}));
+    ["x", "y", "width", "height"].map(|field| window[field].as_i64().unwrap())
+}
+
+fn propose(peer: &TestPeer, ops: Value) -> Value {
+    peer.call(
+        catalog::CHANGES_PROPOSE,
+        json!({"base_revision": head(peer), "ops": ops}),
+    )
+}
+
+#[test]
+fn region_rules_place_narrow_undo_and_follow_new_windows() {
+    let harness = harness("regions");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    let before = geometry(&cli, "fixture-window-2");
+    // The editor on the left half of the work area (the fixture's work area
+    // is the 1920×1080 output below a 40-pixel panel).
+    let placed = record(
+        &propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions", "after": [
+                {"rule_id": "editor", "match": {"app_id": "fixture.editor"},
+                 "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}
+            ]}]),
+        )["result"],
+    );
+    assert_eq!(placed.state, ChangeState::Committed, "{placed:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 960, 1040]);
+    let layout = cli.result(catalog::LAYOUT_GET, json!({}));
+    assert_eq!(layout["regions"][0]["rule_id"], json!("editor"));
+    assert_eq!(
+        layout["region_windows"][0]["geometry"],
+        json!([0, 40, 960, 1040])
+    );
+
+    // "A bit narrower": only that rule's width changes.
+    let narrower = record(
+        &propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions/0/region/width", "after": 0.4}]),
+        )["result"],
+    );
+    assert_eq!(narrower.state, ChangeState::Committed, "{narrower:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 768, 1040]);
+
+    // Undo puts the window back where the narrowing found it.
+    let undo = record(&cli.result(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": narrower.change_id}),
+    ));
+    assert_eq!(undo.state, ChangeState::Committed, "{undo:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 960, 1040]);
+
+    // A window that opens later follows the rule; Core places it, not a change.
+    harness
+        .core
+        .session
+        .with_adapter(|adapter| {
+            adapter.fixture().unwrap().open_window(
+                "fixture-window-3",
+                "fixture.editor",
+                "FIXTURE-1",
+            );
+            Ok(())
+        })
+        .unwrap();
+    harness.core.session.publish_changes();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while geometry(&cli, "fixture-window-3") != [0, 40, 960, 1040] && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(geometry(&cli, "fixture-window-3"), [0, 40, 960, 1040]);
+
+    // Undo follows Core's order: the older change is blocked while a newer
+    // one touched the same rule.
+    let blocked = cli.call(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": placed.change_id}),
+    );
+    assert_eq!(
+        blocked["error"]["data"]["reason"],
+        json!("undo_blocked_by_newer_change")
+    );
+
+    // Removing the rule moves nothing: windows stay where they are.
+    let removed = record(
+        &propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions", "after": []}]),
+        )["result"],
+    );
+    assert_eq!(removed.state, ChangeState::Committed, "{removed:?}");
+    assert_eq!(geometry(&cli, "fixture-window-2"), [0, 40, 960, 1040]);
+    assert_ne!(before, [0, 40, 960, 1040]);
+}
+
+#[test]
+fn region_rules_are_validated_and_need_floating_geometry() {
+    let harness = harness("regions-invalid");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    wait_for_boot_sync(&state);
+    for bad in [
+        json!({"rule_id": "r", "match": {"app_id": "fixture.editor"}, "region": {"x": 0.6, "y": 0.0, "width": 0.5, "height": 1.0}}),
+        json!({"rule_id": "", "match": {"app_id": "fixture.editor"}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}),
+        json!({"rule_id": "r", "match": {"app_id": ""}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}),
+        json!({"rule_id": "r", "match": {"app_id": "a"}, "region": {"x": 0.0, "y": 0.0, "width": 0.01, "height": 1.0}}),
+    ] {
+        let response = propose(
+            &cli,
+            json!([{"op": "set_value", "path": "/layout/regions", "after": [bad]}]),
+        );
+        assert_eq!(
+            response["error"]["name"],
+            json!("preflight_rejected"),
+            "{response}"
+        );
+    }
+    let twice = propose(
+        &cli,
+        json!([{"op": "set_value", "path": "/layout/regions", "after": [
+            {"rule_id": "r", "match": {"app_id": "a"}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}},
+            {"rule_id": "r", "match": {"app_id": "b"}, "region": {"x": 0.5, "y": 0.0, "width": 0.5, "height": 1.0}}
+        ]}]),
+    );
+    assert_eq!(
+        twice["error"]["name"],
+        json!("preflight_rejected"),
+        "{twice}"
+    );
+
+    // The terminal is tiled in the fixture: the compositor owns its geometry,
+    // so the rule cannot place it and the change does not claim success.
+    let tiled = propose(
+        &cli,
+        json!([{"op": "set_value", "path": "/layout/regions", "after": [
+            {"rule_id": "term", "match": {"app_id": "fixture.terminal"},
+             "region": {"x": 0.5, "y": 0.0, "width": 0.5, "height": 1.0}}
+        ]}]),
+    );
+    let outcome = tiled.get("result").map(record);
+    assert!(
+        outcome
+            .as_ref()
+            .is_none_or(|r| r.result != Some(ditto_protocol::change::ResultKind::Succeeded)),
+        "{tiled}"
+    );
+
+    // Under the tiling strategy, region rules are refused at prepare.
+    let floating = entry_of(&document(&cli), "ditto.layout.floating").unwrap();
+    let both = propose(
+        &cli,
+        json!([
+            {"op": "add_entry", "entry": {"package": "ditto.layout.simple-tile", "version": "1.0.0", "host": "core_builtin"}, "slot": "layout.strategy"},
+            {"op": "remove_entry", "entry_id": floating},
+            {"op": "set_value", "path": "/layout/regions", "after": [
+                {"rule_id": "ed", "match": {"app_id": "fixture.editor"}, "region": {"x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0}}
+            ]}
+        ]),
+    );
+    let refused = both.get("result").map(record);
+    assert!(
+        refused
+            .as_ref()
+            .is_none_or(|r| r.state != ChangeState::Committed),
+        "{both}"
+    );
+}
+
+#[test]
+fn a_profile_cannot_bind_core_reserved_chords() {
+    let harness = harness("reserved-chords");
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    for chord in crate::preflight::RESERVED_CHORDS {
+        let response = cli.call(
+            catalog::CHANGES_PROPOSE,
+            json!({"base_revision": head(&cli), "ops": [
+                {"op": "set_value", "path": "/shortcuts", "after": [{"chord": chord, "command": "launcher.toggle"}]}
+            ]}),
+        );
+        assert_eq!(
+            response["error"]["name"],
+            json!("preflight_rejected"),
+            "{chord}: {response}"
+        );
+        assert!(
+            response.to_string().contains("shortcut_conflict"),
+            "{response}"
+        );
     }
 }

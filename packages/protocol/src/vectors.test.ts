@@ -10,10 +10,10 @@ import { protocolVersion } from './client.js';
 
 /**
  * The TS half of the shared contract vectors (G1-QA-01). The Rust half is in
- * crates/ditto-core/src/tests.rs; both read tests/contract-vectors/0.2.
+ * crates/ditto-core/src/tests.rs; both read tests/contract-vectors/0.3.
  */
 const root = resolve(import.meta.dirname, '../../..');
-const directory = join(root, 'tests/contract-vectors/0.2');
+const directory = join(root, 'tests/contract-vectors/0.3');
 let child: ChildProcess;
 let runtime: string;
 let token: string;
