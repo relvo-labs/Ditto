@@ -12,6 +12,8 @@
 | [plan/02/](plan/02/README.md)、[plan/03/](plan/03/README.md)、[plan/04/](plan/04/README.md) | G0／G1／G2 執行計畫：範圍、出口、工作包、依賴與決策；G2 含 Codex 訂閱＋app-server，44 包／十九項出口，選型與估算待核定 | 該階段動手之前 |
 | [.agents/skills/](.agents/skills/README.md) | 把上述原則轉成可觸發判斷程序的 skill 集合 | 見下方觸發速查 |
 
+G3 計畫與獨立基礎設施見 [plan/05](plan/05/README.md)，主追蹤為 issue #34。依 [D-45](.agents/notes/decisions/2026-10-13-d45-g3-independent-foundation.md)，在 `codex/g3-restricted-generation` 疊在 G2 的 `a88bce8` 上開始；Core／協定接線等 G2 參考機量測完成，G2／G3 證據不得混用。
+
 ## 五條不可違反原則
 
 出處：[milestones/01/README.md](milestones/01/README.md)。違反任一條的變更不予合併。

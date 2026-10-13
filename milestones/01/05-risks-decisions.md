@@ -77,6 +77,7 @@
 | D-42 | **G2 增補與估算修正** | **2026-10-09 已決定**：保留 44 包範圍追蹤，125 人週不作承諾；剩餘工作依剩下的項目估（[紀錄](../../.agents/notes/decisions/2026-10-09-d42-g2-estimate.md)） | G2 M0 初估、M1 校正 | owner＋各工作流 |
 | D-43 | **G2 保留集與驗收重複方式** | **2026-10-09 已決定**：兩組各 ≥45／50、保留集降幅 ≤5 pp；「詢問」不限問號；刪除設定檔經 approval 詢問後依本人決定放行；oracle v3 兩組重跑（[紀錄](../../.agents/notes/decisions/2026-10-09-d43-semantic-holdout-and-judging.md)） | G2 M2 語意基線前 | QA＋Agent＋owner |
 | D-44 | **Codex app-server 程序與限制** | **2026-10-09 已決定**：1 controller＋至多 1 個 confine 內的 app-server；Agent scope 暫定 MemoryMax 256 MiB，參考機冷登入量測後套用；暖態 ≤150 MiB 不變（[紀錄](../../.agents/notes/decisions/2026-10-09-d44-codex-process-and-limits.md)） | G2 M0 probe、M1 可寫之前 | Core＋平台＋Agent＋owner |
+| D-45 | **G2 出口前開始 G3 獨立基礎設施** | **2026-10-13 依使用者指示開始**：疊在 `a88bce8` 的 `codex/g3-restricted-generation`；G2／G3 證據分開，Core／協定等 G2 參考機量測結束（[紀錄](../../.agents/notes/decisions/2026-10-13-d45-g3-independent-foundation.md)） | G3 獨立工作開工；正式接線前重核 | 使用者／專案 owner |
 
 ## 3. 團隊與估算假設
 
