@@ -11,6 +11,7 @@ jobs:
     runs-on: [self-hosted, ditto-refmachine]
     timeout-minutes: 240
     steps:
+      - uses: actions/checkout@v4
       - name: Phase
         env:
           WHAT: ${{ inputs.what }}
@@ -24,12 +25,7 @@ jobs:
           git log -1 --format='HEAD %H'; git status --porcelain | head -3
           case "$WHAT" in
             probe)
-              echo "== journal 13:43-13:55"; journalctl --user --since '2026-10-13 13:43:30' --until '2026-10-13 13:55' -o short-iso --no-pager | grep -v -E 'ditto-rpc ' | grep -i -E 'chat|launcher|shortcut|stipc|feed|frame|Super|keybind|warn|error|lock|output|dpms' | head -60
-              echo "== count"; journalctl --user --since '2026-10-13 13:43:30' --until '2026-10-13 13:55' -o cat --no-pager | wc -l
-              echo "== wayfire log tail"; journalctl --user -u ditto-wayfire.scope --since '2026-10-13 13:00' --until '2026-10-13 13:55' -o short-iso --no-pager | tail -30
-              echo "== drm"; for c in /sys/class/drm/card*-*; do printf '%s %s %s\n' "$(basename $c)" "$(cat $c/status 2>/dev/null)" "$(cat $c/dpms 2>/dev/null)"; done
-              echo "== earlier G2 first-frame on ref?"; ls ~/funlab/Ditto/artifacts/g2 | grep -i -E 'first-frame|cold-start' | tail
-              echo "== keyring now"; for c in login session; do printf '%s locked=' $c; busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/$c org.freedesktop.Secret.Collection Locked 2>&1; done
+              bash "$GITHUB_WORKSPACE/.hermes-probe/probe.sh"
               ;;
             phase-a)
               mark=$(mktemp); touch -d '-1 min' "$mark"
