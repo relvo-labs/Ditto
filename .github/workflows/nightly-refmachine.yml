@@ -1,167 +1,30 @@
 name: nightly-refmachine
+# TEMPORARY probe branch (hermes/g2-ref-probe): read-only state of the
+# reference machine before G2 exit runs. Not for merge.
 on:
-  schedule:
-    - cron: '0 18 * * *'
   workflow_dispatch:
-# Graphics, timing and window control need the frozen reference machine. Until
-# one is registered with this label the workflow simply does not run; a green
-# result here is the only kind that may be cited for EX-01, EX-03 and EX-04.
 jobs:
-  verify:
+  probe:
     runs-on: [self-hosted, ditto-refmachine]
-    timeout-minutes: 90
-    env:
-      DITTO_REFERENCE_MACHINE: '1'
-      DITTO_ENVIRONMENT_LABEL: reference-machine
-      DITTO_WORKSPACE: ${{ github.workspace }}
-      DITTO_BINARIES: ${{ github.workspace }}/target/debug
-      DITTO_ARTIFACTS: ${{ github.workspace }}/artifacts/g0
-      DITTO_COMPOSITOR: wayfire
-      WLR_RENDERER: gles2
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - name: Reference toolchain paths
+      - name: Read-only reference machine state
         run: |
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.nvm/versions/node/v22.23.2/bin" >> "$GITHUB_PATH"
-          echo "$HOME/Qt/6.10.2/gcc_64/bin" >> "$GITHUB_PATH"
-          echo "$HOME/wayfire/bin" >> "$GITHUB_PATH"
-          echo "LD_LIBRARY_PATH=$HOME/wayfire/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
-      - name: Version fingerprint
-        run: |
-          mkdir -p artifacts/g0
-          {
-            echo "kernel=$(uname -r)"
-            echo "compositor=$(wayfire --version 2>/dev/null || echo unknown)"
-            echo "qt=$(qmake6 -query QT_VERSION 2>/dev/null || echo unknown)"
-            echo "quickshell=$(quickshell --version 2>&1 | head -1)"
-            echo "rust=$(rustc --version)"
-            echo "node=$(node --version)"
-            echo "ditto_commit=$GITHUB_SHA"
-          } | tee "artifacts/g0/fingerprint-$GITHUB_RUN_ID.txt"
-      - name: Reference-machine preflight
-        run: bash packaging/reference-image/preflight.sh
-      - run: cargo build --locked --workspace --bins
-      - name: EX-01 window capability matrix
-        run: bash tests/g0/window-matrix/run.sh
-      - name: EX-03 shell restart survival
-        run: bash tests/g0/shell-restart-survival/run.sh
-      - name: EX-04 frame time and hot path
-        run: bash tests/g0/hotpath/run.sh
-      - name: EX-07 identity cannot be self-declared
-        run: bash tests/g0/identity-negative/run.sh
-      - name: Production avatar hit region
-        run: bash tests/g0/avatar-hit-region/run.sh
-      - name: Compositor capability probe
-        run: bash tests/g0/compositor-probe/run.sh
-      # Run ids carry ISO timestamps, and upload-artifact rejects ':' in file
-      # names. The archive keeps every artifact under its own name.
-      - name: Pack artifacts
-        if: always()
-        run: tar -czf g0-nightly-artifacts.tar.gz --ignore-failed-read artifacts/g0
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: g0-nightly-${{ github.run_id }}
-          path: g0-nightly-artifacts.tar.gz
-          retention-days: 90
-  # G1 gates (plan/03/06 §10, EX1-15 ②: EX1-01/03/07/09, plus EX1-08). A
-  # runner exits 0 only when every sub-check passed; `incomplete` and
-  # `not_implemented` (exit 3) are red here on purpose, so five green nights
-  # mean five nights of real passes. The one exception is EX1-01's operator
-  # item (a person's recorded run), which DITTO_G1_PENDING_OK lets through
-  # the exit code only; its document still says incomplete. EX1-12/13 need
-  # a logged-in session or the second monitor and are informational here.
-  # Every step runs even after an earlier one fails.
-  verify-g1:
-    needs: verify
-    if: always()
-    runs-on: [self-hosted, ditto-refmachine]
-    timeout-minutes: 120
-    env:
-      DITTO_REFERENCE_MACHINE: '1'
-      DITTO_ENVIRONMENT_LABEL: reference-machine
-      DITTO_WORKSPACE: ${{ github.workspace }}
-      DITTO_BINARIES: ${{ github.workspace }}/target/debug
-      DITTO_ARTIFACTS: ${{ github.workspace }}/artifacts/g1
-      DITTO_COMPOSITOR: wayfire
-      WLR_RENDERER: gles2
-    steps:
-      - uses: actions/checkout@v4
-      - name: Reference toolchain paths
-        run: |
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          echo "$HOME/.nvm/versions/node/v22.23.2/bin" >> "$GITHUB_PATH"
-          echo "$HOME/Qt/6.10.2/gcc_64/bin" >> "$GITHUB_PATH"
-          echo "$HOME/wayfire/bin" >> "$GITHUB_PATH"
-          echo "LD_LIBRARY_PATH=$HOME/wayfire/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
-      - name: Reference-machine preflight
-        run: bash packaging/reference-image/preflight.sh
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
-      - name: Build Core, hostd and the built-in packages
-        run: |
-          cargo build --locked --workspace --bins
-          pnpm install --frozen-lockfile
-          pnpm --filter @ditto/host-runtime build
-          bash scripts/build-builtin-packages.sh
-      - name: EX1-01 manual cross-plugin switch (keyboard-driven GUI)
-        if: success() || failure()
-        env:
-          # The person-run recording is an operator item; it never runs at night.
-          DITTO_G1_PENDING_OK: operator
-        run: bash tests/g1/manual-switch/run.sh
-      - name: EX1-03 rollback
-        if: success() || failure()
-        run: bash tests/g1/rollback/run.sh
-      - name: EX1-07 Cordis services outlive clients
-        if: success() || failure()
-        run: bash tests/g1/cordis-independent/run.sh
-      - name: EX1-08 lifecycle L-01…L-10
-        if: success() || failure()
-        run: bash tests/g1/lifecycle/run.sh
-      - name: EX1-09 persistence faults
-        if: success() || failure()
-        # ② needs a filesystem that really fills up: an 80 MiB tmpfs, as in
-        # the VM run. Mounting needs root; without passwordless sudo the
-        # check stays `environment` and this step is red.
-        run: |
-          small=/mnt/ditto-g1-small
-          if sudo -n mkdir -p "$small" && sudo -n mount -t tmpfs -o size=80m,uid="$(id -u)" tmpfs "$small"; then
-            export DITTO_G1_SMALL_FS="$small"
-          fi
-          status=0
-          bash tests/g1/persistence-faults/run.sh || status=$?
-          sudo -n umount "$small" 2>/dev/null || true
-          exit "$status"
-      - name: EX1-12 rescue and supervision
-        if: success() || failure()
-        # Decided in a logged-in session (and, for EX1-13, with the second
-        # monitor); outside one it is recorded as environment. Not part of
-        # the EX1-15 ② count.
-        continue-on-error: true
-        run: bash tests/g1/rescue-supervision/run.sh
-      - name: EX1-12 lock
-        if: success() || failure()
-        # Decided in a logged-in session (and, for EX1-13, with the second
-        # monitor); outside one it is recorded as environment. Not part of
-        # the EX1-15 ② count.
-        continue-on-error: true
-        run: bash tests/g1/lock/run.sh
-      - name: EX1-13 output hot-plug (automated)
-        if: success() || failure()
-        # Decided in a logged-in session (and, for EX1-13, with the second
-        # monitor); outside one it is recorded as environment. Not part of
-        # the EX1-15 ② count.
-        continue-on-error: true
-        run: bash tests/g1/output-hotplug/run.sh --automated
-      - name: Pack artifacts
-        if: always()
-        run: tar -czf g1-nightly-artifacts.tar.gz --ignore-failed-read artifacts/g1
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: g1-nightly-${{ github.run_id }}
-          path: g1-nightly-artifacts.tar.gz
-          retention-days: 90
+          set +e
+          echo "== time"; date -Is; uptime
+          echo "== host"; hostname; uname -r; grep MemTotal /proc/meminfo; lscpu | grep 'Model name'
+          echo "== sessions"; loginctl list-sessions --no-legend
+          for s in $(loginctl list-sessions --no-legend | awk '{print $1}'); do echo "-- $s"; loginctl show-session "$s" -p Name -p Type -p Class -p Desktop -p State -p Active -p Seat -p Remote -p IdleHint -p IdleSinceHint -p Timestamp; done
+          echo "== seat0"; loginctl show-seat seat0 -p ActiveSession 2>&1
+          echo "== gdm"; grep -E -i '^\s*(AutomaticLogin|AutomaticLoginEnable|WaylandEnable|TimedLogin)' /etc/gdm3/custom.conf 2>&1
+          ls /usr/share/wayland-sessions /usr/local/share/wayland-sessions 2>&1
+          echo "== sudo -n rules"; sudo -n -l 2>&1 | sed -n '1,40p'
+          ls -la /usr/local/libexec/ | grep ditto
+          echo "== codex / subscription"; ls -la ~/.local/bin/codex 2>&1; ls -la ~/.cache/ditto-g2-subscription 2>&1 | head
+          echo "== measure state"; ls -la ~/.local/state/ditto 2>&1 | head -20
+          echo "== checkouts"; for d in ~/funlab/Ditto ~/Ditto ~/src/Ditto; do [ -d "$d/.git" ] && { echo "$d"; git -C "$d" status -sb | head -5; git -C "$d" log -1 --oneline; }; done
+          echo "== user processes (names only)"; ps -u "$(id -u)" -o comm= | sort | uniq -c | sort -rn | head -60
+          echo "== other users graphical"; ps -eo user:20,comm= | grep -E -i 'wayfire|gnome-shell|quickshell|Xwayland|firefox|kate|foot|rustdesk' | sort | uniq -c
+          echo "== resources"; free -m; df -h ~ | tail -1
+          echo "== tools"; for t in cargo pnpm node quickshell wayfire jq firefox; do printf '%s: ' $t; command -v $t || echo missing; done; ls ~/.nvm/versions/node 2>&1; ls ~/wayfire/bin 2>&1 | head -3
+          echo "== artifacts"; ls -d ~/funlab/Ditto/artifacts/* 2>/dev/null | tail -20
