@@ -16,6 +16,34 @@ git fetch -q origin && git merge -q --ff-only origin/codex/g2-agent-foundation |
 log "phase-b start at $(git rev-parse HEAD) dirty=$(git status --porcelain | wc -l)"
 cargo build --locked --release -p ditto-measure 2>&1 | tail -1
 
+# 1. autologin + series
+sudo -n cp -p /etc/gdm3/custom.conf "$st/custom.conf.orig-$ts"
+sha=$(sha256sum /etc/gdm3/custom.conf | cut -d' ' -f1); log "custom.conf sha256 $sha"
+restore() {
+  sudo -n cp -p "$st/custom.conf.orig-$ts" /etc/gdm3/custom.conf
+  if [[ "$(sha256sum /etc/gdm3/custom.conf | cut -d' ' -f1)" == "$sha" ]]; then log "gdm custom.conf restored byte-identical ($sha)"; else log "RESTORE MISMATCH"; fi
+  bash tests/g1/measure/cold-login.sh reset >/dev/null 2>&1
+  log "relogin to the login screen"; sudo -n /usr/local/libexec/ditto-relogin >>"$st/phase-b.log" 2>&1
+  log "phase-b done"
+}
+trap restore EXIT
+sudo -n python3 -c "
+p='/etc/gdm3/custom.conf'; s=open(p).read()
+assert 'AutomaticLoginEnable=True' not in s
+s=s.replace('[daemon]\n','[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=neil\n',1)
+open(p,'w').write(s)"
+log "autologin enabled"
+# The seat sits at the login screen since an earlier attempt ended the Ditto
+# login; a Profile change needs the compositor and Shell (participants), so
+# step 0 runs in a first autologin, which series.sh then spends.
+old=$(bash tests/g1/measure/cold-login.sh login-id 2>/dev/null)
+sudo -n /usr/local/libexec/ditto-relogin
+for i in $(seq 1 120); do
+  cur=$(bash tests/g1/measure/cold-login.sh login-id 2>/dev/null)
+  [[ -n "$cur" && "$cur" != "$old" ]] && r desktop.capabilities.list >/dev/null 2>&1 && break
+  sleep 5
+done
+log "setup login: ${cur:-none}"; sleep 20
 # 0. the live Profile. Its G1 built-ins require protocol ^0.2, so preflight
 # rejects every change (protocol_incompatible), and desktop.profiles.upgrade
 # answers not_found because some entries (G1 test fixtures) have no build for
@@ -40,23 +68,6 @@ if ! jq -e '.result.document.shortcuts[]? | select(.chord=="Super+A")' <<<"$doc"
 fi
 log "profile head after: $(r desktop.profiles.get | jq -r .result.profile.head_revision)"
 
-# 1. autologin + series
-sudo -n cp -p /etc/gdm3/custom.conf "$st/custom.conf.orig-$ts"
-sha=$(sha256sum /etc/gdm3/custom.conf | cut -d' ' -f1); log "custom.conf sha256 $sha"
-restore() {
-  sudo -n cp -p "$st/custom.conf.orig-$ts" /etc/gdm3/custom.conf
-  if [[ "$(sha256sum /etc/gdm3/custom.conf | cut -d' ' -f1)" == "$sha" ]]; then log "gdm custom.conf restored byte-identical ($sha)"; else log "RESTORE MISMATCH"; fi
-  bash tests/g1/measure/cold-login.sh reset >/dev/null 2>&1
-  log "relogin to the login screen"; sudo -n /usr/local/libexec/ditto-relogin >>"$st/phase-b.log" 2>&1
-  log "phase-b done"
-}
-trap restore EXIT
-sudo -n python3 -c "
-p='/etc/gdm3/custom.conf'; s=open(p).read()
-assert 'AutomaticLoginEnable=True' not in s
-s=s.replace('[daemon]\n','[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=neil\n',1)
-open(p,'w').write(s)"
-log "autologin enabled"
 clean=(env -u WAYLAND_DISPLAY -u XDG_SESSION_DESKTOP -u DISPLAY)
 "${clean[@]}" DITTO_ARTIFACTS="$PWD/artifacts/g2-ref-exit" DITTO_SERIES_FINAL_RELOGIN=0 DITTO_LOGIN_TIMEOUT_SECONDS=600 \
   bash tests/g1/measure/series.sh rescue_no_node desktop_full_no_agent desktop_full_agent_warm desktop_full_agent_active
