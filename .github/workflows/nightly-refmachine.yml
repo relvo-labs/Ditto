@@ -11,20 +11,15 @@ jobs:
       - name: Read-only reference machine state
         run: |
           set +e
-          echo "== time"; date -Is; uptime
-          echo "== host"; hostname; uname -r; grep MemTotal /proc/meminfo; lscpu | grep 'Model name'
-          echo "== sessions"; loginctl list-sessions --no-legend
-          for s in $(loginctl list-sessions --no-legend | awk '{print $1}'); do echo "-- $s"; loginctl show-session "$s" -p Name -p Type -p Class -p Desktop -p State -p Active -p Seat -p Remote -p IdleHint -p IdleSinceHint -p Timestamp; done
-          echo "== seat0"; loginctl show-seat seat0 -p ActiveSession 2>&1
-          echo "== gdm"; grep -E -i '^\s*(AutomaticLogin|AutomaticLoginEnable|WaylandEnable|TimedLogin)' /etc/gdm3/custom.conf 2>&1
-          ls /usr/share/wayland-sessions /usr/local/share/wayland-sessions 2>&1
-          echo "== sudo -n rules"; sudo -n -l 2>&1 | sed -n '1,40p'
-          ls -la /usr/local/libexec/ | grep ditto
-          echo "== codex / subscription"; ls -la ~/.local/bin/codex 2>&1; ls -la ~/.cache/ditto-g2-subscription 2>&1 | head
-          echo "== measure state"; ls -la ~/.local/state/ditto 2>&1 | head -20
-          echo "== checkouts"; for d in ~/funlab/Ditto ~/Ditto ~/src/Ditto; do [ -d "$d/.git" ] && { echo "$d"; git -C "$d" status -sb | head -5; git -C "$d" log -1 --oneline; }; done
-          echo "== user processes (names only)"; ps -u "$(id -u)" -o comm= | sort | uniq -c | sort -rn | head -60
-          echo "== other users graphical"; ps -eo user:20,comm= | grep -E -i 'wayfire|gnome-shell|quickshell|Xwayland|firefox|kate|foot|rustdesk' | sort | uniq -c
-          echo "== resources"; free -m; df -h ~ | tail -1
-          echo "== tools"; for t in cargo pnpm node quickshell wayfire jq firefox; do printf '%s: ' $t; command -v $t || echo missing; done; ls ~/.nvm/versions/node 2>&1; ls ~/wayfire/bin 2>&1 | head -3
-          echo "== artifacts"; ls -d ~/funlab/Ditto/artifacts/* 2>/dev/null | tail -20
+          echo "== cgroups of long-lived user work"
+          for c in tmux claude codex agentd node foot rustdesk Runner.Listener; do for pid in $(pgrep -u "$(id -u)" -x "$c" 2>/dev/null | head -5); do printf '%s %s %s :: %s\n' "$c" "$pid" "$(ps -o etime= -p $pid | tr -d ' ')" "$(cat /proc/$pid/cgroup)"; done; done
+          echo "== tmux sessions"; tmux ls 2>&1
+          for s in $(tmux ls -F '#S' 2>/dev/null); do echo "-- $s"; tmux list-panes -s -t "$s" -F '#{pane_current_command} #{pane_current_path}' 2>&1 | head; done
+          echo "== logind"; grep -E -i '^\s*KillUserProcesses' /etc/systemd/logind.conf /etc/systemd/logind.conf.d/*.conf 2>&1; loginctl show-user neil -p Linger -p KillUserProcesses 2>&1
+          echo "== session scope"; loginctl show-session 994 -p Scope -p Service -p Leader 2>&1
+          echo "== subscription"; ls -la ~/.cache/ditto-g2-subscription/store 2>&1 | head; ls ~/.cache/ditto-g2-subscription | tail -3
+          echo "== rustdesk connections"; ss -tnp 2>/dev/null | grep -i rustdesk | head; sudo -n ss -tnp state established 2>/dev/null | grep -i -E 'rustdesk|21118|21119' | head
+          echo "== input idle"; sudo -n cat /proc/interrupts 2>/dev/null | grep -i -E 'i8042|xhci' | head -3
+          echo "== firefox"; snap list firefox 2>&1 | tail -1
+          echo "== measure artifacts"; ls ~/funlab/Ditto/artifacts/ 2>&1 | head -30; ls ~/funlab/Ditto/artifacts/g1 2>/dev/null | grep -E 'agent|series' | tail -20
+          echo "== repo dirty"; git -C ~/funlab/Ditto status --porcelain | head
