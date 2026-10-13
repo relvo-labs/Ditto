@@ -11,15 +11,19 @@ jobs:
       - name: Read-only reference machine state
         run: |
           set +e
-          echo "== tmux"
-          for pid in $(pgrep -u "$(id -u)" -f '^tmux'); do printf '%s etime=%s :: %s :: %s\n' "$pid" "$(ps -o etime= -p $pid|tr -d ' ')" "$(tr '\0' ' ' </proc/$pid/cmdline)" "$(cat /proc/$pid/cgroup)"; done
-          srv=$(pgrep -u "$(id -u)" -f '^tmux: server' | head -1)
-          sock=$(sudo -n ls -la /proc/$srv/fd 2>/dev/null | grep -o 'socket:.*' | head -1); echo "server fds: $sock"
-          sudo -n cat /proc/$srv/net/unix 2>/dev/null | grep -i tmux | head -3
-          S=$(sudo -n cat /proc/$srv/net/unix 2>/dev/null | grep -o '/[^ ]*tmux[^ ]*' | head -1); echo "socket=$S"
-          sudo -n -u neil tmux -S "/proc/$srv/root$S" ls 2>&1 | head; sudo -n -u neil tmux -S "/proc/$srv/root$S" list-panes -a -F '#S:#I.#P #{pane_current_command} #{pane_current_path} active=#{session_activity}' 2>&1 | head -20
-          echo "== session scope members"; for p in $(cat /sys/fs/cgroup/user.slice/user-1000.slice/session-994.scope/cgroup.procs); do printf '%s %s\n' $p "$(ps -o comm=,etime= -p $p)"; done | head -40
-          echo "== app scopes"; ls /sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/ | grep -v -E '^cgroup|^memory|^cpu|^io|^pids|^misc|^rdma|^hugetlb' | head -40
-          echo "== input delta 45s"; a=$(grep -E 'xhci|i8042' /proc/interrupts | awk '{s=0; for(i=2;i<=33;i++) s+=$i; print s}' | paste -sd+ | bc); sleep 45; b=$(grep -E 'xhci|i8042' /proc/interrupts | awk '{s=0; for(i=2;i<=33;i++) s+=$i; print s}' | paste -sd+ | bc); echo "usb/ps2 irq delta: $((b-a))"
-          echo "== rustdesk active conn"; sudo -n ss -tnp state established 2>/dev/null | grep rustdesk
-          echo "== last input by wayfire"; sudo -n cat /proc/$(pgrep -x wayfire)/io 2>/dev/null | head -2
+          R=~/funlab/Ditto; cd $R
+          echo "== head"; git log -1 --format='%H %cI'; git status --porcelain | head
+          echo "== binaries"; ls -la --time-style=+%FT%T target/debug/ditto-core target/release/ditto-core target/release/ditto-measure target/debug/ditto-confine packages/agent-runtime/dist/ditto-agentd.mjs 2>&1
+          echo "== installed units"; ls /etc/systemd/user/ | grep ditto; ls /etc/systemd/user/ditto-core.service.d/ 2>&1
+          grep -h -E 'ExecStart|--agent|Environment|funlab' /etc/systemd/user/ditto-core.service /etc/systemd/user/ditto-core.service.d/*.conf 2>/dev/null | head -20
+          echo "== gdm conf"; sudo -n sed -n '/\[daemon\]/,/^\[/p' /etc/gdm3/custom.conf; sudo -n cat /var/lib/AccountsService/users/neil
+          echo "== conditions"; cat ~/.local/state/ditto/measure-conditions.json 2>&1
+          export XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+          echo "== relay"; ls -la /run/user/1000/ditto/ 2>&1
+          export DITTO_G1_RELAY=/run/user/1000/ditto/verify-relay.sock
+          for m in agent.runtime.get agent.providers.list desktop.windows.list; do echo "-- $m"; timeout 20 python3 tests/g1/lib/gui.py relay $m '{}' 2>&1 | head -c 1500; echo; done
+          echo "-- provider status"; timeout 30 python3 tests/g1/lib/gui.py relay agent.providers.status '{"provider":"codex-app-server"}' 2>&1 | head -c 1500; echo
+          echo "== keyring locked?"; busctl --user get-property org.freedesktop.secrets /org/freedesktop/secrets/collection/login org.freedesktop.Secret.Collection Locked 2>&1
+          echo "== codex pin"; jq -c . tools/codex/pin.json; sha256sum $(readlink -f ~/.local/bin/codex) | cut -c1-64
+          echo "== sub store"; ls ~/.cache/ditto-g2-subscription/store/ ~/.cache/ditto-g2-subscription/store/* 2>&1 | head -20
+          echo "== preflight"; bash packaging/reference-image/preflight.sh 2>&1 | tail -5; echo "exit=$?"
