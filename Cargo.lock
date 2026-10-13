@@ -301,6 +301,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ditto-generation"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "ditto-measure"
 version = "0.1.0"
 dependencies = [
@@ -348,6 +357,15 @@ dependencies = [
  "serde",
  "serde_json",
  "zbus",
+]
+
+[[package]]
+name = "ditto-test-host"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

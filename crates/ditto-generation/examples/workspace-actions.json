@@ -1,0 +1,15 @@
+{
+  "format_version": 1,
+  "plugin_id": "local.generated.workspace_actions",
+  "version": "0.1.0",
+  "title": "工作區捷徑",
+  "width": 280,
+  "accent": "#8B5CF6",
+  "content": {
+    "template": "workspace_actions_v1",
+    "actions": [
+      { "workspace_id": "workspace-1", "label": "專注工作" },
+      { "workspace_id": "workspace-2", "label": "閱讀整理" }
+    ]
+  }
+}

@@ -32,6 +32,7 @@ HOST 第一批只以 subprocess 使用本倉庫的 `ditto-confine@a88bce8`，沒
 | G2 還在量測，G3 污染基線 | 分支／commit 固定；不變動 Core／wire；量測在 G2 checkout 跑 |
 | bwrap 被 AppArmor 擋住 | 不把 bwrap 設為唯一方案；confine ABI／seccomp／cgroup 實測，缺證據拒絕 |
 | `confined:true` 被誤當 full | 由受控 runner 分項彙總，讀 cgroup，固定政策與原因；不能由候選自證 |
+| G2 connect broker 不是全面關閉網路 | 程式碼檢查顯示 unconnected UDP 不經 connect；G3 額外 seccomp 禁止非 Unix socket。G2 本身的網路政策另行檢討，不能將其直接稱為生成安全政策 |
 | 測試程序逃離 process group | 以整個 cgroup 清理、驗證 pids；不只 kill 父 PID |
 | 模板內容注入程式碼 | 描述封閉、文字純文字、無 source interpolation、無動態 import／URL |
 | 生成只是切內建外觀 | AT-06 留真模型的全新內容地址產物與多次修改，不接受 fixture 替代 |

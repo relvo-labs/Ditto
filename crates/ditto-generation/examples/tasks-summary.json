@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "plugin_id": "local.generated.daily_summary",
+  "version": "0.1.0",
+  "title": "今日待辦摘要",
+  "width": 320,
+  "accent": "#8B5CF6",
+  "content": {
+    "template": "tasks_summary_v1",
+    "max_items": 5,
+    "show_completed": false,
+    "order": "source"
+  }
+}
