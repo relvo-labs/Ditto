@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 set +e
-cd ~/.local/share/ditto/packages 2>/dev/null && find . -maxdepth 3 -type d | grep -i launcher | head
-for f in $(find ~/.local/share/ditto/packages -name 'Launcher*.qml' 2>/dev/null); do echo "$f $(grep -c 'launcher.frame' $f) $(sha256sum $f | cut -c1-12)"; done
-for f in ~/funlab/Ditto/target/ditto-packages*/ditto.launcher.search*/qml/*.qml ~/funlab/Ditto/target/ditto-packages*/*/*/qml/LauncherSearch.qml; do [ -f "$f" ] && echo "$f $(grep -c 'launcher.frame' $f)"; done
-ls ~/funlab/Ditto/target/ditto-packages-verification | head -30
-python3 - <<'PY'
-import sqlite3, json, os
-c=sqlite3.connect(f"file:{os.path.expanduser('~/.local/share/ditto/core.db')}?mode=ro", uri=True)
-for r in c.execute("select package_id,version,substr(sha256,1,12),substr(tree_sha256,1,12),source,installed_at from plugin_packages where package_id like '%launcher%'"): print(r)
-doc=json.loads(c.execute("select document_json from revisions r join profiles p on p.head_revision=r.revision_id").fetchone()[0])
-for e in doc['entries']:
-    if 'launcher' in json.dumps(e): print(json.dumps(e)[:300])
-PY
-journalctl --user -b -o cat --no-pager | grep -i -E 'launcher' | grep -v ditto-rpc | tail -5
+cd ~/funlab/Ditto
+r() { timeout 30 python3 tests/g1/lib/gui.py relay "$1" "${2:-{\}}" 2>&1; }
+echo "== sessions"; loginctl list-sessions --no-legend
+echo "== ditto units"; systemctl --user list-units --plain --no-legend 'ditto-*' | cut -c1-120
+source <(sed -n '/^d34_packages()/,/^}/p;/^d34_entries()/,/^}/p' tests/g1/measure/cold-login.sh)
+relay_call() { r "$@"; }
+workspace=$PWD
+echo "== d34 entries"; d34_entries
+head=$(r desktop.profiles.get '{}' | jq -r .result.profile.head_revision); echo "head=$head"
+mapfile -t entries < <(d34_entries)
+if (( ${#entries[@]} )); then
+  echo "== dry propose (preflight only?)"
+  r desktop.changes.propose "$(jq -cn --arg base "$head" '{base_revision:$base, dry_run:true, ops:($ARGS.positional|map({op:"remove_entry",entry_id:.}))}' --args "${entries[@]}")" | head -c 3000; echo
+fi
+echo "== last changes"; r desktop.changes.list '{"limit":3}' | jq -c '.result.changes[]|{change_id,state,reasons,created_at}' 2>&1 | head -c 3000
+echo "== entries summary"; r desktop.profiles.get '{}' | jq -c '.result.document.entries[]|[.package,.version,.disabled]' | sort | uniq -c
