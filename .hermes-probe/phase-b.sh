@@ -23,46 +23,19 @@ cargo build --locked --release -p ditto-measure 2>&1 | tail -1
 # accepts 0.3; remove the entries that have none (recorded; undoable).
 head=$(r desktop.profiles.get | jq -r .result.profile.head_revision)
 log "profile head before: $head"
-plan=$(r desktop.profiles.get | python3 -c '
-import sys, json, sqlite3, os, re
-doc = json.load(sys.stdin)["result"]["document"]
-db = sqlite3.connect("file:" + os.path.expanduser("~/.local/share/ditto/core.db") + "?mode=ro", uri=True)
-proto = (0, 3, 0)
-def ver(v): return tuple(int(x) for x in re.match(r"(\d+)\.(\d+)\.(\d+)", v).groups())
-def ok(rng):
-    rng = rng.strip()
-    m = re.fullmatch(r"\^(\d+)\.(\d+)(?:\.(\d+))?", rng)
-    if m:
-        lo = (int(m[1]), int(m[2]), int(m[3] or 0))
-        hi = (lo[0] + 1, 0, 0) if lo[0] else (0, lo[1] + 1, 0)
-        return lo <= proto < hi
-    return None
-ops, notes = [], []
-for e in doc["entries"]:
-    rows = db.execute("select version, manifest_json, source from plugin_packages where package_id=?", (e["package"],)).fetchall()
-    cur = [json.loads(m) for v, m, s in rows if v == e["version"]]
-    if cur and ok(cur[0].get("required_protocol_version", "")):
-        continue
-    cands = sorted((ver(v), v) for v, m, s in rows if s == "builtin" and ok(json.loads(m).get("required_protocol_version", "")))
-    if cands:
-        ops.append({"op": "upgrade_entry", "entry_id": e["entry_id"], "from_version": e["version"], "to_version": cands[-1][1]})
-        notes.append(f"upgrade {e['package']} {e['version']}->{cands[-1][1]}")
-    else:
-        ops.append({"op": "remove_entry", "entry_id": e["entry_id"]})
-        notes.append(f"remove {e['package']} {e['version']} (no 0.3 build)")
-print(json.dumps({"ops": ops, "notes": notes}, ensure_ascii=False))
-')
+here="$(cd "$(dirname "$0")" && pwd)"
+plan=$(r desktop.profiles.get | python3 "$here/plan.py" ~/.local/share/ditto/core.db) || { log "plan failed"; exit 1; }
 log "profile plan: $(jq -c .notes <<<"$plan")"
 if [[ "$(jq '.ops|length' <<<"$plan")" != 0 ]]; then
   res=$(r desktop.changes.propose "$(jq -cn --arg b "$head" --argjson ops "$(jq -c .ops <<<"$plan")" '{base_revision:$b, ops:$ops, idempotency_key:"g2-exit-profile-0.3-2026-10-13"}')")
-  log "profile change: $(jq -c '(.result|{change_id,state,reasons}) // .error' <<<"$res" | head -c 2500)"
+  log "profile change: $(jq -c 'if .result then (.result|{change_id,state,reasons}) else .error end' <<<"$res" | head -c 2500)"
   [[ "$(jq -r .result.state <<<"$res")" == committed ]] || exit 1
 fi
 doc=$(r desktop.profiles.get); head=$(jq -r .result.profile.head_revision <<<"$doc")
 if ! jq -e '.result.document.shortcuts[]? | select(.chord=="Super+A")' <<<"$doc" >/dev/null; then
   after=$(jq -c '.result.document.shortcuts + [{chord:"Super+A",command:"chat.toggle"}]' <<<"$doc")
   res=$(r desktop.changes.propose "$(jq -cn --arg b "$head" --argjson a "$after" '{base_revision:$b, idempotency_key:"g2-exit-super-a-2026-10-13", ops:[{op:"set_value",path:"/shortcuts",after:$a}]}')")
-  log "Super+A change: $(jq -c '.result|{change_id,state,reasons}' <<<"$res" | head -c 800)"
+  log "Super+A change: $(jq -c 'if .result then (.result|{change_id,state,reasons}) else .error end' <<<"$res" | head -c 800)"
   [[ "$(jq -r .result.state <<<"$res")" == committed ]] || exit 1
 fi
 log "profile head after: $(r desktop.profiles.get | jq -r .result.profile.head_revision)"
