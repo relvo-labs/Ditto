@@ -39,6 +39,55 @@ jobs:
               find artifacts -newer "$mark" -type f | tee /tmp/phase-a-files.txt | wc -l
               tar -czf "$GITHUB_WORKSPACE/phase-a.tar.gz" -T /tmp/phase-a-files.txt
               ;;
+            phase-b-start)
+              st=$HOME/.local/state/ditto-g2-exit; mkdir -p "$st"
+              systemctl --user is-active g2-exit-series.service && { echo "already running"; exit 1; }
+              cargo build --locked --release -p ditto-measure -p ditto-core -p ditto-supervisor -p dittoctl -p ditto-confine 2>&1 | tail -3
+              git status --porcelain | head -3
+              ls artifacts/g2-ref-exit 2>/dev/null && { echo "artifacts/g2-ref-exit exists; refusing"; exit 1; }
+              cat > "$st/phase-b.sh" <<'SH'
+          #!/usr/bin/env bash
+          # G2 EX2-14 on the reference machine: temporary GDM autologin, 4 states x 3 cold logins.
+          set -uo pipefail
+          st=$HOME/.local/state/ditto-g2-exit; ts=$(date -u +%Y%m%dT%H%M%SZ)
+          log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" >>"$st/phase-b.log"; }
+          sudo -n cp -p /etc/gdm3/custom.conf "$st/custom.conf.orig" && sudo -n cp -p /etc/gdm3/custom.conf /etc/gdm3/custom.conf.g2-exit-$ts
+          sha256sum /etc/gdm3/custom.conf >"$st/custom.conf.sha256"
+          restore() {
+            sudo -n cp -p "$st/custom.conf.orig" /etc/gdm3/custom.conf
+            if sudo -n cmp -s "$st/custom.conf.orig" /etc/gdm3/custom.conf && sha256sum -c "$st/custom.conf.sha256" >/dev/null; then log "gdm custom.conf restored byte-identical"; else log "RESTORE MISMATCH"; fi
+            log "relogin to the login screen"; sudo -n /usr/local/libexec/ditto-relogin >>"$st/phase-b.log" 2>&1
+            log "phase-b done"
+          }
+          trap restore EXIT
+          sudo -n python3 - <<'PY'
+          import re
+          p='/etc/gdm3/custom.conf'; s=open(p).read()
+          s=s.replace('[daemon]\n','[daemon]\nAutomaticLoginEnable=True\nAutomaticLogin=neil\n',1)
+          open(p,'w').write(s)
+          PY
+          log "autologin enabled"; grep -A3 '^\[daemon\]' /etc/gdm3/custom.conf >>"$st/phase-b.log"
+          cd ~/funlab/Ditto
+          DITTO_ARTIFACTS=$PWD/artifacts/g2-ref-exit DITTO_SERIES_FINAL_RELOGIN=0 DITTO_LOGIN_TIMEOUT_SECONDS=600 \
+            bash tests/g1/measure/series.sh rescue_no_node desktop_full_no_agent desktop_full_agent_warm desktop_full_agent_active >>"$st/phase-b.log" 2>&1
+          log "series exit $?"
+          SH
+              sed -i 's/^          //' "$st/phase-b.sh"; chmod +x "$st/phase-b.sh"; bash -n "$st/phase-b.sh" && echo syntax-ok
+              systemd-run --user --unit=g2-exit-series --collect --same-dir \
+                -E PATH="$PATH" -E LD_LIBRARY_PATH="$LD_LIBRARY_PATH" bash "$st/phase-b.sh"
+              sleep 5; systemctl --user status g2-exit-series.service --no-pager | head -5; cat "$st/phase-b.log"
+              ;;
+            phase-b-status)
+              st=$HOME/.local/state/ditto-g2-exit
+              systemctl --user is-active g2-exit-series.service
+              tail -40 "$st/phase-b.log"; echo; tail -15 artifacts/g2-ref-exit/cold-login-progress.log 2>/dev/null
+              loginctl list-sessions --no-legend
+              ;;
+            phase-b-collect)
+              st=$HOME/.local/state/ditto-g2-exit
+              cat "$st/phase-b.log"; sudo -n cmp "$st/custom.conf.orig" /etc/gdm3/custom.conf && echo gdm-identical
+              tar -czf "$GITHUB_WORKSPACE/phase-b.tar.gz" artifacts/g2-ref-exit "$st/phase-b.log" "$st/phase-b.sh"
+              ;;
           esac
       - uses: actions/upload-artifact@v4
         if: always()
