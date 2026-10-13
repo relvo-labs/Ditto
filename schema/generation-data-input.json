@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "type": "string"
+    },
+    "expected_revision": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "payload": true
+  },
+  "required": [
+    "artifact_id",
+    "payload",
+    "expected_revision"
+  ],
+  "title": "GeneratedDataInput",
+  "type": "object"
+}

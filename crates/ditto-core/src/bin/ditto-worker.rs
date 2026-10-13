@@ -109,6 +109,49 @@ fn main() {
     .unwrap_or_else(|_| fail("job.invalid_params"));
     let result = match kind.as_str() {
         "packages.verify" => verify_packages(&params),
+        "generation.validate" | "generation.preview" => {
+            use std::io::{BufRead, BufReader};
+            use std::process::{Command, Stdio};
+            let binary = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|p| p.join("ditto-generation-host")))
+                .unwrap_or_else(|| fail("generation.host_unavailable"));
+            let mut child = Command::new(binary)
+                .arg(if kind == "generation.preview" {
+                    "preview"
+                } else {
+                    "validate"
+                })
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap_or_else(|_| fail("generation.host_unavailable"));
+            if let Some(mut input) = child.stdin.take() {
+                if input.write_all(params.to_string().as_bytes()).is_err() {
+                    fail("generation.invalid_params");
+                }
+            }
+            let mut result = None;
+            if let Some(output) = child.stdout.take() {
+                for line in BufReader::new(output).lines().map_while(Result::ok) {
+                    if let Ok(value) = serde_json::from_str::<Value>(&line) {
+                        if let Some(v) = value.get("result") {
+                            result = Some(v.clone());
+                        } else if value.get("phase").is_some() {
+                            emit(value);
+                        }
+                    }
+                }
+            }
+            let status = child
+                .wait()
+                .unwrap_or_else(|_| fail("generation.host_failed"));
+            if !status.success() {
+                fail("generation.host_unavailable");
+            }
+            result.unwrap_or_else(|| fail("generation.validation_missing"))
+        }
         "test.spin" => spin(&params),
         "test.memory" => memory(&params),
         "test.sleep" => sleep(&params),

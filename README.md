@@ -4,7 +4,7 @@
 
 Ditto 同時是專案名稱與預設角色。Soft Jelly／柔光果凍是預設桌面形象，並不限制其他組合的風格。
 
-**目前進度（2026-10-07）：G0 原生可行性與 G1 組合底座已完成，由 owner 依實際使用接受（[D-38](.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)）。** 下一開發階段為 G2，接入真實 Agent／LLM；剩餘功能、驗證證據與核定事項依 D-38 繼續追蹤。
+**目前進度（2026-10-14）：G0／G1 已依 D-38 接受，G2 功能已由 owner 依 [D-46](.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受。** G3 正式生成、隔離驗證／預覽、版本與資料回退已有實作和開發證據；真實模型與參考機出口仍待驗證，見 [G3 評審紀錄](.agents/notes/gate-reviews/G3-exit.md)。
 
 ## 文件與原型
 
@@ -15,6 +15,7 @@ Ditto 同時是專案名稱與預設角色。Soft Jelly／柔光果凍是預設�
 - [G0 執行計畫](plan/02/README.md)：G0 的範圍界線、出口門檻、工作包與週序。
 - [G1 執行計畫](plan/03/README.md)：組合底座、交易、宿主與驗證；[G0 評審](.agents/notes/gate-reviews/G0-exit.md)、[G1 評審](.agents/notes/gate-reviews/G1-exit.md)保存逐項接受與量測證據。
 - [G2 執行計畫](plan/04/README.md)：Codex 個人訂閱＋app-server、Core 會話、授權與上下文、按需 Agent、對話介面；44個工作包與十九項出口，選型與估算為待核定提案。
+- [G3 執行計畫](plan/05/README.md)：受限描述、固定模板、原生測試宿主、生成與回退；[生產邊界](docs/platform/generated-template-boundary.md)、[驗證入口](tests/g3/README.md)。
 - [開發導覽 AGENTS.md](AGENTS.md)：權威文件位置、五條不可違反原則與 [skill 集合](.agents/skills/README.md)。
 - [已部署體驗](https://ditto-soft-jelly-desktop.neil0628.chatgpt.site)：依既有存取權限開放，並非 GitHub Pages。
 
@@ -73,7 +74,7 @@ bash tests/g0/window-matrix/run.sh      # 能力 × 視窗形態矩陣
 
 網頁原型的自然語言採本機規則解析，元件由受限模板組合；檔案、終端與系統狀態為示範。原生側已有 Rust Core／SQLite、Profile／revision、ChangeSet 交易與回復、Cordis hostd、待辦與通知策略服務，以及可替換 Dock／啟動器、四個管理中心、救援與鎖定介面。
 
-參考機已完成交易、回復、生命週期與故障注入驗證，完整桌面（Agent 不存在）的三次冷登入 PSS p95 為 449.9／449.1／450.9 MiB；條件與原始資料見 [G1 評審 §6](.agents/notes/gate-reviews/G1-exit.md#6-ex1-10-分層資源參考機2026-10-05)。真實 Agent／LLM、互動授權應答者與秘密儲存待 G2 實作。實體雙螢幕、部分桌面基本功能、人工錄影、五晚 nightly 與內建套件升版檢查列為後續工作。
+參考機已完成交易、回復、生命週期與故障注入驗證，完整桌面（Agent 不存在）的三次冷登入 PSS p95 為 449.9／449.1／450.9 MiB；條件與原始資料見 [G1 評審 §6](.agents/notes/gate-reviews/G1-exit.md#6-ex1-10-分層資源參考機2026-10-05)。真實 Agent／LLM、互動授權與秘密儲存已於 G2 實作，證據與未完成量測見 [G2 評審](.agents/notes/gate-reviews/G2-exit.md)。實體雙螢幕、部分桌面基本功能、人工錄影、五晚 nightly 與內建套件升版檢查列為後續工作。
 
 ## 驗證與發行
 

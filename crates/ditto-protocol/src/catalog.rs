@@ -112,7 +112,7 @@ pub struct CapabilitiesListOutput {
     pub capabilities: Vec<CapabilityDescriptor>,
 }
 
-pub const CATALOG_REVISION: u64 = 5;
+pub const CATALOG_REVISION: u64 = 6;
 
 // G0
 pub const CAPABILITIES_LIST: &str = "desktop.capabilities.list";
@@ -153,6 +153,15 @@ pub const PLUGINS_INSPECT: &str = "desktop.plugins.inspect";
 pub const PLUGINS_INSTALL: &str = "desktop.plugins.install";
 pub const PLUGINS_REMOVE: &str = "desktop.plugins.remove";
 pub const PLUGINS_DIAGNOSTICS: &str = "desktop.plugins.diagnostics";
+pub const DEVELOPMENT_CREATE: &str = "desktop.plugins.development.create";
+pub const DEVELOPMENT_GET: &str = "desktop.plugins.development.get";
+pub const DEVELOPMENT_LIST: &str = "desktop.plugins.development.list";
+pub const DEVELOPMENT_VALIDATE: &str = "desktop.plugins.development.validate";
+pub const DEVELOPMENT_PREVIEW: &str = "desktop.plugins.development.preview";
+pub const DEVELOPMENT_PUBLISH: &str = "desktop.plugins.development.publish";
+pub const DEVELOPMENT_ACTIVATE: &str = "desktop.plugins.development.activate";
+pub const DEVELOPMENT_DATA_GET: &str = "desktop.plugins.development.data_get";
+pub const DEVELOPMENT_DATA_WRITE: &str = "desktop.plugins.development.data_write";
 // permissions
 pub const PERMISSIONS_LIST: &str = "desktop.permissions.list";
 pub const PERMISSIONS_CHECK: &str = "desktop.permissions.check";
@@ -217,6 +226,8 @@ pub mod scope {
     pub const WINDOWS_CONTROL: &str = "desktop.windows.control";
     pub const RESCUE: &str = "desktop.rescue";
     pub const PLUGINS_MANAGE: &str = "plugins.manage";
+    pub const PLUGINS_DEVELOP: &str = "plugins.develop";
+    pub const PLUGINS_DATA: &str = "plugins.data";
     pub const PERMISSIONS_MANAGE: &str = "permissions.manage";
     pub const SESSION_POWER: &str = "session.power";
     pub const SESSION_LOCK: &str = "session.lock";
@@ -246,6 +257,8 @@ pub mod scope {
         WINDOWS_CONTROL,
         RESCUE,
         PLUGINS_MANAGE,
+        PLUGINS_DEVELOP,
+        PLUGINS_DATA,
         PERMISSIONS_MANAGE,
         SESSION_POWER,
         SESSION_LOCK,
@@ -944,7 +957,75 @@ fn definitions() -> Vec<Definition> {
         .timeout(15_000, 30_000),
     ];
     definitions.extend(agent_definitions());
+    definitions.extend(generation_definitions());
     definitions
+}
+
+fn generation_definitions() -> Vec<Definition> {
+    use crate::generation::*;
+    use Idempotency::{KeyBased, Natural};
+    vec![
+        def(
+            DEVELOPMENT_CREATE,
+            schema::<GenerateInput>,
+            schema::<GeneratedArtifact>,
+            &[s::PLUGINS_DEVELOP],
+        )
+        .write(KeyBased, DEVELOPMENT_GET, true),
+        def(
+            DEVELOPMENT_GET,
+            schema::<ArtifactInput>,
+            schema::<GeneratedArtifact>,
+            &[s::READ],
+        ),
+        def(
+            DEVELOPMENT_LIST,
+            schema::<Empty>,
+            schema::<ArtifactsOutput>,
+            &[s::READ],
+        ),
+        def(
+            DEVELOPMENT_VALIDATE,
+            schema::<GenerationJobInput>,
+            schema::<Job>,
+            &[s::PLUGINS_DEVELOP],
+        )
+        .write(KeyBased, JOBS_GET, true),
+        def(
+            DEVELOPMENT_PREVIEW,
+            schema::<GenerationJobInput>,
+            schema::<Job>,
+            &[s::PLUGINS_DEVELOP],
+        )
+        .write(KeyBased, JOBS_GET, true),
+        def(
+            DEVELOPMENT_PUBLISH,
+            schema::<ArtifactInput>,
+            schema::<GeneratedArtifact>,
+            &[s::PLUGINS_DEVELOP],
+        )
+        .write(Natural, DEVELOPMENT_GET, true),
+        def(
+            DEVELOPMENT_ACTIVATE,
+            schema::<GenerationActivateInput>,
+            schema::<crate::change::ChangeRecord>,
+            &[s::PLUGINS_DEVELOP, s::CONFIG, s::PLUGINS_DATA],
+        )
+        .change(KeyBased, CHANGES_GET),
+        def(
+            DEVELOPMENT_DATA_GET,
+            schema::<ArtifactInput>,
+            schema::<GeneratedData>,
+            &[s::PLUGINS_DATA],
+        ),
+        def(
+            DEVELOPMENT_DATA_WRITE,
+            schema::<GeneratedDataInput>,
+            schema::<GeneratedData>,
+            &[s::PLUGINS_DATA],
+        )
+        .write(Natural, DEVELOPMENT_DATA_GET, true),
+    ]
 }
 
 fn agent_definitions() -> Vec<Definition> {

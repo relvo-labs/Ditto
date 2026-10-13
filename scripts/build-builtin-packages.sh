@@ -15,6 +15,8 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 out="${1:-$root/target/ditto-packages}"
 mkdir -p "$out"
+# Plugin pack scripts run from their own directory; retain one output root.
+out="$(cd "$out" && pwd)"
 rm -f "$out"/*.dittopkg
 
 pack_dir() {

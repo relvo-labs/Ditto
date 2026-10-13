@@ -45,6 +45,13 @@ pub fn kind_spec(kind: &str) -> Option<KindSpec> {
     };
     match kind {
         "packages.verify" => Some(short(120_000, false)),
+        "generation.validate" | "generation.preview" => Some(KindSpec {
+            deadline_ms: 60000,
+            memory_max: "512M",
+            cpu_quota: "100%",
+            tasks_max: 64,
+            test_only: false,
+        }),
         "test.spin" | "test.memory" | "test.sleep" => Some(short(120_000, true)),
         _ => None,
     }
@@ -65,13 +72,23 @@ struct Running {
 pub struct JobPool {
     worker: Option<PathBuf>,
     pub available: bool,
+    pub recovery_clean: std::sync::atomic::AtomicBool,
     pub test_kinds: bool,
     running: Mutex<HashMap<String, Running>>,
     wake: Mutex<Option<Sender<()>>>,
 }
 
+fn manager_command(binary: &str) -> Command {
+    let mut command = Command::new(binary);
+    command.env(
+        "DBUS_SESSION_BUS_ADDRESS",
+        format!("unix:path=/run/user/{}/bus", unsafe { libc::getuid() }),
+    );
+    command
+}
+
 fn systemd_user_available() -> bool {
-    Command::new("/usr/bin/systemctl")
+    manager_command("/usr/bin/systemctl")
         .args(["--user", "is-system-running"])
         .env_remove("NOTIFY_SOCKET")
         .stdout(Stdio::piped())
@@ -95,10 +112,18 @@ impl JobPool {
         Self {
             worker,
             available,
+            recovery_clean: std::sync::atomic::AtomicBool::new(false),
             test_kinds,
             running: Mutex::new(HashMap::new()),
             wake: Mutex::new(None),
         }
+    }
+
+    pub fn ready(&self) -> bool {
+        self.available
+            && self
+                .recovery_clean
+                .load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Whether a kind may be submitted here.
@@ -202,7 +227,7 @@ fn spawn(
     } else {
         params
     };
-    let mut child = Command::new("/usr/bin/systemd-run")
+    let mut child = manager_command("/usr/bin/systemd-run")
         .args(["--user", "--scope", "--quiet", "--collect"])
         .arg(format!("--unit={unit}"))
         .args(["-p", &format!("MemoryMax={}", spec.memory_max)])
@@ -220,9 +245,22 @@ fn spawn(
                 "PATH",
                 "LANG",
                 "HOME",
+                "WAYLAND_DISPLAY",
             ]
             .iter()
             .filter_map(|k| std::env::var_os(k).map(|v| (*k, v))),
+        )
+        .env(
+            "DBUS_SESSION_BUS_ADDRESS",
+            format!("unix:path=/run/user/{}/bus", unsafe { libc::getuid() }),
+        )
+        .env(
+            "DITTO_JOB_CORE_WITNESS",
+            format!(
+                "{}:{}",
+                std::process::id(),
+                process_start(std::process::id()).ok_or("job.core_identity_unavailable")?
+            ),
         )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -259,7 +297,7 @@ fn spawn(
 
 /// Whether the scope's cgroup recorded an OOM kill.
 fn oom_killed(unit: &str) -> bool {
-    Command::new("/usr/bin/systemctl")
+    manager_command("/usr/bin/systemctl")
         .args([
             "--user",
             "show",
@@ -280,7 +318,7 @@ fn signal_group(running: &Running, signal: i32) {
     // SAFETY: signalling our own child process by PID while not yet reaped.
     unsafe { libc::kill(running.child.id() as i32, signal) };
     if signal == libc::SIGKILL {
-        let _ = Command::new("/usr/bin/systemctl")
+        let _ = manager_command("/usr/bin/systemctl")
             .args([
                 "--user",
                 "kill",
@@ -294,6 +332,9 @@ fn signal_group(running: &Running, signal: i32) {
 }
 
 fn step(core: &Arc<Core>) {
+    if core.is_recovering() || !core.jobs.ready() {
+        return;
+    }
     // 1. Running workers: progress, deadlines, cancels, exits.
     let ids: Vec<String> = core
         .jobs
@@ -379,7 +420,12 @@ fn step(core: &Arc<Core>) {
         if let Some((text, progress)) = phase {
             let job_id = id.clone();
             if write(core, move |c| {
-                ditto_store::jobs::set_phase(c, &job_id, &text, progress)
+                ditto_store::jobs::set_phase(c, &job_id, &text, progress)?;
+                if text == "preview_opened" {
+                    let job = ditto_store::jobs::get(c, &job_id)?;
+                    crate::generation::preview_event(c, &job, true)?;
+                }
+                Ok(())
             })
             .is_some()
             {
@@ -391,7 +437,15 @@ fn step(core: &Arc<Core>) {
         if let Some((state, result, error)) = finished {
             let job_id = id.clone();
             if let Some(job) = write(core, move |c| {
-                ditto_store::jobs::finish(c, &job_id, state, result.as_ref(), error.as_deref())
+                let job = ditto_store::jobs::finish(
+                    c,
+                    &job_id,
+                    state,
+                    result.as_ref(),
+                    error.as_deref(),
+                )?;
+                crate::generation::finish_job(c, &job)?;
+                Ok(job)
             }) {
                 crate::log::event(
                     "jobs.finished",
@@ -461,11 +515,168 @@ fn step(core: &Arc<Core>) {
             Err(error) => {
                 let job_id = job.job_id.clone();
                 if let Some(job) = write(core, move |c| {
-                    ditto_store::jobs::finish(c, &job_id, JobState::Failed, None, Some(&error))
+                    let job = ditto_store::jobs::finish(
+                        c,
+                        &job_id,
+                        JobState::Failed,
+                        None,
+                        Some(&error),
+                    )?;
+                    crate::generation::finish_job(c, &job)?;
+                    Ok(job)
                 }) {
                     publish(core, job);
                 }
             }
+        }
+    }
+}
+
+fn process_start(pid: u32) -> Option<String> {
+    std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        .ok()?
+        .rsplit_once(')')?
+        .1
+        .split_whitespace()
+        .nth(19)
+        .map(str::to_owned)
+}
+/// Stop only persisted Core-owned scopes before admitting replacement work.
+pub fn reap_interrupted(c: &rusqlite::Connection) -> ditto_store::StoreResult<()> {
+    let mut statement = c.prepare(
+        // A previous boot may have marked work interrupted while cleanup was
+        // unavailable. Keep checking those scopes on every restart as well.
+        "SELECT job_id,unit FROM jobs WHERE unit IS NOT NULL AND
+         (state IN ('running','cancelling') OR (state = 'failed' AND error_key = 'job.interrupted')
+          OR (state = 'cancelled' AND error_key = 'job.cancelled'))",
+    )?;
+    let rows = statement
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for (id, unit) in rows {
+        let expected = format!(
+            "ditto-job-{}",
+            id.to_ascii_lowercase()
+                .replace(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-', "-")
+        );
+        if unit != expected {
+            return Err(ditto_store::StoreError::Invalid(
+                "interrupted worker unit identity mismatch".into(),
+            ));
+        }
+        let scope = format!("{unit}.scope");
+        // Remember the kernel path before stop: systemd can retain an inactive
+        // transient unit with an empty ControlGroup property until it is GC'd.
+        let before = manager_command("/usr/bin/systemctl")
+            .args(["--user", "show", &scope, "-p", "ControlGroup", "--value"])
+            .output()?;
+        let previous_group = String::from_utf8_lossy(&before.stdout).trim().to_owned();
+        if !previous_group.is_empty() && !previous_group.ends_with(&format!("/{scope}")) {
+            return Err(ditto_store::StoreError::Invalid(
+                "interrupted worker cgroup identity mismatch".into(),
+            ));
+        }
+        // Interrupted work cannot finish its transaction. Reap the complete
+        // old scope immediately instead of waiting for the manager's default
+        // graceful-stop timeout while holding replacement admission closed.
+        let _ = manager_command("/usr/bin/systemctl")
+            .args(["--user", "kill", "--signal=KILL", "--kill-whom=all", &scope])
+            .output()?;
+        let result = manager_command("/usr/bin/systemctl")
+            .args(["--user", "stop", "--no-block", &scope])
+            .output()?;
+        // An already-collected unit is also empty; verify through LoadState.
+        let mut clean = false;
+        let mut last_observed = String::new();
+        for _ in 0..100 {
+            let out = manager_command("/usr/bin/systemctl")
+                .args([
+                    "--user",
+                    "show",
+                    &scope,
+                    "-p",
+                    "LoadState",
+                    "-p",
+                    "ActiveState",
+                    "-p",
+                    "ControlGroup",
+                ])
+                .output()?;
+            let text = String::from_utf8_lossy(&out.stdout);
+            let collected = text.lines().any(|l| l == "LoadState=not-found");
+            let current_group = text.lines().find_map(|l| l.strip_prefix("ControlGroup="));
+            let path = current_group
+                .filter(|path| !path.is_empty())
+                .or_else(|| (!previous_group.is_empty()).then_some(previous_group.as_str()));
+            let empty = path
+                .filter(|path| path.ends_with(&format!("/{scope}")))
+                .is_some_and(|path| {
+                    let events = std::path::Path::new("/sys/fs/cgroup")
+                        .join(path.trim_start_matches('/'))
+                        .join("cgroup.events");
+                    match std::fs::read_to_string(events) {
+                        Ok(text) => text.lines().any(|l| l == "populated 0"),
+                        Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+                    }
+                });
+            let inactive_without_group = out.status.success()
+                && previous_group.is_empty()
+                && current_group == Some("")
+                && text
+                    .lines()
+                    .any(|l| l == "ActiveState=inactive" || l == "ActiveState=failed");
+            last_observed = text.into_owned();
+            if collected || empty || inactive_without_group {
+                clean = true;
+                break;
+            }
+            if !result.status.success() && !out.status.success() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        if !clean {
+            return Err(ditto_store::StoreError::Invalid(format!(
+                "interrupted worker cleanup unconfirmed: {scope}: {last_observed}"
+            )));
+        }
+        // Clear only after proof. If this boot or a later Store write fails,
+        // the persisted unit remains a cleanup obligation for the next boot.
+        c.execute("UPDATE jobs SET unit = NULL WHERE job_id = ?1", [&id])?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn terminal_interrupted_and_cancelled_jobs_remain_cleanup_obligations() {
+        for (state, error) in [
+            ("failed", "job.interrupted"),
+            ("cancelled", "job.cancelled"),
+        ] {
+            let c = rusqlite::Connection::open_in_memory().unwrap();
+            c.execute_batch("CREATE TABLE jobs(job_id TEXT,unit TEXT,state TEXT,error_key TEXT);")
+                .unwrap();
+            c.execute(
+                "INSERT INTO jobs VALUES ('job-old','unrelated-user-unit',?1,?2)",
+                [state, error],
+            )
+            .unwrap();
+            // Refuse the corrupt identity before touching any manager unit,
+            // even though the job was already terminal on a previous boot.
+            assert!(reap_interrupted(&c)
+                .unwrap_err()
+                .to_string()
+                .contains("unit identity mismatch"));
+            let unit: String = c
+                .query_row("SELECT unit FROM jobs", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(unit, "unrelated-user-unit");
+            c.execute("UPDATE jobs SET unit = NULL", []).unwrap();
+            reap_interrupted(&c).unwrap();
         }
     }
 }

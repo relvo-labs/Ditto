@@ -85,8 +85,30 @@ fn verified<T: serde::Serialize>(value: T) -> Handled {
 // ---- authorization and availability --------------------------------------
 
 /// `files:` scopes need the grant the call is about.
-fn resource_for(contract: &CapabilityContract, params: &Map<String, Value>) -> Option<String> {
-    let _ = contract;
+fn resource_for(
+    core: &Core,
+    contract: &CapabilityContract,
+    params: &Map<String, Value>,
+) -> Option<String> {
+    if contract
+        .capability_id
+        .starts_with("desktop.plugins.development.")
+    {
+        if let Some(id) = params
+            .get("description")
+            .and_then(|v| v.get("plugin_id"))
+            .and_then(Value::as_str)
+        {
+            return Some(id.into());
+        }
+        if let Some(id) = params.get("artifact_id").and_then(Value::as_str) {
+            return Some(
+                core.read(|c| ditto_store::generated::get(c, id))
+                    .map(|a| a.description.plugin_id)
+                    .unwrap_or_else(|_| format!("artifact:{id}")),
+            );
+        }
+    }
     params
         .get("grant_id")
         .and_then(Value::as_str)
@@ -110,7 +132,7 @@ pub fn authorize(
     let outcome = authz::authorize(
         &caller.subject,
         contract.scopes,
-        resource_for(contract, params).as_deref(),
+        resource_for(core, contract, params).as_deref(),
         &usable,
     );
     let decision = if outcome.allowed() {
@@ -137,7 +159,21 @@ pub fn authorize(
 
 pub fn resolve(core: &Core, contract: &CapabilityContract) -> Resolved {
     let id = contract.capability_id;
-    if id == catalog::JOBS_SUBMIT && !core.jobs.available {
+    if matches!(
+        id,
+        catalog::DEVELOPMENT_VALIDATE | catalog::DEVELOPMENT_PREVIEW
+    ) {
+        let available = crate::generation::available(core, id == catalog::DEVELOPMENT_PREVIEW);
+        return Resolved {
+            provider_label: Some("isolated-generation".into()),
+            availability: Availability::DependsOnSystem {
+                component: "generation-host".into(),
+                available,
+                reason: (!available).then_some(UnavailableReason::SystemUnavailable),
+            },
+        };
+    }
+    if id == catalog::JOBS_SUBMIT && !core.jobs.ready() {
         return Resolved {
             provider_label: None,
             availability: Availability::DependsOnSystem {
@@ -439,6 +475,13 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
         ));
     }
     check_available(core, call.contract)?;
+    if call
+        .contract
+        .capability_id
+        .starts_with("desktop.plugins.development.")
+    {
+        return crate::generation::dispatch(core, caller, &call);
+    }
     if call.contract.provider == Provider::Compositor {
         return crate::desktop::execute(&core.session, &call);
     }
@@ -931,7 +974,13 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
             }
             let job_id = input.job_id.clone();
             let job = coordinate(core, &call, move |c| {
-                c.store().write(|tx| jobs::request_cancel(tx, &job_id))
+                c.store().write(|tx| {
+                    let job = jobs::request_cancel(tx, &job_id)?;
+                    if job.state == JobState::Cancelled {
+                        crate::generation::finish_job(tx, &job)?;
+                    }
+                    Ok::<_, ditto_store::StoreError>(job)
+                })
             })??;
             core.jobs.wake();
             core.publish(DesktopEventPayload::JobsUpdated { job: job.clone() });
@@ -945,7 +994,7 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
                     "background jobs need a systemd user manager to enforce their limits",
                 ));
             }
-            if !core.jobs.accepts(&input.kind) {
+            if input.kind.starts_with("generation.") || !core.jobs.accepts(&input.kind) {
                 return Err(CoreError::invalid("unknown job kind"));
             }
             // Fixture kinds take bounded numbers; real kinds take nothing.
@@ -1079,7 +1128,7 @@ fn change_outcome(record: ChangeRecord) -> Handled {
     Ok((json!(record), verified))
 }
 
-fn origin_for(
+pub(crate) fn origin_for(
     core: &Core,
     caller: &Caller,
     call: &Call<'_>,
@@ -1118,7 +1167,12 @@ fn origin_for(
 /// known), then for the outcome within the caller's deadline. Running over the
 /// deadline returns the record as it is now; the change continues and the
 /// caller follows it with `changes.get`, never by resending.
-fn run_proposal(core: &Arc<Core>, caller: &Caller, proposal: Proposal, call: &Call<'_>) -> Handled {
+pub(crate) fn run_proposal(
+    core: &Arc<Core>,
+    caller: &Caller,
+    proposal: Proposal,
+    call: &Call<'_>,
+) -> Handled {
     let (accepted, change_id) = mpsc::channel();
     let (reply, outcome) = mpsc::channel();
     let gone = Arc::clone(&caller.gone);
@@ -1575,7 +1629,7 @@ fn changes_list(core: &Core, input: ChangesListInput) -> Handled {
 
 // ---- appearance, panels, layout, shortcuts, commands -------------------------
 
-fn active_document(
+pub(crate) fn active_document(
     core: &Core,
 ) -> Result<(ProfileSummary, RevisionSummary, ProfileDocument), CoreError> {
     Ok(core.read(|connection| {
@@ -1976,10 +2030,17 @@ fn plugins_list(core: &Core) -> Handled {
                 disabled: entry.disabled,
                 state,
                 started_reason: "profile".into(),
-                trust_note_key: match entry.host {
-                    HostKind::Cordis => "trust.same_host_no_isolation.cordis".into(),
-                    HostKind::Qml => "trust.same_host_no_isolation.qml".into(),
-                    HostKind::CoreBuiltin => "trust.core_builtin".into(),
+                trust_note_key: if packages
+                    .get(&entry.package, &entry.version)
+                    .is_some_and(|row| row.generated.is_some())
+                {
+                    "trust.generated_fixed_template".into()
+                } else {
+                    match entry.host {
+                        HostKind::Cordis => "trust.same_host_no_isolation.cordis".into(),
+                        HostKind::Qml => "trust.same_host_no_isolation.qml".into(),
+                        HostKind::CoreBuiltin => "trust.core_builtin".into(),
+                    }
                 },
             }
         })

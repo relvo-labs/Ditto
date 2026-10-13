@@ -36,13 +36,27 @@ vm_ssh 'uname -r' >>"$out/restore.log" 2>&1
 record restore pass
 vm_sync_workspace >"$out/sync.log" 2>&1
 record sync pass
+step build 'cargo build --locked -p ditto-core -p ditto-test-host -p ditto-confine'
 step foundation 'bash tests/g3/run.sh'
 if [[ "${DITTO_G3_EXPECT_OLD_ABI:-0}" == 1 ]]; then
   step rejection 'python3 tests/g3/host/rejection.py --old-abi'
+  step production-partial 'DITTO_G3_EXPECT_OLD_ABI=1 node tests/g3/integration/run.mjs'
   record candidate-execution not_run
 else
   step rejection 'python3 tests/g3/host/rejection.py'
   step host 'DITTO_ENVIRONMENT_LABEL=development-vm timeout -k 5 180 bash tests/g3/host/run.sh'
+  step production 'node tests/g3/integration/run.mjs'
+  step dependencies 'pnpm install --frozen-lockfile'
+  step packages 'bash tests/g3/desktop/build.sh'
+  step desktop 'bash tests/g3/desktop/run.sh'
+  step restart 'bash tests/g3/restart/run.sh'
+  codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}" 2>/dev/null || true)"
+  if [[ -f "$codex" && "$(sha256sum "$codex" | cut -d' ' -f1)" == "$(jq -r .sha256 "$WORKSPACE/tools/codex/pin.json")" ]]; then
+    vm_rsync "$codex" "neil@$(vm_ip):funlab/Ditto/target/codex-app-server" >"$out/codex-copy.log" 2>&1
+    step agent 'DITTO_CODEX_BINARY=$PWD/target/codex-app-server bash tests/g3/agent/run.sh'
+  else
+    record agent not_run
+  fi
 fi
 vm_rsync "neil@$(vm_ip):funlab/Ditto/artifacts/g3/" "$out/suite-records/" >"$out/collect.log" 2>&1 || record collect fail
 if jq -e 'select(.status == "fail")' "$out/summary.jsonl" >/dev/null; then exit 1; fi

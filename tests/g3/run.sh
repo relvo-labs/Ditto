@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Lightweight development checks; no generated code is executed or activated.
+# G3 development checks; desktop and OS stress suites run separately.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-cargo test --locked -p ditto-generation -p ditto-test-host
+cargo test --locked -p ditto-generation -p ditto-test-host -p ditto-protocol -p ditto-store
+python3 scripts/sync-generated-templates.py --check
 cargo build --locked -p ditto-generation -p ditto-test-host -p ditto-confine
 target/debug/ditto-generation inspect <crates/ditto-generation/examples/tasks-summary.json >/dev/null
 target/debug/ditto-generation inspect <crates/ditto-generation/examples/workspace-actions.json >/dev/null
@@ -14,3 +15,5 @@ if [[ ! -x "$qml_lint" || ! -x "$qml_test" ]]; then
 fi
 "$qml_lint" crates/ditto-generation/templates/*.qml
 QT_QPA_PLATFORM=offscreen "$qml_test" -input tests/g3/templates
+
+bash tools/generation-host/build.sh

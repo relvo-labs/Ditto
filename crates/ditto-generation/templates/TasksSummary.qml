@@ -3,10 +3,11 @@ import QtQuick
 import QtQuick.Layouts
 
 // Trusted fixed template. Generated text is DATA, never QML source.
-// Core capability projection and ProviderHost mounting are not wired yet.
+// The trusted Shell interpreter supplies the authorized service read model.
 Item {
     id: root
     property var client: null
+    function tr(text) { return client ? client.t(text) : text; }
     property var screen: null
     property string reservedEdge: "none"
     property var config: ({})
@@ -38,7 +39,7 @@ Item {
         spacing: 8
         Text {
             objectName: "panelTitle"
-            text: root.config.title || qsTr("待辦摘要")
+            text: root.config.title || root.tr(qsTr("待辦摘要"))
             textFormat: Text.PlainText
             color: "#241B35"
             font.bold: true
@@ -50,7 +51,7 @@ Item {
         Text {
             objectName: "testDataLabel"
             visible: root.testData
-            text: qsTr("預覽使用測試資料")
+            text: root.tr(qsTr("預覽使用測試資料"))
             textFormat: Text.PlainText
             color: "#504060"
             Layout.fillWidth: true
@@ -59,7 +60,7 @@ Item {
         Text {
             objectName: "dataStatus"
             visible: !root.dataAvailable || root.displayedTasks.length === 0
-            text: root.dataAvailable ? qsTr("沒有符合條件的待辦") : qsTr("尚未取得待辦資料")
+            text: root.dataAvailable ? root.tr(qsTr("沒有符合條件的待辦")) : root.tr(qsTr("尚未取得待辦資料"))
             textFormat: Text.PlainText
             color: "#504060"
         }

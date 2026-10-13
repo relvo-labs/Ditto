@@ -36,7 +36,7 @@
 | `permission_grants` | 授予 | 不能刪；只能撤銷一次，其他欄位不能改 |
 | `audit_log` | 稽核紀錄（已遮蔽的細節） | 只增不改不刪 |
 | `jobs` | 長工作（安裝等） | 狀態受 CHECK 限制；`idempotency_key` 唯一 |
-| `sessions`、`messages`、`tasks`、`generated_artifacts` | 為 G2／G3 預留，G1 不寫入 | 之後加列，不加表 |
+| `sessions`、`messages`、`tasks` | 為 G2／G3 預留，G1 不寫入 | 舊預留表不作 G2／G3 權威；正式表由前向 migration 建立 |
 
 `changesets.request_operation_id` 保存呼叫者自己的 `_meta.operation_id`，斷線後可用 `desktop.changes.get {operation_id}` 找回自己送出的變更（CHG-07）。
 
@@ -58,3 +58,7 @@
 ## 6. 故障注入點（只在 `fault-injection` build）
 
 `store.commit_revision:full|ioerr`、`store.unpack:ioerr`，以及 Core 側的 `coordinator.after_state=<state>:abort_process`、`coordinator.readback=mismatch`。環境變數 `DITTO_FAULT=<point>:<action>[:n]`。release 二進位不得含這些字串（`scripts/check-release-fault-points.sh`，`rust.yml` 另以 fault-injection build 做正向對照）。
+
+## 7. G3 schema 4
+
+原空殼 generated_artifacts 完整改名為 generated_artifacts_legacy，保留舊列；新 generated_artifacts 以 plugin_id/version 唯一、parent 外鍵與 create idempotency key 保存正式產物。generated_plugin_data 是每個插件的唯一資料權威，generated_data_snapshots 保存回退快照。遷移失敗不改 schema version 或舊表；資料升版、快照與 Profile revision 同筆交易。詳見 [生產模板邊界](../platform/generated-template-boundary.md)。

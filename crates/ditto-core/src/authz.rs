@@ -72,6 +72,9 @@ pub fn policy(subject: &Subject, scope_name: &str) -> PolicyDefault {
         ],
         scope::RESCUE => [Allow, Allow, Allow, Allow, Deny, Deny, Deny],
         scope::PLUGINS_MANAGE => [Allow, Allow, Deny, Deny, Deny, GrantRequired, Deny],
+        scope::PLUGINS_DEVELOP | scope::PLUGINS_DATA => {
+            [Allow, Allow, Deny, Deny, Deny, GrantRequired, Deny]
+        }
         scope::PERMISSIONS_MANAGE => [Allow, Allow, Deny, Deny, Deny, Deny, Deny],
         scope::SESSION_POWER => [Allow, Allow, Allow, Deny, Deny, Deny, Deny],
         scope::SESSION_LOCK => [Allow, Allow, Allow, Allow, Deny, GrantRequired, Allow],
@@ -143,6 +146,13 @@ pub fn authorize(
                 let covered = grants.iter().any(|grant| {
                     grant.subject == subject.0
                         && ditto_store::grants::pattern_covers(&grant.scope, &scope_name)
+                        && (!matches!(
+                            scope_name.as_str(),
+                            scope::PLUGINS_DATA | scope::PLUGINS_DEVELOP
+                        ) || grant
+                            .resource
+                            .as_deref()
+                            .is_none_or(|wanted| resource == Some(wanted)))
                 });
                 if covered {
                     continue;
@@ -226,6 +236,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn generated_plugin_grants_are_scoped_to_the_core_resolved_plugin() {
+        let agent = Subject(Subject::AGENT.into());
+        for name in [scope::PLUGINS_DEVELOP, scope::PLUGINS_DATA] {
+            let mut g = grant(Subject::AGENT, name);
+            g.resource = Some("local.generated.first".into());
+            assert!(
+                authorize(&agent, &[name], Some("local.generated.first"), &[g.clone()]).allowed()
+            );
+            assert!(!authorize(
+                &agent,
+                &[name],
+                Some("local.generated.second"),
+                &[g.clone()]
+            )
+            .allowed());
+            assert!(!authorize(&agent, &[name], None, &[g]).allowed());
+            assert!(authorize(
+                &agent,
+                &[name],
+                Some("local.generated.second"),
+                &[grant(Subject::AGENT, name)]
+            )
+            .allowed());
+        }
+    }
     #[test]
     fn the_same_rule_answers_gui_and_agent_and_fails_closed_without_a_responder() {
         let shell = Subject(Subject::SHELL.into());

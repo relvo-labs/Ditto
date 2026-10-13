@@ -44,6 +44,10 @@ FloatingWindow {
             return t(qsTr("新增或完成待辦事項"));
         case "apps.launch":
             return t(qsTr("開啟應用程式"));
+        case "plugins.develop":
+            return t(qsTr("建立、驗證、安裝或啟用受限生成插件"));
+        case "plugins.data":
+            return t(qsTr("存取、升版或回復生成插件的資料"));
         case "plugins.manage":
             return t(qsTr("安裝或管理插件"));
         case "session.lock":

@@ -684,6 +684,9 @@ ShellRoot {
                     } else if (command[0] === "focus") {
                         connection.write(JSON.stringify(root.focusReport()) + "\n");
                         connection.flush();
+                    } else if (command[0] === "generated") {
+                        const panels=Object.values(providers.slots).filter(unit=>unit.activeItem && unit.activeItem.slotName==="ui.generated_panel").map(unit=>unit.activeItem.observation());
+                        connection.write(JSON.stringify(panels)+"\n");connection.flush();
                     } else if (command[0] === "services") {
                         connection.write(JSON.stringify(root.servicesReport()) + "\n");
                         connection.flush();

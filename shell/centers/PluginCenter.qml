@@ -224,7 +224,7 @@ Flickable {
 
     /// The multi-entry area a package can join (status items), or "".
     /// Joining adds a place beside the others; no single slot is taken.
-    readonly property var areas: ["ui.status_item"]
+    readonly property var areas: ["ui.status_item", "ui.generated_panel"]
     function areaOf(manifest) {
         if (!manifest || !manifest.slots) {
             return "";
@@ -327,6 +327,12 @@ Flickable {
             client: page.client
             tokens: page.tokens
             record: page.lastRecord
+        }
+
+        GeneratedArtifacts {
+            width: parent.width
+            client: page.client
+            tokens: page.tokens
         }
 
         Section {

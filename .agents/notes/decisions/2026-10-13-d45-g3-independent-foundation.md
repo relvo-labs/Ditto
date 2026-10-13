@@ -6,6 +6,8 @@
 | 狀態 | 依此次使用者指示開始獨立實作；Core／協定仍等 G2 參考機量測完成 |
 | 決策者 | 使用者／專案 owner（此次工作指示） |
 
+> 後續：同日 owner 以 [D-46](2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受 G2 功能完成並授權完整 G3，取代本文的正式接線等待條件；原始開工紀錄保留。
+
 ## 結論
 
 在 `codex/g3-restricted-generation` 從 `codex/g2-agent-foundation@a88bce89b8976d546497345777c642d9f2b7de59` 開始 G3 計畫、獨立測試宿主與僅輸出描述的 SDK。PR #13 尚未合併，所以採 stacked 分支；合併基底待其合併後重核。

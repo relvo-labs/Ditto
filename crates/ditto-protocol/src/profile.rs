@@ -27,7 +27,7 @@ pub const SLOTS: &[&str] = &[
 /// enabled member is mounted, in the order of `entries`. Membership is the
 /// entry's own `area` field, set when the entry is added (`add_entry` with
 /// `slot` naming the area); it is not part of the single-provider `slots` map.
-pub const AREAS: &[&str] = &["ui.status_item"];
+pub const AREAS: &[&str] = &["ui.status_item", "ui.generated_panel"];
 
 pub fn is_area(name: &str) -> bool {
     AREAS.contains(&name)

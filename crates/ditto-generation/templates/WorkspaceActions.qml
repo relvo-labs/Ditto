@@ -3,11 +3,12 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// The future capability proxy supplies availability and handles this signal
+// The trusted capability proxy supplies availability and handles this signal
 // through Core authorization. No arbitrary command or direct RPC is accepted.
 Item {
     id: root
     property var client: null
+    function tr(text) { return client ? client.t(text) : text; }
     property var screen: null
     property string reservedEdge: "none"
     property var config: ({})
@@ -34,7 +35,7 @@ Item {
         spacing: 8
         Text {
             objectName: "panelTitle"
-            text: root.config.title || qsTr("工作區捷徑")
+            text: root.config.title || root.tr(qsTr("工作區捷徑"))
             textFormat: Text.PlainText
             color: "#241B35"
             font.bold: true
@@ -46,7 +47,7 @@ Item {
         Text {
             objectName: "testDataLabel"
             visible: root.testData
-            text: qsTr("預覽使用測試資料")
+            text: root.tr(qsTr("預覽使用測試資料"))
             textFormat: Text.PlainText
             color: "#504060"
             wrapMode: Text.Wrap
@@ -54,7 +55,7 @@ Item {
         }
         Text {
             visible: !root.actionsAvailable
-            text: qsTr("工作區操作目前不可用")
+            text: root.tr(qsTr("工作區操作目前不可用"))
             textFormat: Text.PlainText
             color: "#504060"
         }

@@ -19,6 +19,7 @@ pub mod error;
 pub mod events;
 pub mod exports;
 pub mod fault;
+pub mod generation;
 pub mod hosts;
 pub mod identity;
 pub mod jobs_pool;

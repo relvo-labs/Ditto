@@ -100,13 +100,19 @@ pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjec
         let manifest = resolver.packages.manifest(entry)?;
         let directory = resolver.package_dir(entry)?;
         let qml_entry = manifest.qml_entry.as_ref()?;
+        let generated = resolver
+            .packages
+            .get(&entry.package, &entry.version)?
+            .generated
+            .as_ref()
+            .filter(|a| ditto_store::generated::approved(a));
         Some(ShellSlotBinding {
             slot: slot.into(),
             entry_id: entry.entry_id.clone(),
             package: entry.package.clone(),
             version: entry.version.clone(),
-            qml_url: format!("file://{}", directory.join(qml_entry).display()),
-            config: entry.config.clone(),
+            qml_url: if generated.is_some(){"ditto-generated:fixed".into()}else{format!("file://{}", directory.join(qml_entry).display())},
+            config: generated.map(|a|serde_json::json!({"artifact_id":a.artifact_id,"description":a.description})).unwrap_or_else(||entry.config.clone()),
         })
     };
     let mut slots = Vec::new();

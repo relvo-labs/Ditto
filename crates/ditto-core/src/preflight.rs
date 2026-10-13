@@ -233,6 +233,13 @@ fn check_all(
         }
     }
     let changed = docops::changed_entries(base, target);
+    if target.area_members("ui.generated_panel").count() > 8 {
+        reasons.push(reason(
+            PreflightCode::PreconditionFailed,
+            None,
+            json!({"why":"generated_panel_limit","max":8}),
+        ));
+    }
     let enabled: Vec<_> = target
         .entries
         .iter()
@@ -312,7 +319,17 @@ fn check_all(
         }
         // G1 enables only built-in trusted packages; a manifest's claim is a
         // request the policy may refuse.
+        let generated_ok = context
+            .packages
+            .get(&entry.package, &entry.version)
+            .is_some_and(|row| {
+                row.summary.source == "generated"
+                    && row.generated.as_ref().is_some_and(|a| {
+                        ditto_store::generated::approved(a) && ditto_store::generated::integrity(a)
+                    })
+            });
         if changed.contains(&entry.entry_id)
+            && !generated_ok
             && (manifest.trust_level != TrustLevel::Trusted
                 || context
                     .packages

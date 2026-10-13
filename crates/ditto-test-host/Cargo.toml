@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+ditto-protocol = { path = "../ditto-protocol" }
 libc = "=0.2.189"
 serde.workspace = true
 serde_json.workspace = true
@@ -16,3 +17,7 @@ path = "src/main.rs"
 [[bin]]
 name = "ditto-test-probe"
 path = "src/bin/probe.rs"
+
+[[bin]]
+name = "ditto-generation-host"
+path = "src/bin/generation.rs"

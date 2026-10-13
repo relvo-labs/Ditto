@@ -8,7 +8,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::error::{StoreError, StoreResult};
 
-pub const CURRENT_VERSION: u32 = 3;
+pub const CURRENT_VERSION: u32 = 4;
 
 const V1: &str = r#"
 CREATE TABLE core_meta (
@@ -349,6 +349,25 @@ fn apply(transaction: &Transaction<'_>, version: u32) -> StoreResult<()> {
             ALTER TABLE jobs_v3 RENAME TO jobs;
             CREATE INDEX jobs_by_state ON jobs(state, created_at);
         "#)?,
+        4 => transaction.execute_batch(r#"
+            ALTER TABLE generated_artifacts RENAME TO generated_artifacts_legacy;
+            CREATE TABLE generated_artifacts (
+                artifact_id TEXT PRIMARY KEY, plugin_id TEXT NOT NULL, version TEXT NOT NULL,
+                parent_id TEXT REFERENCES generated_artifacts(artifact_id), bundle_sha256 TEXT NOT NULL,
+                create_key TEXT NOT NULL UNIQUE, create_hash TEXT NOT NULL, artifact_json TEXT NOT NULL,
+                UNIQUE(plugin_id,version)
+            );
+            CREATE TABLE generated_plugin_data (
+                plugin_id TEXT PRIMARY KEY, artifact_id TEXT NOT NULL REFERENCES generated_artifacts(artifact_id),
+                schema_version INTEGER NOT NULL CHECK(schema_version>0), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), payload_json TEXT NOT NULL
+            );
+            CREATE TABLE generated_data_snapshots (
+                change_id TEXT NOT NULL, plugin_id TEXT NOT NULL, from_artifact_id TEXT NOT NULL,
+                to_artifact_id TEXT NOT NULL, schema_version INTEGER NOT NULL, payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, PRIMARY KEY(change_id,plugin_id)
+            );
+            CREATE INDEX generated_snapshots_by_artifact ON generated_data_snapshots(plugin_id,from_artifact_id,created_at);
+        "#)?,
         other => return Err(StoreError::Invalid(format!("no migration to {other}"))),
     }
     transaction.pragma_update(None, "user_version", version)?;
@@ -435,6 +454,44 @@ mod tests {
         drop(backup);
         drop(lock);
         std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn generation_migration_keeps_legacy_rows_and_rolls_back_on_conflict() {
+        let mut db = Connection::open_in_memory().unwrap();
+        for version in 1..=3 {
+            let tx = db.transaction().unwrap();
+            apply(&tx, version).unwrap();
+            tx.commit().unwrap();
+        }
+        db.execute(
+            "INSERT INTO generated_artifacts VALUES ('legacy','t','{\"keep\":true}')",
+            [],
+        )
+        .unwrap();
+        db.execute("CREATE TABLE generated_plugin_data (conflict TEXT)", [])
+            .unwrap();
+        assert!(migrate(&mut db).is_err());
+        assert_eq!(user_version(&db).unwrap(), 3);
+        assert_eq!(
+            db.query_row(
+                "SELECT meta_json FROM generated_artifacts WHERE artifact_id='legacy'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "{\"keep\":true}"
+        );
+        db.execute("DROP TABLE generated_plugin_data", []).unwrap();
+        migrate(&mut db).unwrap();
+        assert_eq!(
+            db.query_row(
+                "SELECT meta_json FROM generated_artifacts_legacy WHERE artifact_id='legacy'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "{\"keep\":true}"
+        );
     }
     #[test]
     fn a_failed_v2_migration_rolls_back_all_new_tables() {

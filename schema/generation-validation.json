@@ -1,0 +1,174 @@
+{
+  "$defs": {
+    "Enforcement": {
+      "enum": [
+        "full",
+        "partial",
+        "unavailable"
+      ],
+      "type": "string"
+    },
+    "GenerationBoundary": {
+      "additionalProperties": false,
+      "properties": {
+        "cgroup": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cleanup_complete": {
+          "type": "boolean"
+        },
+        "cpu_max": {
+          "type": "string"
+        },
+        "deadline_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "enforcement": {
+          "$ref": "#/$defs/Enforcement"
+        },
+        "files": {
+          "type": "boolean"
+        },
+        "landlock_abi": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "memory_max": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "network": {
+          "type": "boolean"
+        },
+        "pids_max": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "process_exec_blocked": {
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "runner_pid": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "enforcement",
+        "policy",
+        "landlock_abi",
+        "files",
+        "network",
+        "process_exec_blocked",
+        "memory_max",
+        "cpu_max",
+        "pids_max",
+        "deadline_ms",
+        "cleanup_complete",
+        "reasons"
+      ],
+      "type": "object"
+    },
+    "StageEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "diagnostic": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/StageResult"
+        },
+        "stage": {
+          "$ref": "#/$defs/ValidationStage"
+        }
+      },
+      "required": [
+        "stage",
+        "result",
+        "diagnostic"
+      ],
+      "type": "object"
+    },
+    "StageResult": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_run"
+      ],
+      "type": "string"
+    },
+    "ValidationStage": {
+      "enum": [
+        "syntax",
+        "contract",
+        "load",
+        "focus",
+        "interaction"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "boundary": {
+      "$ref": "#/$defs/GenerationBoundary"
+    },
+    "bundle_sha256": {
+      "type": "string"
+    },
+    "diagnostics": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "preview_opened": {
+      "type": "boolean"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/StageEvidence"
+      },
+      "type": "array"
+    },
+    "test_data": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "bundle_sha256",
+    "boundary",
+    "stages",
+    "test_data",
+    "preview_opened"
+  ],
+  "title": "GenerationValidation",
+  "type": "object"
+}

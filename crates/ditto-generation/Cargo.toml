@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+ditto-protocol = { path = "../ditto-protocol" }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"

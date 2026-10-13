@@ -304,6 +304,7 @@ dependencies = [
 name = "ditto-generation"
 version = "0.1.0"
 dependencies = [
+ "ditto-protocol",
  "serde",
  "serde_json",
  "sha2",
@@ -363,6 +364,7 @@ dependencies = [
 name = "ditto-test-host"
 version = "0.1.0"
 dependencies = [
+ "ditto-protocol",
  "libc",
  "serde",
  "serde_json",

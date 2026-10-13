@@ -9,6 +9,7 @@ pub mod changes;
 pub mod conversations;
 pub mod error;
 pub mod fault;
+pub mod generated;
 pub mod grants;
 pub mod jobs;
 pub mod lock;

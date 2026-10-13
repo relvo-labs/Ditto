@@ -2560,6 +2560,7 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
         "context-reference" => through::<ditto_protocol::agent::ContextReference>(value),
         "credential-status" => through::<ditto_protocol::agent::CredentialStatus>(value),
         "job" => through::<ditto_protocol::services::Job>(value),
+        "generated-description" => through::<ditto_protocol::generation::Description>(value),
         "change-record" => through::<change::ChangeRecord>(value),
         "participant-prepare-params" => through::<participant::PrepareParams>(value),
         "shell-report-input" => through::<participant::ShellObservation>(value),
@@ -2912,4 +2913,99 @@ fn a_profile_cannot_bind_core_reserved_chords() {
             "{response}"
         );
     }
+}
+
+#[test]
+fn generation_without_native_host_keeps_candidate_inspectable_and_refuses_execution() {
+    let h = harness("generation-unavailable");
+    let cli = TestPeer::connect(&h.core, "dittoctl", None);
+    let before = head(&cli);
+    let descriptor = cli.result(catalog::CAPABILITIES_LIST, json!({}))["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["capability_id"] == catalog::DEVELOPMENT_VALIDATE)
+        .unwrap()
+        .clone();
+    assert_eq!(descriptor["availability"]["available"], false);
+    let description: Value = serde_json::from_str(include_str!(
+        "../../ditto-generation/examples/tasks-summary.json"
+    ))
+    .unwrap();
+    let a=cli.result(catalog::DEVELOPMENT_CREATE,json!({"description":description,"request_summary":"inspect only","idempotency_key":"candidate"}));
+    for method in [catalog::DEVELOPMENT_VALIDATE, catalog::DEVELOPMENT_PREVIEW] {
+        let r = cli.call(
+            method,
+            json!({"artifact_id":a["artifact_id"],"idempotency_key":"missing-host"}),
+        );
+        assert_eq!(r["error"]["name"], "unavailable");
+    }
+    assert_eq!(
+        cli.result(
+            catalog::DEVELOPMENT_GET,
+            json!({"artifact_id":a["artifact_id"]})
+        )["state"],
+        "candidate"
+    );
+    assert_eq!(
+        cli.call(
+            catalog::DEVELOPMENT_PUBLISH,
+            json!({"artifact_id":a["artifact_id"]})
+        )["error"]["name"],
+        "invalid_params"
+    );
+    assert_eq!(head(&cli), before);
+}
+
+#[test]
+fn a_manifest_cannot_self_declare_a_generated_qml_or_node_trust_exception() {
+    let root = root("generation-spoofed-manifest");
+    let builtin = root.join("builtin");
+    std::fs::create_dir_all(&builtin).unwrap();
+    builtin_packages(&builtin);
+    for (id, kind, host, slot) in [
+        (
+            "local.fake.qml",
+            "qml_provider",
+            "qml",
+            "ui.generated_panel",
+        ),
+        ("local.fake.node", "service", "cordis", "svc.tasks"),
+    ] {
+        pack(
+            &builtin,
+            &manifest(
+                id,
+                kind,
+                host,
+                &[slot],
+                json!({"source":"generated","trust_level":"untrusted"}),
+            ),
+        );
+    }
+    let core = start_at(&root, false);
+    let cli = TestPeer::connect(&core, "dittoctl", None);
+    let before = head(&cli);
+    for (id, host, slot) in [
+        ("local.fake.qml", "qml", "ui.generated_panel"),
+        ("local.fake.node", "cordis", "svc.tasks"),
+    ] {
+        let refused=cli.call(catalog::CHANGES_PROPOSE,json!({"base_revision":before,"ops":[{"op":"add_entry","entry":{"package":id,"version":"1.0.0","host":host},"slot":slot}]}));
+        assert_eq!(refused["error"]["name"], "preflight_rejected");
+        let change = record(&cli.result(
+            catalog::CHANGES_GET,
+            json!({"change_id":refused["error"]["data"]["change_id"]}),
+        ));
+        assert_eq!(change.state, ChangeState::Rejected);
+        assert!(change
+            .reasons
+            .iter()
+            .any(|r| r.detail.get("why") == Some(&json!("trust_policy"))));
+        assert!(change.operations.is_empty());
+        assert_eq!(head(&cli), before);
+    }
+    drop(cli);
+    drop(core);
+    let _ = ditto_store::packages::make_writable(&root);
+    let _ = std::fs::remove_dir_all(root);
 }

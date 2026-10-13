@@ -36,7 +36,7 @@ export function check(root: Schema, value: unknown, options: {strict?:boolean} =
       if(typeof schema==='boolean')return;
       if(!schema||typeof schema!=='object'||Array.isArray(schema))throw new Error('invalid schema');
       for(const keyword of Object.keys(schema))if(!allowed.has(keyword))throw new Error(`unsupported schema keyword ${keyword}`);
-      if(typeof schema.format==='string'&&!['uint','uint32','uint64','int32','int64','float','double'].includes(schema.format))throw new Error('unsupported schema format');
+      if(typeof schema.format==='string'&&!['uint','uint8','uint16','uint32','uint64','int8','int16','int32','int64','float','double'].includes(schema.format))throw new Error('unsupported schema format');
       for(const key of ['$defs','definitions','properties']){
         const children=schema[key];if(children&&typeof children==='object')for(const child of Object.values(children))inspect(child as Schema,depth+1);
       }
@@ -62,7 +62,7 @@ export function check(root: Schema, value: unknown, options: {strict?:boolean} =
     if(!schema||typeof schema!=='object'||Array.isArray(schema))throw new Error('invalid schema');
     if(options.strict){
       for(const keyword of Object.keys(schema))if(!allowed.has(keyword))throw new Error(`unsupported schema keyword ${keyword}`);
-      if(typeof schema.format==='string'&&!['uint','uint32','uint64','int32','int64','float','double'].includes(schema.format))throw new Error('unsupported schema format');
+      if(typeof schema.format==='string'&&!['uint','uint8','uint16','uint32','uint64','int8','int16','int32','int64','float','double'].includes(schema.format))throw new Error('unsupported schema format');
     }
     if (typeof schema.$ref === 'string') visit(resolve(schema.$ref), current, path, into);
     if (schema.type !== undefined) {
@@ -80,6 +80,9 @@ export function check(root: Schema, value: unknown, options: {strict?:boolean} =
     }
     if (typeof current === 'number') {
       if(!Number.isFinite(current)||Object.is(current,-0)||Number.isInteger(current)&&!Number.isSafeInteger(current))into.push({path,message:'number is not lossless JSON'});
+      const bounds:Record<string,[number,number]>={uint8:[0,255],uint16:[0,65535],int8:[-128,127],int16:[-32768,32767]};
+      const range=typeof schema.format==='string'?bounds[schema.format]:undefined;
+      if(range&&(!Number.isInteger(current)||current<range[0]||current>range[1]))into.push({path,message:'integer format out of range'});
       if (typeof schema.minimum === 'number' && current < schema.minimum) into.push({ path, message: 'below minimum' });
       if (typeof schema.maximum === 'number' && current > schema.maximum) into.push({ path, message: 'above maximum' });
       if(typeof schema.exclusiveMinimum==='number'&&current<=schema.exclusiveMinimum)into.push({path,message:'below exclusive minimum'});

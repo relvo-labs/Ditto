@@ -1,0 +1,24 @@
+{
+  "kind": "shape",
+  "description": "tasks generated description",
+  "type": "generated-description",
+  "valid": true,
+  "value": {
+    "format_version": 1,
+    "plugin_id": "local.generated.fixture",
+    "version": "1.0.0",
+    "title": "Task summary",
+    "width": 320,
+    "accent": "#8B5CF6",
+    "content": {
+      "template": "tasks_summary_v1",
+      "max_items": 5,
+      "show_completed": false,
+      "order": "source"
+    },
+    "data": {
+      "schema_version": 1,
+      "fields": {}
+    }
+  }
+}

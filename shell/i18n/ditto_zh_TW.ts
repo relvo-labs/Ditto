@@ -171,8 +171,16 @@
         <translation>只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。</translation>
     </message>
     <message>
+        <source>存取、升版或回復生成插件的資料</source>
+        <translation>存取、升版或回復生成插件的資料</translation>
+    </message>
+    <message>
         <source>安裝或管理插件</source>
         <translation>安裝或管理插件</translation>
+    </message>
+    <message>
+        <source>建立、驗證、安裝或啟用受限生成插件</source>
+        <translation>建立、驗證、安裝或啟用受限生成插件</translation>
     </message>
     <message>
         <source>拒絕</source>
@@ -1813,6 +1821,10 @@
         <translation>Dock</translation>
     </message>
     <message>
+        <source>slot.ui.generated_panel</source>
+        <translation>生成面板</translation>
+    </message>
+    <message>
         <source>slot.ui.launcher</source>
         <translation>啟動器</translation>
     </message>
@@ -1839,6 +1851,10 @@
     <message>
         <source>trust.core_builtin</source>
         <translation>Core 內建，不另外執行程式碼。</translation>
+    </message>
+    <message>
+        <source>trust.generated_fixed_template</source>
+        <translation>以固定桌面模板解讀受限描述，不執行套件程式碼；這不代表一般 QML 具備隔離。</translation>
     </message>
     <message>
         <source>trust.same_host_no_isolation.cordis</source>
@@ -1929,6 +1945,101 @@
     <message>
         <source>（已釘選）</source>
         <translation>（已釘選）</translation>
+    </message>
+</context>
+<context>
+    <name>GeneratedArtifacts</name>
+    <message>
+        <source>原始碼、驗證與啟用紀錄</source>
+        <translation>原始碼、驗證與啟用紀錄</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <source>套用這個版本</source>
+        <translation>套用這個版本</translation>
+    </message>
+    <message>
+        <source>安裝這個版本</source>
+        <translation>安裝這個版本</translation>
+    </message>
+    <message>
+        <source>寬度</source>
+        <translation>寬度</translation>
+    </message>
+    <message>
+        <source>已安裝，尚未啟用</source>
+        <translation>已安裝，尚未啟用</translation>
+    </message>
+    <message>
+        <source>已達修復上限，停止自動重試。</source>
+        <translation>已達修復上限，停止自動重試。</translation>
+    </message>
+    <message>
+        <source>強調色</source>
+        <translation>強調色</translation>
+    </message>
+    <message>
+        <source>曾成功啟用；目前組合請見下方</source>
+        <translation>曾成功啟用；目前組合請見下方</translation>
+    </message>
+    <message>
+        <source>未通過，請檢查診斷並建立修正版</source>
+        <translation>未通過，請檢查診斷並建立修正版</translation>
+    </message>
+    <message>
+        <source>本版本修改：%1</source>
+        <translation>本版本修改：%1</translation>
+    </message>
+    <message>
+        <source>標題</source>
+        <translation>標題</translation>
+    </message>
+    <message>
+        <source>正在隔離環境中驗證</source>
+        <translation>正在隔離環境中驗證</translation>
+    </message>
+    <message>
+        <source>生成的插件</source>
+        <translation>生成的插件</translation>
+    </message>
+    <message>
+        <source>等待驗證</source>
+        <translation>等待驗證</translation>
+    </message>
+    <message>
+        <source>資料格式</source>
+        <translation>資料格式</translation>
+    </message>
+    <message>
+        <source>開啟測試資料預覽</source>
+        <translation>開啟測試資料預覽</translation>
+    </message>
+    <message>
+        <source>隔離條件不足，只能檢查</source>
+        <translation>隔離條件不足，只能檢查</translation>
+    </message>
+    <message>
+        <source>需求：%1</source>
+        <translation>需求：%1</translation>
+    </message>
+    <message>
+        <source>顯示內容</source>
+        <translation>顯示內容</translation>
+    </message>
+    <message>
+        <source>顯示最近十個版本。每次修改都建立新版本並重新驗證；舊版本保留供檢查與回復。</source>
+        <translation>顯示最近十個版本。每次修改都建立新版本並重新驗證；舊版本保留供檢查與回復。</translation>
+    </message>
+    <message>
+        <source>驗證</source>
+        <translation>驗證</translation>
+    </message>
+    <message>
+        <source>驗證通過，尚未安裝</source>
+        <translation>驗證通過，尚未安裝</translation>
     </message>
 </context>
 <context>
@@ -2722,6 +2833,25 @@
     </message>
 </context>
 <context>
+    <name>TasksSummary</name>
+    <message>
+        <source>尚未取得待辦資料</source>
+        <translation>尚未取得待辦資料</translation>
+    </message>
+    <message>
+        <source>待辦摘要</source>
+        <translation>待辦摘要</translation>
+    </message>
+    <message>
+        <source>沒有符合條件的待辦</source>
+        <translation>沒有符合條件的待辦</translation>
+    </message>
+    <message>
+        <source>預覽使用測試資料</source>
+        <translation>預覽使用測試資料</translation>
+    </message>
+</context>
+<context>
     <name>Tr</name>
     <message>
         <source>（未翻譯的項目）</source>
@@ -2730,6 +2860,21 @@
     <message>
         <source>（無）</source>
         <translation>（無）</translation>
+    </message>
+</context>
+<context>
+    <name>WorkspaceActions</name>
+    <message>
+        <source>工作區捷徑</source>
+        <translation>工作區捷徑</translation>
+    </message>
+    <message>
+        <source>工作區操作目前不可用</source>
+        <translation>工作區操作目前不可用</translation>
+    </message>
+    <message>
+        <source>預覽使用測試資料</source>
+        <translation>預覽使用測試資料</translation>
     </message>
 </context>
 <context>

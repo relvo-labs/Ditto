@@ -4,11 +4,11 @@
 | --- | --- |
 | 文件編號 | DITTO-PLAN-005 |
 | 日期 | 2026-10-13 |
-| 狀態 | 執行提案；獨立基礎設施開始實作，出口未評審 |
+| 狀態 | 功能整合實作與開發驗證中；出口未評審 |
 | 上位權威 | [PRD v0.4.0](../../docs/product/Ditto-PRD-v0.4.0.md) §9、12.1、14～17、19、21；[milestones/01 G3](../../milestones/01/03-phases.md#g3受限生成與移植) |
 | 追蹤 | [#34](https://github.com/relvo-labs/Ditto/issues/34)，子 issue #15～#33（2026-10-13 已逐項閱讀，均無補充留言） |
 | 分支／基底 | `codex/g3-restricted-generation`，疊在 `codex/g2-agent-foundation@a88bce89b8976d546497345777c642d9f2b7de59`；PR #13 尚未合併 |
-| 前置 | G1 依 D-38 已完成；G2 十九項出口全部**待 G2 評審** |
+| 前置 | G1 依 D-38 已完成；G2 功能由 owner 依 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受；原量測缺口繼續追蹤 |
 
 目標是透過對話產出兩種原先未安裝、可運作且可繼續修改的新插件，失敗時桌面維持可用。這份計畫不宣告 G2 或 G3 出口，不更改資源門檻。
 
@@ -25,6 +25,6 @@
 
 順序固定：**隔離基礎設施 → 受限模板 → 生成管線 → 版本升級與回退**。隔離建立前僅產出固定模板引用與受限描述；模板外的程式碼不得執行。開發 CLI 不是正式能力，沒有權限寫入 Profile、授權、安裝表或正式生成紀錄。
 
-先提交本計畫（#15 的文件交付），再提交獨立宿主與宣告式 SDK。Core、Store、協定、Agent 工具與使用中 Shell 的接線須等 G2 參考機量測完成，再核對當時基底。不得拿本分支的提交當作 G2 的量測證據。
+先提交本計畫（#15 的文件交付），再提交獨立宿主與宣告式 SDK。owner 後續以 D-46 裁定 G2 功能完成並要求繼續實完 G3，正式 Core／Store／協定／Agent／Shell 接線依此進行。不得拿本分支的提交當作 G2 的量測證據。
 
-2026-10-13 首批獨立實作與兩種核心的 VM 證據已整理於 [G3-exit](../../.agents/notes/gate-reviews/G3-exit.md)。這是基礎設施開發證據；正式生成能力、啟用交易、資料回退與真實模型驗收尚未實作。
+2026-10-13 首批獨立實作與兩種核心的 VM 證據已整理於 [G3-exit](../../.agents/notes/gate-reviews/G3-exit.md)。正式生成能力、五關原生驗證／預覽、啟用交易、版本及資料回退已有實作與開發證據；真實模型及參考機出口仍須逐項記錄，不能由 fixture 取代。生產政策見 [generated-template-boundary](../../docs/platform/generated-template-boundary.md)。

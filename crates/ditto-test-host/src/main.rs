@@ -238,8 +238,11 @@ fn runner(args: &[String]) -> io::Result<()> {
         if let Some(status) = child.try_wait()? {
             break status;
         }
+        // RuntimeMaxSec is the authoritative deadline. Leave time for the
+        // manager's timer and stop sequence before this last-resort watchdog;
+        // killing the probe first would incorrectly record SERVICE_RESULT=success.
         if process_start(launcher).as_ref() != Some(original_start)
-            || started.elapsed() >= Duration::from_millis(deadline)
+            || started.elapsed() >= Duration::from_millis(deadline + 5_000)
         {
             child.kill()?;
             break child.wait()?;
@@ -315,7 +318,15 @@ fn run(kind: &str, deadline: u64) -> io::Result<Report> {
                 "-p",
                 "NoNewPrivileges=yes",
             ])
-            .args(["-p", &format!("RuntimeMaxSec={deadline}ms")]);
+            .args(["-p", &format!("RuntimeMaxSec={deadline}ms")])
+            .args([
+                "-p",
+                &format!(
+                    "ExecStopPost={} __service-result {}",
+                    unit_quote(&exe.to_string_lossy()),
+                    unit_quote(&root.to_string_lossy())
+                ),
+            ]);
         if let Some(value) = std::env::var_os("XDG_RUNTIME_DIR") {
             command.arg(format!(
                 "--setenv=XDG_RUNTIME_DIR={}",
@@ -367,7 +378,7 @@ fn run(kind: &str, deadline: u64) -> io::Result<Report> {
         let completion = lines
             .next()
             .and_then(|s| serde_json::from_str::<Completion>(s).ok());
-        let service_result = ctl(&[
+        let observed = ctl(&[
             "show",
             &format!("{unit}.service"),
             "-p",
@@ -386,6 +397,24 @@ fn run(kind: &str, deadline: u64) -> io::Result<Report> {
                 .find_map(|l| l.strip_prefix("Result=").map(str::to_owned))
         })
         .unwrap_or_else(|| "not_observed".into());
+        // systemd may GC a transient unit before a later show. ExecStopPost
+        // retains SERVICE_RESULT outside the candidate writable workspace.
+        let service_result = fs::read_to_string(root.join("unit-result"))
+            .ok()
+            .filter(|s| {
+                [
+                    "success",
+                    "timeout",
+                    "oom-kill",
+                    "signal",
+                    "exit-code",
+                    "resources",
+                    "protocol",
+                    "start-limit-hit",
+                ]
+                .contains(&s.as_str())
+            })
+            .unwrap_or(observed);
         let outcome = interrupted
             .unwrap_or_else(|| {
                 if boundary.enforcement != Enforcement::Full {
@@ -442,8 +471,33 @@ fn run(kind: &str, deadline: u64) -> io::Result<Report> {
     result
 }
 
+fn unit_quote(text: &str) -> String {
+    format!(
+        "\"{}\"",
+        text.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('%', "%%")
+    )
+}
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|s| s == "__service-result") {
+        if args.len() != 2 || std::env::var_os("INVOCATION_ID").is_none() {
+            std::process::exit(64);
+        }
+        let root = Path::new(&args[1]);
+        if !root
+            .file_name()
+            .is_some_and(|s| s.to_string_lossy().starts_with("ditto-generated-test-"))
+        {
+            std::process::exit(64);
+        }
+        let result = std::env::var("SERVICE_RESULT").unwrap_or_else(|_| "not_observed".into());
+        if fs::write(root.join("unit-result"), result).is_err() {
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.first().is_some_and(|s| s == "__runner") {
         if let Err(error) = runner(&args[1..]) {
             eprintln!("test-host runner: {error}");

@@ -6,7 +6,7 @@
 
 使用者於 2026-10-13 明確要求深入分析 #34、相關 issues、參考 `.agents`、開新 branch 實作。依此開始獨立基礎設施，採目前可用的 G2 分支基底；見 [D-45](../../.agents/notes/decisions/2026-10-13-d45-g3-independent-foundation.md)。
 
-G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定的工作等 G2 參考機量測結束再做。這只記錄此次工作授權，不是 G2 出口、D-44 hard limit 核定、D-17 選型核定或工期承諾。
+G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定接線等待條件由 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 取代，owner 接受 G2 功能完成並授權完整 G3。這不把未執行的量測改成通過，也不是 D-44 hard limit 核定、D-17 選型核定或工期承諾。
 
 ## 2. 待決策／提案
 
@@ -23,13 +23,13 @@ G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定的
 
 HOST 第一批只以 subprocess 使用本倉庫的 `ditto-confine@a88bce8`，沒有複製 Harness 的 `landlock-run`／`sandbox-local`。這是 Ditto 既有邊界的薄轉接，不是新增外部源碼移植；新增政策與 cgroup 是 Ditto 工作，不寫成 Harness 既有功能。
 
-#29 仍需彙整 `docs/upstream/cordis-port.md`、`harness-g2-port.md`、Codex／D-Bus proxy pins、各 vendor manifest 與固定測試矩陣。新增外部程式碼時逐項記 package、repo、commit、port kind、modifications、host contract、trust、license、test matrix，以及四欄沿用對照。原來源授權不能改成主專案授權；G4 完整盤點仍另做。
+本次 #29 已彙整於 [G3 沿用紀錄](../../docs/upstream/g3-adoption.md)，來源包括 `docs/upstream/cordis-port.md`、`harness-g2-port.md`、Codex／D-Bus proxy pins、各 vendor manifest 與固定測試矩陣。原待決策表保留提案脈絡，實際模板／資料政策見 [實作邊界](../../docs/platform/generated-template-boundary.md)，出口與剩餘驗收見 [G3-exit](../../.agents/notes/gate-reviews/G3-exit.md)。新增外部程式碼時逐項記 package、repo、commit、port kind、modifications、host contract、trust、license、test matrix，以及四欄沿用對照。原來源授權不能改成主專案授權；G4 完整盤點仍另做。
 
 ## 4. 風險
 
 | 風險 | 處理／阻擋條件 |
 | --- | --- |
-| G2 還在量測，G3 污染基線 | 分支／commit 固定；不變動 Core／wire；量測在 G2 checkout 跑 |
+| G2 還在量測，G3 污染基線 | 分支／commit 固定；依 D-46 整合 Core／wire；G2 量測仍在原 G2 checkout 跑 |
 | bwrap 被 AppArmor 擋住 | 不把 bwrap 設為唯一方案；confine ABI／seccomp／cgroup 實測，缺證據拒絕 |
 | `confined:true` 被誤當 full | 由受控 runner 分項彙總，讀 cgroup，固定政策與原因；不能由候選自證 |
 | G2 connect broker 不是全面關閉網路 | 程式碼檢查顯示 unconnected UDP 不經 connect；G3 額外 seccomp 禁止非 Unix socket。G2 本身的網路政策另行檢討，不能將其直接稱為生成安全政策 |
