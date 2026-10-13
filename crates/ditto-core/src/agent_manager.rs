@@ -135,11 +135,12 @@ impl AgentManager {
         )];
         // The backend starts first and only from Core: its binary, arguments
         // and OS boundary are Core's, and the controller just gets a channel.
-        // No hard memory limit is applied to it yet: D-44 sets one from
-        // measurements, and D-06b's service quota is not reused for it.
+        // D-44: its own scope with a deliberately loose hard limit while G2
+        // verifies function; D-06b's service quota is not reused for it.
+        let backend_quota = Quota::agent_backend();
         let mut channel = None;
         if let Some(backend) = &self.backend {
-            match agent_backend::launch(backend, &self.state_root, None) {
+            match agent_backend::launch(backend, &self.state_root, Some(&backend_quota)) {
                 Ok(launched) => {
                     environment.push(("DITTO_BACKEND_FD".into(), launcher::CHANNEL_FD.to_string()));
                     environment.push((

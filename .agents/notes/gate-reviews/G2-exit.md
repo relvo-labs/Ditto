@@ -2,7 +2,7 @@
 
 | 欄位 | 內容 |
 | --- | --- |
-| 狀態 | **未評審。** 本檔整理 2026-10-08～09 在開發機（同時是參考機 `ditto-ref-ws-rtx4060-01`）與開發 VM 取得的證據；十九項出口沒有任何一項由本檔判定通過 |
+| 狀態 | **owner 判定功能完成（2026-10-13）。** 參考機出口量測（§3.6）已在 `a88bce8` 執行；未完成或只有開發證據的項目移為 follow-up issue（§6），不在本 PR 處理。下表「狀態」欄仍照證據陳列，不因判定而改寫 |
 | 計畫 | [plan/04](../../../plan/04/README.md) |
 | 範圍 | `main@787b44a` 之後分支 `codex/g2-agent-foundation` 的全部提交（自 `108d25e` 起） |
 | 評審者 | owner（依 D-38 慣例，實際使用裁定）；本檔只陳列事實、缺口與提案 |
@@ -11,6 +11,8 @@
 
 ## 1. 結論摘要
 
+- **參考機出口量測（2026-10-13，§3.6）**：EX2-14 冷登入四狀態各三次，Agent 暖態 p95 88.6～89.2 MiB（預算 150）、全桌面 505.3～511.9 MiB（預算 750）、無 Agent 全桌面 418.3～418.5 MiB（預算 600）；EX2-13 實體座位首幀聊天 p95 64 ms、啟動器 27 ms；EX2-12 真實後端冷啟動 p95 1355 ms、完整回答 5／5；語意集 Firefox 固定集 48／50、保留集 46／50。VM 上 Agent 超過 150 MiB 的情形在參考機沒有出現。
+- **owner 判定（2026-10-13）**：以功能而言 G2 完成，PR 可轉 Ready；其餘項目另開 issue #35～#39。D-44 後端先套寬鬆上限（1G），收緊屬之後的優化（#35）。
 - **已實作並有開發證據**：Core 啟動並驗證隔離的 Codex app-server、動態工具全經 Core、ChangeSet 歸屬 Agent turn 並回讀、會話與設定由 Core 持有、approval 四結果、使用者附加的 context、job pool 配額、可保存的區域布局、直接 API 金鑰路徑（Secret Service）、Shell 聊天兩種外觀與七態、閒置回收、崩潰後的工具結果對帳、競爭與模型斷線故障。
 - **真實訂閱已執行（2026-10-09）**：瀏覽器 OAuth 被 OpenAI 以 `invalid_client`（originator `ditto`）拒絕，改用 device code 登入（owner 指示）。帳號矩陣 10 項通過、2 項無法產生（配額耗盡、第二個帳號）。語意集第一輪（oracle v1）**固定集 42／50、保留集 41／50**；修正 token 可發現性、撤銷歸屬與 oracle／夾具缺陷後重跑（oracle v2）**固定集 45／50、保留集 46／50**（§3.4）。owner 核定 D-43（「詢問」不限問號、刪除設定檔經 approval 詢問後依本人決定放行）後以 oracle v3 重跑：**固定集 48／50、保留集 47／50**，兩組都達 45／50、保留集降 2 pp。
 - **v3 的未通過**：5 題，都不是基礎設施錯誤；4 題是模型行為（該做而問、該問而做），1 題（F-E05）turn 以 `interrupted` 結束、沒有回答，原因未留下紀錄；見 §3.4。v1、v2 的分數保留不改。
@@ -34,15 +36,15 @@
 | EX2-08 受理前後終止 | 有開發證據 | 受理前終止不執行（工具 intent 綁世代）；受理後 Core 提交或回復、重連查 trace（`codex/crash.mjs`、`turns.rs` 單元測試）；hostd 同 PID 存活 | 參考機 |
 | EX2-09 keyring 與無秘密外洩 | 有開發證據 | 真 Secret Service 寫讀刪（`direct/run.mjs` 13／13）；金鑰不在磁碟、日誌、Profile 匯出；刪除對話後文字不留在 Core 儲存任何檔案、任何日誌（`codex/run.mjs` 40／40）；真實登入後權杖只在 keyring、Codex home 無 `auth.json`（`subscription.mjs`、帳號矩陣） | 匯入缺引用提示的端到端 |
 | EX2-10 離線與停用 | 部分 | 模型不可用時手動設定照常（faults）；無角色時 Super+A 開聊天視窗（`shell/run.sh`） | 參考機上斷網與停用角色的完整流程、重連後會話 |
-| EX2-11 語意 45／50 與保留集 | 部分 | 固定集與保留集各 50 題、oracle 只讀 Core；自我檢查兩組各 50／50、空白對照兩組各 0／50；真實模型 v1 固定集 42／50、保留集 41／50；v2 固定集 45／50、保留集 46／50；**v3（D-43）固定集 48／50、保留集 47／50**（保留集降 2 pp） | 開發機巢狀桌面、Chrome 代瀏覽器；參考機與 Firefox 重跑 |
-| EX2-12 冷啟動 p95 ≤2 s | 部分 | 開發機 30 次 p95 118 ms（release Core，fixture）；方法見 `measure/cold-start.mjs`。VM 登入工作階段（§3.5）：30 次 ensure→ready＋已驗證 p95 150 ms；從冷到完整回答 5／5，中位數 2863 ms（環回模型約 2.6 s 串流） | 參考機登入工作階段中、真實後端與真實首字 |
-| EX2-13 暖態首幀 p95 ≤150 ms | 部分 | 聊天 200 次 p95 30 ms、啟動器 200 次 p95 40 ms（headless，`measure/chat-first-frame.sh`）。VM 登入座位（§3.5，按鍵送入 Wayfire→frameSwapped）：聊天 p95 74 ms、啟動器 p95 74 ms，冷首次 90／84 ms | 實體座位呈現時間（wp_presentation）、G1 的呈現警訊 |
-| EX2-14 四狀態冷登入資源 | 未執行（參考機） | 冷登入工具新增 `desktop_full_agent_warm`／`_active`、預算判定（Agent ≤150、全桌面 ≤750 MiB）。VM 真冷登入四狀態各三次（§3.5，不判定）：無 Agent 全桌面 p95 545.3～565.8 MiB；Agent 暖態全桌面 718.9～730.6 MiB、**Agent 168.5～171.6 MiB（超過 150）**；活動中 Agent 171.8～173.2 MiB | 參考機三次真冷登入×四狀態；活動狀態需登入訂閱 |
-| EX2-15 程序上限、工作池、清理 | 有開發證據 | ≤1 controller＋≤1 app-server（Core 單例）；工作池兩個並行、第三個排隊、取消、逾時、OOM（256 MiB 範圍內 512 MiB 被殺）、CPU 0.50 核（`jobs/run.mjs` 17／17）；100 次清理 | D-44 的後端 cgroup 硬限制尚未設定 |
+| EX2-11 語意 45／50 與保留集 | 有參考機證據 | 開發機 v3 固定集 48／50、保留集 47／50；**參考機 Firefox（§3.6）固定集 48／50、保留集 46／50**，無基礎設施錯誤 | 未通過 6 題分析、結果檔環境標籤錯誤（#37） |
+| EX2-12 冷啟動 p95 ≤2 s | 有參考機證據 | 參考機登入工作階段、真實訂閱後端（§3.6）：30 次 ensure→ready＋已驗證 p50 1087、p95 1355、最大 1371 ms；完整回答 5／5，中位數 4759、最大 5062 ms。開發機與 VM 見 §3.1、§3.5 | — |
+| EX2-13 暖態首幀 p95 ≤150 ms | 有參考機證據 | 參考機實體座位（§3.6，按鍵送入 Wayfire→frameSwapped）：聊天 200 次 p50 58、p95 64、最大 72 ms；啟動器 200 次 p50 24、p95 27、最大 29 ms；冷首次 40／11 ms | wp_presentation 呈現時間（最多晚一個更新週期） |
+| EX2-14 四狀態冷登入資源 | 有參考機證據 | 參考機真冷登入四狀態各三次（§3.6）：Agent 暖態 p95 88.8、89.2、88.6 MiB（≤150）；全桌面 511.9、505.3、505.6 MiB（≤750）；無 Agent 全桌面 418.4、418.3、418.5 MiB（≤600）；hostd 38.7～45.2 MiB（≤100）；活動中 Agent 約 198 MiB、全桌面 625.3、620.0、670.8 MiB（不判定） | VM 與參考機 Agent PSS 差異原因（#35） |
+| EX2-15 程序上限、工作池、清理 | 有開發證據 | ≤1 controller＋≤1 app-server（Core 單例）；工作池兩個並行、第三個排隊、取消、逾時、OOM（256 MiB 範圍內 512 MiB 被殺）、CPU 0.50 核（`jobs/run.mjs` 17／17）；100 次清理；Codex 後端 scope 套寬鬆上限 1G／200%／256（D-44，2026-10-13） | 依 `memory.peak` 收緊並改整組 slice、OOM 故障測試（#35） |
 | EX2-16 兩種聊天外觀與七態 | 部分 | 角色旁面板↔完整視窗、草稿與串流 20 次切換不丟、七態文字、無角色入口、AI 設定鍵盤操作（`shell/run.sh`）；第一次使用的三個例子依能力啟用 | 實體鍵盤中文輸入（D-38 追蹤項）、reduced motion 實機 |
 | EX2-17 Core 持有會話與設定 | 有開發證據 | 單 writer、append／flush、torn tail、中段損毀、磁碟滿、遷移回滾、刪除中斷（`ditto-store` conversations 故障套件）；刪對話不撤銷配置 | 參考機 |
 | EX2-18 移植、契約新鮮度、身分 | 有開發證據 | [harness-g2-port](../../../docs/upstream/harness-g2-port.md)：Harness 9 檔雜湊、Codex 與 D-Bus proxy 釘選；schema→TS 新鮮度；G2 共享向量（Rust 與 TS 同檔，含未知 enum／多餘欄位拒絕）；Agent 身分只能由 Core 啟動取得 | CI 在 runner 上的第一次執行 |
-| EX2-19 Codex 訂閱真實矩陣 | 部分 | device code 登入、keyring 保存、無 `auth.json`；模型與配額列出；新世代從 Core 歷史回答且不重播工具；真實回答中停止 255 ms 取消；後端崩潰 turn 失敗而登入保留；登出後 turn 以 `provider_unavailable` 失敗且不改用 API key；取消的登入不登入任何人、下次拿到新代碼（10／10） | 切換第二個帳號（需第二個帳號）；配額耗盡無法刻意產生 |
+| EX2-19 Codex 訂閱真實矩陣 | 部分 | device code 登入、keyring 保存、無 `auth.json`；模型與配額列出；新世代從 Core 歷史回答且不重播工具；真實回答中停止 255 ms 取消；後端崩潰 turn 失敗而登入保留；登出後 turn 以 `provider_unavailable` 失敗且不改用 API key；取消的登入不登入任何人、下次拿到新代碼（10／10） | 切換第二個帳號、配額耗盡（#36） |
 
 ## 3. 執行紀錄
 
@@ -170,6 +172,30 @@ run `2026-10-09T14:50:29Z-33ab`（`33ab768` 加上本節的工具修正），快
 
 解讀限制：VM 以軟體算繪，合成器與 Shell 的數字與有 GPU 的參考機不同；首幀時鐘停在 frameSwapped，畫面呈現最多晚一個更新週期。Agent 層 168～173 MiB 高於 D-44 資料中真實登入後一個 turn 的 102～115 MiB（app-server 87～95 MiB），差異來源未查明（環回 provider 設定、VM 環境或量測時點不同都可能），需以參考機數字為準。這一輪的 `first-frame-session-*.json`、`cold-start-session-*.json` 的 `environment` 欄位仍是工具預設的「reference machine」，是標記錯誤；工具已改為由 `DITTO_MEASURE_ENVIRONMENT` 指定，VM 流程會設定。量測過程修正的工具缺陷：pipefail 下 `awk … exit` 的 SIGPIPE 讓取樣靜默結束、AccountsService 快取使第一次自動登入不進 Ditto、首幀讀日誌漏行、冷啟動把 Core 當成 Agent 程序、Core 停止中呼叫 ensure 會卡住。
 
+### 3.6 參考機出口量測（2026-10-13，`ditto-ref-ws-rtx4060-01`）
+
+參考機 run 38364782769（`a88bce8`），經 `nightly-refmachine.yml`（臨時分支 `hermes/g2-ref-probe`，只派送、不合併）。量測前把「預設」Profile 升到協定 0.3 並補 Super+A（`chg-01M4T3MRBW5QDBPFBMA320GWJ5`、`chg-01M4T3MRGVFVDZ495WJ01YQ144`，皆 committed）；GDM 自動登入只在量測期間開啟，結束後 `custom.conf` 逐位元組還原（sha256 `ceee968c…`）並回到登入畫面。指紋：Ubuntu 24.04.2、核心 6.17.0-40、Ryzen 9 7945HX、RTX 4060（570.211.01）、Wayfire 0.11.0、Qt 6.10.2、Firefox 156.0.1。原始資料在 run 的 artifact `g2-exit-phase-b-start-38364782769`（保留至 2026-11-12），另存一份離線副本（sha256 `09329d4e…2071`）。
+
+| 狀態（每次冷登入、暖機 300 s、採樣 600 s） | 每次 p95（MiB） | 判定（量測工具；owner 已判定功能完成） |
+| --- | --- | --- |
+| `rescue_no_node`（救援，不作全桌面） | — | 不判定 |
+| `desktop_full_no_agent`（全桌面 ≤600、hostd ≤100） | 全桌面 418.4、418.3、418.5；hostd 45.1、45.2、45.0 | 三次皆在門檻內 |
+| `desktop_full_agent_warm`（全桌面 ≤750、Agent ≤150、hostd ≤100） | 全桌面 511.9、505.3、505.6；Agent 88.8、89.2、88.6；hostd 38.7 | 三次皆在門檻內 |
+| `desktop_full_agent_active`（turn 進行中，不判定） | 全桌面 625.3、620.0、670.8；Agent 約 198 | 不判定 |
+
+Agent 分層（單程序最大 PSS）：暖態 app-server 約 68 MiB、controller 約 20 MiB；活動中 app-server 159、163、209 MiB，controller 37～38 MiB。
+
+| 量測 | 結果 |
+| --- | --- |
+| EX2-13 聊天（Super+A）200 次，實體座位 | p50 58、p95 64、最大 72 ms；冷首次 40 ms |
+| EX2-13 啟動器 200 次，實體座位 | p50 24、p95 27、最大 29 ms；冷首次 11 ms |
+| EX2-12 冷啟動 30 次（真實訂閱後端） | p50 1087、p95 1355、最大 1371 ms；ready p95 155 ms |
+| EX2-12 從冷到完整回答 | 5／5，中位數 4759、最大 5062 ms |
+| 語意集固定集（Firefox，oracle v3） | **48／50**：中文 24／25、英文 24／25；未通過 F-E04、F-E05 |
+| 語意集保留集（Firefox，oracle v3） | **46／50**：中文 23／25、英文 23／25；未通過 H-B06、H-C01、H-E05、H-F08 |
+
+注意：語意集結果檔的 `environment` 仍寫 `development-headless-desktop`，是 runner 的標籤錯誤，指紋是參考機（#37）。同日稍早在 `a4ad1ed` 的一輪（固定 45／50、保留 46／50）屬工具修正前，僅保留紀錄。
+
 ## 4. 發現
 
 ### 4.1 已修正
@@ -209,12 +235,19 @@ hostd 承載的條目在 Core 與 hostd 一起中斷後，開機恢復把 applyi
 | D-41 會話儲存 | 事件檔＋SQLite 索引、預設保留、刪除即移除文字（已驗證）、工具前先落盤 | 依實作定案；30 天自動清除另議 |
 | D-42 人力 | 本分支 23 個提交完成可在開發環境驗證的工作包；剩餘工作集中在真實模型、參考機量測與評審 | owner 依剩餘項目重估 |
 | D-43 保留集門檻 | v1 固定集 42／50、保留集 41／50；修正後 v2 固定集 45／50、保留集 46／50（未下降）；分類見 §3.4 | 門檻維持計畫提案（≥45／50、降幅 ≤5 pp）；另決定「詢問」與刪除設定檔兩類題的判定方式，若改動須升 oracle 版本並兩組重跑 |
-| D-44 Codex 程序與限制 | 一個 turn 後 Agent 群組 102～115 MiB（controller 15.7～19.4、app-server 87.2～94.5、confine 0.5、proxy 0.5 MiB），各次之間差約 13 MiB；新啟動約 63 MiB；後端無 MemoryMax | 參考機冷登入量測後再定 hard limit；暫提 MemoryMax 256 MiB 給整個 Agent scope，量測前不套用 |
+| D-44 Codex 程序與限制 | 一個 turn 後 Agent 群組 102～115 MiB（controller 15.7～19.4、app-server 87.2～94.5、confine 0.5、proxy 0.5 MiB），各次之間差約 13 MiB；新啟動約 63 MiB；後端無 MemoryMax | 參考機冷登入量測後再定 hard limit；暫提 MemoryMax 256 MiB 給整個 Agent scope，量測前不套用。**2026-10-13 owner**：參考機活動中 app-server 達 209 MiB，256 MiB 不足；先給後端 scope 寬鬆上限 1G／200%／256 驗證功能，收緊與整組 slice 屬優化（#35） |
 
-## 6. G3 交接
+## 6. G3 交接與 follow-up
 
 - 已可沿用：Core 對 Agent 的單例、世代、活動租約與回收；工具 intent／dispatch／trace 與開機對帳；Core 的 job pool（受信任種類、配額 scope）可承載 G3 生成與驗證工作；`ditto-confine` 可作為生成物隔離測試宿主的起點（Landlock＋seccomp，但沒有 user namespace）。
-- G3 前必須處理：參考機項目（EX2-12／13／14、語意集以 Firefox 重跑）；D-44 hard limit；approval 在鎖定狀態下的行為；`ditto-generation-safety` 仍是 draft，其隔離前提（principle 4）要以 `ditto-confine` 的實際能力重新核對。
+- 參考機項目（EX2-12／13／14、語意集以 Firefox 重跑）已於 2026-10-13 完成（§3.6）。D-44 先套寬鬆上限；worker limits 仍不能當作 G3 的安全 sandbox（plan/04/06）。
+- owner 2026-10-13 判定 G2 功能完成，以下移為 follow-up：
+  - #35 D-44 收緊後端上限、整組 Agent slice、OOM 故障測試、VM 與參考機差異
+  - #36 EX2-19 第二個帳號與配額耗盡
+  - #37 EX2-11 未通過題分析、runner 環境標籤、後端日誌保留
+  - #38 參考機補測：離線／停用、實體中文輸入、approval 等待中不回收等
+  - #39 hostd 承載條目恢復判定過於保守（原 §4.3）
+- 仍待處理（未開 issue）：approval 在鎖定狀態下的參考機行為；`ditto-generation-safety` 仍是 draft，其隔離前提（principle 4）要以 `ditto-confine` 的實際能力重新核對（屬 G3 #16）。
 - skill 核對：`ditto-agent-changeset` 與 `ditto-permission-and-secrets` 依 G2-AGENT-01／05 與 G2-CORE-02 的實作核對後改為 stable（2026-10-08）；`ditto-cordis-plugin`、`ditto-failure-and-rescue`、`ditto-generation-safety` 不屬 G2 核對範圍，維持 draft。
 
 ## 7. 登入後要跑的命令
