@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 set +e
+cd ~/.local/share/ditto/packages 2>/dev/null && find . -maxdepth 3 -type d | grep -i launcher | head
+for f in $(find ~/.local/share/ditto/packages -name 'Launcher*.qml' 2>/dev/null); do echo "$f $(grep -c 'launcher.frame' $f) $(sha256sum $f | cut -c1-12)"; done
+for f in ~/funlab/Ditto/target/ditto-packages*/ditto.launcher.search*/qml/*.qml ~/funlab/Ditto/target/ditto-packages*/*/*/qml/LauncherSearch.qml; do [ -f "$f" ] && echo "$f $(grep -c 'launcher.frame' $f)"; done
+ls ~/funlab/Ditto/target/ditto-packages-verification | head -30
 python3 - <<'PY'
 import sqlite3, json, os
-db=os.path.expanduser('~/.local/share/ditto/core.db')
-c=sqlite3.connect(f'file:{db}?mode=ro', uri=True)
-for pid,name,head in c.execute('select profile_id,name,head_revision from profiles'):
-    doc=json.loads(c.execute('select document_json from revisions where revision_id=?',(head,)).fetchone()[0])
-    print('profile',pid,name,head,'created', c.execute('select created_at from revisions where revision_id=?',(head,)).fetchone())
-    print(' shortcuts',json.dumps(doc.get('shortcuts'),ensure_ascii=False))
-    print(' avatar',json.dumps(doc.get('avatar'),ensure_ascii=False)[:300])
-    print(' slots',json.dumps(doc.get('slots'),ensure_ascii=False)[:400])
-print('agent prefs', c.execute('select settings_json from agent_preferences').fetchone())
+c=sqlite3.connect(f"file:{os.path.expanduser('~/.local/share/ditto/core.db')}?mode=ro", uri=True)
+for r in c.execute("select package_id,version,substr(sha256,1,12),substr(tree_sha256,1,12),source,installed_at from plugin_packages where package_id like '%launcher%'"): print(r)
+doc=json.loads(c.execute("select document_json from revisions r join profiles p on p.head_revision=r.revision_id").fetchone()[0])
+for e in doc['entries']:
+    if 'launcher' in json.dumps(e): print(json.dumps(e)[:300])
 PY
-echo "== firefox crash counters"; grep -h -E 'recent_crashes|max_resumed|last_success|safe' ~/snap/firefox/common/ditto-g0-reference-profile/prefs.js 2>&1 | head
-echo "== journal 13:52 core"; journalctl --user --since '2026-10-13 13:52:30' --until '2026-10-13 13:53:00' -o short-iso --no-pager | grep -v -E 'ditto-rpc|keysym|xkbcomp|keycode' | cut -c1-250 | head -30
-echo "== journal earlier first-frame (phase A start of ff)"; journalctl --user --since '2026-10-13 13:52:00' --until '2026-10-13 13:52:45' -o short-iso --no-pager | grep -i -E 'mark|chat|toggle|command' | head
+journalctl --user -b -o cat --no-pager | grep -i -E 'launcher' | grep -v ditto-rpc | tail -5
