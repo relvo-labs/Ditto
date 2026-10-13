@@ -332,7 +332,7 @@ start_app() {
       mkdir -p "$firefox_profile"
       # The fixed starting state of the other reference fixtures.
       rm -f -- "$firefox_profile/xulstore.json"
-      systemd-run --user --scope --quiet --collect --unit="$unit" -- env MOZ_ENABLE_WAYLAND=1 MOZ_DISABLE_WAYLAND_PROXY=1 \
+      systemd-run --user --scope --quiet --collect --unit="$unit" -- env MOZ_ENABLE_WAYLAND=1 MOZ_DISABLE_WAYLAND_PROXY=1 MOZ_DISABLE_AUTO_SAFE_MODE=1 \
         firefox --no-remote --profile "$firefox_profile" about:blank >/dev/null 2>&1 &
       ;;
     terminal)

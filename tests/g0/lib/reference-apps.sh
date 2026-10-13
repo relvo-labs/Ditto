@@ -25,7 +25,11 @@ start_reference_app() {
       # Firefox 156.0.1 routes Wayland through its own in-process proxy; under
       # the headless fixture compositor that proxy never maps a toplevel. The
       # direct connection is the same xdg-toplevel path the matrix measures.
-      MOZ_ENABLE_WAYLAND=1 MOZ_DISABLE_WAYLAND_PROXY=1 firefox --no-remote --profile "$firefox_profile" \
+      # Fixtures stop Firefox by signal, which it counts as a crash; after a
+      # few it opens a "Troubleshoot Mode" prompt instead of the browser
+      # (G2 semantic run 2026-10-13T05:16:08Z: four layout tasks met that
+      # 348-px prompt). MOZ_DISABLE_AUTO_SAFE_MODE keeps the normal window.
+      MOZ_ENABLE_WAYLAND=1 MOZ_DISABLE_WAYLAND_PROXY=1 MOZ_DISABLE_AUTO_SAFE_MODE=1 firefox --no-remote --profile "$firefox_profile" \
         about:blank >"$RUNTIME_DIR/firefox.log" 2>&1 &
       ;;
     terminal)

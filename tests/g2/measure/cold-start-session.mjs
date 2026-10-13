@@ -41,7 +41,12 @@ function agentPids(){
       // By program, not by command line: Core's own arguments name the Agent.
       const argv=readFileSync(`/proc/${pid}/cmdline`,'utf8').split('\0')
       const program=argv[0].split('/').at(-1)
-      if(['ditto-confine','codex','xdg-dbus-proxy','ditto-dbus-proxy'].includes(program)||argv[1]?.endsWith('ditto-agentd.mjs'))out.push(Number(pid))
+      if(!(['ditto-confine','codex','xdg-dbus-proxy','ditto-dbus-proxy'].includes(program)||argv[1]?.endsWith('ditto-agentd.mjs')))continue
+      // Only Ditto's: Core launches the Agent in its <prefix>-agent and
+      // <prefix>-agent-backend scopes. Other Codex processes of the same user
+      // (a terminal Codex, another product's sessions) are not the Agent.
+      if(!/\/[A-Za-z0-9_-]+-agent(-backend)?\.scope$/m.test(readFileSync(`/proc/${pid}/cgroup`,'utf8')))continue
+      out.push(Number(pid))
     }catch{}
   }
   return out
