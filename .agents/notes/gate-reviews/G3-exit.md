@@ -3,9 +3,9 @@
 | 欄位 | 內容 |
 | --- | --- |
 | 日期／狀態 | 2026-10-14；**整合實作提交審查，G3 出口尚未裁定通過** |
-| 計畫／追蹤 | [plan/05](../../../plan/05/README.md)；[#34](https://github.com/relvo-labs/Ditto/issues/34)，相關 #15～#33 已逐項閱讀 |
+| 計畫／追蹤 | [plan/05](../../../plan/05/README.md)；[#34](https://github.com/relvo-labs/Ditto/issues/34)，相關 #15～#33 與 G2 follow-up #35～#39 已逐項閱讀 |
 | 分支 | `codex/g3-restricted-generation`；整合實作 `5ed55b8c44d94bae6e3dd70841c7961b85b25eb2`；G2 PR #13 已合併，本次 PR 以 `main` 為基底 |
-| G2 交接 | owner 依 [D-46](../decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受功能完成；未執行量測與既有警訊保留 |
+| G2 交接 | owner 依 [D-46](../decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受功能完成；PR #13 已提供 G2 參考機量測，D-44 後端寬鬆上限已為 1G；剩餘 #35～#39 保留 |
 | 歷史 | 獨立基礎設施 `d77b4e7`、證據 `27abec9`；先前未接線的狀態保留於 [歷史快照](G3-foundation-2026-10-13.md) |
 | 評審者 | owner；本紀錄提供事實與缺口，不代替 owner 裁定 |
 
@@ -44,7 +44,7 @@ AT-26：兩個生成工作執行、第三個排隊、取消與 artifact 狀態�
 
 ### 3.1 開發機回歸
 
-- `cargo test --locked --workspace`：**246 項通過，0 失敗**；全 workspace format 與 clippy `--all-targets -- -D warnings` 通過。
+- `cargo test --locked --workspace`：**247 項通過，0 失敗**；全 workspace format 與 clippy `--all-targets -- -D warnings` 通過。
 - `pnpm typecheck`、`pnpm test`：型別檢查及 **184 項 Node 測試通過**。
 - Rust schema export `--check`、TS `check:generated`、可信模板同步 `--check`、共享契約向量通過。
 - QML lint 與 QtTest **5 項通過**（3 個行為測試及 init／cleanup）；native runner 用固定 Qt 6.10.2 建置。
@@ -54,7 +54,7 @@ AT-26：兩個生成工作執行、第三個排隊、取消與 artifact 狀態�
 
 ### 3.2 開發 VM 與真桌面測試
 
-最終兩次 run 都來自乾淨實作 commit `5ed55b8`，來源樹 SHA256 `5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23`。後續提交只整理評審與證據，沒有更改執行程式。
+最終兩次 run 都來自乾淨實作 commit `5ed55b8`，來源樹 SHA256 `5070d72a2a84943f6b7410c4ad39a643176485df7acea658a44dea5b4d127f23`。後續合併 `main@603018a`，保留 G2 後端 1G 寬鬆限制與量測更新；G3 執行程式沒有變更，合併後整合回歸另附於證據摘要。
 
 | run | 實際結果 |
 | --- | --- |
@@ -78,7 +78,7 @@ AT-26：兩個生成工作執行、第三個排隊、取消與 artifact 狀態�
 
 已準備 `tests/g3/agent/real.sh` 與四回合自然語言 oracle，僅做靜態語法檢查；須取得明確授權後，以指定私有開發測試 store 執行。真實訂閱與參考機流程未跑，不影響提交目前可審查實作，但不能宣告 AT-06／G3 出口完成。
 
-實體座位逐關故障、中文鍵盤、雙螢幕、冷登入三次四態 PSS／CPU、呈現時間、100 次啟停與五晚 nightly 均未由本批重新驗收。G2 VM Agent 暖態 p95 超過 150 MiB、D-06a／D-44 預算與 D-38 其他缺口繼續追蹤，沒有移除程序或提高門檻。
+實體座位逐關故障、中文鍵盤、雙螢幕、冷登入三次四態 PSS／CPU、呈現時間、100 次啟停與五晚 nightly 均未由本批重新驗收。G2 參考機暖態 Agent p95 88.6～89.2 MiB 的原始證據見 G2-exit §3.6；VM 超過 150 MiB 的差異與 D-44 由 #35 追蹤，後端已採 1G 寬鬆上限。這些 G2 數字不作 G3 資源驗收；D-06a 與 D-38 其他缺口繼續追蹤，沒有移除程序或提高門檻。
 
 ## 4. 已知限制與 G4 交接
 

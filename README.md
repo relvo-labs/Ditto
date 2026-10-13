@@ -81,3 +81,7 @@ bash tests/g0/window-matrix/run.sh      # 能力 × 視窗形態矩陣
 原型附 8 項配置／意圖測試；瀏覽器流程驗證紀錄見研究文件。原生開發依 PRD 的 G0～G5 門檻推進。
 
 本次匯入未指定專案開源授權；對外發行前需依 PRD 完成依賴、名稱與角色素材審查。
+
+## 致謝
+
+Ditto 深受 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek-AI，MIT）啟發：「Everything is a Plugin」的組合方式、Cordis 插件底座、Profile／Bundle 分層與 approval、session、jobs 等子系統設計，都是 Ditto 架構的重要參考。Ditto 的 Cordis 宿主沿用 Harness 的 vendored fork。借鑑的設計、取用的程式碼、Ditto 自行新增的部分與授權義務見 [DeepSeek Harness 參考與啟發紀錄](docs/upstream/deepseek-harness.md)。Ditto 是獨立專案，與 DeepSeek 沒有隸屬關係。

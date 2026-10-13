@@ -6,7 +6,7 @@
 
 使用者於 2026-10-13 明確要求深入分析 #34、相關 issues、參考 `.agents`、開新 branch 實作。依此開始獨立基礎設施，採目前可用的 G2 分支基底；見 [D-45](../../.agents/notes/decisions/2026-10-13-d45-g3-independent-foundation.md)。
 
-G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定接線等待條件由 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 取代，owner 接受 G2 功能完成並授權完整 G3。這不把未執行的量測改成通過，也不是 D-44 hard limit 核定、D-17 選型核定或工期承諾。
+G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定接線等待條件由 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 取代，owner 接受 G2 功能完成並授權完整 G3。這不把未執行量測改成通過，也不核定 D-17 選型或工期。後續 main 的 G2-exit §3.6 已提供參考機數據，D-44 後端先採 1G 寬鬆上限；其收緊與整組 slice 由 #35 追蹤。
 
 ## 2. 待決策／提案
 
@@ -15,7 +15,7 @@ G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定接
 | D-17 兩類生成插件 | 沿用待辦摘要／工作區快捷動作；SDK 可先做，不宣告選型核定 | #28 真模型驗收前 |
 | D-08 實作細節 | 沿用現有 `ditto-confine`，獨立 systemd cgroup；不新增 Harness 原始碼；AppArmor 不放寬 | #23 生產執行政策凍結前 |
 | D-12／G3 人力與曆時 | 64 人週維持提案，各流拆分見 05；實作後按剩餘工作估，不以 Agent 執行時間換算人週 | 正式接線與出口排程前 |
-| D-44／G2 資源 | 參考機四態三次量測後核定 Agent hard limit；G3 測試宿主另依 D-06b | G2 出口、G3 資源比較前 |
+| D-44／G2 資源 | G2 參考機量測已完成，後端先採 1G；#35 依 memory.peak 收緊並整組 slice。G3 宿主另依 D-06b | G2 出口、G3 資源比較前 |
 | 生產模板的執行位置 | 受限描述由可信固定 UI 解譯；自由 QML 不載主 Shell；試載／預覽獨立 | #19／22 正式契約前 |
 | 資料 schema 回退政策 | 按可讀範圍／可逆／快照／不可回退分項，不提供通用任意遷移腳本 | #21 實作前 |
 
@@ -39,7 +39,7 @@ HOST 第一批只以 subprocess 使用本倉庫的 `ditto-confine@a88bce8`，沒
 | 修復重啟重置預算 | Core 持久三輪與錯誤指紋、工具前落盤 |
 | schema 回退破壞新資料 | 快照／相容範圍與獨立授權；不能證明時拒絕回退，保留資料 |
 | OOM 或診斷洪水影響桌面 | D-06b cgroup、輸出上限、整組終止，見證桌面同 PID／revision |
-| Agent 暖態 VM 超標 | 原 150 MiB 目標不變，保留 G2 警訊，等參考機數據再提案 |
+| Agent 暖態 VM 超標 | 原 150 MiB 目標不變；G2 參考機暖態 88.6～89.2 MiB，VM 差異由 #35 追蹤，不作 G3 資源驗收 |
 
 ## 5. G4 交接清單
 

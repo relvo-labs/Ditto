@@ -3,7 +3,7 @@
 | 欄位 | 內容 |
 | --- | --- |
 | 決策日期 | 2026-10-09 |
-| 狀態 | 已決定；硬上限在參考機冷登入量測後套用 |
+| 狀態 | 已決定；2026-10-13 先套寬鬆上限，收緊待 #35 |
 | 決策者 | 使用者／專案 owner Lei-k（採 [G2 評審](../gate-reviews/G2-exit.md) §5 提案） |
 
 ## 結論
@@ -27,3 +27,9 @@
 
 - `milestones/01/05` 的 D-44 列改為已決定。
 - EX2-14 完成後，依數據套用 `MemoryMax`（或附數據提出調整），寫回本紀錄與評審。
+
+## 2026-10-13 更新（owner）
+
+- 參考機冷登入（G2 評審 §3.6）：暖態 Agent p95 88.6～89.2 MiB，在 150 MiB 預算內；turn 進行中 app-server 單程序 PSS 達 159～209 MiB、controller 37～38 MiB。暫定的 256 MiB 不足以涵蓋活動中的峰值，且 cgroup 另計檔案快取與 kernel 記憶體。
+- 決定：現階段以驗證功能為主，不採嚴格上限。Codex 後端 scope（`ditto-agent-backend.scope`：`ditto-confine`＋app-server）套 `Quota::agent_backend()`＝`MemoryMax=1G`、`CPUQuota=200%`、`TasksMax=256`；controller 維持 D-06b 的 256M／50%／32。暖態 PSS ≤150 MiB 的預算不變。
+- 之後的優化（#35）：記錄 `memory.current`／`memory.peak`、兩個 scope 改掛同一 Agent slice、依數據收緊並設 `MemoryHigh`、正式 session 強制 `DITTO_REQUIRE_QUOTA`、OOM 故障測試。

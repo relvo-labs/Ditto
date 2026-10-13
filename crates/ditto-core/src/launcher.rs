@@ -62,6 +62,19 @@ impl Quota {
         }
     }
 
+    /// D-44's Codex app-server scope (`ditto-confine` and the app-server).
+    /// Deliberately generous while G2 verifies function: on the reference
+    /// machine the app-server peaked at 209 MiB PSS during a turn, and a
+    /// cgroup also charges page cache and kernel memory. The 150 MiB warm PSS
+    /// target is unchanged; tightening this limit is later optimisation work.
+    pub fn agent_backend() -> Self {
+        Self {
+            memory_max: "1G".into(),
+            cpu_quota: "200%".into(),
+            tasks_max: 256,
+        }
+    }
+
     pub fn properties(&self) -> Vec<String> {
         vec![
             format!("MemoryMax={}", self.memory_max),
@@ -267,4 +280,20 @@ pub fn launch_with_channel(
     )?;
     launcher_end.write_all(format!("{token}\n").as_bytes())?;
     Ok(child)
+}
+
+#[cfg(test)]
+mod quota_tests {
+    use super::Quota;
+
+    #[test]
+    fn the_codex_backend_has_its_own_generous_limit() {
+        let backend = Quota::agent_backend();
+        assert_eq!(
+            backend.properties(),
+            ["MemoryMax=1G", "CPUQuota=200%", "TasksMax=256"]
+        );
+        // Not the hostd/controller service class reused (D-06b, D-44).
+        assert_ne!(backend, Quota::service());
+    }
 }
