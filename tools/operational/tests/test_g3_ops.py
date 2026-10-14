@@ -21,6 +21,7 @@ spec = importlib.util.spec_from_file_location("g3_ops", MODULE)
 ops = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ops)
 REPO = MODULE.parents[2]
+REAL_WITNESS = ops.witness
 
 
 def database(path, version=4):
@@ -54,6 +55,7 @@ class TestOnlyHost:
     def remove_override(self):
         self.event("remove")
         (self.root / "override").unlink(missing_ok=True)
+        return True
 
     def relogin(self):
         self.event("relogin")
@@ -87,6 +89,9 @@ class Boundaries(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="TEST_ONLY_g3_ops_")
         self.addCleanup(self.temp.cleanup)
+        self.origin_witness = patch.object(ops, "witness", return_value=None)
+        self.origin_witness.start()
+        self.addCleanup(self.origin_witness.stop)
         self.root = Path(self.temp.name)
         self.candidate = self.root / "candidate"
         self.store = self.root / "private"
@@ -175,15 +180,17 @@ class Boundaries(unittest.TestCase):
 
     def test_origin_worker_waits_exact_witness(self):
         origin = {"pid": 21, "starttime": "900", "worker": True}
-        self.assertFalse(ops.worker_gate(origin, [origin]))
-        self.assertTrue(ops.worker_gate(origin, []))
+        with patch.object(ops, "witness", return_value=origin):
+            self.assertFalse(ops.worker_gate(origin, [origin]))
+        with patch.object(ops, "witness", return_value=None):
+            self.assertTrue(ops.worker_gate(origin, []))
 
     def test_different_worker_refused(self):
-        with self.assertRaisesRegex(ops.Refused, "other active"):
+        with patch.object(ops, "witness", return_value=None), self.assertRaisesRegex(ops.Refused, "other active"):
             ops.worker_gate({"pid": 21, "starttime": "900"}, [{"pid": 22, "starttime": "900"}])
 
     def test_pid_reuse_refused(self):
-        with self.assertRaisesRegex(ops.Refused, "PID reuse"):
+        with patch.object(ops, "witness", return_value=None), self.assertRaisesRegex(ops.Refused, "PID reuse"):
             ops.worker_gate({"pid": 21, "starttime": "900"}, [{"pid": 21, "starttime": "901"}])
 
     def pause_fixture(self, workers):
@@ -201,14 +208,14 @@ class Boundaries(unittest.TestCase):
 
     def test_listener_freeze_closes_pause_race(self):
         host, state, events = self.pause_fixture([])
-        with patch.object(ops.Path, "read_text", return_value="111"), patch.object(ops.Path, "resolve", return_value=Path("/home/neil/actions-runner-ditto-ref/bin/Runner.Listener")), patch.object(ops, "witness", return_value={"pid": 111, "starttime": "55", "worker": False}):
+        with patch.object(ops.Path, "read_text", return_value="111"), patch.object(ops.Path, "resolve", return_value=Path("/home/neil/actions-runner-ditto-ref/bin/Runner.Listener")), patch.object(ops, "witness", side_effect=lambda pid: {"pid": 111, "starttime": "55", "worker": False} if int(pid) == 111 else None):
             host.pause_runner(state)
         self.assertEqual(events, ["show", signal.SIGSTOP, "--no-block", "is-active", signal.SIGCONT])
         self.assertEqual(ops.read(self.root / "state.json")["listener"]["pid"], 111)
 
     def test_worker_arrives_during_pause_refuses_stop_and_resumes_listener(self):
         host, state, events = self.pause_fixture([{"pid": 99, "starttime": "666"}])
-        with patch.object(ops.Path, "read_text", return_value="111"), patch.object(ops.Path, "resolve", return_value=Path("/home/neil/actions-runner-ditto-ref/bin/Runner.Listener")), patch.object(ops, "witness", return_value={"pid": 111, "starttime": "55", "worker": False}):
+        with patch.object(ops.Path, "read_text", return_value="111"), patch.object(ops.Path, "resolve", return_value=Path("/home/neil/actions-runner-ditto-ref/bin/Runner.Listener")), patch.object(ops, "witness", side_effect=lambda pid: {"pid": 111, "starttime": "55", "worker": False} if int(pid) == 111 else None):
             with self.assertRaises(ops.Refused):
                 host.pause_runner(state)
         self.assertNotIn("--no-block", events)
@@ -240,7 +247,7 @@ class Boundaries(unittest.TestCase):
         proc.mkdir(parents=True)
         proc.joinpath("stat").write_text("21 (weird ) name) " + " ".join(["0"] * 19 + ["777", "0"]))
         proc.joinpath("cmdline").write_bytes(b"/task/bin/Runner.Worker\0spawnclient\0")
-        self.assertEqual(ops.witness(21, self.root / "proc"), {"pid": 21, "starttime": "777", "worker": True})
+        self.assertEqual(REAL_WITNESS(21, self.root / "proc"), {"pid": 21, "starttime": "777", "worker": True})
 
     def selection(self):
         self.home = self.root / "home"

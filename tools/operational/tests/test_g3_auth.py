@@ -25,6 +25,7 @@ class TestOnlyCore:
     def __init__(self):
         self.calls = []
         self.status_count = 0
+        self.logged_out = False
         self.login = {"login_id": "TEST_ONLY_LOGIN", "auth_url": "https://auth.openai.com/codex/device", "user_code": CODE, "expires_at_ms": b.now_ms() + 90_000}
 
     def ready(self):
@@ -34,8 +35,11 @@ class TestOnlyCore:
         self.calls.append((method, params))
         if method == "agent.providers.status":
             self.status_count += 1
-            return {"available": True, "provider": "codex-app-server", "authenticated": self.status_count > 1,
+            return {"available": True, "provider": "codex-app-server", "authenticated": self.status_count > 1 and not self.logged_out,
                     "account_label": "TEST_ONLY_ACCOUNT", "models": [{"id": a.MODEL, "reasoning_efforts": [a.EFFORT]}]}
+        if method == "agent.providers.logout":
+            self.logged_out = True
+            return {"completed": True}
         if method == "agent.providers.login":
             return self.login
         return {"completed": True}
@@ -56,6 +60,9 @@ class AuthLogic(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="TEST_ONLY_auth_")
         self.addCleanup(self.temp.cleanup)
+        scope_mock = patch.object(a, "scope_readbacks", return_value=[])
+        scope_mock.start()
+        self.addCleanup(scope_mock.stop)
         self.home = Path(self.temp.name) / "home"
         self.root = Path(self.temp.name) / ("q" + ID)
         self.root.mkdir(mode=0o700)
@@ -295,7 +302,7 @@ class AuthLogic(unittest.TestCase):
         with patch.object(a, "minimal_probe", side_effect=ops.Refused("TEST_ONLY_PROBE_FAILURE")):
             with self.assertRaises(ops.Refused):
                 a.device_flow(core, transport, self.receipt(), lambda **v: updates.append(v))
-        self.assertIn({"status": "login_complete", "login_complete": True}, updates)
+        self.assertTrue(any(v.get("status") == "login_complete" and v.get("login_complete") is True for v in updates))
         self.assertIn("/status", transport.paths)
         self.assertNotIn(CODE, json.dumps(updates))
 

@@ -126,63 +126,137 @@ class NativeCore:
             raise ops.Refused("BLOCKED_NATIVE_MANAGED_API") from None
 
     def ready(self):
-        self.call("agent.runtime.ensure")
-        end = time.monotonic() + 30
-        while time.monotonic() < end:
-            runtime = self.call("agent.runtime.get")
-            if runtime.get("phase") == "ready":
-                ops.require(runtime.get("isolation_verified") is True, "BLOCKED_NATIVE_BACKEND_BOUNDARY")
-                pid = runtime["backend_pid"]
-                ops.require(Path(f"/proc/{pid}/exe").resolve(strict=True) == ops.CODEX and ops.sha(ops.CODEX) == ops.CODEX_SHA, "BLOCKED_NATIVE_BACKEND_BINARY")
-                entries = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
-                for name, path in {"HOME": self.realm / "state/agent/backend/home", "CODEX_HOME": self.realm / "state/agent/backend/codex"}.items():
-                    ops.require((name + "=" + str(path)).encode() in entries, "BLOCKED_NATIVE_AUTH_PATH")
-                args = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
-                ops.require(b'cli_auth_credentials_store="keyring"' in args and b"--strict-config" in args and not any(b"ditto_test" in a for a in args), "BLOCKED_NATIVE_AUTH_METHOD")
-                group = next(x.split("::", 1)[1] for x in Path(f"/proc/{pid}/cgroup").read_text().splitlines() if x.startswith("0::"))
-                ops.require(("ditto-g3-auth-q" + self.identifier + "-agent-backend.scope") in group, "BLOCKED_NATIVE_BACKEND_SCOPE")
-                cgroup = Path("/sys/fs/cgroup") / group.lstrip("/")
-                limits = {n: (cgroup / n).read_text().strip() for n in ("memory.max", "cpu.max", "pids.max", "memory.swap.max")}
-                cpu = limits["cpu.max"].split()
-                ops.require(limits["memory.max"] == "1073741824" and limits["pids.max"] == "256" and cpu[0] != "max" and int(cpu[0]) == 2 * int(cpu[1]), "BLOCKED_NATIVE_BACKEND_QUOTA")
-                realm_guard(self.realm)
-                return {"backend_witness": ops.witness(pid), "limits": limits, "isolation_verified": True}
-            ops.require(runtime.get("phase") != "failed", "BLOCKED_NATIVE_BACKEND_START")
-            time.sleep(.2)
-        raise ops.Refused("BLOCKED_NATIVE_BACKEND_START")
+        runtime = ops.wait_ready(self.call)
+        ops.require(runtime.get("isolation_verified") is True, "BLOCKED_NATIVE_BACKEND_BOUNDARY")
+        pid = runtime["backend_pid"]
+        ops.require(Path(f"/proc/{pid}/exe").resolve(strict=True) == ops.CODEX and ops.sha(ops.CODEX) == ops.CODEX_SHA, "BLOCKED_NATIVE_BACKEND_BINARY")
+        entries = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+        for name, path in {"HOME": self.realm / "state/agent/backend/home", "CODEX_HOME": self.realm / "state/agent/backend/codex"}.items():
+            ops.require((name + "=" + str(path)).encode() in entries, "BLOCKED_NATIVE_AUTH_PATH")
+        args = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+        ops.require(b'cli_auth_credentials_store="keyring"' in args and b"--strict-config" in args and not any(b"ditto_test" in a for a in args), "BLOCKED_NATIVE_AUTH_METHOD")
+        group = next(x.split("::", 1)[1] for x in Path(f"/proc/{pid}/cgroup").read_text().splitlines() if x.startswith("0::"))
+        ops.require(("ditto-g3-auth-q" + self.identifier + "-agent-backend.scope") in group, "BLOCKED_NATIVE_BACKEND_SCOPE")
+        cgroup = Path("/sys/fs/cgroup") / group.lstrip("/")
+        limits = {n: (cgroup / n).read_text().strip() for n in ("memory.max", "cpu.max", "pids.max", "memory.swap.max")}
+        cpu = limits["cpu.max"].split()
+        ops.require(limits["memory.max"] == "1073741824" and limits["pids.max"] == "256" and cpu[0] != "max" and int(cpu[0]) == 2 * int(cpu[1]), "BLOCKED_NATIVE_BACKEND_QUOTA")
+        realm_guard(self.realm)
+        return {"backend_witness": ops.witness(pid), "limits": limits, "isolation_verified": True}
 
     def stop(self):
+        errors = []
         try:
             self.call("agent.runtime.stop", timeout=5)
         except Exception:
-            pass
-        # Stop only this realm's known, prefix-bound child scopes. This also
-        # covers abrupt Core death; no normal desktop/runner unit is touched.
-        stop_scopes(self.root, self.identifier)
-        if self.child and self.child.poll() is None:
-            self.child.terminate()
-            try:
-                self.child.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.child.kill()
-                self.child.wait(timeout=5)
-        for name in ("relay.sock", "core.sock"):
-            (self.runtime / name).unlink(missing_ok=True)
-        # Core may have other task-only runtime state: preserve it privately.
+            errors.append("runtime_stop")
+        try:
+            errors.extend(stop_scopes(self.root, self.identifier) or [])
+        except Exception:
+            errors.append("scope_stop")
+        # Popen owns its unreaped child; PID cannot be reused before wait.
+        try:
+            if self.child and self.child.poll() is None:
+                self.child.terminate()
+                try:
+                    self.child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.child.kill()
+                    self.child.wait(timeout=5)
+        except Exception:
+            errors.append("core_stop")
+        try:
+            errors.extend(scope_readbacks(self.root, self.identifier))
+        except Exception:
+            errors.append("scope_readback")
+        try:
+            ops.require(not self.child or self.child.poll() is not None, "BLOCKED_AUTH_CORE_STILL_RUNNING")
+            for name in ("relay.sock", "core.sock"):
+                (self.runtime / name).unlink(missing_ok=True)
+        except Exception:
+            errors.append("core_readback")
+        if errors:
+            raise CleanupFailed(errors)
 
     def __exit__(self, *args):
         self.stop()
 
 
+class CleanupFailed(ops.Refused):
+    def __init__(self, errors):
+        self.errors = errors
+        super().__init__("BLOCKED_AUTH_CLEANUP")
+
+
+def owned_units(identifier):
+    bridge.qualification(identifier)
+    return ["ditto-g3-auth-q" + identifier + "-" + kind + ".scope" for kind in ("agent", "agent-backend", "dittoctl")]
+
+
+def scope_readbacks(root, identifier):
+    host, errors = ops.Host(root), []
+    for unit in owned_units(identifier):
+        try:
+            active = host.system("is-active", unit, check=False)
+            ops.require(active in ("inactive", "failed", "unknown"), "BLOCKED_AUTH_SCOPE_STILL_ACTIVE")
+        except Exception:
+            errors.append(unit + ":active_readback")
+        try:
+            group = host.system("show", unit, "-p", "ControlGroup", "--value", check=False)
+            if group:
+                ops.require(group.startswith("/user.slice/user-1000.slice/user@1000.service/") and unit in group, "BLOCKED_AUTH_SCOPE_IDENTITY")
+                procs = Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs"
+                ops.require(not procs.exists() or not procs.read_text().strip(), "BLOCKED_AUTH_SCOPE_CLEANUP")
+        except Exception:
+            errors.append(unit + ":process_readback")
+    return errors
+
+
 def stop_scopes(root, identifier):
-    host = ops.Host(root)
-    for kind in ("agent", "agent-backend", "dittoctl"):
-        unit = "ditto-g3-auth-q" + identifier + "-" + kind + ".scope"
-        host.system("stop", unit, check=False)
-        group = host.system("show", unit, "-p", "ControlGroup", "--value", check=False)
-        if group:
-            procs = Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs"
-            ops.require(not procs.exists() or not procs.read_text().strip(), "BLOCKED_AUTH_SCOPE_CLEANUP")
+    host, errors = ops.Host(root), []
+    for unit in owned_units(identifier):
+        try:
+            host.system("stop", unit)  # nonzero/timeout is retained, not ignored
+        except Exception:
+            errors.append(unit + ":stop")
+    errors.extend(scope_readbacks(root, identifier))
+    return errors
+
+
+def stop_owned_core(root, saved):
+    current = ops.witness(saved["pid"]) if saved else None
+    if not current:
+        return
+    ops.require(current["starttime"] == saved["starttime"], "BLOCKED_AUTH_PID_REUSE")
+    ops.require(Path(f"/proc/{saved['pid']}/exe").resolve() == root / "candidate/target/release/ditto-core", "BLOCKED_AUTH_CLEANUP_IDENTITY")
+    fd = os.pidfd_open(saved["pid"])
+    try:
+        again = ops.witness(saved["pid"])
+        ops.require(again and again["starttime"] == saved["starttime"], "BLOCKED_AUTH_PID_REUSE")
+        signal.pidfd_send_signal(fd, signal.SIGTERM)
+    finally:
+        os.close(fd)
+    end = time.monotonic() + 5
+    while ops.witness(saved["pid"]) is not None and time.monotonic() < end:
+        time.sleep(.1)
+    ops.require(ops.witness(saved["pid"]) is None, "BLOCKED_AUTH_CORE_STILL_RUNNING")
+
+
+def revoke(core, login=None):
+    """Cancel pending, then logout and prove unauthenticated in sole realm.
+
+    cancel:false and process exit never prove keyring revocation. Logout also
+    clears the provider's pending flow. No normal/default backend is reachable.
+    """
+    core.ready()  # settings restoration may have stopped Agent; same realm only
+    if type(login) is dict and type(login.get("login_id")) is str:
+        try:
+            core.call("agent.providers.cancel_login", {**PROVIDER, "login_id": login["login_id"]}, timeout=5)
+        except Exception:
+            pass  # authoritative logout + status below must still succeed
+    value = core.call("agent.providers.logout", PROVIDER, timeout=10)
+    ops.require(value.get("completed") is True, "BLOCKED_AUTH_REVOCATION")
+    ops.require(not status_guard(core.call("agent.providers.status", PROVIDER, timeout=10)), "BLOCKED_AUTH_REVOCATION")
 
 
 def prepare(root, host):
@@ -199,7 +273,7 @@ def prepare(root, host):
     directory.mkdir(mode=0o700)
     state = {"source": ops.SOURCE, "ops_sha": built["ops_sha"], "qualification_id": identifier, "flow_id": secrets.token_hex(16),
              "realm": str(realm), "backend_home": str(realm / "state/agent/backend/home"), "codex_home": str(realm / "state/agent/backend/codex"),
-             "status": "starting", "login_complete": False, "model_verified": False, "native_stopped": False, "normal_before": before}
+             "status": "starting", "auth_lifecycle": "none", "login_complete": False, "model_verified": False, "native_stopped": False, "normal_before": before}
     ops.write(root / "auth-state.json", state)
     try:
         # No-auth controls against the exact pinned binary. No credential
@@ -245,42 +319,71 @@ def minimal_probe(core):
     original = core.call("agent.settings.describe")
     settings = {k: v for k, v in original.items() if k != "_meta"}
     settings.update(enabled=True, provider="codex-app-server", model=MODEL, reasoning_effort=EFFORT, turn_timeout_ms=30000, max_tool_calls=1, approval_mode="never")
-    applied = core.call("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
-    ops.require(applied.get("model") == MODEL and applied.get("reasoning_effort") == EFFORT, "BLOCKED_MINIMAL_PROBE_SETTINGS")
-    before = core.call("desktop.profiles.get")
-    session = core.call("agent.sessions.create", {"title": "G3 isolated subscription verification", "idempotency_key": "auth-probe"})
-    turn = core.call("agent.turns.submit", {"session_id": session["session_id"], "client_message_id": "auth-probe-one",
-                                         "text": "Reply only OK. Do not use tools, read files, or modify desktop state."})
-    end = time.monotonic() + 45
-    while time.monotonic() < end:
-        finished = core.call("agent.turns.get", {"turn_id": turn["turn_id"]})
-        if finished.get("state") in ("succeeded", "failed", "cancelled", "unknown", "partial"):
-            break
-        time.sleep(.25)
-    else:
-        core.call("agent.turns.cancel", {"turn_id": turn["turn_id"]})
-        raise ops.Refused("BLOCKED_MINIMAL_PROBE_DEADLINE")
-    trace = core.call("agent.turns.trace", {"turn_id": turn["turn_id"]})
-    events = core.call("agent.sessions.read", {"session_id": session["session_id"], "offset": 0, "limit": 100})
-    probe_guard(finished, trace, events)
-    selection = next(e["data"] for e in events["events"] if e["type"] == "model/selection")
-    ops.require(selection.get("settings_revision") == applied.get("revision"), "BLOCKED_MINIMAL_PROBE_SETTINGS_REVISION")
-    after = core.call("desktop.profiles.get")
-    ops.require(before["revision"]["document_sha256"] == after["revision"]["document_sha256"], "BLOCKED_MINIMAL_PROBE_DESKTOP_CHANGE")
-    # Keep the requested model/high for physical acceptance, restore the
-    # original budgets/enabled flag via Core (not a DB-row edit).
-    settings = {k: v for k, v in original.items() if k != "_meta"}
-    settings["revision"] = core.call("agent.settings.describe")["revision"]
-    core.call("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
-    return {"model": MODEL, "effort": EFFORT, "tool_calls_observed": 0, "no_tool_enforcement": "observed_only; prompt plus existing Core authorization/budgets", "request_count": 1}
+    turn = None
+    original_failure = None
+    try:
+        applied = core.call("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
+        ops.require(applied.get("model") == MODEL and applied.get("reasoning_effort") == EFFORT, "BLOCKED_MINIMAL_PROBE_SETTINGS")
+        before = core.call("desktop.profiles.get")
+        session = core.call("agent.sessions.create", {"title": "G3 isolated subscription verification", "idempotency_key": "auth-probe"})
+        turn = core.call("agent.turns.submit", {"session_id": session["session_id"], "client_message_id": "auth-probe-one",
+                                             "text": "Reply only OK. Do not use tools, read files, or modify desktop state."})
+        end = time.monotonic() + 45
+        while time.monotonic() < end:
+            finished = core.call("agent.turns.get", {"turn_id": turn["turn_id"]})
+            if finished.get("state") in ("succeeded", "failed", "cancelled", "unknown", "partial"):
+                break
+            time.sleep(.25)
+        else:
+            raise ops.Refused("BLOCKED_MINIMAL_PROBE_DEADLINE")
+        trace = core.call("agent.turns.trace", {"turn_id": turn["turn_id"]})
+        events = core.call("agent.sessions.read", {"session_id": session["session_id"], "offset": 0, "limit": 100})
+        probe_guard(finished, trace, events)
+        selection = next(e["data"] for e in events["events"] if e["type"] == "model/selection")
+        ops.require(selection.get("settings_revision") == applied.get("revision"), "BLOCKED_MINIMAL_PROBE_SETTINGS_REVISION")
+        after = core.call("desktop.profiles.get")
+        ops.require(before["revision"]["document_sha256"] == after["revision"]["document_sha256"], "BLOCKED_MINIMAL_PROBE_DESKTOP_CHANGE")
+        return {"model": MODEL, "effort": EFFORT, "tool_calls_observed": 0, "no_tool_enforcement": "observed_only; prompt plus existing Core authorization/budgets", "request_count": 1}
+    except BaseException as error:
+        original_failure = error
+        raise
+    finally:
+        cleanup_failed = False
+        # Only the one synthetic turn; no broad session/global cancellation.
+        if turn:
+            try:
+                current = core.call("agent.turns.get", {"turn_id": turn["turn_id"]})
+                if current.get("state") not in ("succeeded", "failed", "cancelled", "unknown", "partial"):
+                    core.call("agent.turns.cancel", {"turn_id": turn["turn_id"]})
+                    end = time.monotonic() + 5
+                    while time.monotonic() < end:
+                        current = core.call("agent.turns.get", {"turn_id": turn["turn_id"]}, timeout=2)
+                        if current.get("state") in ("succeeded", "failed", "cancelled", "unknown", "partial"):
+                            break
+                        time.sleep(.1)
+                    else:
+                        raise ops.Refused("BLOCKED_MINIMAL_PROBE_CANCEL")
+            except Exception:
+                cleanup_failed = True
+        try:
+            settings = {k: v for k, v in original.items() if k != "_meta"}
+            settings["revision"] = core.call("agent.settings.describe")["revision"]
+            core.call("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
+        except Exception:
+            cleanup_failed = True
+        if cleanup_failed and original_failure is None:
+            raise ops.Refused("BLOCKED_MINIMAL_PROBE_CLEANUP")
 
 
 def device_flow(core, transport, receipt, safe_update):
     """Secret-bearing login values live only in this function's memory."""
     login = None
+    lifecycle = "unknown"
     try:
+        safe_update(auth_lifecycle=lifecycle)
         safe_update(native_runtime=core.ready())
         ops.require(not status_guard(core.call("agent.providers.status", PROVIDER)), "BLOCKED_FRESH_REALM_ALREADY_AUTHENTICATED")
+        safe_update(auth_lifecycle="pending")
         login = core.call("agent.providers.login", PROVIDER)
         ops.require(type(login) is dict and set(login) == {"login_id", "auth_url", "user_code", "expires_at_ms"} and type(login["login_id"]) is str and 0 < len(login["login_id"]) <= 128,
                     "BLOCKED_DEVICE_LOGIN_METHOD")
@@ -296,7 +399,7 @@ def device_flow(core, transport, receipt, safe_update):
         while bridge.now_ms() < login["expires_at_ms"] - 60_000:
             status = core.call("agent.providers.status", PROVIDER)
             if status_guard(status):
-                safe_update(status="login_complete", login_complete=True)
+                safe_update(status="login_complete", login_complete=True, auth_lifecycle="completed")
                 transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "login_complete"})
                 model_guard(status)
                 proof = minimal_probe(core)
@@ -304,16 +407,18 @@ def device_flow(core, transport, receipt, safe_update):
             time.sleep(3)
         raise ops.Refused("BLOCKED_DEVICE_LOGIN_EXPIRED")
     except BaseException as error:
-        if type(login) is dict and type(login.get("login_id")) is str:
-            try:
-                core.call("agent.providers.cancel_login", {**PROVIDER, "login_id": login["login_id"]}, timeout=5)
-            except Exception:
-                pass  # stopping the exact backend/service is also mandatory
+        reason = str(error) if isinstance(error, ops.Refused) and str(error).startswith("BLOCKED_") else "BLOCKED_DEVICE_LOGIN_OR_PROBE"
+        safe_update(reason=reason)
+        try:
+            revoke(core, login)
+            safe_update(auth_lifecycle="revoked")
+        except BaseException:
+            safe_update(auth_lifecycle="unknown", status="needs_human", revocation_error="BLOCKED_AUTH_REVOCATION")
+        # Needed logout/readback happened before stopping the backend.
         try:
             core.call("agent.runtime.stop", timeout=5)
         except Exception:
             pass
-        reason = str(error) if isinstance(error, ops.Refused) and str(error).startswith("BLOCKED_") else "BLOCKED_DEVICE_LOGIN_OR_PROBE"
         raise ops.Refused(reason) from None
 
 
@@ -335,15 +440,27 @@ def supervisor(root, host):
             ops.require(not any((runtime / name).exists() for name in ("relay.sock", "core.sock")), "BLOCKED_AUTH_RUNTIME_IN_USE")
         with NativeCore(root, realm, root.name[1:]) as core:
             state.update(ops.read(root / "auth-state.json"))
-            proof = device_flow(core, transport, receipt, update)
-            realm_guard(realm)
-        ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED")
-        update(status="verified", model_verified=True, native_stopped=True, auth_method="chatgpt_subscription", probe=proof,
+            try:
+                proof = device_flow(core, transport, receipt, update)
+                update(model_verified=True, probe=proof)
+                realm_guard(realm)
+                ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED")
+                transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "verified"})
+            except BaseException:
+                if state.get("auth_lifecycle") != "revoked":
+                    try:
+                        revoke(core)
+                        update(auth_lifecycle="revoked")
+                    except BaseException:
+                        update(auth_lifecycle="unknown", revocation_error="BLOCKED_AUTH_REVOCATION", status="needs_human")
+                raise
+        update(status="verified", native_stopped=True, auth_method="chatgpt_subscription",
                database_sha256=ops.sha(realm / "data/core.db"), evidence_class="native-core-auth-verified")
-        transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "verified"})
     except BaseException as error:
         reason = str(error) if isinstance(error, ops.Refused) and str(error).startswith("BLOCKED_") else "BLOCKED_AUTH_OR_MODEL_VERIFICATION"
-        update(status="blocked", reason=reason)  # retain an actual probe PASS
+        if isinstance(error, CleanupFailed):
+            update(resource_errors=error.errors)
+        update(status="needs_human" if state.get("revocation_error") or state.get("resource_errors") else "blocked", reason=state.get("reason", reason))  # original failure retained
         try:
             transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "blocked"})
         except Exception:
@@ -370,42 +487,86 @@ def start_login(root, host, public_config):
                   "/usr/bin/python3", str(helper), "auth_supervise", "--id", root.name[1:]])
 
 
+def revoke_live_core(root, state):
+    """Attach only to the saved task Core; do not spawn over a live runtime."""
+    saved = state.get("core_witness")
+    current = ops.witness(saved["pid"]) if saved else None
+    if current is None:
+        return False  # a proved-dead Core needs same-realm recovery below
+    ops.require(current["starttime"] == saved["starttime"], "BLOCKED_AUTH_PID_REUSE")
+    ops.require(Path(f"/proc/{saved['pid']}/exe").resolve() == root / "candidate/target/release/ditto-core", "BLOCKED_AUTH_CLEANUP_IDENTITY")
+    built = ops.verify_stage(root)
+    realm = realm_path(root.name[1:])
+    ops.require(state.get("source") == ops.SOURCE and state.get("ops_sha") == built["ops_sha"] and state.get("realm") == str(realm), "BLOCKED_AUTH_BINDING")
+    fields = Path(f"/proc/{saved['pid']}/environ").read_bytes().split(b"\0")
+    ops.require(b"DITTO_DATA_DIR=" + str(realm).encode() in fields, "BLOCKED_AUTH_CLEANUP_IDENTITY")
+    core = NativeCore.__new__(NativeCore)
+    core.root, core.realm, core.identifier = root, realm, root.name[1:]
+    core.argv, core.env, core.runtime = core_contract(root, realm, root.name[1:])
+    revoke(core)  # same path/keyring readiness + logout + status before stop
+    state.update(auth_lifecycle="revoked")
+    ops.write(root / "auth-state.json", state)
+    return True
+
+
 def cleanup(root, host):
     state = ops.read(root / "auth-state.json")
-    errors = []
-    # Certificate disposal cannot be delayed by a stalled native readback.
-    bridge.erase_keys(root / "auth-bridge", "client")
-    (root / "auth-transport.json").unlink(missing_ok=True)
-    try:
-        host.system("stop", "ditto-g3-auth-lease-q" + root.name[1:] + ".timer", check=False)
-    except Exception:
-        errors.append("prepare_deadline_timer")
-    try:
-        stop_scopes(root, root.name[1:])
-        saved = state.get("core_witness")
-        current = ops.witness(saved["pid"]) if saved else None
-        if current:
-            ops.require(current["starttime"] == saved["starttime"], "BLOCKED_AUTH_PID_REUSE")
-            ops.require(Path(f"/proc/{saved['pid']}/exe").resolve() == root / "candidate/target/release/ditto-core", "BLOCKED_AUTH_CLEANUP_IDENTITY")
-            fd = os.pidfd_open(saved["pid"])
+    errors = list(state.get("cleanup_errors", state.get("resource_errors", [])))
+    def attempt(name, fn):
+        try:
+            result = fn()
+            if isinstance(result, list):
+                errors.extend(result)
+            return result
+        except Exception as error:
+            errors.extend(error.errors if isinstance(error, CleanupFailed) else [name])
+    if state.get("auth_lifecycle", "none") not in ("none", "pending", "completed", "unknown", "revoked"):
+        errors.append("auth_lifecycle_unknown")
+    # Keys are disposed even when native cleanup fails; no exception values.
+    attempt("bridge_keys", lambda: bridge.erase_keys(root / "auth-bridge", "client"))
+    attempt("bridge_transport", lambda: (root / "auth-transport.json").unlink(missing_ok=True))
+    attempt("prepare_deadline_timer", lambda: host.system("stop", "ditto-g3-auth-lease-q" + root.name[1:] + ".timer", check=False))
+    if state.get("status") != "verified" and state.get("auth_lifecycle") in ("pending", "completed", "unknown"):
+        attempt("live_auth_revocation", lambda: revoke_live_core(root, state))
+    attempt("scope_stop", lambda: stop_scopes(root, root.name[1:]))
+    attempt("core_stop", lambda: stop_owned_core(root, state.get("core_witness")))
+    attempt("scope_final_readback", lambda: scope_readbacks(root, root.name[1:]))
+    saved = state.get("core_witness")
+    if saved:
+        attempt("core_final_readback", lambda: ops.require(ops.witness(saved["pid"]) is None, "BLOCKED_AUTH_CORE_STILL_RUNNING"))
+    backend = state.get("native_runtime", {}).get("backend_witness")
+    if backend:
+        attempt("backend_final_readback", lambda: ops.require(ops.witness(backend["pid"]) is None, "BLOCKED_AUTH_BACKEND_STILL_RUNNING"))
+    # On abrupt supervisor death pending/possibly completed keyring auth is
+    # not assumed revoked. Reopen ONLY this sole initialized fresh realm,
+    # after exact owned processes/scopes are proved stopped, using same paths.
+    if state.get("status") != "verified" and state.get("auth_lifecycle") in ("pending", "completed", "unknown"):
+        if not errors:
             try:
-                again = ops.witness(saved["pid"])
-                ops.require(again and again["starttime"] == saved["starttime"], "BLOCKED_AUTH_PID_REUSE")
-                signal.pidfd_send_signal(fd, signal.SIGTERM)
-            finally:
-                os.close(fd)
-            end = time.monotonic() + 5
-            while ops.witness(saved["pid"]) is not None and time.monotonic() < end:
-                time.sleep(.1)
-            ops.require(ops.witness(saved["pid"]) is None, "BLOCKED_AUTH_CORE_STILL_RUNNING")
-        backend = state.get("native_runtime", {}).get("backend_witness")
-        if backend:
-            ops.require(ops.witness(backend["pid"]) is None, "BLOCKED_AUTH_BACKEND_STILL_RUNNING")
-        ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED")
-    except Exception:
-        errors.append("native_or_normal_cleanup")
-    if state.get("status") not in ("verified", "blocked"):
+                built = ops.verify_stage(root)
+                ops.require(state.get("source") == ops.SOURCE and state.get("ops_sha") == built["ops_sha"], "BLOCKED_AUTH_BINDING")
+                realm = realm_path(root.name[1:])
+                ops.require(state.get("realm") == str(realm), "BLOCKED_AUTH_BINDING")
+                realm_guard(realm)
+                runtime = ops.RUNTIME / ("ditto-g3-auth-q" + root.name[1:])
+                ops.require(runtime == runtime.resolve(), "BLOCKED_AUTH_RUNTIME_ALIAS")
+                for name in ("relay.sock", "core.sock"):
+                    (runtime / name).unlink(missing_ok=True)
+                with NativeCore(root, realm, root.name[1:]) as core:
+                    core.ready()
+                    revoke(core)
+                    state.update(auth_lifecycle="revoked")
+                state["core_witness"] = ops.read(root / "auth-state.json")["core_witness"]
+            except Exception:
+                errors.append("auth_revocation")
+        else:
+            errors.append("auth_revocation_unproved")
+    if state.get("revocation_error"):
+        errors.append("auth_revocation_failed")  # failures remain sticky
+    attempt("normal_final_readback", lambda: ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED"))
+    if state.get("status") not in ("verified", "blocked", "needs_human"):
         state.update(status="blocked", reason="BLOCKED_AUTH_INTERRUPTED_OR_EXPIRED")
+    errors = list(dict.fromkeys(errors))
     state.update(native_stopped=not errors, cleanup_errors=errors)
     if errors:
         state.update(status="needs_human", model_verified=False)
@@ -428,7 +589,7 @@ def verified_realm(root, host=None):
     ops.require(state["source"] == ops.SOURCE and state["ops_sha"] == built["ops_sha"] and state["qualification_id"] == root.name[1:] and state["realm"] == str(realm)
                 and state["codex_home"] == str(realm / "state/agent/backend/codex"), "BLOCKED_AUTH_BINDING")
     ops.require(state["status"] == "verified" and state["login_complete"] is True and state["model_verified"] is True and state["native_stopped"] is True
-                and not state.get("cleanup_errors") and state.get("auth_method") == "chatgpt_subscription", "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
+                and not state.get("cleanup_errors") and state.get("auth_lifecycle") == "completed" and state.get("auth_method") == "chatgpt_subscription", "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
     proof = state["probe"]
     ops.require(proof["model"] == MODEL and proof["effort"] == EFFORT and proof["tool_calls_observed"] == 0 and proof["request_count"] == 1, "BLOCKED_MINIMAL_PROBE_RECEIPT")
     ops.require(state["database_sha256"] == ops.sha(realm / "data/core.db"), "BLOCKED_AUTH_DATABASE_CHANGED")

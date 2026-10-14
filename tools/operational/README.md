@@ -122,7 +122,7 @@ stdout/stderr null, LimitCORE=0, 1GiB/128-task controller limit) with independen
 1GiB/200%-CPU/256-task limits; actual cgroup, executable, strict keyring config
 and final HOME/CODEX_HOME are checked before login. Task-only scope prefix
 `ditto-g3-auth-q<ID>` keeps it separate from the normal desktop's scopes.
-Managed APIs are `agent.providers.login/status/cancel_login`; they use the pinned
+Managed APIs are `agent.providers.login/status/cancel_login/logout`; they use the pinned
 `chatgptDeviceCode` method, Unix socket transit only, strict keyring storage and
 no auto/file fallback. Direct `codex login` is deliberately avoided because
 [official authentication documentation](https://developers.openai.com/codex/auth)
@@ -135,8 +135,11 @@ process stays alive for bounded **local provider** status polling; no Actions
 status queries/timers are used. Neil opens the official URL and authenticates
 directly to OpenAI, never returning password/token/callback to an agent. Official
 device-code settings may require personal security/workspace-admin enablement.
-On transport failure, signal or expiry, cancel the exact managed login and stop
-its task Core/backend scopes before returning a blocker. No replacement code,
+On transport failure, signal, expiry or failed verification, cancel the exact
+pending login, logout the sole fresh realm and read back unauthenticated before
+stopping its task Core/backend scopes. Completed/unknown login is not revoked
+by cancel:false or process exit. A failed logout/readback remains needs_human
+with the original failure retained. No replacement code,
 artifact/group fallback or login retry is issued for the same ID.
 
 Pinned CodexBackend.status accepts only ChatGPT account type; fixture-model flag
@@ -204,14 +207,20 @@ unmodified real driver once (four bounded turns), with no retries. Only full
 runs real-model and quota probes. Each mode's readback is checked against the
 staged source byte tree. Other modes do not invoke models.
 
-Normal recovery removes the test override **before** normal relogin, retains
+Normal recovery proves the test override absent and daemon reload successful
+**before** normal relogin; both canonical copy and outer recovery gate login. It retains
 the test autologin only until that login is attempted, then restores original
 GDM bytes/permissions and checks normal schema4, installed source/executable,
 relay template and Profile/hash. Private restoration is guarded by live
 candidate executable/store readback and uses canonical APIs. Failure in one
 recovery step does not skip subsequent normal rescue/runner restoration; it
 leaves `needs_human`. Idempotent recovery is shared by finally and ExecStopPost.
-Its result never erases the original failure or unfinished modes. An abrupt
+Its result never erases the original failure or unfinished modes. Removed GDM/
+override files alone cannot prove restoration: active intended seat, live normal
+executable/store, relay, installed source and Profile must agree. If canonical
+restoration removed autologin but normal login is incomplete, bounded authorized
+relogin is attempted only after the removal/reload gate; failure is needs_human.
+No new autologin setting or DB rollback is introduced. An abrupt
 machine power loss/user-manager death is outside this transient unit's recovery
 guarantee; retain task state for human recovery before normal use.
 
@@ -247,3 +256,64 @@ they establish no physical recovery, OS isolation or subscription result.
 The standalone selftest binds loopback only and injects an in-memory TEST ONLY sender; it never invokes Hermes or a provider. Actual counts and logs for this extension are in durable `physical/auth-extension/gates/`. Native Core initialization, account login, model request, LAN bridge and physical recovery remain not_run in the writer session. Parent must review this implementation afresh, run real stage,
 read the native host evidence and preserve recovery failures before claiming
 any G3 requirement completed.
+
+## Consolidated repair 1 — decisions before implementation
+
+Review at 0e6a110bc0f00da8bfa50a7cbe423c71ab2bc36a is FAIL. This is the same
+authorized operations repair, resumed after terminal provider503; no product
+repair or native acceptance is implied. Tests below are TEST ONLY logic evidence.
+
+| Class / state | Required transition / decision | Refusal outcome |
+| --- | --- | --- |
+| Auth pending / completed / unknown | cancel pending, logout possibly established sole fresh realm, read back unauthenticated before stop | original failure plus needs_human if revocation unproved |
+| Owned cleanup | attempt every owned scope, exact Core cleanup, every final readback independently | aggregate all failures; no other PID signals |
+| Agent starting | bounded ready wait before provider/settings consumers | failed/unknown/cancelled/deadline refuses, no retry |
+| Normal NEED / NORMAL / UNKNOWN | executable/store/seat/relay provenance, then prove override gone and reload before login | no unsafe login; GDM/listener/runner cleanup still attempted |
+| Worker alive / gone / reused / unreadable | independent original PID/start witness plus all Workers | reuse/unreadable/other Worker refuses pause |
+| Bootstrap normal / private | pinned present normal helper vs explicit candidate helper, frozen outside _work | no private-to-normal fallback |
+
+| Row | Unchanged-code counterexample (`test_ops_repair1.RepairCounterexamples`) | Sibling surfaces to close |
+| --- | --- | --- |
+| F1 | test_F1_completed_probe_failure_revokes | transport, expiry, method/status failure, final verified forwarding, abrupt cleanup |
+| F2 | test_F2_cleanup_attempts_normal_after_scope_failure | all scopes, NativeCore.stop, pidfd/readbacks/key cleanup |
+| F3 | test_F3_enter_waits_before_provider_status | NativeCore.ready, probe, auth status/logout |
+| F4 | test_F4_remove_failure_forbids_relogin | canonical copy, outer finally, ExecStopPost, cached reload |
+| F5 | test_F5_removed_files_do_not_prove_normal | canonical partial restore, normal seat/provenance, idempotency |
+| F6 | test_F6_reused_nonworker_refuses | controller wait/pause, frozen Listener, dispatch |
+| F7 | test_F7_fresh_normal_helper_exists | preflight/stage failure, detached recovery, private API targeting |
+
+Existing crypto, quotas, templates and source17f remain pinned. If canonical GDM
+restoration removed automatic login and live normal proof fails, bounded normal
+relogin may fail and returns needs_human; no new autologin policy is introduced.
+RED/GREEN logs and final gate counts live under physical/ops-repair1/gates.
+Native initialization/auth/LAN/Home/model/physical remain not_run by this writer.
+
+The normal relay resolver always uses hash-pinned `ops/bootstrap/tests/g1/lib/gui.py`
+and `tools/compositor-probe/g1/wfipc.py`. These unchanged source17f bytes were
+compared with installed d493's ABI and are recorded with source/path/hash in
+preflight. Stage freezes them with ops before detached use; clone/build failure
+cannot remove the baseline API path. Private desktop APIs explicitly use the
+candidate helper after live candidate executable/store proof. Auth uses only
+the fixed task Unix socket. There is no fallback from missing private candidate
+to normal Core.
+
+Every ensure→provider path shares bounded readiness readback. Revocation also
+rechecks readiness because restoring disabled preferences stops Agent in17f.
+Auth cleanup attempts every owned scope and each active/process readback, exact
+Core pidfd cleanup, backend/Core readbacks and normal provenance independently.
+Errors are aggregated and remain sticky. Pending/completed/unknown auth is
+revoked through a still-live identity-bound task Core before resource stop when
+possible. After an abrupt Core death, only a source/ops/path-bound, initialized
+same realm may be reopened for formal logout/status, after owned processes are
+proved stopped. This is recovery, with no login/model/network-delivery retry.
+Unknown lifecycle or failed revocation/cleanup requires human inspection.
+Receiver `verified` forwarding reports model verification; authoritative native
+stopped/normal proof is still the local auth-state receipt after cleanup.
+
+Repair evidence is under durable `physical/ops-repair1/gates`. The seven original
+assertions fail on unchanged0e6a and pass with this implementation. Additional
+transition-table tests exercise the sibling callers. Intermediate failures are
+retained separately (old Listener fixture did not distinguish origin PID; one
+TEST ONLY shell witness had a syntax error); these are not new baseline REDs.
+The prior semantic FAIL and provider503 ledger remain unchanged. Independent
+delta review is required before parent uses any native phase.

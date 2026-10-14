@@ -173,25 +173,68 @@ def adapt_seat(text, candidate, helper, identifier):
     require(changed.count(anchor) == 1, "canonical login changed")
     changed = changed.replace(anchor, f'wait_login "$old"\npython3 "{helper}" enter --id {identifier}\nfoot ')
     changed = changed.replace('    rm -f "$dropin"', f'    local private_restored=0\n    python3 "{helper}" leave --id {identifier} || private_restored=1\n    rm -f "$dropin"', 1)
-    changed = changed.replace('    local restored=$?', '    local restored=$?\n    [[ "$private_restored" == 0 ]] || restored=1', 1)
+    restore_block = '    rm -f "$dropin"\n    systemctl --user daemon-reload\n    old="${XDG_SESSION_ID:-}"\n    sudo -n /usr/local/libexec/ditto-relogin\n    wait_login "$old"\n    local restored=$?'
+    guarded = '    local restored=1\n    if rm -f "$dropin" && [[ ! -e "$dropin" && ! -L "$dropin" ]] && systemctl --user daemon-reload; then\n        old="${XDG_SESSION_ID:-}"\n        if sudo -n /usr/local/libexec/ditto-relogin && wait_login "$old"; then restored=0; fi\n    fi\n    [[ "$private_restored" == 0 ]] || restored=1'
+    require(changed.count(restore_block) == 1, "canonical recovery block changed")
+    changed = changed.replace(restore_block, guarded, 1)
     return changed
 
 
 def witness(pid, proc=Path("/proc")):
+    p = proc / str(pid)
     try:
-        p = proc / str(pid)
-        start = p.joinpath("stat").read_text().rsplit(")", 1)[1].split()[19]
-        cmd = p.joinpath("cmdline").read_bytes().split(b"\0")
-        return {"pid": int(pid), "starttime": start, "worker": any(x.endswith(b"/bin/Runner.Worker") for x in cmd) and b"spawnclient" in cmd}
+        raw = p.joinpath("stat").read_text()
     except (FileNotFoundError, ProcessLookupError):
+        require(not p.exists(), "PID witness partially unreadable")
         return None
+    start = raw.rsplit(")", 1)[1].split()[19]
+    try:
+        cmd = p.joinpath("cmdline").read_bytes().split(b"\0")
+    except (FileNotFoundError, ProcessLookupError):
+        require(not p.exists(), "PID command witness unreadable")
+        return None
+    return {"pid": int(pid), "starttime": start, "worker": any(x.endswith(b"/bin/Runner.Worker") for x in cmd) and b"spawnclient" in cmd}
 
 
 def worker_gate(origin, workers):
-    """PID reuse is a refusal, never permission to kill or pause."""
-    for current in workers:
-        require(current["pid"] == origin["pid"] and current["starttime"] == origin["starttime"], "other active Runner.Worker or PID reuse")
-    return not workers
+    """Read original identity independently of its current executable/name."""
+    try:
+        current = witness(origin["pid"])
+    except (OSError, ValueError, IndexError):
+        raise Refused("origin PID witness unreadable") from None
+    if current:
+        require(current["starttime"] == origin["starttime"], "origin PID reuse")
+    for worker in workers:
+        require(worker["pid"] == origin["pid"] and worker["starttime"] == origin["starttime"], "other active Runner.Worker or PID reuse")
+    return current is None and not workers
+
+
+def wait_ready(call, timeout=30):
+    """Bounded local runtime readback; relay exposes no readiness event."""
+    end = time.monotonic() + timeout
+    call("agent.runtime.ensure")
+    while time.monotonic() < end:
+        runtime = call("agent.runtime.get")
+        phase = runtime.get("phase")
+        if phase == "ready":
+            return runtime
+        require(phase in ("starting",), "Agent failed/cancelled/unknown before ready")
+        time.sleep(.2)
+    raise Refused("Agent readiness deadline")
+
+
+BOOTSTRAP_HASHES = {
+    "tests/g1/lib/gui.py": "7b3e76242fe188958aef87494bf5a4ee39d47a197b3196a9e5d79e4b29126a4f",
+    "tools/compositor-probe/g1/wfipc.py": "90f18b9546b2cb54dce1d339195dd5d6c3179cc520f64edb0523c02ffb117376",
+}
+
+def normal_helper():
+    # Exact unchanged17f helper and its import frozen with ops; available
+    # before candidate exists and after Actions clears its checkout.
+    base = HERE / "bootstrap"
+    for name, expected in BOOTSTRAP_HASHES.items():
+        require(sha(base / name) == expected, "normal bootstrap helper changed")
+    return base / "tests/g1/lib/gui.py"
 
 
 class Host:
@@ -218,20 +261,31 @@ class Host:
     def system(self, *args, check=True):
         return self.command(["systemctl", "--user", *args], check=check).stdout.strip()
 
-    def relay(self, method, params=None):
-        candidate = self.root / "candidate"
+    def relay(self, method, params=None, *, private=False):
+        helper = self.root / "candidate/tests/g1/lib/gui.py" if private else normal_helper()
+        if private:
+            require(sha(helper) == BOOTSTRAP_HASHES["tests/g1/lib/gui.py"], "private relay helper changed")
         budget = min(15, getattr(self, "private_recovery_deadline", time.monotonic() + 15) - time.monotonic())
         require(budget > 0, "private recovery API budget exhausted")
-        result = self.command(["python3", str(candidate / "tests/g1/lib/gui.py"), "relay", method, json.dumps(params or {})], timeout=budget)
+        result = self.command(["python3", str(helper), "relay", method, json.dumps(params or {})], timeout=budget)
         reply = json.loads(result.stdout)
         require("error" not in reply, "relay refused " + method)
         return reply["result"]
+
+    def private_relay(self, method, params=None):
+        state = read(self.root / "state.json")
+        self.private_live(state)
+        return self.relay(method, params, private=True)
 
     def profile(self):
         p = self.relay("desktop.profiles.get")
         return {"profile_id": p["profile"]["profile_id"], "sha256": p["revision"]["document_sha256"]}
 
     def normal(self):
+        session = next((x[15:] for x in self.system("show-environment").splitlines() if x.startswith("XDG_SESSION_ID=")), "")
+        require(session, "normal active session missing")
+        props = self.command(["loginctl", "show-session", session, "-p", "User", "-p", "Active", "-p", "Type", "-p", "Seat"]).stdout.splitlines()
+        require(all(x in props for x in ("User=1000", "Active=yes", "Type=wayland", "Seat=seat0")), "normal intended seat unavailable")
         pid = int(self.system("show", "ditto-core.service", "-p", "MainPID", "--value"))
         exe = Path(f"/proc/{pid}/exe").resolve(strict=True)
         require(exe == INSTALLED / "target/release/ditto-core", "normal executable mismatch")
@@ -359,26 +413,26 @@ class Host:
         # Never apply private snapshots to the normal desktop after the
         # canonical finally has already removed the temporary drop-in.
         self.private_live(state)
-        self.relay("agent.runtime.stop")
-        current = self.relay("desktop.profiles.get")
+        self.private_relay("agent.runtime.stop")
+        current = self.private_relay("desktop.profiles.get")
         target = before["profile"]
-        self.relay("desktop.changes.propose", {"base_revision": current["profile"]["head_revision"],
+        self.private_relay("desktop.changes.propose", {"base_revision": current["profile"]["head_revision"],
                    "ops": [{"op": "switch_profile", "to_profile": target["profile"]["profile_id"], "to_revision": target["profile"]["head_revision"]}],
                    "idempotency_key": "ops-private-restore-" + self.root.name + "-" + state["mode"]})
         settings = dict(before["preferences"])
         settings.pop("_meta", None)
-        settings["revision"] = self.relay("agent.settings.describe")["revision"]
-        self.relay("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
-        grants = self.relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]
+        settings["revision"] = self.private_relay("agent.settings.describe")["revision"]
+        self.private_relay("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
+        grants = self.private_relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]
         original = set(before["grant_ids"])
         for grant in grants:
             if grant["grant_id"] not in original and not grant.get("revoked_at"):
-                self.relay("desktop.permissions.revoke", {"grant_id": grant["grant_id"]})
-        after = self.relay("desktop.profiles.get")
+                self.private_relay("desktop.permissions.revoke", {"grant_id": grant["grant_id"]})
+        after = self.private_relay("desktop.profiles.get")
         require(after["profile"]["profile_id"] == target["profile"]["profile_id"] and after["revision"]["document_sha256"] == target["revision"]["document_sha256"], "private profile restore mismatch")
         normalize = lambda p: {k: v for k, v in p.items() if k not in ("revision", "_meta")}
-        require(normalize(self.relay("agent.settings.describe")) == normalize(before["preferences"]), "private settings restore mismatch")
-        after_grants = self.relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]
+        require(normalize(self.private_relay("agent.settings.describe")) == normalize(before["preferences"]), "private settings restore mismatch")
+        after_grants = self.private_relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]
         require(all(g["grant_id"] in original or g.get("revoked_at") for g in after_grants), "private test grants remain")
         write(receipt, {"status": "verified", "source": SOURCE})
 
@@ -389,12 +443,26 @@ class Host:
         fields = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
         require(b"DITTO_DATA_DIR=" + state["store"].encode() in fields, "private runtime store mismatch")
 
+    def normal_state(self):
+        if DROPIN.exists():
+            return "NEED"
+        try:
+            self.normal()  # executable, store, seat, source, relay and Profile
+            return "NORMAL"
+        except Refused:
+            return "NEED"
+        except (OSError, ValueError):
+            return "UNKNOWN"
+
     def needs_relogin(self):
-        return DROPIN.exists() or sha(GDM) != sha(self.root / "gdm-original.conf")
+        return self.normal_state() != "NORMAL"
 
     def remove_override(self):
         DROPIN.unlink(missing_ok=True)
+        require(not DROPIN.exists() and not DROPIN.is_symlink(), "runtime override remains")
         self.system("daemon-reload")
+        require(not DROPIN.exists() and not DROPIN.is_symlink(), "runtime override reappeared")
+        return True
 
     def restore_gdm(self):
         self.command(["sudo", "-n", "cp", "-p", str(self.root / "gdm-original.conf"), str(GDM)])
@@ -422,11 +490,12 @@ def recover(root, host):
 
         def attempt(name, fn):
             try:
-                fn()
+                return fn()
             except Exception as error:
                 errors.append(name)  # no private exception values exported
                 diagnostics.append({"step": name, "type": type(error).__name__,
                                     "reason": str(error) if isinstance(error, Refused) else type(error).__name__})
+                return False
 
         if state.get("disruption_armed"):
             relogin = True
@@ -437,8 +506,8 @@ def recover(root, host):
             if state.get("mode"):
                 attempt("private_api_restore", lambda: host.restore_private(state))
             # This ordering also holds after SIGKILL / service deadline.
-            attempt("remove_runtime_override", host.remove_override)
-            if relogin:
+            override_safe = attempt("remove_runtime_override", host.remove_override) is True
+            if relogin and override_safe:
                 attempt("normal_relogin", host.relogin)
             # Keep test autologin until normal runtime is back, then remove
             # autologin even if login/readback failed (canonical order).
@@ -476,7 +545,7 @@ def preflight(root, host):
     if (root / "auth-state.json").exists():
         from g3_auth import public_status
         selected = public_status(root)["status"]
-    report = {"source": SOURCE, "normal": normal, "seat0": True, "private_store_status": selected,
+    report = {"source": SOURCE, "normal": normal, "normal_helper": {"source": SOURCE, "abi_installed_source": "d49387f94cea3f37207224463895be1b4e95d8ec", "path": str(normal_helper()), "sha256": sha(normal_helper())}, "seat0": True, "private_store_status": selected,
               "github_cli_authenticated": gh, "codex_sha256": CODEX_SHA, "provider_called": False, "disruption_started": False}
     write(root / "preflight.json", report)
     return report
@@ -603,13 +672,14 @@ def enter(root, host):
     state = read(root / "state.json")
     mode = state["mode"]
     host.private_live(state)
-    directory = root / "evidence" / mode
-    write(directory / "private-before.json", {"profile": host.relay("desktop.profiles.get"), "preferences": host.relay("agent.settings.describe"),
-          "grant_ids": [g["grant_id"] for g in host.relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]]})
     if mode == "full":
-        host.relay("agent.runtime.ensure")
-        require(host.relay("agent.providers.status", {"provider": "codex-app-server"}).get("authenticated") is True, "BLOCKED_EXISTING_SUBSCRIPTION_AUTH: no model call")
-        host.relay("agent.runtime.stop")
+        wait_ready(host.private_relay)
+    directory = root / "evidence" / mode
+    write(directory / "private-before.json", {"profile": host.private_relay("desktop.profiles.get"), "preferences": host.private_relay("agent.settings.describe"),
+          "grant_ids": [g["grant_id"] for g in host.private_relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]]})
+    if mode == "full":
+        require(host.private_relay("agent.providers.status", {"provider": "codex-app-server"}).get("authenticated") is True, "BLOCKED_EXISTING_SUBSCRIPTION_AUTH: no model call")
+        host.private_relay("agent.runtime.stop")
 
 
 def override(root):
