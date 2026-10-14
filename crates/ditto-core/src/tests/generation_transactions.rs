@@ -403,3 +403,229 @@ fn generated_write_rechecks_a_previously_authorized_but_revoked_grant() {
         .unwrap()
         .is_empty());
 }
+
+#[test]
+fn irreversible_middle_and_stale_sibling_snapshot_refuse_without_changing_state() {
+    for stale_sibling in [false, true] {
+        let h = harness("generated-middle-lineage-refusal");
+        let state = Arc::new(Mutex::new(ShellState::default()));
+        let _shell = fake_shell(&h.core, Arc::clone(&state));
+        let cli = TestPeer::connect(&h.core, "dittoctl", None);
+        wait_for_boot_sync(&state);
+        let mut initial = data(1, "x", None);
+        initial.fields.insert("y".into(), DataType::Text);
+        let a = publish(&h.core, &cli, "1.0.0", None, initial);
+        assert_eq!(activate(&cli, &a, "initial").state, ChangeState::Committed);
+        write_note(&cli, &a, "x", "original x");
+        if stale_sibling {
+            let b = publish(
+                &h.core,
+                &cli,
+                "2.0.0",
+                Some(&a),
+                data(2, "y", Some((1, "x", RollbackPolicy::Snapshot))),
+            );
+            assert_eq!(
+                activate(&cli, &b, "old-branch").state,
+                ChangeState::Committed
+            );
+            assert_eq!(
+                activate(&cli, &a, "old-branch-back").state,
+                ChangeState::Committed
+            );
+            write_note(&cli, &a, "x", "later data must remain");
+        }
+        let b = publish(
+            &h.core,
+            &cli,
+            "2.1.0",
+            Some(&a),
+            data(2, "y", Some((1, "x", RollbackPolicy::Unavailable))),
+        );
+        assert_eq!(
+            activate(&cli, &b, "irreversible-middle").state,
+            ChangeState::Committed
+        );
+        let c = publish(
+            &h.core,
+            &cli,
+            "3.0.0",
+            Some(&b),
+            DataPlan {
+                schema_version: 3,
+                fields: b.description.data.fields.clone(),
+                migration: Some(DataMigration {
+                    from_version: 2,
+                    rename: Default::default(),
+                    defaults: Default::default(),
+                    remove: vec![],
+                    rollback: if stale_sibling {
+                        RollbackPolicy::Snapshot
+                    } else {
+                        RollbackPolicy::Compatible
+                    },
+                }),
+            },
+        );
+        assert_eq!(activate(&cli, &c, "last-hop").state, ChangeState::Committed);
+        let before = head(&cli);
+        let read_data = || {
+            let mut value = cli.result(
+                catalog::DEVELOPMENT_DATA_GET,
+                json!({"artifact_id":c.artifact_id}),
+            );
+            value.as_object_mut().unwrap().remove("_meta");
+            value
+        };
+        let before_data = read_data();
+        let before_artifact = artifact(cli.result(
+            catalog::DEVELOPMENT_GET,
+            json!({"artifact_id":c.artifact_id}),
+        ));
+        let result = cli.call(
+            catalog::DEVELOPMENT_ACTIVATE,
+            json!({"artifact_id":a.artifact_id,"base_revision":before,"idempotency_key":"refused"}),
+        );
+        assert_eq!(result["error"]["name"], "preflight_rejected", "{result}");
+        assert_eq!(head(&cli), before);
+        assert_eq!(read_data(), before_data);
+        assert_eq!(
+            before_data["payload"],
+            json!({"y":if stale_sibling { "later data must remain" } else { "original x" }})
+        );
+        assert_eq!(
+            artifact(cli.result(
+                catalog::DEVELOPMENT_GET,
+                json!({"artifact_id":c.artifact_id})
+            )),
+            before_artifact
+        );
+        assert_eq!(
+            cli.call(
+                catalog::DEVELOPMENT_DATA_GET,
+                json!({"artifact_id":a.artifact_id})
+            )["error"]["name"],
+            "conflict"
+        );
+        assert!(state
+            .lock()
+            .unwrap()
+            .committed
+            .as_ref()
+            .unwrap()
+            .slots
+            .iter()
+            .any(|slot| slot.config["artifact_id"] == c.artifact_id));
+    }
+}
+
+#[test]
+fn generated_projection_omits_non_intact_or_unapproved_packages() {
+    let h = harness("generated-projection-integrity");
+    // Pure projection fixture: no RPC or native execution is needed.
+    let a = h
+        .core
+        .coordinate(Duration::from_secs(5), |c| {
+            c.store().write(|tx| {
+                let description = Description::parse(include_bytes!(
+                    "../../../ditto-generation/examples/tasks-summary.json"
+                ))
+                .unwrap();
+                let mut a = ditto_store::generated::create(
+                    tx,
+                    &GenerateInput {
+                        description,
+                        request_summary: "projection fixture".into(),
+                        parent_id: None,
+                        idempotency_key: "projection".into(),
+                    },
+                    GenerationOrigin {
+                        request_summary: "projection fixture".into(),
+                        turn_id: None,
+                        model: None,
+                    },
+                )?;
+                let vector: Value = serde_json::from_str(include_str!(
+                    "../../../../tests/contract-vectors/0.3/shape-generation-validation-full.json"
+                ))
+                .unwrap();
+                let mut report: GenerationValidation =
+                    serde_json::from_value(vector["value"].clone()).unwrap();
+                report.bundle_sha256 = a.bundle_sha256.clone();
+                a.validation = Some(report);
+                a.state = ArtifactState::Published;
+                ditto_store::generated::save(tx, &a)?;
+                ditto_store::packages::insert(
+                    tx,
+                    &ditto_store::packages::Unpacked {
+                        sha256: a.bundle_sha256.trim_start_matches("sha256:").into(),
+                        tree_sha256: "fixture".into(),
+                        manifest: a.manifest.clone(),
+                        directory: std::path::PathBuf::from("/fixture"),
+                        already_present: false,
+                    },
+                    "generated",
+                    None,
+                )?;
+                Ok(a)
+            })
+        })
+        .unwrap()
+        .unwrap();
+    let paths = &h.core.paths;
+    let mut document = h
+        .core
+        .read(|c| {
+            let profile = ditto_store::profiles::active_profile(c)?.unwrap();
+            Ok(ditto_store::profiles::head_document(c, &profile)?.2)
+        })
+        .unwrap();
+    document.entries.push(ditto_protocol::profile::EntrySpec {
+        entry_id: "ent-generated".into(),
+        package: a.description.plugin_id.clone(),
+        version: a.description.version.clone(),
+        host: ditto_protocol::profile::HostKind::Qml,
+        config: json!({}),
+        disabled: false,
+        area: Some("ui.generated_panel".into()),
+    });
+    let mut rows = h.core.read(ditto_store::packages::list).unwrap();
+    let index = rows.iter().position(|r| r.generated.is_some()).unwrap();
+    for condition in ["intact", "tampered", "unapproved", "missing"] {
+        rows[index].generated = Some(a.clone());
+        match condition {
+            "tampered" => rows[index]
+                .generated
+                .as_mut()
+                .unwrap()
+                .source_files
+                .insert("changed.qml".into(), "changed".into()),
+            "unapproved" => {
+                rows[index].generated.as_mut().unwrap().state = ArtifactState::Candidate;
+                None
+            }
+            "missing" => {
+                rows[index].generated = None;
+                None
+            }
+            _ => None,
+        };
+        let packages = crate::projection::PackageSet::new(rows.clone());
+        let projected = crate::projection::shell(
+            &document,
+            &crate::projection::Resolver {
+                packages: &packages,
+                paths,
+                grants: &[],
+            },
+        );
+        let rendered = projected
+            .slots
+            .iter()
+            .find(|s| s.entry_id == "ent-generated");
+        assert_eq!(rendered.is_some(), condition == "intact");
+        if let Some(binding) = rendered {
+            assert_eq!(binding.qml_url, "ditto-generated:fixed");
+        }
+    }
+}

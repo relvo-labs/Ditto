@@ -100,12 +100,15 @@ pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjec
         let manifest = resolver.packages.manifest(entry)?;
         let directory = resolver.package_dir(entry)?;
         let qml_entry = manifest.qml_entry.as_ref()?;
-        let generated = resolver
-            .packages
-            .get(&entry.package, &entry.version)?
-            .generated
-            .as_ref()
-            .filter(|a| ditto_store::generated::approved(a));
+        let row = resolver.packages.get(&entry.package, &entry.version)?;
+        let generated = row.generated.as_ref();
+        if row.summary.source == "generated"
+            && !generated.is_some_and(|a| {
+                ditto_store::generated::approved(a) && ditto_store::generated::integrity(a)
+            })
+        {
+            return None;
+        }
         Some(ShellSlotBinding {
             slot: slot.into(),
             entry_id: entry.entry_id.clone(),

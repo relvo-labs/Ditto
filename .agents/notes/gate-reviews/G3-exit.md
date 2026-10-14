@@ -96,3 +96,15 @@ AT-26：兩個生成工作、第三個排隊、排隊取消、雙預覽鍵盤取
 4. 來源刪除是權威紀錄的邏輯遮蔽；備份、已匯出內容與磁碟抹除不由此保證。資料與描述不可放憑證，沿用秘密引用及同一授權路徑。
 5. G4 納入新 Qt6Test 執行期依賴、Qt 版本／來源／授權文本與重新連結義務；專案目前 UNLICENSED，Codex 再散布、名稱／角色素材與所有 shipping 權利仍待完整審查。
 6. 實體參考座位 AT-06／07／22／26／29 證據已補齊，下一步為 owner 審查 AT-18、D-17 與五出口。G4 承接安裝／發行、桌面基本面、中文／雙螢幕、nightly、資源／幀時及 D-38／D-46 未完項。64 人週仍是未核定規劃，不把 Agent 執行時間換算人週，也不在缺少參考機數據時承諾新的工期。
+
+## 獨立審查與修正（2026-10-14）
+
+Claude Opus 5.5 High 對 `d49387f94cea3f37207224463895be1b4e95d8ec` 的唯讀審查結論為 **FAIL**：Class A（AT-22／#21）多跳回退未檢查中間不可逆政策及快照實際分支；Class B（GEN-08／#26）預建候選可繞過只在 create 檢查的回合停止。既有實體與開發證據未覆蓋這兩個反例，不能據此宣告阻擋項已通過。
+
+本次以既有快照表保存實際資料鏈，逐跳核對回退政策、artifact 端點與 schema；不可證明時預檢拒絕。回退提交移除退出鏈結，相容保留目前值，快照依原政策回復該跳升版前資料。新增九格政策、過期兄弟快照、兩跳快照及損壞／缺失鏈結回歸。create／validate 共用序列化回合預算，入列／validating 先占額度，初始生成加三輪修復；新增預建候選與停止後拒絕入列、預覽與新回合回歸。Shell 投影另拒絕非完整或未核可 generated 套件，無 `file://` 退路，新增純投影測試。
+
+本 runner 離線 fmt、workspace clippy 通過；生成 Store 9、Core generation 單元 4、純投影 1 項通過。指定 `cargo test --locked --workspace` 17 通過、2 失敗，停在 sandbox 限制的 confine socket／D-Bus 測試；補跑 `--no-fail-fast` 214 通過、52 失敗（4 targets），包含 Core RPC handshake `Operation not permitted`、supervisor socket 與 notifications D-Bus 環境失敗。既有兩次修改回第一版測試未改，與新 Core 多跳拒絕測試同遭 RPC 環境阻擋。命令／log／範圍詳見 [完成盤點](../../../plan/05/07-completion-audit.md#獨立審查與修正2026-10-14)。
+
+**Writer 結束時 BLOCKED：完整 workspace gate 與依 gates 通過條件的本地提交。** 修正尚在工作樹，提交後的新 HEAD 仍須 fresh delta review；本節不裁定 Ready 或 owner 出口。救援與資料政策語意、其他非阻擋追蹤項未改，未重跑 VM／實體座位／Node／Qt，未改 wire／TS／QML／證據 JSON。
+
+後續 coordinator 套用本段 patch 並解除執行環境阻擋：同一修正內容在本機重跑 fmt、workspace clippy（0 warning）及 `cargo test --locked --workspace --no-fail-fast`，**266 通過、0 失敗**；新 Core 拒絕旅程與原兩次修改回第一版皆通過。Node 22.23.2／pnpm 10.11.0 的 workspace build／typecheck 通過，**184 測試通過、2 個既有 skip**。runner 原失敗與 Node 缺 Core 二進位的前置失敗保留，詳見完成盤點；不冒充本機 Qt／VM／實體重驗，修正 head 仍待 fresh delta review。救援語意由 [#41](https://github.com/relvo-labs/Ditto/issues/41) 追蹤。

@@ -47,6 +47,25 @@ pub fn save(c: &Connection, a: &GeneratedArtifact) -> StoreResult<()> {
     )?;
     Ok(())
 }
+/// Initial validation plus at most three repairs. Validating includes queued
+/// jobs: admission and the state reservation must share the writer transaction.
+pub fn check_turn_budget(c: &Connection, origin: &GenerationOrigin) -> StoreResult<()> {
+    if let Some(turn) = &origin.turn_id {
+        let reservations:i64=c.query_row("SELECT count(*) FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only','validating')",[turn],|r|r.get(0))?;
+        let repeated:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only') GROUP BY json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') HAVING count(*)>=2 AND json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') IS NOT NULL)",[turn],|r|r.get(0))?;
+        let stopped: bool = c.query_row(
+            "SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.repair.stopped')=1)",
+            [turn],
+            |r| r.get(0),
+        )?;
+        if reservations >= 4 || repeated || stopped {
+            return Err(StoreError::Conflict(
+                "this turn's generation repair budget is exhausted".into(),
+            ));
+        }
+    }
+    Ok(())
+}
 pub fn create(
     c: &Connection,
     input: &GenerateInput,
@@ -77,20 +96,7 @@ pub fn create(
     }
     let (manifest, source_files, dependencies, bundle_sha256) =
         bundle(&input.description).map_err(StoreError::Invalid)?;
-    if let Some(turn) = &origin.turn_id {
-        let failures:i64=c.query_row("SELECT count(*) FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only')",[turn],|r|r.get(0))?;
-        let repeated:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only') GROUP BY json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') HAVING count(*)>=2 AND json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') IS NOT NULL)",[turn],|r|r.get(0))?;
-        let stopped: bool = c.query_row(
-            "SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.repair.stopped')=1)",
-            [turn],
-            |r| r.get(0),
-        )?;
-        if failures >= 4 || repeated || stopped {
-            return Err(StoreError::Conflict(
-                "this turn's generation repair budget is exhausted".into(),
-            ));
-        }
-    }
+    check_turn_budget(c, &origin)?;
     let parent = input.parent_id.as_ref().map(|id| get(c, id)).transpose()?;
     let mut repair = RepairBudget::default();
     let mut changed_fields = Vec::new();
@@ -389,22 +395,45 @@ fn version(s: &str) -> Vec<u32> {
     s.split('.').filter_map(|v| v.parse().ok()).collect()
 }
 
-type DataTransition = (Value, Option<(String, u32, Value)>);
+struct DataTransition {
+    payload: Value,
+    // Every actual ownership hop is recorded, including compatible/unavailable
+    // migrations. Artifact parents alone do not identify the active data lineage.
+    snapshot: Option<(String, u32, Value)>,
+    retired_edges: Vec<i64>,
+}
 fn transition(c: &Connection, a: &GeneratedArtifact) -> StoreResult<DataTransition> {
     let row:Option<(String,u32,String)>=c.query_row("SELECT artifact_id,schema_version,payload_json FROM generated_plugin_data WHERE plugin_id=?1",[&a.description.plugin_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
     let Some((old_id, old_version, text)) = row else {
-        return Ok((json!({}), None));
+        return Ok(DataTransition {
+            payload: json!({}),
+            snapshot: None,
+            retired_edges: vec![],
+        });
     };
+    let owner = get(c, &old_id)?;
+    if owner.description.plugin_id != a.description.plugin_id
+        || owner.description.data.schema_version != old_version
+    {
+        return Err(StoreError::Conflict(
+            "rollback data snapshot unavailable".into(),
+        ));
+    }
     let old_payload: Value = serde_json::from_str(&text)?;
     if old_id == a.artifact_id {
         a.description
             .data
             .validate_payload(&old_payload)
             .map_err(StoreError::Invalid)?;
-        return Ok((old_payload, None));
+        return Ok(DataTransition {
+            payload: old_payload,
+            snapshot: None,
+            retired_edges: vec![],
+        });
     }
     let mut payload = old_payload.clone();
     let mut snapshot = None;
+    let mut retired_edges = Vec::new();
     if old_version < a.description.data.schema_version {
         let m = a
             .description
@@ -432,38 +461,88 @@ fn transition(c: &Connection, a: &GeneratedArtifact) -> StoreResult<DataTransiti
         for (k, v) in &m.defaults {
             object.entry(k).or_insert(v.clone());
         }
-        if m.rollback == RollbackPolicy::Snapshot {
-            snapshot = Some((old_id, old_version, old_payload));
-        }
+        snapshot = Some((old_id.clone(), old_version, old_payload.clone()));
     } else if old_version > a.description.data.schema_version {
-        let old = get(c, &old_id)?;
-        match old
-            .description
-            .data
-            .migration
-            .as_ref()
-            .map(|m| m.rollback)
-            .unwrap_or(RollbackPolicy::Unavailable)
-        {
-            RollbackPolicy::Unavailable => {
-                return Err(StoreError::Conflict(
-                    "data migration is irreversible; old version cannot read new data".into(),
-                ))
+        let irreversible = || {
+            StoreError::Conflict(
+                "data migration is irreversible; old version cannot read new data".into(),
+            )
+        };
+        let unavailable = || StoreError::Conflict("rollback data snapshot unavailable".into());
+        let mut owner = owner;
+        let mut before_rowid = i64::MAX;
+        while owner.artifact_id != a.artifact_id {
+            let schema = owner.description.data.schema_version;
+            if schema < a.description.data.schema_version {
+                return Err(irreversible());
             }
-            RollbackPolicy::Compatible => {}
-            RollbackPolicy::Snapshot => {
-                let text:Option<String>=c.query_row("SELECT payload_json FROM generated_data_snapshots WHERE plugin_id=?1 AND from_artifact_id=?2 AND schema_version=?3 ORDER BY rowid DESC LIMIT 1",params![a.description.plugin_id,a.artifact_id,a.description.data.schema_version],|r|r.get(0)).optional()?;
-                payload = serde_json::from_str(&text.ok_or_else(|| {
-                    StoreError::Conflict("rollback data snapshot unavailable".into())
-                })?)?;
+            let edge: Option<(i64, String, u32, String)> = c.query_row(
+                "SELECT rowid,from_artifact_id,schema_version,payload_json FROM generated_data_snapshots WHERE plugin_id=?1 AND to_artifact_id=?2 AND rowid<?3 ORDER BY rowid DESC LIMIT 1",
+                params![a.description.plugin_id, owner.artifact_id, before_rowid],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            ).optional()?;
+            let (rowid, from, from_schema, saved) = edge.ok_or_else(unavailable)?;
+            let previous = get(c, &from)?;
+            if previous.description.plugin_id != a.description.plugin_id
+                || previous.description.data.schema_version != from_schema
+                || from_schema > schema
+            {
+                return Err(unavailable());
             }
+            if from_schema == schema {
+                if previous.description.data.fields != owner.description.data.fields {
+                    return Err(irreversible());
+                }
+            } else {
+                let migration = owner
+                    .description
+                    .data
+                    .migration
+                    .as_ref()
+                    .filter(|m| m.from_version == from_schema)
+                    .ok_or_else(irreversible)?;
+                match migration.rollback {
+                    RollbackPolicy::Unavailable => return Err(irreversible()),
+                    RollbackPolicy::Compatible => {
+                        if !migration.rename.is_empty() || !migration.remove.is_empty() {
+                            return Err(irreversible());
+                        }
+                    }
+                    // Snapshot policy explicitly returns to the data that this
+                    // exact hop replaced, as in the accepted two-upgrade journey.
+                    RollbackPolicy::Snapshot => {
+                        payload = serde_json::from_str(&saved).map_err(|_| unavailable())?;
+                    }
+                }
+            }
+            previous
+                .description
+                .data
+                .validate_payload(&payload)
+                .map_err(|_| unavailable())?;
+            retired_edges.push(rowid);
+            before_rowid = rowid;
+            owner = previous;
         }
+    } else {
+        // Same-schema UI modifications still change the data owner. Retain that
+        // actual edge so a later downgrade cannot jump to a sibling's history.
+        if owner.description.data.fields != a.description.data.fields {
+            return Err(StoreError::Conflict(
+                "data schema differs at the same version".into(),
+            ));
+        }
+        snapshot = Some((old_id, old_version, old_payload));
     }
     a.description
         .data
         .validate_payload(&payload)
         .map_err(StoreError::Invalid)?;
-    Ok((payload, snapshot))
+    Ok(DataTransition {
+        payload,
+        snapshot,
+        retired_edges,
+    })
 }
 pub fn check_document(c: &Connection, document: &ProfileDocument) -> StoreResult<()> {
     let mut plugins = BTreeSet::new();
@@ -493,8 +572,14 @@ pub fn apply_document(
     check_document(c, document)?;
     for entry in document.entries.iter().filter(|e| !e.disabled) {
         if let Some(mut a) = by_package(c, &entry.package, &entry.version)? {
-            let (payload, snapshot) = transition(c, &a)?;
-            if let Some((from, version, old)) = snapshot {
+            let transition = transition(c, &a)?;
+            for rowid in transition.retired_edges {
+                c.execute(
+                    "DELETE FROM generated_data_snapshots WHERE rowid=?1",
+                    [rowid],
+                )?;
+            }
+            if let Some((from, version, old)) = transition.snapshot {
                 c.execute(
                     "INSERT INTO generated_data_snapshots VALUES(?1,?2,?3,?4,?5,?6,?7)",
                     params![
@@ -508,7 +593,7 @@ pub fn apply_document(
                     ],
                 )?;
             }
-            c.execute("INSERT INTO generated_plugin_data VALUES(?1,?2,?3,1,?4) ON CONFLICT(plugin_id) DO UPDATE SET artifact_id=excluded.artifact_id,schema_version=excluded.schema_version,revision=revision+1,payload_json=excluded.payload_json WHERE artifact_id!=excluded.artifact_id",params![a.description.plugin_id,a.artifact_id,a.description.data.schema_version,serde_json::to_string(&payload)?])?;
+            c.execute("INSERT INTO generated_plugin_data VALUES(?1,?2,?3,1,?4) ON CONFLICT(plugin_id) DO UPDATE SET artifact_id=excluded.artifact_id,schema_version=excluded.schema_version,revision=revision+1,payload_json=excluded.payload_json WHERE artifact_id!=excluded.artifact_id",params![a.description.plugin_id,a.artifact_id,a.description.data.schema_version,serde_json::to_string(&transition.payload)?])?;
             data_get(c, &a)?;
             a.state = ArtifactState::Active;
             save(c, &a)?;
@@ -861,6 +946,270 @@ mod tests {
         input.description.version = "1.9.0".into();
         assert!(create(c, &input, b.origin.clone()).is_err());
     }
+    #[test]
+    fn rollback_checks_every_actual_lineage_hop() {
+        for first in [
+            RollbackPolicy::Compatible,
+            RollbackPolicy::Snapshot,
+            RollbackPolicy::Unavailable,
+        ] {
+            for second in [
+                RollbackPolicy::Compatible,
+                RollbackPolicy::Snapshot,
+                RollbackPolicy::Unavailable,
+            ] {
+                let temp = crate::testing::open("generated-lineage-matrix");
+                let c = temp.store.connection();
+                let mut a = candidate(
+                    c,
+                    None,
+                    "1.0.0",
+                    DataPlan {
+                        fields: [("note".into(), DataType::Text)].into(),
+                        ..Default::default()
+                    },
+                );
+                publish(c, &mut a);
+                apply_document(c, &document(&a), "initial").unwrap();
+                let mut owner = a.clone();
+                for (schema, rollback) in [(2, first), (3, second)] {
+                    data_write(
+                        c,
+                        &owner,
+                        &GeneratedDataInput {
+                            artifact_id: owner.artifact_id.clone(),
+                            expected_revision: data_get(c, &owner).unwrap().revision,
+                            payload: json!({"note":format!("version {}", schema - 1)}),
+                        },
+                    )
+                    .unwrap();
+                    let mut next = candidate(
+                        c,
+                        Some(&owner),
+                        &format!("{schema}.0.0"),
+                        DataPlan {
+                            schema_version: schema,
+                            fields: owner.description.data.fields.clone(),
+                            migration: Some(DataMigration {
+                                from_version: schema - 1,
+                                rename: Default::default(),
+                                remove: vec![],
+                                defaults: Default::default(),
+                                rollback,
+                            }),
+                        },
+                    );
+                    publish(c, &mut next);
+                    apply_document(c, &document(&next), &format!("upgrade-{schema}")).unwrap();
+                    owner = next;
+                }
+                let before = data_get(c, &owner).unwrap();
+                let refused =
+                    first == RollbackPolicy::Unavailable || second == RollbackPolicy::Unavailable;
+                assert_eq!(
+                    check_document(c, &document(&a)).is_err(),
+                    refused,
+                    "{first:?}/{second:?}"
+                );
+                let result = apply_document(c, &document(&a), "rollback");
+                assert_eq!(result.is_err(), refused);
+                if refused {
+                    assert_eq!(json!(data_get(c, &owner).unwrap()), json!(before));
+                    assert!(data_get(c, &a).is_err());
+                    assert_eq!(
+                        get(c, &owner.artifact_id).unwrap().state,
+                        ArtifactState::Active
+                    );
+                } else {
+                    let expected = if first == RollbackPolicy::Snapshot {
+                        "version 1"
+                    } else {
+                        "version 2"
+                    };
+                    assert_eq!(data_get(c, &a).unwrap().payload, json!({"note":expected}));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn two_snapshot_hops_restore_original_data_and_refuse_missing_or_invalid_links() {
+        for damage in ["intact", "missing", "endpoint", "schema", "payload"] {
+            let temp = crate::testing::open("generated-snapshot-chain");
+            let c = temp.store.connection();
+            let mut a = candidate(
+                c,
+                None,
+                "1.0.0",
+                DataPlan {
+                    fields: [("note".into(), DataType::Text)].into(),
+                    ..Default::default()
+                },
+            );
+            publish(c, &mut a);
+            apply_document(c, &document(&a), "initial").unwrap();
+            let mut owner = a.clone();
+            for (schema, field, previous) in [(2, "title", "note"), (3, "label", "title")] {
+                data_write(
+                    c,
+                    &owner,
+                    &GeneratedDataInput {
+                        artifact_id: owner.artifact_id.clone(),
+                        expected_revision: data_get(c, &owner).unwrap().revision,
+                        payload: json!({previous:format!("version {}", schema - 1)}),
+                    },
+                )
+                .unwrap();
+                let mut next = candidate(
+                    c,
+                    Some(&owner),
+                    &format!("{schema}.0.0"),
+                    DataPlan {
+                        schema_version: schema,
+                        fields: [(field.into(), DataType::Text)].into(),
+                        migration: Some(DataMigration {
+                            from_version: schema - 1,
+                            rename: [(previous.into(), field.into())].into(),
+                            remove: vec![],
+                            defaults: Default::default(),
+                            rollback: RollbackPolicy::Snapshot,
+                        }),
+                    },
+                );
+                publish(c, &mut next);
+                apply_document(c, &document(&next), &format!("upgrade-{schema}")).unwrap();
+                owner = next;
+            }
+            data_write(
+                c,
+                &owner,
+                &GeneratedDataInput {
+                    artifact_id: owner.artifact_id.clone(),
+                    expected_revision: data_get(c, &owner).unwrap().revision,
+                    payload: json!({"label":"version 3"}),
+                },
+            )
+            .unwrap();
+            match damage {
+                "missing" => {
+                    c.execute(
+                        "DELETE FROM generated_data_snapshots WHERE change_id='upgrade-2'",
+                        [],
+                    )
+                    .unwrap();
+                }
+                "endpoint" => {
+                    c.execute("UPDATE generated_data_snapshots SET to_artifact_id=?1 WHERE change_id='upgrade-3'", [&a.artifact_id]).unwrap();
+                }
+                "schema" => {
+                    c.execute("UPDATE generated_data_snapshots SET schema_version=1 WHERE change_id='upgrade-3'", []).unwrap();
+                }
+                "payload" => {
+                    c.execute("UPDATE generated_data_snapshots SET payload_json='[1]' WHERE change_id='upgrade-2'", []).unwrap();
+                }
+                _ => {}
+            }
+            let before = json!(data_get(c, &owner).unwrap());
+            if damage == "intact" {
+                apply_document(c, &document(&a), "back-to-first").unwrap();
+                assert_eq!(
+                    data_get(c, &a).unwrap().payload,
+                    json!({"note":"version 1"})
+                );
+            } else {
+                assert!(
+                    matches!(
+                        check_document(c, &document(&a)),
+                        Err(StoreError::Conflict(_))
+                    ),
+                    "{damage}"
+                );
+                assert!(apply_document(c, &document(&a), "refused").is_err());
+                assert_eq!(json!(data_get(c, &owner).unwrap()), before);
+                assert!(data_get(c, &a).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn stale_sibling_snapshot_never_replaces_later_data() {
+        let temp = crate::testing::open("generated-stale-sibling");
+        let c = temp.store.connection();
+        let mut a = candidate(
+            c,
+            None,
+            "1.0.0",
+            DataPlan {
+                fields: [("x".into(), DataType::Text), ("y".into(), DataType::Text)].into(),
+                ..Default::default()
+            },
+        );
+        publish(c, &mut a);
+        apply_document(c, &document(&a), "initial").unwrap();
+        let write = |owner: &GeneratedArtifact, payload| {
+            data_write(
+                c,
+                owner,
+                &GeneratedDataInput {
+                    artifact_id: owner.artifact_id.clone(),
+                    expected_revision: data_get(c, owner).unwrap().revision,
+                    payload,
+                },
+            )
+            .unwrap()
+        };
+        write(&a, json!({"x":"old data"}));
+        let migrated = |rollback| DataPlan {
+            schema_version: 2,
+            fields: [("y".into(), DataType::Text)].into(),
+            migration: Some(DataMigration {
+                from_version: 1,
+                rename: [("x".into(), "y".into())].into(),
+                defaults: Default::default(),
+                remove: vec![],
+                rollback,
+            }),
+        };
+        let mut b = candidate(c, Some(&a), "2.0.0", migrated(RollbackPolicy::Snapshot));
+        publish(c, &mut b);
+        apply_document(c, &document(&b), "old-upgrade").unwrap();
+        apply_document(c, &document(&a), "back").unwrap();
+        write(&a, json!({"x":"later data"}));
+        let mut sibling = candidate(c, Some(&a), "2.1.0", migrated(RollbackPolicy::Unavailable));
+        publish(c, &mut sibling);
+        apply_document(c, &document(&sibling), "sibling").unwrap();
+        let mut third = candidate(
+            c,
+            Some(&sibling),
+            "3.0.0",
+            DataPlan {
+                schema_version: 3,
+                fields: sibling.description.data.fields.clone(),
+                migration: Some(DataMigration {
+                    from_version: 2,
+                    rename: Default::default(),
+                    defaults: Default::default(),
+                    remove: vec![],
+                    rollback: RollbackPolicy::Snapshot,
+                }),
+            },
+        );
+        publish(c, &mut third);
+        apply_document(c, &document(&third), "third").unwrap();
+        let before = json!(data_get(c, &third).unwrap());
+        assert!(matches!(
+            check_document(c, &document(&a)),
+            Err(StoreError::Conflict(_))
+        ));
+        assert!(matches!(
+            apply_document(c, &document(&a), "refused"),
+            Err(StoreError::Conflict(_))
+        ));
+        assert_eq!(json!(data_get(c, &third).unwrap()), before);
+        assert_eq!(before["payload"], json!({"y":"later data"}));
+        assert!(data_get(c, &a).is_err());
+    }
+
     #[test]
     fn repeated_failure_stops_repair_and_versions_remain_immutable() {
         let temp = crate::testing::open("generated-repair");

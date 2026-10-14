@@ -58,3 +58,29 @@ Core 持有生成紀錄、修復預算、配置 revision 與插件資料；Agent
 PR 更新後另修正 [CI 長 checkout 路徑與早期報告](../../.agents/notes/gate-reviews/G3-ci-followup-2026-10-14.md)，管理中心快照亂序保護增至 7 項 QtTest。CI 實際結果分開記錄，不以先前本機成功推定遠端已通過。
 
 以上完成順序保留重跑入口；第 4 步的功能矩陣現已執行，詳見[實體驗收與最後修正](../../.agents/notes/gate-reviews/G3-reference-seat-2026-10-14.md)。未執行的資源／人工／G4 項保持原追蹤；GitHub #15～#34 的關閉與五出口由 owner 依新證據裁定。
+
+## 獨立審查與修正（2026-10-14）
+
+Claude Opus 5.5 High 對 `d49387f94cea3f37207224463895be1b4e95d8ec` 的唯讀審查結論為 **FAIL**。Class A（AT-22／#21）只檢查目前所有者的回退政策，可能跨過不可逆中間版本或重用兄弟版本的舊快照；Class B（GEN-08／#26）只在 create 檢查回合預算，預先建立的候選可在停止後繼續 validate。先前證據未涵蓋這兩個反例，歷史紀錄保持原樣。
+
+本次 Store 用既有快照欄位記錄實際資料遷移鏈，預檢與提交共用逐跳政策／端點／schema 檢查，回退原子移除退出鏈結。新增九格政策、過期兄弟快照、兩跳快照及缺失／無效鏈結回歸；既有 `two_generated_schema_modifications_can_return_to_first_version` 保持原意及原碼。create 與序列化 validate 入列共用回合預算，failed／inspect_only／validating 均占額度（初始生成加三輪修復）；新增預建候選、停止後入列、預覽與明確新回合回歸。Shell 投影另以小幅完整性檢查封鎖非完整 generated 套件，新增核可／損壞／缺失紀錄測試，無 `file://` 退路。
+
+指定離線環境下的本次命令與結果：
+
+| 命令 | 結果 |
+| --- | --- |
+| `cargo fmt --all -- --check` | 通過 |
+| `cargo clippy --locked --workspace --all-targets -- -D warnings` | 通過，0 warning |
+| `cargo test --locked --workspace` | 17 通過、2 失敗；在 confine socket／D-Bus 測試停止 |
+| `cargo test --locked --workspace --no-fail-fast` | 214 通過、52 失敗，4 targets 失敗；Core RPC handshake／supervisor socket 遭 `Operation not permitted`，另有 confine／notifications D-Bus 環境失敗 |
+| `cargo test --locked -p ditto-store generated::tests` | 9 通過、0 失敗 |
+| `cargo test --locked -p ditto-core generation::tests` | 4 通過、0 失敗 |
+| `cargo test --locked -p ditto-core generated_projection_omits` | 1 通過、0 失敗 |
+
+完整 log 在 `/data/hermes/cache/scratch/g3-audit/round1-{clippy,workspace,workspace-all}.log`。新 Core 多跳拒絕與既有兩次修改旅程尚無本 runner 的可執行 RPC 證據；Store 的等義資料旅程通過不冒充 Core／實體驗收。
+
+**BLOCKED：完整 workspace gate 與依「gates 通過後提交」條件的本地提交。** 本次修改仍在本地工作樹；修正提交後的新 HEAD 必須重新接受差異審查，不代表 Ready 或 owner 出口裁定。未推送、未修改 wire／TS／QML／證據 JSON；protocol 型別未改，不需 schema export gate。未跑 VM／實體座位／Node／Qt，救援與資料政策語意及其他非阻擋追蹤項未改。
+
+`.agents/notes/gate-reviews/G3-exit.md` 的追加寫入另遭 patch sandbox 拒絕（`writing outside of the project; rejected by user approval settings`）。同名「獨立審查與修正」段落已備成 `/data/hermes/cache/scratch/g3-audit/G3-exit-round1.patch`，供 coordinator 套用；本 runner 未繞過受保護路徑。
+
+後續 coordinator 已套用該 patch，並在相同修正內容、沒有 Codex socket sandbox 的本機環境重跑：`cargo fmt --all -- --check`、workspace clippy（0 warning）、`cargo test --locked --workspace --no-fail-fast` **266 通過、0 失敗**，含新增 Core RPC 拒絕與原有兩次修改回第一版。釘選 Rust 1.98.1、Node 22.23.2／pnpm 10.11.0；Node workspace build／typecheck 通過，測試 **184 通過、2 個既有 skip**。首次 Node 執行因缺 Core 二進位前置失敗，建置後重跑通過，原 log 保留。本機 Qt／VM／實體流程尚未重跑，不將 Rust／Node 數字當作這些驗收。修正候選仍待 fresh delta review；救援語意另由 [#41](https://github.com/relvo-labs/Ditto/issues/41) 追蹤。

@@ -208,100 +208,111 @@ fn submit(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
     let owner = caller.subject.0.clone();
     let root = core.paths.cache.join("generated-validation");
     let job = mutate(core, caller, call, move |c| {
-        c.store().write(|tx| {
-            let mut a = generated::get(tx, &input.artifact_id)?;
-            let kind = if preview {
-                "generation.preview"
-            } else {
-                "generation.validate"
-            };
-            let key = format!("{kind}:{}:{}", a.artifact_id, input.idempotency_key);
-            if let Some(job) = jobs::by_idempotency_key(tx, &key)? {
-                return Ok(job);
-            }
-            if preview
-                && !a
-                    .validation
-                    .as_ref()
-                    .is_some_and(|v| v.passed(&a.bundle_sha256))
-            {
-                return Err(StoreError::Invalid(
-                    "preview requires all validation stages".into(),
-                ));
-            }
-            if !preview {
-                if let Some(job) = a
-                    .validation_job_id
-                    .as_ref()
-                    .and_then(|id| jobs::get(tx, id).ok())
-                {
-                    if job.idempotency_key.as_deref()
-                        == Some(&format!(
-                            "{kind}:{}:{}",
-                            a.artifact_id, input.idempotency_key
-                        ))
-                    {
-                        return Ok(job);
-                    }
-                    if matches!(
-                        job.state,
-                        JobState::Queued | JobState::Running | JobState::Cancelling
-                    ) {
-                        return Err(StoreError::Conflict(
-                            "artifact validation already running".into(),
-                        ));
-                    }
-                }
-                if !matches!(
-                    a.state,
-                    ArtifactState::Candidate | ArtifactState::InspectOnly
-                ) || a.repair.stopped
-                {
-                    return Err(StoreError::Conflict(
-                        "create a repaired new version before validating again".into(),
-                    ));
-                }
-            }
-            if !generated::integrity(&a) {
-                return Err(StoreError::Invalid("candidate integrity mismatch".into()));
-            }
-            // Worker parameters need source and integrity, never conversation text.
-            let mut candidate = a.clone();
-            candidate.origin = GenerationOrigin {
-                request_summary: "isolated template validation".into(),
-                turn_id: None,
-                model: None,
-            };
-            let params = json!({"artifact":candidate,"work_root":root});
-            let job = jobs::enqueue(
-                tx,
-                kind,
-                &owner,
-                &params,
-                &key,
-                if preview { 60000 } else { 45000 },
-            )?;
-            if preview {
-                a.previews.push(PreviewRecord {
-                    job_id: job.job_id.clone(),
-                    state: "queued".into(),
-                    opened: false,
-                    at: ditto_store::time::now(),
-                });
-                if a.previews.len() > 20 {
-                    a.previews.remove(0);
-                }
-                generated::save(tx, &a)?;
-            } else {
-                a.validation_job_id = Some(job.job_id.clone());
-                a.state = ArtifactState::Validating;
-                generated::save(tx, &a)?;
-            }
-            Ok(job)
-        })
+        c.store()
+            .write(|tx| enqueue(tx, &input, preview, &owner, &root))
     })?;
     core.jobs.wake();
     Ok((json!(job), true))
+}
+// Invoked only inside submit's serialized store write. Keep budget admission,
+// job insertion and artifact reservation atomic; previews consume no repair.
+fn enqueue(
+    tx: &rusqlite::Connection,
+    input: &GenerationJobInput,
+    preview: bool,
+    owner: &str,
+    root: &std::path::Path,
+) -> Result<Job, StoreError> {
+    let mut a = generated::get(tx, &input.artifact_id)?;
+    let kind = if preview {
+        "generation.preview"
+    } else {
+        "generation.validate"
+    };
+    let key = format!("{kind}:{}:{}", a.artifact_id, input.idempotency_key);
+    if let Some(job) = jobs::by_idempotency_key(tx, &key)? {
+        return Ok(job);
+    }
+    if preview
+        && !a
+            .validation
+            .as_ref()
+            .is_some_and(|v| v.passed(&a.bundle_sha256))
+    {
+        return Err(StoreError::Invalid(
+            "preview requires all validation stages".into(),
+        ));
+    }
+    if !preview {
+        generated::check_turn_budget(tx, &a.origin)?;
+        if let Some(job) = a
+            .validation_job_id
+            .as_ref()
+            .and_then(|id| jobs::get(tx, id).ok())
+        {
+            if job.idempotency_key.as_deref()
+                == Some(&format!(
+                    "{kind}:{}:{}",
+                    a.artifact_id, input.idempotency_key
+                ))
+            {
+                return Ok(job);
+            }
+            if matches!(
+                job.state,
+                JobState::Queued | JobState::Running | JobState::Cancelling
+            ) {
+                return Err(StoreError::Conflict(
+                    "artifact validation already running".into(),
+                ));
+            }
+        }
+        if !matches!(
+            a.state,
+            ArtifactState::Candidate | ArtifactState::InspectOnly
+        ) || a.repair.stopped
+        {
+            return Err(StoreError::Conflict(
+                "create a repaired new version before validating again".into(),
+            ));
+        }
+    }
+    if !generated::integrity(&a) {
+        return Err(StoreError::Invalid("candidate integrity mismatch".into()));
+    }
+    // Worker parameters need source and integrity, never conversation text.
+    let mut candidate = a.clone();
+    candidate.origin = GenerationOrigin {
+        request_summary: "isolated template validation".into(),
+        turn_id: None,
+        model: None,
+    };
+    let params = json!({"artifact":candidate,"work_root":root});
+    let job = jobs::enqueue(
+        tx,
+        kind,
+        owner,
+        &params,
+        &key,
+        if preview { 60000 } else { 45000 },
+    )?;
+    if preview {
+        a.previews.push(PreviewRecord {
+            job_id: job.job_id.clone(),
+            state: "queued".into(),
+            opened: false,
+            at: ditto_store::time::now(),
+        });
+        if a.previews.len() > 20 {
+            a.previews.remove(0);
+        }
+        generated::save(tx, &a)?;
+    } else {
+        a.validation_job_id = Some(job.job_id.clone());
+        a.state = ArtifactState::Validating;
+        generated::save(tx, &a)?;
+    }
+    Ok(job)
 }
 fn materialize(
     paths: &ditto_store::Paths,
@@ -583,6 +594,236 @@ pub fn reconcile(c: &rusqlite::Connection) -> ditto_store::StoreResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn budget_store() -> (
+        ditto_store::Paths,
+        ditto_store::WriterLock,
+        ditto_store::Store,
+    ) {
+        let root =
+            std::env::temp_dir().join(format!("ditto-g3-budget-{}", ditto_protocol::ids::ulid()));
+        let paths = ditto_store::Paths::under(&root);
+        let lock = ditto_store::WriterLock::acquire(&paths.lock()).unwrap();
+        let (store, _) = ditto_store::Store::open_writer(&paths, &lock).unwrap();
+        (paths, lock, store)
+    }
+    fn precreate(store: &mut ditto_store::Store, count: usize) -> Vec<GeneratedArtifact> {
+        (0..count)
+            .map(|index| {
+                store
+                    .write(|tx| {
+                        let mut description = Description::parse(include_bytes!(
+                            "../../ditto-generation/examples/tasks-summary.json"
+                        ))
+                        .unwrap();
+                        description.plugin_id = format!("local.generated.budget_{index}");
+                        generated::create(
+                            tx,
+                            &GenerateInput {
+                                description,
+                                request_summary: "budget fixture".into(),
+                                parent_id: None,
+                                idempotency_key: format!("candidate-{index}"),
+                            },
+                            GenerationOrigin {
+                                request_summary: "budget fixture".into(),
+                                turn_id: Some("same-turn".into()),
+                                model: None,
+                            },
+                        )
+                    })
+                    .unwrap()
+            })
+            .collect()
+    }
+    fn queue(
+        store: &mut ditto_store::Store,
+        a: &GeneratedArtifact,
+        root: &std::path::Path,
+    ) -> Result<Job, StoreError> {
+        store.write(|tx| {
+            enqueue(
+                tx,
+                &GenerationJobInput {
+                    artifact_id: a.artifact_id.clone(),
+                    idempotency_key: "validation".into(),
+                },
+                false,
+                "cli",
+                root,
+            )
+        })
+    }
+    #[test]
+    fn precreated_candidates_reserve_the_turn_budget_before_enqueue() {
+        // Queued, failed and mixed reservations all share the same admission cap.
+        for finished in [0, 2, 4] {
+            let (paths, lock, mut store) = budget_store();
+            let candidates = precreate(&mut store, 5);
+            for (index, a) in candidates.iter().take(4).enumerate() {
+                let job = queue(&mut store, a, &paths.cache).unwrap();
+                if index < finished {
+                    store
+                        .write(|tx| {
+                            generated::validation_finished(
+                                tx,
+                                &a.artifact_id,
+                                &job.job_id,
+                                None,
+                                Some(&format!("error-{index}")),
+                            )?;
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+            }
+            let before = jobs::list(store.connection(), 100).unwrap();
+            assert_eq!(before.len(), 4); // Initial attempt plus three repairs.
+            assert!(matches!(
+                queue(&mut store, &candidates[4], &paths.cache),
+                Err(StoreError::Conflict(_))
+            ));
+            assert_eq!(jobs::list(store.connection(), 100).unwrap(), before);
+            assert_eq!(
+                generated::get(store.connection(), &candidates[4].artifact_id).unwrap(),
+                candidates[4]
+            );
+            // An idempotent readback is still allowed after reservations fill.
+            let original = generated::get(store.connection(), &candidates[0].artifact_id)
+                .unwrap()
+                .validation_job_id
+                .unwrap();
+            assert_eq!(
+                queue(&mut store, &candidates[0], &paths.cache)
+                    .unwrap()
+                    .job_id,
+                original
+            );
+            drop(store);
+            drop(lock);
+            std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+        }
+    }
+    #[test]
+    fn candidate_created_before_turn_stop_cannot_enqueue_validation() {
+        for repeated in [false, true] {
+            let (paths, lock, mut store) = budget_store();
+            let candidates = precreate(&mut store, 3);
+            let job = queue(&mut store, &candidates[0], &paths.cache).unwrap();
+            store
+                .write(|tx| {
+                    let mut failed = generated::validation_finished(
+                        tx,
+                        &candidates[0].artifact_id,
+                        &job.job_id,
+                        None,
+                        Some("same error"),
+                    )?;
+                    if !repeated {
+                        failed.repair.stopped = true;
+                        generated::save(tx, &failed)?;
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            if repeated {
+                let job = queue(&mut store, &candidates[1], &paths.cache).unwrap();
+                store
+                    .write(|tx| {
+                        generated::validation_finished(
+                            tx,
+                            &candidates[1].artifact_id,
+                            &job.job_id,
+                            None,
+                            Some("same error"),
+                        )?;
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+            let before = jobs::list(store.connection(), 100).unwrap();
+            assert!(matches!(
+                queue(&mut store, &candidates[2], &paths.cache),
+                Err(StoreError::Conflict(_))
+            ));
+            assert_eq!(jobs::list(store.connection(), 100).unwrap(), before);
+            assert_eq!(
+                generated::get(store.connection(), &candidates[2].artifact_id).unwrap(),
+                candidates[2]
+            );
+            drop(store);
+            drop(lock);
+            std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn preview_and_explicit_new_turn_survive_a_stopped_budget() {
+        let (paths, lock, mut store) = budget_store();
+        let candidates = precreate(&mut store, 2);
+        store
+            .write(|tx| {
+                let mut stopped = candidates[0].clone();
+                stopped.repair.stopped = true;
+                generated::save(tx, &stopped)?;
+                let mut validated = candidates[1].clone();
+                // Forged report is only a fixture; preview admission is tested here,
+                // not isolation or native rendering.
+                let vector: Value = serde_json::from_str(include_str!(
+                    "../../../tests/contract-vectors/0.3/shape-generation-validation-full.json"
+                ))
+                .unwrap();
+                let mut report: GenerationValidation =
+                    serde_json::from_value(vector["value"].clone()).unwrap();
+                report.bundle_sha256 = validated.bundle_sha256.clone();
+                validated.validation = Some(report);
+                validated.state = ArtifactState::Validated;
+                generated::save(tx, &validated)?;
+                enqueue(
+                    tx,
+                    &GenerationJobInput {
+                        artifact_id: validated.artifact_id,
+                        idempotency_key: "preview".into(),
+                    },
+                    true,
+                    "cli",
+                    &paths.cache,
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            jobs::list(store.connection(), 100).unwrap()[0].kind,
+            "generation.preview"
+        );
+        let fresh = store
+            .write(|tx| {
+                let mut description = candidates[0].description.clone();
+                description.plugin_id = "local.generated.new_turn".into();
+                generated::create(
+                    tx,
+                    &GenerateInput {
+                        description,
+                        request_summary: "explicit new request".into(),
+                        parent_id: None,
+                        idempotency_key: "new-turn".into(),
+                    },
+                    GenerationOrigin {
+                        request_summary: "explicit new request".into(),
+                        turn_id: Some("new-turn".into()),
+                        model: None,
+                    },
+                )
+            })
+            .unwrap();
+        assert_eq!(
+            queue(&mut store, &fresh, &paths.cache).unwrap().kind,
+            "generation.validate"
+        );
+        drop(store);
+        drop(lock);
+        std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+    }
+
     #[test]
     fn interrupted_validation_is_settled_once_without_replay() {
         let root =

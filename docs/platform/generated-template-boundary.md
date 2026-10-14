@@ -36,7 +36,7 @@ systemd 控制連線使用登入者 `/run/user/<uid>/bus`；桌面的 session bu
 
 產物保留來源需求摘要、parent、變更欄位、封裝、驗證與啟用歷程。失敗不覆寫舊版本；同一需求最多三次修復，同錯兩次或未通過更多連續驗證關卡時提前停止。只改診斷文字不算進展，缺少報告也不算通過關卡；Core 從已保存的父版本報告比較，重新連線不重置。經 Core 綁定的明確新使用者回合可另啟預算。失敗 parent 只允許一個後繼修復，Agent turn 另有持久總預算，不能靠分支重置。取消排隊工作與重啟後中斷工作會對帳候選狀態，沒有自動重播。
 
-資料只接受 bounded object 的 text／integer／boolean／text_list。遷移只可 rename、remove、defaults，不能執行任意腳本。資料升版／快照與 Profile revision 在同一 SQLite 交易；提交失敗全部回滾。回退可依快照或相容政策；不可逆或沒有匹配快照時在預檢拒絕，舊版本不可誤讀較新資料。
+資料只接受 bounded object 的 text／integer／boolean／text_list。遷移只可 rename、remove、defaults，不能執行任意腳本。資料升版／快照與 Profile revision 在同一 SQLite 交易；提交失敗全部回滾。既有快照表記錄實際資料所有者的每一跳，不以候選 parent 推定資料分支。回退逐跳檢查政策、from／to artifact 與 schema；相容政策保留目前可讀值，快照政策回到該次升版前的資料，不保留該跳升版後的寫入。任一跳不可逆、缺少鏈結或快照無效時在預檢拒絕；回退提交同時移除已退出的鏈結，不能從兄弟版本重用舊快照。舊版本不可誤讀較新資料；既有資料若缺少可證明的鏈結，也拒絕回退。
 
 來源摘要屬私有紀錄，刪除對話時遮蔽摘要與 turn／model，保留插件本身和因果 id。worker 參數不複製對話來源。這是邏輯遮蔽，不宣稱可抹除已備份或底層媒體的歷史位元。
 
@@ -44,4 +44,4 @@ systemd 控制連線使用登入者 `/run/user/<uid>/bus`；桌面的 session bu
 
 `bash tools/generation-host/build.sh [debug|release]` 建置固定 C++ Qt runner；使用 Qt 6.10.2 Core／Gui／Qml／Quick／Test。`-fPIC` 避免 Qt metaobject 的 COPY relocation；QtTest 是 native runner 的執行期依賴。session 安裝器會建置 Rust generation-host 與 native runner；不是在執行生成請求時編譯程式。
 
-`tests/g3/README.md` 列出單元、契約、真 Core／Shell、腳本模型、VM 超限與舊 ABI 入口。各輸出保留開發／VM／真模型分類；參考機及真實模型尚未執行時不得宣告 AT-06 或 G3 出口通過。固定模板程式升版會改 hash；舊產物不自動被新程式認定相容，須明確重新驗證與升版。
+`tests/g3/README.md` 列出單元、契約、真 Core／Shell、腳本模型、VM 超限與舊 ABI 入口。各輸出保留開發／VM／真模型分類；參考機及真實模型尚未執行時不得宣告 AT-06 或 G3 出口通過。固定模板程式升版會改 hash；舊產物不自動被新程式認定相容，須明確重新驗證與升版。Core 的 Shell 投影同時檢查核可與封裝完整性；generated 來源缺少紀錄或未通過檢查時不渲染，也不改走套件的 `file://` 入口。
