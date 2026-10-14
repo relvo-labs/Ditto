@@ -31,7 +31,7 @@ def process_link(pid,name):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--out',required=True);args=ap.parse_args()
     home=pathlib.Path.home();uid=os.getuid();runtime=pathlib.Path('/run/user')/str(uid)
-    env=os.environ.copy();env.update(XDG_RUNTIME_DIR=str(runtime),DBUS_SESSION_BUS_ADDRESS=f'unix:path={runtime}/bus')
+    env=os.environ.copy();env.update(XDG_RUNTIME_DIR=str(runtime),DBUS_SESSION_BUS_ADDRESS=f'unix:path={runtime}/bus',DITTO_RUNTIME_DIR=str(runtime/'ditto'),DITTO_G1_RELAY=str(runtime/'ditto/verify-relay.sock'))
     units={}
     for unit in ['ditto-core.service','ditto-shell.service','github-actions-ditto-ref.service']:
         rc,text=command(['systemctl','--user','show',unit,'-p','ActiveState','-p','MainPID','-p','WorkingDirectory','-p','FragmentPath'],env)
@@ -55,6 +55,25 @@ def main():
                     for q in [p,*list(p.glob('*'))[:80]]:
                         schema=readonly_schema(q)
                         if schema is not None:candidates.append({'path':str(q),'schema':schema})
+    # Bounded metadata discovery in the prior Ditto test roots, not other home data.
+    searched=0
+    for base in [home/'funlab/Ditto/artifacts/g3',home/'funlab/Ditto/target',home/'.cache/ditto']:
+        if base.is_dir():
+            for parent,dirs,files in os.walk(base):
+                searched+=1
+                dirs[:]=[x for x in dirs if x not in {'node_modules','debug','release','incremental','packages','bundles'}]
+                if searched>5000:break
+                if 'core.db' in files and not any(x['path']==parent for x in candidates):
+                    schema=readonly_schema(parent)
+                    if schema is not None:candidates.append({'path':parent,'schema':schema})
+    for entry in candidates:
+        try:
+            c=sqlite3.connect((pathlib.Path(entry['path'])/'core.db').as_uri()+'?mode=ro',uri=True)
+            try:
+                row=c.execute("SELECT json_extract(settings_json,'$.provider'),json_type(settings_json,'$.auth')='object' FROM agent_preferences WHERE singleton=1").fetchone()
+                entry['codex_reference_present']=bool(row and row[0]=='codex-app-server' and row[1])
+            finally:c.close()
+        except sqlite3.Error:entry['codex_reference_present']=False
     _,sessions=command(['loginctl','list-sessions','--no-legend'],env)
     physical=[]
     for line in sessions.splitlines():
@@ -86,8 +105,14 @@ def main():
         if p.is_file():overrides.append({'path':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'size':p.stat().st_size})
     tool_paths={}
     for name,p in [('node',home/'.nvm/versions/node/v22.23.2/bin/node'),('qt',home/'Qt/6.10.2/gcc_64/bin/qmake6'),('relogin',pathlib.Path('/usr/local/libexec/ditto-relogin'))]:tool_paths[name]={'path':str(p),'executable':os.access(p,os.X_OK)}
+    host_public_key=pathlib.Path('/etc/ssh/ssh_host_ed25519_key.pub')
+    public_key=host_public_key.read_text().strip() if host_public_key.is_file() and os.access(host_public_key,os.R_OK) else None
+    template=pathlib.Path('/etc/systemd/user/ditto-core.service.d/verification-relay.conf')
+    template_text=template.read_text() if template.is_file() else None
+    if template_text and any(x in template_text for x in ['BEGIN PRIVATE','Authorization:','Bearer ','sk-']):template_text=None
     # Credential values, account identifiers and raw environments never emitted.
     report={'format_version':1,'phase':'read-only-preflight','hostname':socket.gethostname(),'uid':uid,'units':units,'checkouts':checkouts,'data_dir':data,'normal_store_schema':readonly_schema(data),'private_store_candidates':candidates,'sessions':physical,'profile':profile,'keyring':keyring,'sudo_available':sudo_rc==0,'gdm_sha256':gdm_sha,'overrides':overrides,'tools':tool_paths,'global_addresses':addresses,'disruption_started':False,'provider_called':False}
+    report.update(ssh_host_ed25519_public_key=public_key,verification_relay_template=template_text,metadata_directories_scanned=searched)
     out=pathlib.Path(args.out);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2));out.chmod(0o600)
     print(json.dumps({'phase':report['phase'],'disruption_started':False,'provider_called':False,'core_active':core.get('ActiveState')=='active','profile_readable':profile is not None,'store_candidates':len(candidates)}))
 
