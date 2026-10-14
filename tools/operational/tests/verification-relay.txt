@@ -1,0 +1,15 @@
+# Verification runs only (install-session.sh --verification-relay).
+[Service]
+Environment=DITTO_VERIFY_RELAY_OPTION=--launch
+Environment="DITTO_VERIFY_RELAY_SPEC=dittoctl 0.2.0 /home/neil/.nvm/versions/node/v22.23.2/bin/node /home/neil/funlab/Ditto/tests/g1/lib/relay.mjs %t/ditto/verify-relay.sock"
+ExecStart=
+ExecStart=/home/neil/funlab/Ditto/target/release/ditto-core serve --compositor wayfire \
+    --builtin-packages /home/neil/funlab/Ditto/target/ditto-packages-verification \
+    --shell "quickshell 0.3.1 /home/neil/Qt/6.10.2/gcc_64/bin/quickshell --no-color -p /home/neil/funlab/Ditto/shell/shell.qml" \
+    --hostd "hostd 0.2.0 /home/neil/.nvm/versions/node/v22.23.2/bin/node --expose-gc --min-semi-space-size=4 --max-semi-space-size=4 /home/neil/funlab/Ditto/packages/host-runtime/dist/ditto-hostd.mjs" \
+    --rescue-ui "rescue-shell 0.3.1 /home/neil/Qt/6.10.2/gcc_64/bin/quickshell --no-color -p /home/neil/funlab/Ditto/shell/rescue/shell.qml" \
+    --lock "lock 0.3.1 /home/neil/Qt/6.10.2/gcc_64/bin/quickshell --no-color -p /home/neil/funlab/Ditto/shell/lock/shell.qml" \
+    --agent "agent 0.3.0 /home/neil/.nvm/versions/node/v22.23.2/bin/node /home/neil/funlab/Ditto/packages/agent-runtime/dist/ditto-agentd.mjs" \
+    --agent-backend "codex-app-server 0.160.0 12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad /home/neil/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex" \
+    $DITTO_CORE_MODE_ARGS \
+    $DITTO_VERIFY_RELAY_OPTION ${DITTO_VERIFY_RELAY_SPEC}

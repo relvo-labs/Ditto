@@ -1,24 +1,49 @@
 name: g3-reference-operations
 on:
   workflow_dispatch:
+    inputs:
+      phase:
+        description: Fixed operational phase (launch receipt is not physical success)
+        required: true
+        type: choice
+        default: preflight
+        options: [preflight, stage, launch, collect]
+      qualification_id:
+        description: Numeric task ID from preflight; empty uses this workflow run ID
+        required: false
+        type: string
 permissions:
   contents: read
 concurrency:
   group: ditto-g3-physical-qualification
   cancel-in-progress: false
 jobs:
-  preflight:
+  qualification:
+    if: github.ref == 'refs/heads/hermes/g3-physical-qualification'
     runs-on: [self-hosted, ditto-refmachine]
-    timeout-minutes: 5
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
-      - name: Read-only host and installed-runtime metadata
-        run: python3 tools/operational/g3_reference_probe.py --out artifacts/g3-qualification/preflight.json
-      - name: Preserve sanitized metadata only
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fixed phase with task-local state
+        env:
+          QUALIFICATION_PHASE: ${{ inputs.phase }}
+          QUALIFICATION_ID: ${{ inputs.qualification_id }}
+        run: |
+          set -euo pipefail
+          case "$QUALIFICATION_PHASE" in preflight|stage|launch|collect) ;; *) exit 64 ;; esac
+          mkdir -p artifacts/g3-qualification/publish
+          python3 tools/operational/g3_ops.py "$QUALIFICATION_PHASE" --id "${QUALIFICATION_ID:-$GITHUB_RUN_ID}" > artifacts/g3-qualification/phase.json
+      - name: Preserve only constructed receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: g3-reference-preflight-${{ github.run_id }}
-          path: artifacts/g3-qualification/preflight.json
+          name: g3-reference-operations-${{ github.run_id }}
+          path: |
+            artifacts/g3-qualification/phase.json
+            artifacts/g3-qualification/publish/receipt.json
           retention-days: 14
           if-no-files-found: error
