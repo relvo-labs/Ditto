@@ -6,7 +6,8 @@ const checks=[],facts={}
 const verify=(name,yes)=>{if(!yes)throw Error(name);checks.push(name)}
 try{
  const core=await connect(),head=(await core.must('desktop.profiles.get')).profile.head_revision
- for(const kind of ['syntax','illegal-import','timeout']){
+ const cases=process.env.DITTO_G3_SKIP_TIMEOUT==='1'?['syntax','illegal-import']:['syntax','illegal-import','timeout']
+ for(const kind of cases){
   writeFileSync(process.env.DITTO_BINARIES+'/generation-fault.txt',kind)
   const description=JSON.parse(readFileSync('crates/ditto-generation/examples/tasks-summary.json','utf8'));description.plugin_id+='.'+kind.replaceAll('-','_')
   const artifact=await core.must('desktop.plugins.development.create',{description,request_summary:'Trusted fixed native failure '+kind,idempotency_key:kind})

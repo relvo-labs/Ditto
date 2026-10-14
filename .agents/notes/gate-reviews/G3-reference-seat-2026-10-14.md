@@ -46,6 +46,7 @@ partial／unavailable 不是偽造 ABI 或報告。三態使用不同 run namesp
 - physical-02 重用舊啟用 idempotency key，正式 Core 正確拒絕另一 target；測試命名空間修正後 physical-03 及最終 desktop 通過。第一次 headless 故障管線與實體登出重疊，其 scope 被登入清理停止；保留失敗，改為實體流程全部完成後獨立重跑，**13 項通過**。
 - 最後本機：Rust workspace **258 項**、Node **184 項**（另 2 項既有 skip）、Qt **13 項**（模板 5／管理中心 8），fmt／workspace clippy、型別、Rust schema／TS／模板新鮮度、i18n 569 字串／181 keys／2 語言、上游 9 檔與 vendor guard 通過。skills 0 error／1 個既有主文件長度警訊。正式四個 release 二進位故障入口 guard 通過，專用測試宿主正控制確實被 guard 拒絕。
 - 乾淨新實作 `bcc7264` 的完整 G3 VM 回歸 **15 步全通過**，來源 SHA256 `b57f16c0c3ac4158b28924683a05cf332399d161297ff3443b788cd0c000fdd0`，含新增 Core 三種原生故障管線 13 項；VM 故障與實體結果分開保存。先前 `88507b7` 的 12 項 GitHub CI 全綠也保留，不能冒充新提交的 CI。
+- `6260973` 的 G3 遠端 CI 已通過；最後依 D-25 再收緊自動化分工：CI 設 `DITTO_G3_SKIP_TIMEOUT=1`，只跑無效 QML／import 的 8 項真 Core 負例，本機同組 8 項已通過。完整 13 項（含忙碌逾時）仍留在 VM／授權實體驗收，避免共用 runner 自動執行資源超限；不是取消逾時驗收或提高門檻。
 
 ## 出口與後續
 

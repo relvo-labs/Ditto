@@ -27,8 +27,8 @@ jobs:
         run: python3 tests/g3/host/rejection.py
       - name: Native five-stage failure gates
         run: python3 tests/g3/native-failures/driver.py
-      - name: Durable native failure and timeout reports
-        run: bash tests/g3/native-failures/run-pipeline.sh
+      - name: Durable native failure reports
+        run: DITTO_G3_SKIP_TIMEOUT=1 bash tests/g3/native-failures/run-pipeline.sh
       - name: Unavailable isolation trust matrix
         run: DITTO_G3_TRUST_ONLY=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/ditto-g3-test-bus node tests/g3/integration/run.mjs
       # Resource exhaustion stays in tools/dev-vm/run-g3.sh (D-25), not in a

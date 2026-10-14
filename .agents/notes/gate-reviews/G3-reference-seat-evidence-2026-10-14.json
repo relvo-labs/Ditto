@@ -1593,7 +1593,24 @@
     "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.P3FiRv/quickshell/by-id/ib87u2wmt/log.log": "115de3299c0a1f1d60a47bafc3c55f0b51e3058ba757eeed7a8ae3a7434faecb",
     "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/summary.jsonl": "2eae5fb1489f9fe42f15bd2f68083221781cc84dd531a9f37b13c2f40b06f598",
     "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/unavailable-trust.log": "3666be89f7349a046f9b929eac2869be4850475bafc97dd6fc923f51d71fe802"
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/unavailable-trust.log": "3666be89f7349a046f9b929eac2869be4850475bafc97dd6fc923f51d71fe802",
+    "artifacts/g3/reference-followup-20261014/ci-no-exhaustion.log": "376400e4ff7dd182c451f3c6e059186fe8793197a7859bf2b703f64c919da18e"
   },
-  "raw_index_excludes": "compiled build caches, executables and SQLite stores; immutable artifact content remains in the indexed JSON reports"
+  "raw_index_excludes": "compiled build caches, executables and SQLite stores; immutable artifact content remains in the indexed JSON reports",
+  "ci_selection_followup": {
+    "checks": 8,
+    "source": {
+      "commit": "626097313294c01e07609cf7ce71b456f943ad5b",
+      "dirty": true,
+      "source_tree_sha256": "6f6c59dc474c2643a87e1035cccc321e6337f751833a4f9615e1c3224ad8cc0f",
+      "kernel": "6.17.0-40-generic",
+      "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+    },
+    "timeout": "not_run in shared CI; full 13 checks passed in VM and authorized reference seat",
+    "changed_files_sha256": {
+      ".github/workflows/g3-foundation.yml": "03c0ae19e59a2dbfc8e744809659b5ba73e6bb4012b5189d8721bcf6e81783a3",
+      "tests/g3/integration/failures-driver.mjs": "a946c64c5328228f5785845f07b0cccbd7d57681507197e4a6864af1ade130ad",
+      "tests/g3/README.md": "b9e6e568e23bb787ef922b11d6124537f2d3a987ebcf7a6b81730eaf94162955"
+    }
+  }
 }

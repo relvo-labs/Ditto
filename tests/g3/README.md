@@ -11,7 +11,7 @@
 | `bash tests/g3/restart/run.sh` | 兩個真實預覽中止 Core、回收舊 scope、回讀歷程並啟動新工作 | headless 開發故障證據 |
 | `bash tests/g3/agent/run.sh` | 釘選 app-server + loopback，真實動態工具、一次性啟用 approval 且無永久 data grant、原生驗證、多輪修改、來源刪除與退出後存活 | 不使用真訂閱、外部模型或既有帳號；不計模型品質 |
 | `python3 tests/g3/native-failures/driver.py` | 真 Qt runner 的 syntax／contract／load／focus／interaction 逐關失敗及非法 import；各自受實際 cgroup 與 confine 限制，後續關卡不執行 | 可信測試 fixture；不新增任意候選入口或正式 fault switch |
-| `bash tests/g3/native-failures/run-pipeline.sh` | 真 Core 持久管線的無效 QML／非法 import／逾時，保留關卡、拒絕發布、不可變來源與 revision | 獨立 `fault-injection` 測試二進位，僅三種固定負例；CI／VM，不宣稱實體畫面 |
+| `bash tests/g3/native-failures/run-pipeline.sh` | 真 Core 持久管線的無效 QML／非法 import／逾時，保留關卡、拒絕發布、不可變來源與 revision | 獨立 `fault-injection` 測試二進位；VM 跑完整 13 項，CI 設 `DITTO_G3_SKIP_TIMEOUT=1` 僅跑 8 項無效 QML／import，不在共用 runner 執行忙碌逾時 |
 | `python3 tests/g3/host/rejection.py` | 缺 bus、早期檔案系統錯誤、長 checkout 實際 network 邊界、非法命令／deadline／私有 runner 拒絕 | 只執行受控 network 診斷，不執行超限程式 |
 | `bash tools/dev-vm/run-g3.sh` | 還原閒置 VM、建置、上述流程與十項 OS 故障 | D-25 開發 VM，保存所有失敗與未執行 |
 | `DITTO_VM_SNAPSHOT=ditto-base DITTO_G3_EXPECT_OLD_ABI=1 bash tools/dev-vm/run-g3.sh` | ABI <6 的診斷與正式 Core partial 拒絕 | 完整候選執行刻意 `not_run`，runner 退出 2 |
