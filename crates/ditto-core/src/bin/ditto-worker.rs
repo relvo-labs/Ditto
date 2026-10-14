@@ -22,6 +22,12 @@ fn fail(key: &str) -> ! {
     std::process::exit(1);
 }
 
+fn generation_host_input(params: &Value) -> Value {
+    // Core-only admission metadata stays in the durable job. The native host
+    // retains its existing closed input and never receives conversation ids.
+    json!({"artifact": params["artifact"], "work_root": params["work_root"]})
+}
+
 /// Re-hash installed package trees and compare with what was recorded at
 /// installation (the same digest preflight uses).
 fn verify_packages(params: &Value) -> Value {
@@ -128,7 +134,10 @@ fn main() {
                 .spawn()
                 .unwrap_or_else(|_| fail("generation.host_unavailable"));
             if let Some(mut input) = child.stdin.take() {
-                if input.write_all(params.to_string().as_bytes()).is_err() {
+                if input
+                    .write_all(generation_host_input(&params).to_string().as_bytes())
+                    .is_err()
+                {
                     fail("generation.invalid_params");
                 }
             }
@@ -158,4 +167,18 @@ fn main() {
         _ => fail("job.unknown_kind"),
     };
     emit(json!({"result": result}));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn generation_host_input_keeps_private_turn_metadata_in_core() {
+        let params = json!({"artifact":{"artifact_id":"fixture"},"work_root":"/fixture","generation_turn_id":"private-turn"});
+        assert_eq!(
+            generation_host_input(&params),
+            json!({"artifact":{"artifact_id":"fixture"},"work_root":"/fixture"})
+        );
+        assert_eq!(params["generation_turn_id"], "private-turn");
+    }
 }

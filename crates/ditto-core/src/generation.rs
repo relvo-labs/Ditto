@@ -287,7 +287,10 @@ fn enqueue(
         turn_id: None,
         model: None,
     };
-    let params = json!({"artifact":candidate,"work_root":root});
+    // Private Core admission metadata is immutable per job, and never
+    // copied from caller input or from conversation text.
+    let params =
+        json!({"artifact":candidate,"work_root":root,"generation_turn_id":a.origin.turn_id});
     let job = jobs::enqueue(
         tx,
         kind,
@@ -711,13 +714,10 @@ mod tests {
             let job = queue(&mut store, &candidates[0], &paths.cache).unwrap();
             store
                 .write(|tx| {
-                    let mut failed = generated::validation_finished(
-                        tx,
-                        &candidates[0].artifact_id,
-                        &job.job_id,
-                        None,
-                        Some("same error"),
-                    )?;
+                    let terminal =
+                        jobs::finish(tx, &job.job_id, JobState::Failed, None, Some("same error"))?;
+                    finish_job(tx, &terminal)?;
+                    let mut failed = generated::get(tx, &candidates[0].artifact_id)?;
                     if !repeated {
                         failed.repair.stopped = true;
                         generated::save(tx, &failed)?;
@@ -729,13 +729,14 @@ mod tests {
                 let job = queue(&mut store, &candidates[1], &paths.cache).unwrap();
                 store
                     .write(|tx| {
-                        generated::validation_finished(
+                        let terminal = jobs::finish(
                             tx,
-                            &candidates[1].artifact_id,
                             &job.job_id,
+                            JobState::Failed,
                             None,
                             Some("same error"),
                         )?;
+                        finish_job(tx, &terminal)?;
                         Ok(())
                     })
                     .unwrap();
@@ -819,6 +820,440 @@ mod tests {
             queue(&mut store, &fresh, &paths.cache).unwrap().kind,
             "generation.validate"
         );
+        drop(store);
+        drop(lock);
+        std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+    }
+
+    fn report_fixture(a: &GeneratedArtifact, partial: Option<&str>) -> GenerationValidation {
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../tests/contract-vectors/0.3/shape-generation-validation-full.json"
+        ))
+        .unwrap();
+        let mut report: GenerationValidation =
+            serde_json::from_value(vector["value"].clone()).unwrap();
+        report.bundle_sha256 = a.bundle_sha256.clone();
+        if let Some(diagnostic) = partial {
+            report.boundary.enforcement = Enforcement::Unavailable;
+            for (index, stage) in report.stages.iter_mut().enumerate() {
+                stage.result = if index == 0 {
+                    StageResult::Failed
+                } else {
+                    StageResult::NotRun
+                };
+                stage.diagnostic = diagnostic.into();
+            }
+        }
+        report
+    }
+    fn queue_key(
+        store: &mut ditto_store::Store,
+        a: &GeneratedArtifact,
+        paths: &ditto_store::Paths,
+        key: &str,
+    ) -> Result<Job, StoreError> {
+        store.write(|tx| {
+            enqueue(
+                tx,
+                &GenerationJobInput {
+                    artifact_id: a.artifact_id.clone(),
+                    idempotency_key: key.into(),
+                },
+                false,
+                "cli",
+                &paths.cache,
+            )
+        })
+    }
+    fn settle(
+        store: &mut ditto_store::Store,
+        job: &Job,
+        state: JobState,
+        report: Option<GenerationValidation>,
+        error: Option<&str>,
+    ) {
+        store
+            .write(|tx| {
+                let result = report.map(|report| json!(report));
+                let terminal = jobs::finish(tx, &job.job_id, state, result.as_ref(), error)?;
+                finish_job(tx, &terminal)
+            })
+            .unwrap();
+    }
+    #[test]
+    fn revalidation_cancel_and_restart_cannot_enqueue_a_fifth_build() {
+        let (paths, lock, mut store) = budget_store();
+        let candidates = precreate(&mut store, 3);
+        let first = queue_key(&mut store, &candidates[0], &paths, "first").unwrap();
+        settle(
+            &mut store,
+            &first,
+            JobState::Failed,
+            Some(report_fixture(
+                &candidates[0],
+                Some("first isolation failure"),
+            )),
+            None,
+        );
+        assert_eq!(
+            generated::get(store.connection(), &candidates[0].artifact_id)
+                .unwrap()
+                .state,
+            ArtifactState::InspectOnly
+        );
+        let second = queue_key(&mut store, &candidates[0], &paths, "retry").unwrap();
+        store
+            .write(|tx| {
+                let cancelled = jobs::request_cancel(tx, &second.job_id)?;
+                finish_job(tx, &cancelled)
+            })
+            .unwrap();
+        assert_eq!(
+            jobs::get(store.connection(), &second.job_id)
+                .unwrap()
+                .error_key
+                .as_deref(),
+            Some("job.cancelled")
+        );
+        let third = queue_key(&mut store, &candidates[1], &paths, "third").unwrap();
+        settle(
+            &mut store,
+            &third,
+            JobState::Failed,
+            Some(report_fixture(
+                &candidates[1],
+                Some("different isolation failure"),
+            )),
+            None,
+        );
+        let fourth = queue_key(&mut store, &candidates[1], &paths, "retry").unwrap();
+        store
+            .write(|tx| {
+                jobs::start(tx, &fourth.job_id, "fixture-unit")?;
+                jobs::fail_interrupted(tx)?;
+                reconcile(tx)
+            })
+            .unwrap();
+        assert_eq!(
+            jobs::get(store.connection(), &fourth.job_id)
+                .unwrap()
+                .error_key
+                .as_deref(),
+            Some("job.interrupted")
+        );
+        let before = jobs::list(store.connection(), 100).unwrap();
+        assert_eq!(before.len(), 4);
+        assert!(
+            matches!(
+                queue_key(&mut store, &candidates[2], &paths, "fifth"),
+                Err(StoreError::Conflict(_))
+            ),
+            "a fifth build was admitted after two overwritten validation attempts"
+        );
+        assert_eq!(jobs::list(store.connection(), 100).unwrap(), before);
+        assert_eq!(
+            generated::get(store.connection(), &candidates[2].artifact_id).unwrap(),
+            candidates[2]
+        );
+        drop(store);
+        drop(lock);
+        std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn validation_job_outcomes_keep_individual_attempts() {
+        for outcome in [
+            "queued",
+            "running",
+            "cancelling",
+            "cancelled",
+            "running_cancelled",
+            "interrupted",
+            "failed",
+            "inspect_only",
+            "missing_report",
+            "malformed_report",
+            "wrong_hash",
+            "unknown",
+            "error_with_full_report",
+        ] {
+            let (paths, lock, mut store) = budget_store();
+            let candidates = precreate(&mut store, 5);
+            let first = queue_key(&mut store, &candidates[0], &paths, "first").unwrap();
+            match outcome {
+                "queued" => {}
+                "running" | "cancelling" | "interrupted" => {
+                    store
+                        .write(|tx| {
+                            jobs::start(tx, &first.job_id, "fixture")?;
+                            if outcome == "cancelling" {
+                                jobs::request_cancel(tx, &first.job_id)?;
+                            }
+                            if outcome == "interrupted" {
+                                jobs::fail_interrupted(tx)?;
+                                reconcile(tx)?;
+                            }
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+                "cancelled" => {
+                    store
+                        .write(|tx| {
+                            let job = jobs::request_cancel(tx, &first.job_id)?;
+                            finish_job(tx, &job)
+                        })
+                        .unwrap();
+                }
+                "running_cancelled" => {
+                    store
+                        .write(|tx| {
+                            jobs::start(tx, &first.job_id, "fixture")?;
+                            jobs::request_cancel(tx, &first.job_id)?;
+                            let cancelled = jobs::finish(
+                                tx,
+                                &first.job_id,
+                                JobState::Cancelled,
+                                None,
+                                Some("job.cancelled"),
+                            )?;
+                            finish_job(tx, &cancelled)
+                        })
+                        .unwrap();
+                }
+                "failed" => settle(
+                    &mut store,
+                    &first,
+                    JobState::Failed,
+                    None,
+                    Some("fixture.failure"),
+                ),
+                "inspect_only" => settle(
+                    &mut store,
+                    &first,
+                    JobState::Failed,
+                    Some(report_fixture(&candidates[0], Some("isolation"))),
+                    None,
+                ),
+                "missing_report" => settle(&mut store, &first, JobState::Succeeded, None, None),
+                "malformed_report" => {
+                    store
+                        .write(|tx| {
+                            let job = jobs::finish(
+                                tx,
+                                &first.job_id,
+                                JobState::Succeeded,
+                                Some(&json!({"not":"a report"})),
+                                None,
+                            )?;
+                            finish_job(tx, &job)
+                        })
+                        .unwrap();
+                }
+                "wrong_hash" => settle(
+                    &mut store,
+                    &first,
+                    JobState::Succeeded,
+                    Some(report_fixture(&candidates[1], None)),
+                    None,
+                ),
+                "error_with_full_report" => settle(
+                    &mut store,
+                    &first,
+                    JobState::Succeeded,
+                    Some(report_fixture(&candidates[0], None)),
+                    Some("fixture.error"),
+                ),
+                "unknown" => {
+                    // Unknown persisted state must not become success through
+                    // the protocol's display fallback or mutable artifact.
+                    store
+                        .write(|tx| {
+                            tx.pragma_update(None, "ignore_check_constraints", true)?;
+                            tx.execute(
+                                "UPDATE jobs SET state='unknown' WHERE job_id=?1",
+                                [&first.job_id],
+                            )?;
+                            tx.pragma_update(None, "ignore_check_constraints", false)?;
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+                _ => unreachable!(),
+            }
+            for a in candidates.iter().skip(1).take(3) {
+                queue(&mut store, a, &paths.cache).unwrap();
+            }
+            let before = jobs::list(store.connection(), 100).unwrap();
+            assert!(
+                matches!(
+                    queue(&mut store, &candidates[4], &paths.cache),
+                    Err(StoreError::Conflict(_))
+                ),
+                "{outcome}"
+            );
+            assert_eq!(jobs::list(store.connection(), 100).unwrap(), before);
+            // Candidate creation must use the same ledger as enqueue.
+            let mut description = candidates[4].description.clone();
+            description.plugin_id = "local.generated.bypass".into();
+            assert!(matches!(
+                store.write(|tx| generated::create(
+                    tx,
+                    &GenerateInput {
+                        description,
+                        request_summary: "bypass".into(),
+                        parent_id: None,
+                        idempotency_key: "bypass".into(),
+                    },
+                    candidates[4].origin.clone()
+                )),
+                Err(StoreError::Conflict(_))
+            ));
+            drop(store);
+            drop(lock);
+            std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn validation_success_releases_only_its_own_attempt() {
+        for repaired_child in [false, true] {
+            let (paths, lock, mut store) = budget_store();
+            let candidates = precreate(&mut store, 5);
+            let failed = queue_key(&mut store, &candidates[0], &paths, "failed").unwrap();
+            let mut failure = report_fixture(&candidates[0], Some("isolation"));
+            if repaired_child {
+                failure.boundary.enforcement = Enforcement::Full;
+            }
+            settle(&mut store, &failed, JobState::Failed, Some(failure), None);
+            let validated = if repaired_child {
+                store
+                    .write(|tx| {
+                        let mut description = candidates[0].description.clone();
+                        description.version = "1.0.1".into();
+                        generated::create(
+                            tx,
+                            &GenerateInput {
+                                description,
+                                request_summary: "repair".into(),
+                                parent_id: Some(candidates[0].artifact_id.clone()),
+                                idempotency_key: "repair-child".into(),
+                            },
+                            candidates[0].origin.clone(),
+                        )
+                    })
+                    .unwrap()
+            } else {
+                candidates[0].clone()
+            };
+            let success = queue_key(&mut store, &validated, &paths, "success").unwrap();
+            settle(
+                &mut store,
+                &success,
+                JobState::Succeeded,
+                Some(report_fixture(&validated, None)),
+                None,
+            );
+            assert_eq!(
+                generated::get(store.connection(), &validated.artifact_id)
+                    .unwrap()
+                    .state,
+                ArtifactState::Validated
+            );
+            assert_eq!(
+                queue_key(&mut store, &validated, &paths, "success")
+                    .unwrap()
+                    .job_id,
+                success.job_id
+            );
+            // Preview has its own job but leaves the three free build slots intact.
+            store
+                .write(|tx| {
+                    enqueue(
+                        tx,
+                        &GenerationJobInput {
+                            artifact_id: validated.artifact_id.clone(),
+                            idempotency_key: "preview".into(),
+                        },
+                        true,
+                        "cli",
+                        &paths.cache,
+                    )
+                })
+                .unwrap();
+            for a in candidates.iter().skip(1).take(3) {
+                queue(&mut store, a, &paths.cache).unwrap();
+            }
+            let before = jobs::list(store.connection(), 100).unwrap();
+            assert_eq!(before.len(), 6); // One failure, one success, preview, three builds.
+            assert!(matches!(
+                queue(&mut store, &candidates[4], &paths.cache),
+                Err(StoreError::Conflict(_))
+            ));
+            assert_eq!(jobs::list(store.connection(), 100).unwrap(), before);
+            assert_eq!(
+                jobs::get(store.connection(), &failed.job_id).unwrap().state,
+                JobState::Failed
+            );
+            drop(store);
+            drop(lock);
+            std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn independent_successes_and_new_turn_do_not_share_spent_attempts() {
+        let (paths, lock, mut store) = budget_store();
+        let candidates = precreate(&mut store, 10);
+        for a in candidates.iter().take(6) {
+            let job = queue(&mut store, a, &paths.cache).unwrap();
+            settle(
+                &mut store,
+                &job,
+                JobState::Succeeded,
+                Some(report_fixture(a, None)),
+                None,
+            );
+        }
+        for a in candidates.iter().skip(6) {
+            queue(&mut store, a, &paths.cache).unwrap();
+        }
+        // Neither a reconnect nor artifact state edits can release queued jobs:
+        // attribution is saved per job and readback has no budget side effects.
+        store
+            .write(|tx| {
+                let mut edited = generated::get(tx, &candidates[6].artifact_id)?;
+                edited.origin.turn_id = Some("different-artifact-origin".into());
+                edited.state = ArtifactState::Validated;
+                generated::save(tx, &edited)?;
+                Ok(())
+            })
+            .unwrap();
+        let reader = ditto_store::Store::open_reader(&paths).unwrap();
+        assert!(generated::check_turn_budget(reader.connection(), &candidates[0].origin).is_err());
+        assert_eq!(jobs::list(reader.connection(), 100).unwrap().len(), 10);
+        let mut description = candidates[0].description.clone();
+        description.plugin_id = "local.generated.explicit_new_turn".into();
+        let fresh = store
+            .write(|tx| {
+                generated::create(
+                    tx,
+                    &GenerateInput {
+                        description,
+                        request_summary: "explicit new turn".into(),
+                        parent_id: None,
+                        idempotency_key: "new-turn".into(),
+                    },
+                    GenerationOrigin {
+                        request_summary: "explicit new turn".into(),
+                        turn_id: Some("new-user-turn".into()),
+                        model: None,
+                    },
+                )
+            })
+            .unwrap();
+        assert!(queue(&mut store, &fresh, &paths.cache).is_ok());
+        drop(reader);
         drop(store);
         drop(lock);
         std::fs::remove_dir_all(paths.data.parent().unwrap()).unwrap();

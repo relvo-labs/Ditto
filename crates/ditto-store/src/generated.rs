@@ -4,7 +4,7 @@ use crate::{time, StoreError, StoreResult};
 use ditto_protocol::{generation::*, ids, jcs, profile::ProfileDocument};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn get(c: &Connection, id: &str) -> StoreResult<GeneratedArtifact> {
     let text: String = c
@@ -47,18 +47,83 @@ pub fn save(c: &Connection, a: &GeneratedArtifact) -> StoreResult<()> {
     )?;
     Ok(())
 }
+/// Each durable validate job is one attempt. Only its own successful, full
+/// report releases it; mutable artifact state is never outcome evidence.
+fn turn_attempts(c: &Connection, turn: &str) -> StoreResult<(usize, bool)> {
+    let mut statement = c.prepare(
+        "SELECT state,params_json,result_json,error_key FROM jobs WHERE kind='generation.validate'",
+    )?;
+    let rows = statement.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, Option<String>>(1)?,
+            r.get::<_, Option<String>>(2)?,
+            r.get::<_, Option<String>>(3)?,
+        ))
+    })?;
+    let mut spent = 0;
+    let mut fingerprints = BTreeMap::<String, usize>::new();
+    for row in rows {
+        let (state, params, result, error) = row?;
+        let params = params.and_then(|text| serde_json::from_str::<Value>(&text).ok());
+        let belongs = match params.as_ref().and_then(|v| v.get("generation_turn_id")) {
+            Some(Value::String(id)) => id == turn,
+            Some(Value::Null) => false, // Known non-Agent request.
+            Some(_) => true,            // Unattributable private history: fail closed.
+            None => {
+                // Legacy jobs stripped origin from worker parameters. Resolve
+                // attribution only, never outcome, through the saved artifact.
+                match params
+                    .as_ref()
+                    .and_then(|v| v["artifact"]["artifact_id"].as_str())
+                {
+                    Some(id) => {
+                        get(c, id).map_or(true, |a| a.origin.turn_id.as_deref() == Some(turn))
+                    }
+                    None => true,
+                }
+            }
+        };
+        if !belongs {
+            continue;
+        }
+        let report =
+            result.and_then(|text| serde_json::from_str::<GenerationValidation>(&text).ok());
+        let passed = state == "succeeded"
+            && error.is_none()
+            && params
+                .as_ref()
+                .and_then(|v| v["artifact"]["bundle_sha256"].as_str())
+                .is_some_and(|hash| report.as_ref().is_some_and(|v| v.passed(hash)));
+        if passed {
+            continue;
+        }
+        spent += 1;
+        if !matches!(state.as_str(), "queued" | "running" | "cancelling") {
+            let fingerprint = report
+                .as_ref()
+                .and_then(|v| v.stages.iter().find(|s| s.result == StageResult::Failed))
+                .map(|s| jcs::digest(&json!([s.stage, s.diagnostic])))
+                .unwrap_or_else(|| {
+                    jcs::digest(&json!(error.as_deref().unwrap_or("validation_unavailable")))
+                });
+            *fingerprints.entry(fingerprint).or_default() += 1;
+        }
+    }
+    Ok((spent, fingerprints.values().any(|count| *count >= 2)))
+}
 /// Initial validation plus at most three repairs. Validating includes queued
 /// jobs: admission and the state reservation must share the writer transaction.
 pub fn check_turn_budget(c: &Connection, origin: &GenerationOrigin) -> StoreResult<()> {
     if let Some(turn) = &origin.turn_id {
-        let reservations:i64=c.query_row("SELECT count(*) FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only','validating')",[turn],|r|r.get(0))?;
-        let repeated:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only') GROUP BY json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') HAVING count(*)>=2 AND json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') IS NOT NULL)",[turn],|r|r.get(0))?;
+        let (reservations, repeated_jobs) = turn_attempts(c, turn)?;
+
         let stopped: bool = c.query_row(
             "SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.repair.stopped')=1)",
             [turn],
             |r| r.get(0),
         )?;
-        if reservations >= 4 || repeated || stopped {
+        if reservations >= 4 || repeated_jobs || stopped {
             return Err(StoreError::Conflict(
                 "this turn's generation repair budget is exhausted".into(),
             ));
@@ -476,13 +541,18 @@ fn transition(c: &Connection, a: &GeneratedArtifact) -> StoreResult<DataTransiti
             if schema < a.description.data.schema_version {
                 return Err(irreversible());
             }
-            let edge: Option<(i64, String, u32, String)> = c.query_row(
-                "SELECT rowid,from_artifact_id,schema_version,payload_json FROM generated_data_snapshots WHERE plugin_id=?1 AND to_artifact_id=?2 AND rowid<?3 ORDER BY rowid DESC LIMIT 1",
+            let edge: Option<(i64, String, u32, String, i64)> = c.query_row(
+                "SELECT rowid,from_artifact_id,schema_version,payload_json,lineage_proven FROM generated_data_snapshots WHERE plugin_id=?1 AND to_artifact_id=?2 AND rowid<?3 ORDER BY rowid DESC LIMIT 1",
                 params![a.description.plugin_id, owner.artifact_id, before_rowid],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             ).optional()?;
-            let (rowid, from, from_schema, saved) = edge.ok_or_else(unavailable)?;
-            let previous = get(c, &from)?;
+            let (rowid, from, from_schema, saved, proven) = edge.ok_or_else(unavailable)?;
+            // Inspect the newest edge before considering proof. Filtering out
+            // unproven rows in SQL could resurrect an older abandoned branch.
+            if proven != 1 {
+                return Err(unavailable());
+            }
+            let previous = get(c, &from).map_err(|_| unavailable())?;
             if previous.description.plugin_id != a.description.plugin_id
                 || previous.description.data.schema_version != from_schema
                 || from_schema > schema
@@ -581,7 +651,7 @@ pub fn apply_document(
             }
             if let Some((from, version, old)) = transition.snapshot {
                 c.execute(
-                    "INSERT INTO generated_data_snapshots VALUES(?1,?2,?3,?4,?5,?6,?7)",
+                    "INSERT INTO generated_data_snapshots (change_id,plugin_id,from_artifact_id,to_artifact_id,schema_version,payload_json,created_at,lineage_proven) VALUES(?1,?2,?3,?4,?5,?6,?7,1)",
                     params![
                         change_id,
                         a.description.plugin_id,
@@ -795,22 +865,85 @@ mod tests {
             },
         );
         publish(c, &mut b);
+        let origin = ditto_protocol::profile::RevisionOrigin::Create {
+            from: "atomic-lineage-fixture".into(),
+        };
+        let (profile, first) = temp
+            .store
+            .write(|tx| {
+                let (profile, first) =
+                    crate::profiles::create(tx, "atomic", &document(&a), &origin)?;
+                crate::profiles::set_active_profile(tx, &profile.profile_id)?;
+                Ok((profile, first))
+            })
+            .unwrap();
         // Simulate a failed Profile commit AFTER data migration, in the same tx.
         let failure: StoreResult<()> = temp.store.write(|tx| {
             apply_document(tx, &document(&b), "aborted")?;
+            let revision = crate::profiles::insert_revision(
+                tx,
+                &profile.profile_id,
+                Some(&first.revision_id),
+                &document(&b),
+                &origin,
+                None,
+            )?;
+            crate::profiles::set_head(tx, &profile.profile_id, &revision.revision_id)?;
+            assert_eq!(
+                tx.query_row(
+                    "SELECT lineage_proven FROM generated_data_snapshots WHERE change_id='aborted'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )?,
+                1
+            );
             Err(StoreError::Invalid("injected commit failure".into()))
         });
         assert!(failure.is_err());
         let c = temp.store.connection();
+        assert_eq!(
+            crate::profiles::get(c, &profile.profile_id)
+                .unwrap()
+                .head_revision,
+            first.revision_id
+        );
+        assert_eq!(
+            c.query_row("SELECT count(*) FROM generated_data_snapshots", [], |r| r
+                .get::<_, i64>(
+                0
+            ))
+            .unwrap(),
+            0
+        );
         assert_eq!(data_get(c, &a).unwrap().payload, json!({"note":"keep me"}));
         assert_eq!(
             get(c, &b.artifact_id).unwrap().state,
             ArtifactState::Published
         );
         temp.store
-            .write(|tx| apply_document(tx, &document(&b), "upgrade"))
+            .write(|tx| {
+                apply_document(tx, &document(&b), "upgrade")?;
+                let revision = crate::profiles::insert_revision(
+                    tx,
+                    &profile.profile_id,
+                    Some(&first.revision_id),
+                    &document(&b),
+                    &origin,
+                    None,
+                )?;
+                crate::profiles::set_head(tx, &profile.profile_id, &revision.revision_id)
+            })
             .unwrap();
         let c = temp.store.connection();
+        assert_eq!(
+            c.query_row(
+                "SELECT lineage_proven FROM generated_data_snapshots WHERE change_id='upgrade'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            1
+        );
         assert_eq!(
             data_get(c, &b).unwrap().payload,
             json!({"title":"keep me","done":false})
@@ -946,6 +1079,339 @@ mod tests {
         input.description.version = "1.9.0".into();
         assert!(create(c, &input, b.origin.clone()).is_err());
     }
+    #[test]
+    fn v4_abandoned_snapshot_is_unproven_after_migration() {
+        for new_last_hop in [false, true] {
+            let root = crate::testing::temp_root("generated-v4-abandoned");
+            let paths = crate::Paths::under(&root);
+            paths.create().unwrap();
+            let lock = crate::WriterLock::acquire(&paths.lock()).unwrap();
+            let mut db = Connection::open(paths.database()).unwrap();
+            crate::schema::tests::v4_fixture(&mut db);
+            let mut a = candidate(
+                &db,
+                None,
+                "1.0.0",
+                DataPlan {
+                    fields: [("x".into(), DataType::Text)].into(),
+                    ..Default::default()
+                },
+            );
+            publish(&db, &mut a);
+            let plan = |schema, from, old: &str, new: &str, rollback| DataPlan {
+                schema_version: schema,
+                fields: [(new.into(), DataType::Text)].into(),
+                migration: Some(DataMigration {
+                    from_version: from,
+                    rename: if old == new {
+                        Default::default()
+                    } else {
+                        [(old.into(), new.into())].into()
+                    },
+                    defaults: Default::default(),
+                    remove: vec![],
+                    rollback,
+                }),
+            };
+            let mut b = candidate(
+                &db,
+                Some(&a),
+                "2.0.0",
+                plan(2, 1, "x", "y", RollbackPolicy::Snapshot),
+            );
+            publish(&db, &mut b);
+            let mut sibling = candidate(
+                &db,
+                Some(&a),
+                "2.1.0",
+                plan(2, 1, "x", "y", RollbackPolicy::Unavailable),
+            );
+            publish(&db, &mut sibling);
+            let mut d = candidate(
+                &db,
+                Some(&b),
+                "3.0.0",
+                plan(3, 2, "y", "label", RollbackPolicy::Snapshot),
+            );
+            publish(&db, &mut d);
+            let origin = ditto_protocol::profile::RevisionOrigin::Create {
+                from: "historical-v4".into(),
+            };
+            let tx = db.transaction().unwrap();
+            let (profile, first) =
+                crate::profiles::create(&tx, "v4", &document(&a), &origin).unwrap();
+            crate::profiles::set_active_profile(&tx, &profile.profile_id).unwrap();
+            tx.execute(
+                "INSERT INTO generated_plugin_data VALUES(?1,?2,1,1,?3)",
+                params![
+                    a.description.plugin_id,
+                    a.artifact_id,
+                    r#"{"x":"original"}"#
+                ],
+            )
+            .unwrap();
+            tx.commit().unwrap();
+            let mut head = first.revision_id;
+            // Exact pre-fix v4 history. Snapshots were saved only for snapshot
+            // upgrades, retained on rollback, and absent on same-schema switches.
+            for (key, owner, payload, snapshot) in [
+                (
+                    "a-b",
+                    &b,
+                    json!({"y":"original"}),
+                    Some((&a, json!({"x":"original"}))),
+                ),
+                ("b-a", &a, json!({"x":"original"}), None),
+                ("a-s", &sibling, json!({"y":"later edit"}), None),
+                ("s-b", &b, json!({"y":"later edit"}), None),
+                (
+                    "b-d",
+                    &d,
+                    json!({"label":"later edit"}),
+                    Some((&b, json!({"y":"later edit"}))),
+                ),
+            ] {
+                if new_last_hop && key == "b-d" {
+                    continue;
+                }
+                if key == "a-s" {
+                    data_write(
+                        &db,
+                        &a,
+                        &GeneratedDataInput {
+                            artifact_id: a.artifact_id.clone(),
+                            expected_revision: data_get(&db, &a).unwrap().revision,
+                            payload: json!({"x":"later edit"}),
+                        },
+                    )
+                    .unwrap();
+                }
+                let tx = db.transaction().unwrap();
+                if let Some((from, saved)) = snapshot {
+                    tx.execute("INSERT INTO generated_data_snapshots (change_id,plugin_id,from_artifact_id,to_artifact_id,schema_version,payload_json,created_at) VALUES(?1,?2,?3,?4,?5,?6,'v4')",
+                    params![key, a.description.plugin_id, from.artifact_id, owner.artifact_id, from.description.data.schema_version, saved.to_string()]).unwrap();
+                }
+                tx.execute("UPDATE generated_plugin_data SET artifact_id=?1,schema_version=?2,revision=revision+1,payload_json=?3", params![owner.artifact_id,owner.description.data.schema_version,payload.to_string()]).unwrap();
+                let revision = crate::profiles::insert_revision(
+                    &tx,
+                    &profile.profile_id,
+                    Some(&head),
+                    &document(owner),
+                    &origin,
+                    None,
+                )
+                .unwrap();
+                crate::profiles::set_head(&tx, &profile.profile_id, &revision.revision_id).unwrap();
+                head = revision.revision_id;
+                tx.commit().unwrap();
+            }
+            if new_last_hop {
+                b.state = ArtifactState::Active;
+                save(&db, &b).unwrap();
+            } else {
+                d.state = ArtifactState::Active;
+                save(&db, &d).unwrap();
+            }
+            let mut snapshots: Vec<String> = db
+                .prepare("SELECT payload_json FROM generated_data_snapshots ORDER BY rowid")
+                .unwrap()
+                .query_map([], |r| r.get(0))
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap();
+            drop(db);
+            let (mut store, report) = crate::Store::open_writer(&paths, &lock).unwrap();
+            assert_eq!(report.migrated_from, Some(4));
+            assert_eq!(crate::schema::user_version(store.connection()).unwrap(), 5);
+            assert_eq!(
+                store
+                    .connection()
+                    .query_row(
+                        "SELECT count(*) FROM generated_data_snapshots WHERE lineage_proven!=0",
+                        [],
+                        |r| r.get::<_, i64>(0)
+                    )
+                    .unwrap(),
+                0
+            );
+            if new_last_hop {
+                // Also cover a proved post-migration b->d hop above the unproven
+                // abandoned a->b snapshot. A valid newest edge proves no ancestor.
+                head = store
+                    .write(|tx| {
+                        apply_document(tx, &document(&d), "new-b-d")?;
+                        let revision = crate::profiles::insert_revision(
+                            tx,
+                            &profile.profile_id,
+                            Some(&head),
+                            &document(&d),
+                            &origin,
+                            None,
+                        )?;
+                        crate::profiles::set_head(tx, &profile.profile_id, &revision.revision_id)?;
+                        Ok(revision.revision_id)
+                    })
+                    .unwrap();
+                snapshots.push(json!({"y":"later edit"}).to_string());
+                assert_eq!(store.connection().query_row("SELECT lineage_proven FROM generated_data_snapshots WHERE change_id='new-b-d'", [], |r| r.get::<_, i64>(0)).unwrap(), 1);
+                assert_eq!(store.connection().query_row("SELECT lineage_proven FROM generated_data_snapshots WHERE change_id='a-b'", [], |r| r.get::<_, i64>(0)).unwrap(), 0);
+            }
+            let before_data = json!(data_get(store.connection(), &d).unwrap());
+            let before_artifact = get(store.connection(), &d.artifact_id).unwrap();
+            assert!(
+                matches!(
+                    check_document(store.connection(), &document(&a)),
+                    Err(StoreError::Conflict(_))
+                ),
+                "historical stale a->b snapshot was accepted as active lineage"
+            );
+            let refused = store.write(|tx| {
+                apply_document(tx, &document(&a), "refused-legacy-rollback")?;
+                let revision = crate::profiles::insert_revision(
+                    tx,
+                    &profile.profile_id,
+                    Some(&head),
+                    &document(&a),
+                    &origin,
+                    None,
+                )?;
+                crate::profiles::set_head(tx, &profile.profile_id, &revision.revision_id)
+            });
+            assert!(matches!(refused, Err(StoreError::Conflict(_))));
+            assert_eq!(
+                crate::profiles::get(store.connection(), &profile.profile_id)
+                    .unwrap()
+                    .head_revision,
+                head
+            );
+            assert_eq!(
+                json!(data_get(store.connection(), &d).unwrap()),
+                before_data
+            );
+            assert_eq!(
+                get(store.connection(), &d.artifact_id).unwrap(),
+                before_artifact
+            );
+            let retained: Vec<String> = store
+                .connection()
+                .prepare("SELECT payload_json FROM generated_data_snapshots ORDER BY rowid")
+                .unwrap()
+                .query_map([], |r| r.get(0))
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap();
+            assert_eq!(retained, snapshots);
+            drop(store);
+            drop(lock);
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn new_same_schema_hops_keep_irreversible_lineage() {
+        let temp = crate::testing::open("same-schema-lineage");
+        let c = temp.store.connection();
+        let mut a = candidate(c, None, "1.0.0", DataPlan::default());
+        publish(c, &mut a);
+        apply_document(c, &document(&a), "initial").unwrap();
+        let plan = |schema, from, rollback| DataPlan {
+            schema_version: schema,
+            fields: Default::default(),
+            migration: Some(DataMigration {
+                from_version: from,
+                rename: Default::default(),
+                remove: vec![],
+                defaults: Default::default(),
+                rollback,
+            }),
+        };
+        let mut b = candidate(
+            c,
+            Some(&a),
+            "2.0.0",
+            plan(2, 1, RollbackPolicy::Unavailable),
+        );
+        publish(c, &mut b);
+        apply_document(c, &document(&b), "irreversible").unwrap();
+        // Candidate parent is a, but the actual data predecessor is b.
+        let mut sibling = candidate(c, Some(&a), "2.1.0", plan(2, 1, RollbackPolicy::Compatible));
+        publish(c, &mut sibling);
+        apply_document(c, &document(&sibling), "same-schema").unwrap();
+        let mut d = candidate(
+            c,
+            Some(&sibling),
+            "3.0.0",
+            plan(3, 2, RollbackPolicy::Snapshot),
+        );
+        publish(c, &mut d);
+        apply_document(c, &document(&d), "third").unwrap();
+        let before = json!(data_get(c, &d).unwrap());
+        assert_eq!(c.query_row("SELECT from_artifact_id FROM generated_data_snapshots WHERE change_id='same-schema' AND lineage_proven=1", [], |r| r.get::<_, String>(0)).unwrap(), b.artifact_id);
+        assert!(matches!(
+            check_document(c, &document(&a)),
+            Err(StoreError::Conflict(_))
+        ));
+        assert!(apply_document(c, &document(&a), "refused").is_err());
+        assert_eq!(json!(data_get(c, &d).unwrap()), before);
+    }
+
+    #[test]
+    fn missing_or_unproven_edge_never_falls_back_to_older_snapshot() {
+        for proven in [0, 7] {
+            let temp = crate::testing::open("unproven-newest-edge");
+            let c = temp.store.connection();
+            let mut a = candidate(c, None, "1.0.0", DataPlan::default());
+            publish(c, &mut a);
+            apply_document(c, &document(&a), "initial").unwrap();
+            let mut b = candidate(
+                c,
+                Some(&a),
+                "2.0.0",
+                DataPlan {
+                    schema_version: 2,
+                    fields: Default::default(),
+                    migration: Some(DataMigration {
+                        from_version: 1,
+                        rename: Default::default(),
+                        defaults: Default::default(),
+                        remove: vec![],
+                        rollback: RollbackPolicy::Snapshot,
+                    }),
+                },
+            );
+            publish(c, &mut b);
+            apply_document(c, &document(&b), "proved-old-edge").unwrap();
+            c.execute("INSERT INTO generated_data_snapshots (change_id,plugin_id,from_artifact_id,to_artifact_id,schema_version,payload_json,created_at) SELECT 'unproven-newest',plugin_id,from_artifact_id,to_artifact_id,schema_version,payload_json,created_at FROM generated_data_snapshots WHERE change_id='proved-old-edge'", []).unwrap();
+            assert!(c.execute("UPDATE generated_data_snapshots SET lineage_proven=7 WHERE change_id='unproven-newest'", []).is_err());
+            if proven == 7 {
+                // A corrupted database cannot make a non-binary proof valid.
+                c.pragma_update(None, "ignore_check_constraints", true)
+                    .unwrap();
+                c.execute("UPDATE generated_data_snapshots SET lineage_proven=7 WHERE change_id='unproven-newest'", []).unwrap();
+                c.pragma_update(None, "ignore_check_constraints", false)
+                    .unwrap();
+            }
+            let before = json!(data_get(c, &b).unwrap());
+            assert!(matches!(
+                check_document(c, &document(&a)),
+                Err(StoreError::Conflict(_))
+            ));
+            assert!(matches!(
+                apply_document(c, &document(&a), "refused"),
+                Err(StoreError::Conflict(_))
+            ));
+            assert_eq!(json!(data_get(c, &b).unwrap()), before);
+            assert_eq!(
+                c.query_row("SELECT count(*) FROM generated_data_snapshots", [], |r| r
+                    .get::<_, i64>(
+                    0
+                ))
+                .unwrap(),
+                2
+            );
+        }
+    }
+
     #[test]
     fn rollback_checks_every_actual_lineage_hop() {
         for first in [
