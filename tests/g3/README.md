@@ -3,7 +3,7 @@
 | 命令 | 範圍 | 證據限制 |
 | --- | --- | --- |
 | `bash tools/dev-vm/test-artifact-collection.sh` | 唯讀套件證據的內容／來源權限保留、接收副本可刪除；不需 VM | CI checkout 回歸，不是候選執行證據 |
-| `bash tests/g3/run.sh` | Rust 描述／資料／修復、固定模板與正式管理中心 QtTest、native runner 建置 | 兩組 QtTest 共 11 項；不能代替真實模型 |
+| `bash tests/g3/run.sh` | Rust 描述／資料／修復、固定模板與正式管理中心 QtTest、native runner 建置 | 兩組 QtTest 共 12 項；不能代替真實模型 |
 | `node tests/g3/integration/run.mjs` | 正式 Core → 工作池 → 隔離 native 五關 → 發布；缺 Shell 啟用安全中止；三類未信任 archive 安裝／啟用拒絕 | 生產政策與故障交易的開發證據 |
 | `DITTO_G3_TRUST_ONLY=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/ditto-g3-test-bus node tests/g3/integration/run.mjs` | 真正不可用隔離的 QML／Node／原生 ELF 安裝矩陣、權威拒絕與 revision／執行見證 | 不模擬 full；同一矩陣也在 full／partial Core 整合執行 |
 | `bash tests/g3/desktop/build.sh` | hostd／Agent 與內建套件建置 | 執行前先 `pnpm install --frozen-lockfile` |
@@ -11,7 +11,7 @@
 | `bash tests/g3/restart/run.sh` | 兩個真實預覽中止 Core、回收舊 scope、回讀歷程並啟動新工作 | headless 開發故障證據 |
 | `bash tests/g3/agent/run.sh` | 釘選 app-server + loopback，真實動態工具、一次性啟用 approval 且無永久 data grant、原生驗證、多輪修改、來源刪除與退出後存活 | 不使用真訂閱、外部模型或既有帳號；不計模型品質 |
 | `python3 tests/g3/native-failures/driver.py` | 真 Qt runner 的 syntax／contract／load／focus／interaction 逐關失敗及非法 import；各自受實際 cgroup 與 confine 限制，後續關卡不執行 | 可信測試 fixture；不新增任意候選入口或正式 fault switch |
-| `python3 tests/g3/host/rejection.py` | 缺 bus、非法命令／deadline／私有 runner 拒絕 | 不執行超限程式 |
+| `python3 tests/g3/host/rejection.py` | 缺 bus、早期檔案系統錯誤、長 checkout 實際 network 邊界、非法命令／deadline／私有 runner 拒絕 | 只執行受控 network 診斷，不執行超限程式 |
 | `bash tools/dev-vm/run-g3.sh` | 還原閒置 VM、建置、上述流程與十項 OS 故障 | D-25 開發 VM，保存所有失敗與未執行 |
 | `DITTO_VM_SNAPSHOT=ditto-base DITTO_G3_EXPECT_OLD_ABI=1 bash tools/dev-vm/run-g3.sh` | ABI <6 的診斷與正式 Core partial 拒絕 | 完整候選執行刻意 `not_run`，runner 退出 2 |
 | `bash tests/g3/host/run.sh` | cgroup、Landlock、seccomp、OOM／fork／timeout／取消／清理 | VM 先跑；參考機另保留桌面 PID／revision |

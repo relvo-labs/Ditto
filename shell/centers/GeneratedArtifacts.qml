@@ -11,14 +11,19 @@ Section {
     property var jobs: ({})
     property int jobEventSerial: 0
     property var jobEventVersions: ({})
+    property int reloadSerial: 0
     property string notice: ""
     property var record: null
     title: client.t(qsTr("生成的插件"))
     note: client.t(qsTr("顯示最近十個版本。每次修改都建立新版本並重新驗證；舊版本保留供檢查與回復。"))
     function reload() {
-        client.capability("desktop.plugins.development.list", {}, result => { page.artifacts=result.artifacts; }, error => {page.notice=client.errorText(error);});
+        const request=++page.reloadSerial;
+        client.capability("desktop.plugins.development.list", {}, result => {
+            if(request===page.reloadSerial) page.artifacts=result.artifacts;
+        }, error => {if(request===page.reloadSerial) page.notice=client.errorText(error);});
         const requestedAt=page.jobEventSerial;
         client.capability("desktop.jobs.list", {}, result => {
+            if(request!==page.reloadSerial) return;
             const next=Object.assign({},page.jobs);
             for(const job of result.jobs) {
                 // A response requested before a received event must not
@@ -26,7 +31,7 @@ Section {
                 if(!(page.jobEventVersions[job.job_id]>requestedAt)) next[job.job_id]=job;
             }
             page.jobs=next;
-        }, error => {page.notice=client.errorText(error);});
+        }, error => {if(request===page.reloadSerial) page.notice=client.errorText(error);});
     }
     function artifactJobs(a) {
         const ids=[a.validation_job_id].concat((a.previews || []).map(p=>p.job_id));

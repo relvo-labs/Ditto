@@ -53,3 +53,5 @@ full／partial 與真模型在最後 UI 補強前的共同來源樹為 `d1aea05a
 ## 提交與遠端 CI
 
 實作提交 `9e6e37d`，證據另作文件提交，一起更新既有 PR #40；沒有合併 PR 或自動關閉 issue。遠端結果以 PR 的當前 commit／GitHub checks 為準；本檔記錄提交前的本機及 VM 驗證，不能用這些成功覆蓋原 HEAD 的 checkout 失敗，也不預告 CI 成功。
+
+PR 推送後的實際 CI 差異另記於 [CI 增補](G3-ci-followup-2026-10-14.md)：lifecycle 通過；G3 的長 checkout 診斷 socket／早期 Report 形狀已修正，管理中心產物清單亂序保護補至 7 項 QtTest。上方完整 VM 的 6 項與來源指紋仍是該輪實測，不回填為後續版本。

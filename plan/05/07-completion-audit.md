@@ -50,3 +50,5 @@ Core 持有生成紀錄、修復預算、配置 revision 與插件資料；Agent
 首次驗證結果與來源指紋見 [後續證據](../../.agents/notes/gate-reviews/G3-followup-2026-10-14.md)。後續實作提交 `9e6e37d` 與證據更新到 PR #40；GitHub 舊 HEAD 的 check 失敗與當前版本分開記錄，本機通過不能寫成遠端 CI 已通過。
 
 使用者追問「每個 issue 都做完了嗎」後的功能補齊與最新證據見 [功能補齊紀錄](../../.agents/notes/gate-reviews/G3-functional-completion-2026-10-14.md)。GitHub #15～#34 仍全部開啟；實作完成、開發驗證、實體驗收與 owner 關閉分別記錄，不以文件勾選代替功能或出口。
+
+PR 更新後另修正 [CI 長 checkout 路徑與早期報告](../../.agents/notes/gate-reviews/G3-ci-followup-2026-10-14.md)，管理中心快照亂序保護增至 7 項 QtTest。CI 實際結果分開記錄，不以先前本機成功推定遠端已通過。

@@ -52,6 +52,24 @@ struct Report {
     candidate_activation_available: bool,
 }
 
+impl Report {
+    fn unavailable(probe: &str, error: &str, elapsed_ms: u128) -> Self {
+        Self {
+            format_version: 1,
+            probe: probe.into(),
+            unit: String::new(),
+            boundary: Boundary::unavailable(error),
+            outcome: "unavailable".into(),
+            service_result: "not_observed".into(),
+            completion: None,
+            cleanup_complete: false,
+            diagnostics: error.into(),
+            elapsed_ms,
+            candidate_activation_available: false,
+        }
+    }
+}
+
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
@@ -160,11 +178,13 @@ fn runner(args: &[String]) -> io::Result<()> {
     let confine = binary_dir.join("ditto-confine");
     let probe = binary_dir.join("ditto-test-probe");
     let workspace = root.join("workspace");
-    let outside = root.join(if kind == "network" {
-        "denied.sock"
+    let outside = if kind == "network" {
+        // The listener lives at a short, manager-visible runtime path. Using
+        // a long checkout path here would fail at sun_path before policy ran.
+        root.join("denied.sock").canonicalize()?
     } else {
-        "sentinel"
-    });
+        root.join("sentinel")
+    };
     let (ours, theirs) = UnixStream::pair()?;
     ours.set_read_timeout(Some(Duration::from_secs(5)))?;
     let fd = theirs.as_raw_fd();
@@ -284,10 +304,19 @@ fn run(kind: &str, deadline: u64) -> io::Result<Report> {
     fs::create_dir_all(&workspace_parent)?;
     let root = workspace_parent.canonicalize()?.join(&unit);
     fs::DirBuilder::new().mode(0o700).create(&root)?;
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| format!("/run/user/{}", unsafe { libc::geteuid() }).into());
+    let socket_directory = runtime.join(format!("ditto-g3-probe-{key}"));
     let result = (|| {
         fs::create_dir(root.join("workspace"))?;
         fs::write(root.join("sentinel"), b"unchanged")?;
-        let _denied_socket = UnixListener::bind(root.join("denied.sock"))?;
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&socket_directory)?;
+        let socket_path = socket_directory.join("denied.sock");
+        let _denied_socket = UnixListener::bind(&socket_path)?;
+        symlink(&socket_path, root.join("denied.sock"))?;
         symlink(root.join("sentinel"), root.join("workspace/escape-link"))?;
         let exe = std::env::current_exe()?;
         let mut command = Command::new("/usr/bin/systemd-run");
@@ -468,6 +497,7 @@ fn run(kind: &str, deadline: u64) -> io::Result<Report> {
         let _ = ctl(&["reset-failed", &format!("{unit}.service")]);
     }
     let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(socket_directory);
     result
 }
 
@@ -532,6 +562,7 @@ fn main() {
             libc::sigaction(signal, &action, std::ptr::null_mut());
         }
     }
+    let started = Instant::now();
     match run(&args[1], deadline) {
         Ok(report) => {
             let code = if report.outcome == "unavailable" {
@@ -545,10 +576,31 @@ fn main() {
             std::process::exit(code);
         }
         Err(error) => {
-            let _ = emit(
-                &serde_json::json!({"format_version":1,"outcome":"unavailable","boundary":Boundary::unavailable(&error.to_string()),"candidate_activation_available":false}),
-            );
+            let _ = emit(&Report::unavailable(
+                &args[1],
+                &error.to_string(),
+                started.elapsed().as_millis(),
+            ));
             std::process::exit(2);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn early_failure_keeps_the_report_shape_without_inventing_execution_or_cleanup() {
+        let report =
+            serde_json::to_value(Report::unavailable("network", "setup failed", 1)).unwrap();
+        assert!(report.as_object().unwrap().contains_key("completion"));
+        assert_eq!(report["completion"], serde_json::Value::Null);
+        assert_eq!(report["outcome"], "unavailable");
+        assert_eq!(report["boundary"]["enforcement"], "unavailable");
+        assert_eq!(report["unit"], "");
+        assert_eq!(report["service_result"], "not_observed");
+        assert_eq!(report["cleanup_complete"], false);
+        assert_eq!(report["candidate_activation_available"], false);
     }
 }

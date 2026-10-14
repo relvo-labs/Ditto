@@ -19,6 +19,8 @@ TestCase {
         property var cancelled: []
         property bool holdJobs: false
         property var pendingSnapshots: []
+        property bool holdArtifacts: false
+        property var pendingArtifacts: []
         signal jobUpdated(var job)
         signal profileChanged(var payload)
         signal capabilitiesReloaded()
@@ -26,7 +28,10 @@ TestCase {
         function key(text,args) { return text; }
         function errorText(error) { return "request failed"; }
         function capability(method,args,success,failure) {
-            if(method==="desktop.plugins.development.list") success({artifacts:artifacts});
+            if(method==="desktop.plugins.development.list") {
+                if(holdArtifacts) pendingArtifacts=pendingArtifacts.concat([{reply:success,artifacts:artifacts.slice()}]);
+                else success({artifacts:artifacts});
+            }
             else if(method==="desktop.jobs.list") {
                 if(holdJobs) pendingSnapshots=pendingSnapshots.concat([{reply:success,jobs:jobs.slice()}]);
                 else success({jobs:jobs});
@@ -48,6 +53,7 @@ TestCase {
     function init() {
         client.cancelled=[];
         client.holdJobs=false;client.pendingSnapshots=[];
+        client.holdArtifacts=false;client.pendingArtifacts=[];
         client.artifacts=[artifact()];
         client.jobs=[job("validate-one","generation.validate","succeeded","interaction"),job("preview-one","generation.preview","running","preview_opened"),job("preview-two","generation.preview","running","preview_opened")];
     }
@@ -106,6 +112,21 @@ TestCase {
         client.jobs=[current];
         client.jobUpdated(current);
         compare(findChild(view,"generationJob_new-agent-job").text,"契約檢查");
+        verify(findChild(view,"cancelGeneration_new-agent-job").enabled);
+    }
+    function test_an_older_artifact_reply_cannot_hide_a_new_job() {
+        client.holdArtifacts=true;
+        const view=page(),next=artifact();
+        next.validation_job_id="new-agent-job";next.previews=[];next.state="validating";
+        client.artifacts=[next];
+        const current=job("new-agent-job","generation.validate","running","load");
+        client.jobs=[current];
+        client.jobUpdated(current);
+        compare(client.pendingArtifacts.length,2);
+        const newer=client.pendingArtifacts[1],older=client.pendingArtifacts[0];
+        newer.reply({artifacts:newer.artifacts});
+        older.reply({artifacts:older.artifacts});
+        compare(findChild(view,"generationJob_new-agent-job").text,"載入檢查");
         verify(findChild(view,"cancelGeneration_new-agent-job").enabled);
     }
 }
