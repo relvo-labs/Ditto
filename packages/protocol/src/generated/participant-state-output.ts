@@ -111,6 +111,11 @@ export interface AvatarPlacement {
   y: number;
 }
 export interface PanelMount {
+  /**
+   * Identity read from the mounted fixed-template instance, never merely
+   * copied from the requested projection. Required to verify G3 upgrades.
+   */
+  artifact_id?: string | null;
   entry_id: string;
   mounted: boolean;
   slot: string;

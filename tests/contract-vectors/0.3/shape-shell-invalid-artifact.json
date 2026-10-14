@@ -1,0 +1,7 @@
+{
+  "kind": "shape",
+  "description": "Artifact identity cannot be a number or a caller-defined object",
+  "type": "shell-report-input",
+  "valid": false,
+  "value": {"mounts": [{"slot": "ui.generated_panel", "entry_id": "ent-generated", "mounted": true, "visible": true, "artifact_id": 7}], "appearance": null, "avatar": null}
+}

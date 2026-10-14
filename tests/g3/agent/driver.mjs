@@ -13,15 +13,34 @@ try{
  const session=await must('agent.sessions.create',{title:'G3 scripted generation',idempotency_key:'g3-agent-test'})
  async function turn(text){
   const t=await must('agent.turns.submit',{session_id:session.session_id,client_message_id:text,text})
-  const done=await eventually(async()=>{const d=await must('agent.turns.get',{turn_id:t.turn_id});return ['succeeded','failed','partial','cancelled','unknown'].includes(d.state)?d:false})
+  const approvals=[]
+  const done=await eventually(async()=>{
+   const d=await must('agent.turns.get',{turn_id:t.turn_id})
+   if(['succeeded','failed','partial','cancelled','unknown'].includes(d.state))return d
+   const pending=(await must('desktop.approvals.list')).approvals
+   for(const approval of pending.filter(a=>a.request?.turn_id===t.turn_id&&!a.decision)){
+    // This fixture person approves only this first activation. Core binds
+    // the receipt to this turn, capability and exact intent hash.
+    if(text!=='g3-tasks'||approval.request.capability_id!=='desktop.plugins.development.activate')throw new Error('unexpected approval: '+JSON.stringify(approval))
+    await must('desktop.approvals.decide',{request_id:approval.request_id,decision:'allowed-once',intent_hash:approval.request.intent_hash})
+    approvals.push({request_id:approval.request_id,capability:approval.request.capability_id,decision:'allowed-once'})
+   }
+   return false
+  })
   const trace=await must('agent.turns.trace',{turn_id:t.turn_id});facts[text]={turn:done,tools:trace.tools}
+  facts[text].approvals=approvals
   verify(text+' turn outcome follows Core',text==='g3-denied'?done.state==='failed':done.state==='succeeded');return t
  }
  await turn('g3-denied')
  verify('denied generation reaches the shared Core authorization path',facts['g3-denied'].tools.some(t=>t.capability_id==='desktop.plugins.development.create'))
  verify('ungranted generation is refused before artifact creation',(await must('desktop.plugins.development.list')).artifacts.length===0)
- for(const scope of ['plugins.develop','plugins.data','desktop.windows.read'])await must('desktop.permissions.grant',{subject:'agent',scope,idempotency_key:'g3-'+scope})
+ for(const scope of ['plugins.develop','desktop.windows.read'])await must('desktop.permissions.grant',{subject:'agent',scope,idempotency_key:'g3-'+scope})
+ const beforeAsk=await must('agent.settings.describe');const {_meta:askMeta,...askSettings}=beforeAsk
+ await must('agent.settings.patch',{expected_revision:beforeAsk.revision,settings:{...askSettings,approval_mode:'ask'}})
  const tasksTurn=await turn('g3-tasks')
+ verify('activation consumes a genuine one-shot approval',facts['g3-tasks'].approvals.length===1)
+ verify('one-shot approval does not create a permanent data grant',!(await must('desktop.permissions.list',{subject:'agent'})).grants.some(g=>g.scope==='plugins.data'&&!g.revoked_at))
+ await must('desktop.permissions.grant',{subject:'agent',scope:'plugins.data',idempotency_key:'g3-plugins.data'})
  let artifacts=(await must('desktop.plugins.development.list')).artifacts
  const original=artifacts.find(a=>a.description.plugin_id==='local.generated.scripted_tasks')
  verify('Agent source is bound to actual turn',original?.origin.turn_id===tasksTurn.turn_id)

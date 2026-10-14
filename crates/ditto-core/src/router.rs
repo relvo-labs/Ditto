@@ -58,6 +58,9 @@ pub struct Call<'a> {
     pub operation_id: Option<String>,
     pub deadline: Duration,
     pub started: Instant,
+    /// Core-only proof that this exact invocation consumed a bound one-shot
+    /// approval. Never parsed from request parameters or caller metadata.
+    pub(crate) approved_once: bool,
 }
 
 impl Call<'_> {
@@ -338,7 +341,7 @@ pub struct CapabilitiesView(pub catalog::CapabilitiesListOutput);
 
 // ---- dispatch -------------------------------------------------------------
 
-pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
+pub fn dispatch(core: &Arc<Core>, caller: &Caller, mut call: Call<'_>) -> Handled {
     // The G1 stand-in remains a test caller. Every tool of the production
     // controller must be correlated before its first side effect.
     if caller.subject.as_str() == Subject::AGENT
@@ -399,7 +402,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
         }
         // Refused calls may request an approval and retry that same intent.
         // Only an authorized dispatch consumes the execution reservation.
-        authorize_call(core, caller, &call)?;
+        call.approved_once = authorize_call(core, caller, &call)?;
         let id = intent_id.clone();
         coordinate(core, &call, move |c| {
             ditto_store::turns::begin_execution(c.store(), &id, &owner, &cap, &args)
@@ -424,11 +427,11 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
         crate::agent_routes::announce_turn(core, &turn.turn_id);
         return outcome;
     }
-    authorize_call(core, caller, &call)?;
+    call.approved_once = authorize_call(core, caller, &call)?;
     dispatch_authorized(core, caller, call)
 }
 
-fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<(), CoreError> {
+fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<bool, CoreError> {
     let result = authorize(core, caller, call.contract, &call.params);
     if result.as_ref().is_err_and(|e| {
         e.data
@@ -457,11 +460,11 @@ fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<
             if coordinate(core, call, move |c| {
                 ditto_store::approvals::consume(c.store(), &owner, &turn.turn_id, cap, &hash)
             })?? {
-                return Ok(());
+                return Ok(true);
             }
         }
     }
-    result
+    result.map(|_| false)
 }
 
 fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
@@ -1176,6 +1179,19 @@ pub(crate) fn run_proposal(
     let (accepted, change_id) = mpsc::channel();
     let (reply, outcome) = mpsc::channel();
     let gone = Arc::clone(&caller.gone);
+    let generation_auth = call
+        .contract
+        .capability_id
+        .starts_with("desktop.plugins.development.")
+        .then(|| {
+            (
+                Arc::clone(core),
+                caller.clone(),
+                call.contract.clone(),
+                call.params.clone(),
+                call.approved_once,
+            )
+        });
     core.submit(move |coordinator| {
         // Acceptance is the draft being written. A caller that disappeared
         // while the proposal waited in the queue never learns a change id,
@@ -1193,6 +1209,18 @@ pub(crate) fn run_proposal(
                 ],
             );
             return;
+        }
+        if let Some((core, caller, contract, params, approved_once)) = generation_auth {
+            if let Err(error) = crate::generation::recheck_authorization(
+                &core,
+                &caller,
+                &contract,
+                &params,
+                approved_once,
+            ) {
+                let _ = reply.send(Err(error));
+                return;
+            }
         }
         let _ = reply.send(coordinator.propose(proposal, Some(accepted)));
     });
@@ -2011,7 +2039,20 @@ fn plugins_list(core: &Core) -> Handled {
                     }
                     HostKind::Qml => {
                         match mounts.iter().find(|mount| mount.entry_id == entry.entry_id) {
-                            Some(mount) if mount.mounted => EntryRuntimeState::Active,
+                            Some(mount) if mount.mounted => {
+                                let expected = packages
+                                    .get(&entry.package, &entry.version)
+                                    .and_then(|row| row.generated.as_ref());
+                                if expected.is_some_and(|a| {
+                                    mount.artifact_id.as_deref() != Some(&a.artifact_id)
+                                }) {
+                                    EntryRuntimeState::Failed {
+                                        reason: "generated_artifact_mismatch".into(),
+                                    }
+                                } else {
+                                    EntryRuntimeState::Active
+                                }
+                            }
                             Some(_) => EntryRuntimeState::Loading,
                             None if slot.is_some() => EntryRuntimeState::NotReported,
                             None => EntryRuntimeState::Disabled,

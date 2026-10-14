@@ -2,8 +2,11 @@
 import {createConnection} from 'node:net'
 import {writeFileSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
+import {descriptionChecks} from './description-checks.mjs'
 const checks=[],facts={source:JSON.parse(execFileSync('python3',['tests/g3/source.py']))},sleep=ms=>new Promise(r=>setTimeout(r,ms)),run=Date.now().toString()
-const call=(method,params={})=>new Promise((resolve,reject)=>{const socket=createConnection(process.env.DITTO_G1_RELAY),timer=setTimeout(()=>{socket.destroy();reject(new Error('relay timeout'))},60000);let buffer='';socket.on('connect',()=>socket.write(JSON.stringify({method,params})+'\n'));socket.on('error',reject);socket.on('data',data=>{buffer+=data;if(buffer.includes('\n')){clearTimeout(timer);socket.destroy();resolve(JSON.parse(buffer.split('\n')[0]))}})})
+const line=(path,request)=>new Promise((resolve,reject)=>{const socket=createConnection(path),timer=setTimeout(()=>{socket.destroy();reject(new Error('relay timeout'))},60000);let buffer='';socket.on('connect',()=>socket.write(request+'\n'));socket.on('error',error=>{clearTimeout(timer);reject(error)});socket.on('data',data=>{buffer+=data;if(buffer.includes('\n')){clearTimeout(timer);socket.destroy();resolve(JSON.parse(buffer.split('\n')[0]))}})})
+const call=(method,params={})=>line(process.env.DITTO_G1_RELAY,JSON.stringify({method,params}))
+const rendered=()=>line(process.env.DITTO_RUNTIME_DIR+'/shell.sock','generated')
 const must=async(method,params)=>{const r=await call(method,params);if(r.error)throw new Error(method+': '+JSON.stringify(r.error));return r.result}
 const verify=(name,yes)=>{if(!yes)throw new Error(name);checks.push(name);console.log('PASS '+name)}
 const eventually=async(fn,tries=600)=>{for(let i=0;i<tries;i++){const v=await fn();if(v)return v;await sleep(500)}throw new Error('condition timed out')}
@@ -11,7 +14,7 @@ let original,preferences
 const createdGrants=[]
 try{
  await eventually(async()=>{const r=await call('desktop.profiles.get');return r.result})
- original=(await must('desktop.profiles.get')).profile;preferences=await must('agent.settings.describe')
+ facts.original_profile=await must('desktop.profiles.get');original=facts.original_profile.profile;preferences=await must('agent.settings.describe')
  const {_meta,...s}=preferences
  await must('agent.settings.patch',{expected_revision:s.revision,settings:{...s,enabled:true,max_tool_calls:24,turn_timeout_ms:120000}})
  await must('agent.runtime.ensure');await eventually(async()=>(await must('agent.runtime.get')).phase==='ready',120)
@@ -41,12 +44,30 @@ try{
   const aa=artifacts.find(x=>x.parent_id===a.artifact_id&&x.state==='active'),bb=artifacts.find(x=>x.parent_id===b.artifact_id&&x.state==='active')
   verify('both plugin kinds support real conversational version changes',aa?.description.width===380&&aa.description.content.max_items===2&&bb?.description.width===340&&bb.description.content.actions[1].label==='閱讀')
   facts.artifacts=await Promise.all([a,b,aa,bb].map(x=>must('desktop.plugins.development.get',{artifact_id:x.artifact_id})))
+  for(const [name,passed] of Object.entries(descriptionChecks(facts.artifacts)))verify(name,passed)
   facts.profile=await must('desktop.profiles.get');facts.jobs=await must('desktop.jobs.list')
+  facts.rendered=await eventually(async()=>{const rows=await rendered();return [aa,bb].every(a=>rows.some(r=>r.artifact_id===a.artifact_id&&r.shown&&r.ready&&r.width===a.description.width))?rows:false},120)
+  const tasksView=facts.rendered.find(r=>r.artifact_id===aa.artifact_id),workspaceView=facts.rendered.find(r=>r.artifact_id===bb.artifact_id)
+  verify('real generated tasks panel reads the live service',tasksView.data_available&&tasksView.tasks.length<=2)
+  verify('real generated workspace buttons are usable',workspaceView.buttons.length===bb.description.content.actions.length&&workspaceView.buttons.every(b=>b.enabled))
+  const button=workspaceView.buttons[1]
+  for(const [method,args] of [['stipc/move_cursor',{x:Math.round(button.x),y:Math.round(button.y)}],['stipc/feed_button',{combo:'BTN_LEFT',mode:'full'}]])execFileSync('python3',['tools/compositor-probe/functional/wayfire-ipc.py',method,JSON.stringify(args)])
+  facts.workspace_action=await eventually(async()=>{const rows=await rendered(),workspaces=await must('desktop.workspaces.list');return rows.some(r=>r.artifact_id===bb.artifact_id&&r.last_requested_workspace===button.workspace_id)&&workspaces.workspaces.some(w=>w.id===button.workspace_id&&w.active)?{button,workspaces}:false},120)
+  verify('real generated button activates its requested workspace',!!facts.workspace_action)
   for(const artifact of [a,b])verify(artifact.description.title+' had a real preview',facts.artifacts.find(a=>a.artifact_id===artifact.artifact_id).previews.some(p=>p.opened))
   const events=await must('agent.sessions.read',{session_id:session.session_id,offset:0,limit:200});facts.models=events.events.filter(e=>e.type==='model/selection').map(e=>e.data)
  }
 }catch(error){facts.error=String(error);process.exitCode=1;console.error(error)}
 finally{
- try{for(const grant_id of createdGrants)await must('desktop.permissions.revoke',{grant_id});if(original){const p=(await must('desktop.profiles.get')).profile;await must('desktop.changes.propose',{base_revision:p.head_revision,ops:[{op:'switch_profile',to_profile:original.profile_id,to_revision:original.head_revision}],idempotency_key:'g3-real-restore-'+run})}if(preferences){const now=await must('agent.settings.describe');const {_meta,...s}=preferences;await must('agent.settings.patch',{expected_revision:now.revision,settings:{...s,revision:now.revision}})}await must('agent.runtime.stop')}catch(error){facts.restore_error=String(error);process.exitCode=1}
+ // Attempt every restoration even when an earlier step fails. A successful
+ // API response alone is insufficient: read back composition, settings and
+ // revocations before reporting the test as complete.
+ facts.restore_errors=[]
+ const restore=async(name,fn)=>{try{await fn()}catch(error){facts.restore_errors.push({step:name,error:String(error)});process.exitCode=1}}
+ for(const grant_id of createdGrants)await restore('revoke '+grant_id,()=>must('desktop.permissions.revoke',{grant_id}))
+ if(original)await restore('profile',async()=>{const p=(await must('desktop.profiles.get')).profile;if(p.profile_id!==original.profile_id||p.head_revision!==original.head_revision)await must('desktop.changes.propose',{base_revision:p.head_revision,ops:[{op:'switch_profile',to_profile:original.profile_id,to_revision:original.head_revision}],idempotency_key:'g3-real-restore-'+run});facts.restored_profile=await must('desktop.profiles.get');verify('original composition restored by readback',facts.restored_profile.profile.profile_id===original.profile_id&&facts.restored_profile.revision.document_sha256===facts.original_profile.revision.document_sha256)})
+ if(preferences)await restore('settings',async()=>{const now=await must('agent.settings.describe');const {_meta,...s}=preferences;await must('agent.settings.patch',{expected_revision:now.revision,settings:{...s,revision:now.revision}});const normalize=({_meta,revision,...settings})=>settings;verify('original settings restored by readback',JSON.stringify(normalize(await must('agent.settings.describe')))===JSON.stringify(normalize(preferences)))})
+ await restore('grants readback',async()=>{const permissions=await must('desktop.permissions.list',{subject:'agent',include_revoked:true});verify('all test grants revoked by readback',createdGrants.every(id=>permissions.grants.some(g=>g.grant_id===id&&g.revoked_at)))})
+ await restore('stop Agent',()=>must('agent.runtime.stop'))
  writeFileSync(process.env.DITTO_G3_AGENT_OUT,JSON.stringify({ok:!process.exitCode,evidence_class:'development-headless-real-subscription',checks,facts},null,2))
 }

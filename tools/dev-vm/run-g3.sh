@@ -38,12 +38,14 @@ vm_sync_workspace >"$out/sync.log" 2>&1
 record sync pass
 step build 'cargo build --locked -p ditto-core -p ditto-test-host -p ditto-confine'
 step foundation 'bash tests/g3/run.sh'
+step unavailable-trust 'DITTO_G3_TRUST_ONLY=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/ditto-g3-test-bus node tests/g3/integration/run.mjs'
 if [[ "${DITTO_G3_EXPECT_OLD_ABI:-0}" == 1 ]]; then
   step rejection 'python3 tests/g3/host/rejection.py --old-abi'
   step production-partial 'DITTO_G3_EXPECT_OLD_ABI=1 node tests/g3/integration/run.mjs'
   record candidate-execution not_run
 else
   step rejection 'python3 tests/g3/host/rejection.py'
+  step native-failures 'python3 tests/g3/native-failures/driver.py'
   step host 'DITTO_ENVIRONMENT_LABEL=development-vm timeout -k 5 180 bash tests/g3/host/run.sh'
   step production 'node tests/g3/integration/run.mjs'
   step dependencies 'pnpm install --frozen-lockfile'
@@ -58,6 +60,6 @@ else
     record agent not_run
   fi
 fi
-vm_rsync "neil@$(vm_ip):funlab/Ditto/artifacts/g3/" "$out/suite-records/" >"$out/collect.log" 2>&1 || record collect fail
+vm_collect_artifacts "neil@$(vm_ip):funlab/Ditto/artifacts/g3/" "$out/suite-records/" >"$out/collect.log" 2>&1 || record collect fail
 if jq -e 'select(.status == "fail")' "$out/summary.jsonl" >/dev/null; then exit 1; fi
 if jq -e 'select(.status == "not_run")' "$out/summary.jsonl" >/dev/null; then exit 2; fi

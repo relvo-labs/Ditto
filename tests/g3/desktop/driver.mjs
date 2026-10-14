@@ -62,6 +62,22 @@ try{
  const undo=await must('desktop.changes.undo',{change_id:upgraded.change_id});facts.undo=undo;verify('undo committed',undo.state==='committed')
  verify('old data snapshot restored',(await must('desktop.plugins.development.data_get',{artifact_id:a.artifact_id})).payload.note==='retain this note')
  verify('old panel restored',!!(await eventually(async()=>{const rows=await shell('generated');return rows.find(e=>e.artifact_id===a.artifact_id)})))
+ // Two consecutive modifications, compatible data rollback, then return
+ // directly to the immutable first artifact and its original snapshot.
+ await activate(b,'tasks-upgrade-again')
+ const twice=structuredClone(modified);twice.version='0.3.0';twice.title='第二次修改的待辦摘要';twice.width=400;twice.data={schema_version:3,fields:{label:'text'},migration:{from_version:2,rename:{title:'label'},defaults:{},remove:[],rollback:'snapshot'}}
+ const c=await prepare(twice,b.artifact_id);await activate(c,'tasks-second-upgrade')
+ verify('second data migration is read from the actual owner',(await must('desktop.plugins.development.data_get',{artifact_id:c.artifact_id})).payload.label==='retain this note')
+ verify('second modified version is actually mounted',!!(await eventually(async()=>(await shell('generated')).find(e=>e.artifact_id===c.artifact_id&&e.width===400&&e.shown))))
+ const compatible=structuredClone(twice);compatible.version='0.4.0';compatible.data={schema_version:4,fields:{label:'text'},migration:{from_version:3,rename:{},defaults:{},remove:[],rollback:'compatible'}}
+ const d=await prepare(compatible,c.artifact_id);await activate(d,'tasks-compatible-upgrade')
+ const latest=await must('desktop.plugins.development.data_get',{artifact_id:d.artifact_id})
+ await must('desktop.plugins.development.data_write',{artifact_id:d.artifact_id,expected_revision:latest.revision,payload:{label:'compatible edits survive'}})
+ await activate(c,'tasks-compatible-rollback')
+ verify('compatible rollback preserves newer readable values',(await must('desktop.plugins.development.data_get',{artifact_id:c.artifact_id})).payload.label==='compatible edits survive')
+ await activate(a,'tasks-return-to-first')
+ verify('two modifications can return to the first data snapshot',(await must('desktop.plugins.development.data_get',{artifact_id:a.artifact_id})).payload.note==='retain this note')
+ verify('first version appearance returns after two modifications',!!(await eventually(async()=>(await shell('generated')).find(e=>e.artifact_id===a.artifact_id&&e.width===tasks.width&&e.title===tasks.title))))
  const actions=JSON.parse(readFileSync('crates/ditto-generation/examples/workspace-actions.json','utf8'));actions.content.actions=workspaces.workspaces.slice(0,2).map((w,i)=>({workspace_id:w.id,label:'G3 工作區 '+i}))
  const w=await prepare(actions);await activate(w,'workspaces-activate')
  verify('both generated panels coexist',(await shell('generated')).filter(e=>e.shown&&e.ready).length===2)
@@ -71,6 +87,19 @@ try{
  for(const [method,args] of [['stipc/move_cursor',{x:Math.round(button.x),y:Math.round(button.y)}],['stipc/feed_button',{combo:'BTN_LEFT',mode:'full'}]])execFileSync('python3',['tools/compositor-probe/functional/wayfire-ipc.py',method,JSON.stringify(args)]);
  await sleep(100);facts.workspaceButton=button;facts.workspaceClickView=await shell('generated');
  verify('actual button click activates the requested workspace',!!(await eventually(async()=>(await must('desktop.workspaces.list')).workspaces.find(ws=>ws.id===button.workspace_id&&ws.active))));
+
+ // An irreversible schema never gives the old artifact newer data. Removing
+ // that plugin is distinct from deleting its retained data.
+ await activate(b,'irreversible-base-b');await activate(c,'irreversible-base-c');await activate(d,'irreversible-base-d')
+ const irreversible=structuredClone(compatible);irreversible.version='0.5.0';irreversible.data={schema_version:5,fields:{final:'text'},migration:{from_version:4,rename:{label:'final'},defaults:{},remove:[],rollback:'unavailable'}}
+ const e=await prepare(irreversible,d.artifact_id);await activate(e,'tasks-irreversible-upgrade')
+ const heldHead=await head(),retained=await must('desktop.plugins.development.data_get',{artifact_id:e.artifact_id})
+ const refused=await call('desktop.plugins.development.activate',{artifact_id:a.artifact_id,base_revision:heldHead,idempotency_key:'irreversible-rollback-denied'})
+ verify('irreversible rollback is refused without moving the revision',refused.error?.name==='preflight_rejected'&&await head()===heldHead)
+ verify('old version cannot read incompatible data',(await call('desktop.plugins.development.data_get',{artifact_id:a.artifact_id})).error?.name==='conflict')
+ const owner=(await must('desktop.profiles.get')).document.entries.find(entry=>entry.package===e.description.plugin_id)
+ const removed=await must('desktop.changes.propose',{base_revision:await head(),ops:[{op:'remove_entry',entry_id:owner.entry_id}],idempotency_key:'remove-with-data-retained'})
+ verify('generated plugin can be removed without deleting its data',removed.state==='committed'&&JSON.stringify((await must('desktop.plugins.development.data_get',{artifact_id:e.artifact_id})).payload)===JSON.stringify(retained.payload))
 
  const history=await must('desktop.plugins.development.get',{artifact_id:b.artifact_id});verify('activation journal includes commit and preserved immutable source',history.activations.some(x=>x.state==='committed')&&history.parent_id===a.artifact_id)
  process.kill(facts.application_pid,0);verify('native application survives generation and rollback',(await must('desktop.windows.list')).windows.some(window=>window.app_id==='ditto-g3-survival'));

@@ -35,6 +35,14 @@ vm_rsync() {
   rsync -a -e "ssh -i $VM_KEY -o UserKnownHostsFile=$VM_STATE/known_hosts -o StrictHostKeyChecking=accept-new -o BatchMode=yes" "$@"
 }
 
+# Evidence is a copy, not an installed package tree. Immutable 0500 package
+# directories must not prevent the next CI checkout from removing its own
+# artifacts. Change only owner permissions on the receiving copy; preserve
+# bytes, timestamps and all permissions in the guest.
+vm_collect_artifacts() {
+  vm_rsync --chmod=Du+rwx,Fu+rw "$@"
+}
+
 vm_wait_ssh() {
   local _
   for _ in $(seq 1 120); do

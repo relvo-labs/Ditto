@@ -2,6 +2,7 @@
 # G3 development checks; desktop and OS stress suites run separately.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+bash tools/dev-vm/test-artifact-collection.sh
 cargo test --locked -p ditto-generation -p ditto-test-host -p ditto-protocol -p ditto-store
 python3 scripts/sync-generated-templates.py --check
 cargo build --locked -p ditto-generation -p ditto-test-host -p ditto-confine
@@ -15,5 +16,7 @@ if [[ ! -x "$qml_lint" || ! -x "$qml_test" ]]; then
 fi
 "$qml_lint" crates/ditto-generation/templates/*.qml
 QT_QPA_PLATFORM=offscreen "$qml_test" -input tests/g3/templates
+"$qml_lint" --max-warnings -1 shell/centers/GeneratedArtifacts.qml
+QT_QPA_PLATFORM=offscreen "$qml_test" -input tests/g3/management
 
 bash tools/generation-host/build.sh

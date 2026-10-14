@@ -80,7 +80,12 @@ pub fn create(
     if let Some(turn) = &origin.turn_id {
         let failures:i64=c.query_row("SELECT count(*) FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only')",[turn],|r|r.get(0))?;
         let repeated:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.state') IN ('failed','inspect_only') GROUP BY json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') HAVING count(*)>=2 AND json_extract(artifact_json,'$.repair.failure_fingerprints[#-1]') IS NOT NULL)",[turn],|r|r.get(0))?;
-        if failures >= 4 || repeated {
+        let stopped: bool = c.query_row(
+            "SELECT EXISTS(SELECT 1 FROM generated_artifacts WHERE json_extract(artifact_json,'$.origin.turn_id')=?1 AND json_extract(artifact_json,'$.repair.stopped')=1)",
+            [turn],
+            |r| r.get(0),
+        )?;
+        if failures >= 4 || repeated || stopped {
             return Err(StoreError::Conflict(
                 "this turn's generation repair budget is exhausted".into(),
             ));
@@ -212,13 +217,32 @@ pub fn validation_finished(
         ArtifactState::Failed
     };
     if !passed {
+        // Compare persisted reports, so a restart cannot reset progress. Only
+        // a contiguous prefix in the prescribed order counts as advancement;
+        // changing diagnostics at the same gate is not another repair budget.
+        let progress = |report: Option<&GenerationValidation>| {
+            report.map_or(0, |v| {
+                v.stages
+                    .iter()
+                    .zip(VALIDATION_STAGES)
+                    .take_while(|(e, stage)| e.stage == *stage && e.result == StageResult::Passed)
+                    .count()
+            })
+        };
+        let no_progress = if a.repair.attempts > 0 {
+            let parent = a.parent_id.as_ref().map(|id| get(c, id)).transpose()?;
+            parent.is_none_or(|p| progress(validation.as_ref()) <= progress(p.validation.as_ref()))
+        } else {
+            false
+        };
         let fingerprint = validation
             .as_ref()
             .and_then(|v| v.stages.iter().find(|s| s.result == StageResult::Failed))
             .map(|s| jcs::digest(&json!([s.stage, s.diagnostic])))
             .unwrap_or_else(|| jcs::digest(&json!(error.unwrap_or("validation_unavailable"))));
         a.repair.failure_fingerprints.push(fingerprint.clone());
-        a.repair.stopped = a.repair.attempts >= 3
+        a.repair.stopped = no_progress
+            || a.repair.attempts >= 3
             || a.repair
                 .failure_fingerprints
                 .iter()
@@ -581,6 +605,71 @@ mod tests {
         }];
         doc
     }
+
+    fn fail_at(c: &Connection, a: &mut GeneratedArtifact, passed: usize, diagnostic: &str) {
+        publish(c, a);
+        let mut report = a.validation.take().unwrap();
+        for (index, stage) in report.stages.iter_mut().enumerate().skip(passed) {
+            stage.result = if index == passed {
+                StageResult::Failed
+            } else {
+                StageResult::NotRun
+            };
+            stage.diagnostic = diagnostic.into();
+        }
+        let job = format!("job-{}", a.description.version);
+        a.validation_job_id = Some(job.clone());
+        a.state = ArtifactState::Validating;
+        save(c, a).unwrap();
+        *a = validation_finished(c, &a.artifact_id, &job, Some(report), None).unwrap();
+    }
+
+    #[test]
+    fn changed_diagnostic_without_stage_progress_stops_a_repair() {
+        let temp = crate::testing::open("generated-no-progress");
+        let c = temp.store.connection();
+        let mut a = candidate(c, None, "1.0.0", DataPlan::default());
+        a.origin.turn_id = Some("turn-no-progress".into());
+        fail_at(c, &mut a, 2, "first load failure");
+        assert!(!a.repair.stopped);
+        let mut b = candidate(c, Some(&a), "1.0.1", DataPlan::default());
+        b.origin = a.origin.clone();
+        fail_at(c, &mut b, 2, "different load failure");
+        assert!(get(c, &b.artifact_id).unwrap().repair.stopped);
+        assert_ne!(
+            b.repair.failure_fingerprints[0],
+            b.repair.failure_fingerprints[1]
+        );
+        let input = GenerateInput {
+            description: Description {
+                version: "1.0.2".into(),
+                ..b.description.clone()
+            },
+            request_summary: "test".into(),
+            parent_id: Some(b.artifact_id.clone()),
+            idempotency_key: "blocked-repair".into(),
+        };
+        assert!(create(c, &input, b.origin.clone()).is_err());
+        // Reopen the persisted store: neither branching from an older parent
+        // nor inventing another plugin id resets this turn's stopped budget.
+        let reopened = crate::Store::open_reader(&crate::Paths::under(&temp.root)).unwrap();
+        let mut bypass = input.clone();
+        bypass.parent_id = Some(a.artifact_id.clone());
+        assert!(create(reopened.connection(), &bypass, b.origin.clone()).is_err());
+        bypass.parent_id = None;
+        bypass.description.plugin_id = "local.generated.budget_bypass".into();
+        assert!(create(reopened.connection(), &bypass, b.origin.clone()).is_err());
+        // A different failure at an earlier gate is also not progress.
+        let mut other = b.origin.clone();
+        other.turn_id = Some("new-explicit-request".into());
+        let mut fresh = create(c, &input, other).unwrap();
+        assert_eq!(fresh.repair.attempts, 0);
+        fail_at(c, &mut fresh, 1, "new request contract failure");
+        assert!(!fresh.repair.stopped);
+        let mut regression = candidate(c, Some(&fresh), "1.0.3", DataPlan::default());
+        fail_at(c, &mut regression, 0, "regressed syntax");
+        assert!(regression.repair.stopped);
+    }
     #[test]
     fn snapshot_migration_rollback_and_optimistic_data_writes_are_atomic() {
         let mut temp = crate::testing::open("generated-migration");
@@ -810,16 +899,7 @@ mod tests {
         let c = temp.store.connection();
         let mut a = candidate(c, None, "1.0.0", DataPlan::default());
         for round in 0..=3 {
-            a.validation_job_id = Some(format!("job{round}"));
-            save(c, &a).unwrap();
-            a = validation_finished(
-                c,
-                &a.artifact_id,
-                &format!("job{round}"),
-                None,
-                Some(&format!("error{round}")),
-            )
-            .unwrap();
+            fail_at(c, &mut a, round, &format!("error{round}"));
             assert_eq!(a.repair.stopped, round == 3);
             if round < 3 {
                 a = candidate(

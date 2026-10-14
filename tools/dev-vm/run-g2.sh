@@ -65,6 +65,6 @@ for suite in layout codex/desktop shell; do
   script="tests/g2/$suite/run.sh"; [[ "$suite" == codex/desktop ]] && script="tests/g2/codex/desktop.sh"
   step "$name" "$label DITTO_COMPOSITOR=wayfire DITTO_ARTIFACTS=\$PWD/artifacts/g2 timeout -k 15 1800 bash $script" || true
 done
-vm_rsync "neil@$(vm_ip):funlab/Ditto/artifacts/g2/" "$out/suite-records/" >/dev/null 2>&1 || true
+vm_collect_artifacts "neil@$(vm_ip):funlab/Ditto/artifacts/g2/" "$out/suite-records/" >/dev/null 2>&1 || true
 # The run fails when any step failed; not_run (environment) does not.
 ! jq -e 'select(.status == "fail")' "$out/summary.jsonl" >/dev/null

@@ -3,6 +3,8 @@
 //! protocol 0.2 over socket pairs. What the fakes report is what Core reads
 //! back, so a lying fake is how readback mismatches are tested.
 
+mod generation_transactions;
+
 use super::*;
 use crate::{
     core::{Core, CoreConfig},
@@ -349,6 +351,8 @@ struct ShellState {
     candidates: HashMap<String, (ShellProjection, Option<ShellProjection>)>,
     /// Refuse candidates of this package at prepare (a QML load failure).
     broken_package: Option<String>,
+    /// A loaded candidate fails its commit-time health check.
+    unhealthy_package: Option<String>,
     /// Report the old mounts after commit: a Shell that says "done" but did not.
     lie_after_commit: bool,
     /// At rollback, report this slot as not restored (the thing it placed
@@ -372,6 +376,7 @@ fn shell_observation(shell: &ShellState) -> Value {
                 "mounts": projection.slots.iter().map(|slot| json!({
                     "slot": slot.slot, "entry_id": slot.entry_id, "mounted": true,
                     "visible": shell.hidden_package.as_ref() != Some(&slot.package),
+                    "artifact_id": slot.config.get("artifact_id"),
                 })).collect::<Vec<_>>(),
                 "appearance": projection.appearance,
                 "avatar": projection.avatar,
@@ -459,9 +464,14 @@ fn fake_shell(core: &Arc<Core>, state: Arc<Mutex<ShellState>>) -> Arc<TestPeer> 
                 if !shell.lie_after_commit {
                     shell.committed = Some(target.clone());
                 }
-                Ok(
-                    json!({"items": target.slots.iter().map(|slot| json!({"key": slot.slot, "status": "applied"})).collect::<Vec<_>>()}),
-                )
+                Ok(json!({"items": target.slots.iter().map(|slot| {
+                    let key = if ditto_protocol::profile::is_area(&slot.slot) { &slot.entry_id } else { &slot.slot };
+                    if shell.unhealthy_package.as_ref() == Some(&slot.package) {
+                        json!({"key":key,"status":"failed","reason":"provider_unhealthy"})
+                    } else {
+                        json!({"key":key,"status":"applied"})
+                    }
+                }).collect::<Vec<_>>()}))
             }
             "participant.abort" => {
                 shell.candidates.remove(&change_id);
@@ -2561,6 +2571,9 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
         "credential-status" => through::<ditto_protocol::agent::CredentialStatus>(value),
         "job" => through::<ditto_protocol::services::Job>(value),
         "generated-description" => through::<ditto_protocol::generation::Description>(value),
+        "generation-validation" => {
+            through::<ditto_protocol::generation::GenerationValidation>(value)
+        }
         "change-record" => through::<change::ChangeRecord>(value),
         "participant-prepare-params" => through::<participant::PrepareParams>(value),
         "shell-report-input" => through::<participant::ShellObservation>(value),

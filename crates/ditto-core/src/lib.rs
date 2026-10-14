@@ -560,6 +560,7 @@ fn dispatch(
         operation_id: meta.operation_id.clone(),
         deadline: Duration::from_millis(requested.min(contract.timeout.max_ms)),
         started,
+        approved_once: false,
     };
     let caller = Caller {
         subject,

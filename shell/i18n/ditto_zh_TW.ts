@@ -1950,12 +1950,20 @@
 <context>
     <name>GeneratedArtifacts</name>
     <message>
+        <source>互動檢查</source>
+        <translation>互動檢查</translation>
+    </message>
+    <message>
         <source>原始碼、驗證與啟用紀錄</source>
         <translation>原始碼、驗證與啟用紀錄</translation>
     </message>
     <message>
-        <source>取消</source>
-        <translation>取消</translation>
+        <source>取消驗證</source>
+        <translation>取消驗證</translation>
+    </message>
+    <message>
+        <source>契約檢查</source>
+        <translation>契約檢查</translation>
     </message>
     <message>
         <source>套用這個版本</source>
@@ -1970,12 +1978,24 @@
         <translation>寬度</translation>
     </message>
     <message>
-        <source>已安裝，尚未啟用</source>
-        <translation>已安裝，尚未啟用</translation>
+        <source>工作已完成</source>
+        <translation>工作已完成</translation>
     </message>
     <message>
-        <source>已達修復上限，停止自動重試。</source>
-        <translation>已達修復上限，停止自動重試。</translation>
+        <source>工作未完成，請檢查診斷後再試</source>
+        <translation>工作未完成，請檢查診斷後再試</translation>
+    </message>
+    <message>
+        <source>已停止自動修復。請檢查診斷，重新說明需求後再試。</source>
+        <translation>已停止自動修復。請檢查診斷，重新說明需求後再試。</translation>
+    </message>
+    <message>
+        <source>已取消並完成清理</source>
+        <translation>已取消並完成清理</translation>
+    </message>
+    <message>
+        <source>已安裝，尚未啟用</source>
+        <translation>已安裝，尚未啟用</translation>
     </message>
     <message>
         <source>強調色</source>
@@ -1984,6 +2004,14 @@
     <message>
         <source>曾成功啟用；目前組合請見下方</source>
         <translation>曾成功啟用；目前組合請見下方</translation>
+    </message>
+    <message>
+        <source>未執行</source>
+        <translation>未執行</translation>
+    </message>
+    <message>
+        <source>未通過</source>
+        <translation>未通過</translation>
     </message>
     <message>
         <source>未通過，請檢查診斷並建立修正版</source>
@@ -1998,24 +2026,60 @@
         <translation>標題</translation>
     </message>
     <message>
+        <source>正在取消並清理</source>
+        <translation>正在取消並清理</translation>
+    </message>
+    <message>
         <source>正在隔離環境中驗證</source>
         <translation>正在隔離環境中驗證</translation>
+    </message>
+    <message>
+        <source>測試資料預覽已開啟</source>
+        <translation>測試資料預覽已開啟</translation>
+    </message>
+    <message>
+        <source>準備隔離環境</source>
+        <translation>準備隔離環境</translation>
+    </message>
+    <message>
+        <source>焦點檢查</source>
+        <translation>焦點檢查</translation>
     </message>
     <message>
         <source>生成的插件</source>
         <translation>生成的插件</translation>
     </message>
     <message>
+        <source>等待其他工作完成</source>
+        <translation>等待其他工作完成</translation>
+    </message>
+    <message>
         <source>等待驗證</source>
         <translation>等待驗證</translation>
+    </message>
+    <message>
+        <source>語法檢查</source>
+        <translation>語法檢查</translation>
     </message>
     <message>
         <source>資料格式</source>
         <translation>資料格式</translation>
     </message>
     <message>
+        <source>載入檢查</source>
+        <translation>載入檢查</translation>
+    </message>
+    <message>
+        <source>通過</source>
+        <translation>通過</translation>
+    </message>
+    <message>
         <source>開啟測試資料預覽</source>
         <translation>開啟測試資料預覽</translation>
+    </message>
+    <message>
+        <source>關閉測試資料預覽</source>
+        <translation>關閉測試資料預覽</translation>
     </message>
     <message>
         <source>隔離條件不足，只能檢查</source>

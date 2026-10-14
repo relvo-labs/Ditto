@@ -1,5 +1,7 @@
 import {readFileSync,writeFileSync} from 'node:fs'
 import {connect,sleep} from '../../g1/lib/core-client.mjs'
+import {trustMatrix} from './trust-matrix.mjs'
+import {spawnSync} from 'node:child_process'
 const checks=[],facts={}
 const verify=(name,value)=>{if(!value)throw new Error('check failed: '+name);checks.push(name)}
 const eventually=async(fn)=>{for(let i=0;i<600;i++){const v=await fn();if(v)return v;await sleep(50)}throw new Error('condition timed out')}
@@ -10,7 +12,13 @@ try{
   const listing=await core.must('desktop.capabilities.list')
   verify('official development capabilities are discoverable',listing.capabilities.filter(c=>c.capability_id.startsWith('desktop.plugins.development.')).length===9)
   const head=(await core.must('desktop.profiles.get')).profile.head_revision
-  for(const example of ['tasks-summary','workspace-actions']){
+  facts.trust_matrix=await trustMatrix(core,head,verify)
+  if(process.env.DITTO_G3_TRUST_ONLY==='1'){
+    const probe=spawnSync('target/debug/ditto-test-host',['probe','files','--deadline-ms','3000'],{encoding:'utf8',timeout:15000})
+    facts.unavailable_boundary=JSON.parse(probe.stdout)
+    verify('trust matrix ran with actually unavailable isolation',probe.status===2&&facts.unavailable_boundary.boundary.enforcement==='unavailable'&&facts.unavailable_boundary.completion===null)
+  }
+  for(const example of process.env.DITTO_G3_TRUST_ONLY==='1'?[]:['tasks-summary','workspace-actions']){
     const description=JSON.parse(readFileSync(new URL(`../../../crates/ditto-generation/examples/${example}.json`,import.meta.url),'utf8'))
     const params={description,request_summary:'Create '+description.title,idempotency_key:'create-'+example}
     const artifact=await core.must('desktop.plugins.development.create',params)
@@ -30,6 +38,8 @@ try{
       continue;
     }
     verify(example+' five stages passed under full production policy',validated.state==='validated'&&validated.validation.boundary.enforcement==='full'&&validated.validation.boundary.process_exec_blocked&&validated.validation.stages.every(s=>s.result==='passed'))
+    const timings=validated.validation.diagnostics.filter(d=>d.startsWith('stage_timing:')).map(d=>JSON.parse(d.slice('stage_timing:'.length)))
+    verify(example+' all native stages have measured start/end and duration',timings.length===5&&timings.every((t,i)=>t.format_version===1&&t.stage===['syntax','contract','load','focus','interaction'][i]&&Number.isFinite(Date.parse(t.started_at))&&Number.isFinite(Date.parse(t.finished_at))&&Number.isInteger(t.elapsed_ms)&&t.elapsed_ms>=0))
     const published=await core.must('desktop.plugins.development.publish',{artifact_id:artifact.artifact_id})
     verify(example+' published after validation',published.state==='published')
     verify(example+' package readback is untrusted fixed description',(await core.must('desktop.plugins.get',{package_id:description.plugin_id,version:description.version})).package.source==='generated')

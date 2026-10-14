@@ -19,6 +19,45 @@ use ditto_store::{generated, jobs, packages, StoreError};
 use serde_json::{json, Value};
 use std::{fs, os::unix::fs::PermissionsExt, sync::Arc};
 
+pub(crate) fn recheck_authorization(
+    core: &Core,
+    caller: &Caller,
+    contract: &catalog::CapabilityContract,
+    params: &serde_json::Map<String, Value>,
+    approved_once: bool,
+) -> Result<(), CoreError> {
+    if core.session_locked() {
+        return Err(CoreError::unavailable(
+            UnavailableReason::SessionLocked,
+            "the session locked before the generated operation was accepted",
+        ));
+    }
+    if approved_once {
+        Ok(())
+    } else {
+        router::authorize(core, caller, contract, params)
+    }
+}
+
+fn mutate<T: Send + 'static>(
+    core: &Arc<Core>,
+    caller: &Caller,
+    call: &Call<'_>,
+    work: impl FnOnce(&mut crate::coordinator::Coordinator) -> ditto_store::StoreResult<T>
+        + Send
+        + 'static,
+) -> Result<T, CoreError> {
+    let authority = Arc::clone(core);
+    let caller = caller.clone();
+    let contract = call.contract.clone();
+    let params = call.params.clone();
+    let approved_once = call.approved_once;
+    router::coordinate(core, call, move |coordinator| {
+        recheck_authorization(&authority, &caller, &contract, &params, approved_once)?;
+        work(coordinator).map_err(CoreError::from)
+    })?
+}
+
 pub fn available(core: &Core, preview: bool) -> bool {
     let bin = std::env::current_exe()
         .ok()
@@ -67,9 +106,9 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
                 turn_id,
                 model: None,
             };
-            let a = router::coordinate(core, call, move |c| {
+            let a = mutate(core, caller, call, move |c| {
                 c.store().write(|tx| generated::create(tx, &input, source))
-            })??;
+            })?;
             Ok((
                 json!(core.read(|c| generated::get(c, &a.artifact_id))?),
                 true,
@@ -94,7 +133,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
                 ));
             }
             let paths = core.paths.clone();
-            let a = router::coordinate(core, call, move |c| {
+            let a = mutate(core, caller, call, move |c| {
                 let unpacked = materialize(&paths, &a)?;
                 c.store().write(|tx| {
                     let mut current = generated::get(tx, &a.artifact_id)?;
@@ -110,7 +149,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
                     generated::save(tx, &current)?;
                     Ok(current)
                 })
-            })??;
+            })?;
             Ok((json!(a), true))
         }
         catalog::DEVELOPMENT_ACTIVATE => activate(core, caller, call),
@@ -126,7 +165,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
         }
         catalog::DEVELOPMENT_DATA_WRITE => {
             let input: GeneratedDataInput = call.input()?;
-            let value = router::coordinate(core, call, move |c| {
+            let value = mutate(core, caller, call, move |c| {
                 c.store().write(|tx| {
                     let a = generated::get(tx, &input.artifact_id)?;
                     if !generated::approved(&a) || a.state != ArtifactState::Active {
@@ -148,7 +187,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
                     }
                     generated::data_write(tx, &a, &input)
                 })
-            })??;
+            })?;
             Ok((json!(value), true))
         }
         _ => Err(CoreError::invalid("unknown development operation")),
@@ -168,7 +207,7 @@ fn submit(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
     }
     let owner = caller.subject.0.clone();
     let root = core.paths.cache.join("generated-validation");
-    let job = router::coordinate(core, call, move |c| {
+    let job = mutate(core, caller, call, move |c| {
         c.store().write(|tx| {
             let mut a = generated::get(tx, &input.artifact_id)?;
             let kind = if preview {
@@ -260,7 +299,7 @@ fn submit(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             }
             Ok(job)
         })
-    })??;
+    })?;
     core.jobs.wake();
     Ok((json!(job), true))
 }

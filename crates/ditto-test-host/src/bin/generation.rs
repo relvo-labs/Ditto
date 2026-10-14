@@ -279,6 +279,9 @@ fn inside(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             if v.get("native_result").is_some() {
                 *result = serde_json::from_value(v["native_result"].clone()).ok();
             }
+            if v.get("stage_timing").is_some() {
+                emit(json!({"stage_timing":v["stage_timing"]}));
+            }
             if v["phase"].as_str().is_some_and(|s| {
                 [
                     "syntax",
@@ -445,6 +448,13 @@ fn run(mode: &str, input: Input) -> Result<GenerationValidation, Box<dyn std::er
                 }
                 if v.get("phase").is_some() {
                     emit(json!({"phase":v["phase"],"progress":v["progress"]}));
+                }
+                if v.get("stage_timing").is_some() {
+                    // Keep telemetry in existing diagnostics, separate from
+                    // deterministic error fingerprints and boundary evidence.
+                    native_diagnostics
+                        .borrow_mut()
+                        .push(format!("stage_timing:{}", v["stage_timing"]));
                 }
             }
         };

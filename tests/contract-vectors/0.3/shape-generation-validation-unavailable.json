@@ -1,0 +1,56 @@
+{
+  "kind": "shape",
+  "description": "Generation validation enforcement unavailable; only full may qualify for publishing",
+  "type": "generation-validation",
+  "valid": true,
+  "value": {
+    "bundle_sha256": "sha256:fixture",
+    "boundary": {
+      "enforcement": "unavailable",
+      "policy": "generated-templates-v1",
+      "landlock_abi": 8,
+      "files": true,
+      "network": true,
+      "process_exec_blocked": true,
+      "memory_max": 536870912,
+      "cpu_max": "100000 100000",
+      "pids_max": 64,
+      "deadline_ms": 15000,
+      "cleanup_complete": true,
+      "reasons": [],
+      "unit": "ditto-generation-fixture.service",
+      "cgroup": "/fixture/ditto-generation-fixture.service",
+      "runner_pid": 1
+    },
+    "stages": [
+      {
+        "stage": "syntax",
+        "result": "passed",
+        "diagnostic": "fixture"
+      },
+      {
+        "stage": "contract",
+        "result": "passed",
+        "diagnostic": "fixture"
+      },
+      {
+        "stage": "load",
+        "result": "passed",
+        "diagnostic": "fixture"
+      },
+      {
+        "stage": "focus",
+        "result": "passed",
+        "diagnostic": "fixture"
+      },
+      {
+        "stage": "interaction",
+        "result": "passed",
+        "diagnostic": "fixture"
+      }
+    ],
+    "test_data": true,
+    "preview_opened": false,
+    "diagnostics": []
+  }
+}

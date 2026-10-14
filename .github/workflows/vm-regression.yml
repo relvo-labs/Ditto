@@ -12,6 +12,7 @@ on:
       - 'tests/g0/**'
       - 'tests/g1/**'
       - 'tests/g2/**'
+      - 'tests/g3/**'
       - 'packages/**'
       - 'schema/**'
       - 'tools/**'

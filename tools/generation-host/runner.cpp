@@ -15,6 +15,8 @@
 #include <QtTest/qtestkeyboard.h>
 #include <QKeyEvent>
 #include <QTimer>
+#include <QDateTime>
+#include <QElapsedTimer>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <linux/audit.h>
@@ -51,13 +53,25 @@ static bool denyExecution() {
 int main(int argc,char** argv) {
     if (argc!=4) return 64;
     const QString mode=QString::fromLocal8Bit(argv[1]);
+    QDateTime stageStarted;
+    QElapsedTimer stageClock;
+    QJsonArray stages;
+    const auto beginStage=[&](const char* name){
+        stageStarted=QDateTime::currentDateTimeUtc();
+        stageClock.start();
+        emitJson({{"phase",name},{"progress",stages.size()/5.0}});
+    };
+    beginStage("syntax");
     QFile input(QString::fromLocal8Bit(argv[2]));
     if (!input.open(QIODevice::ReadOnly) || input.size()>16384) return 1;
     QJsonParseError error;
     const auto parsed=QJsonDocument::fromJson(input.readAll(),&error);
-    QJsonArray stages;
     const auto stage=[&](const char* name,bool passed,const char* reason){
         stages.append(QJsonObject{{"stage",name},{"result",passed?"passed":"failed"},{"diagnostic",reason}});
+        emitJson({{"stage_timing",QJsonObject{{"format_version",1},{"stage",name},
+            {"started_at",stageStarted.toString(Qt::ISODateWithMs)},
+            {"finished_at",QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+            {"elapsed_ms",stageClock.elapsed()}}}});
         emitJson({{"phase",name},{"progress",stages.size()/5.0}});
     };
     bool execBlocked=false;
@@ -97,15 +111,19 @@ int main(int argc,char** argv) {
     view.setSource(QUrl::fromLocalFile(QString::fromLocal8Bit(argv[3])));
     stage("syntax",view.status()!=QQuickView::Error,"fixed_template_compilation");
     if(view.status()==QQuickView::Error){finish(false);return 0;}
+    beginStage("contract");
     const bool contract=description["format_version"]==1 && (tasks || content["template"]=="workspace_actions_v1") && view.rootObject()!=nullptr;
     stage("contract",contract,"fixed_template_contract"); if(!contract){finish(false);return 0;}
+    beginStage("load");
     auto* item=view.rootObject();
     QVariant healthy;
     const bool loaded=item->property("ready").toBool() && QMetaObject::invokeMethod(item,"healthy",Q_RETURN_ARG(QVariant,healthy)) && healthy.toBool();
     stage("load",loaded,"provider_health"); if(!loaded){finish(false);return 0;}
+    beginStage("focus");
     view.setTitle(QStringLiteral("Ditto 插件預覽 — 使用測試資料"));
     view.show(); view.requestActivate(); item->forceActiveFocus(); QTest::qWait(80);
     stage("focus",item->hasActiveFocus(),"keyboard_focus"); if(!item->hasActiveFocus()){finish(false);return 0;}
+    beginStage("interaction");
     bool interaction=false;
     QString interactionDiagnostic="fixture_data_and_keyboard_action";
     if(tasks) {
