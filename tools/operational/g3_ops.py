@@ -414,12 +414,18 @@ def recover(root, host):
             state["modes"][state["mode"]] = "failed"
             state.setdefault("failure", "interrupted_or_deadline")
         errors = list(state.get("recovery_errors", []))
+        diagnostics = list(state.get("recovery_diagnostics", []))
+        service_result = os.environ.get("SERVICE_RESULT")
+        if service_result in ("success", "timeout", "signal", "exit-code", "oom-kill", "resources"):
+            state["service_result"] = service_result
 
         def attempt(name, fn):
             try:
                 fn()
-            except Exception:
+            except Exception as error:
                 errors.append(name)  # no private exception values exported
+                diagnostics.append({"step": name, "type": type(error).__name__,
+                                    "reason": str(error) if isinstance(error, Refused) else type(error).__name__})
 
         if state.get("disruption_armed"):
             relogin = True
@@ -442,7 +448,7 @@ def recover(root, host):
             if state["runner_before"] == "active":
                 attempt("runner_restore", lambda: host.system("start", RUNNER))
             attempt("runner_readback", lambda: require(host.system("is-active", RUNNER, check=False) == state["runner_before"], "runner state mismatch"))
-        state.update(recovery_complete=True, recovery_errors=errors, recovery_status="needs_human" if errors else "verified")
+        state.update(recovery_complete=True, recovery_errors=errors, recovery_diagnostics=diagnostics, recovery_status="needs_human" if errors else "verified")
         write(root / "state.json", state)
         return state
 
@@ -699,6 +705,7 @@ def control(root, host):
         if state.get("mode") and state["modes"][state["mode"]] == "running":
             state["modes"][state["mode"]] = "failed"
         state["failure"] = failure
+        state["failure_detail"] = str(error) if isinstance(error, Refused) else failure
         write(root / "state.json", state)
     finally:
         recovered = recover(root, host)
