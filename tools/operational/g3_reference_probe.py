@@ -66,6 +66,20 @@ def main():
                 if 'core.db' in files and not any(x['path']==parent for x in candidates):
                     schema=readonly_schema(parent)
                     if schema is not None:candidates.append({'path':parent,'schema':schema})
+    # Previously authorized physical runs record the exact private store they used.
+    prior=[]
+    for context in sorted((home/'funlab/Ditto/artifacts/g3').glob('reference-*/physical-context.json')):
+        try:
+            value=json.loads(context.read_text()).get('private_store')
+        except (OSError,ValueError):
+            continue
+        if isinstance(value,str) and value.startswith('/') and value not in prior:
+            prior.append(value)
+            if not any(x['path']==value for x in candidates):
+                schema=readonly_schema(value)
+                if schema is not None:candidates.append({'path':value,'schema':schema})
+    for entry in candidates:
+        entry['used_by_prior_reference_run']=entry['path'] in prior
     for entry in candidates:
         try:
             c=sqlite3.connect((pathlib.Path(entry['path'])/'core.db').as_uri()+'?mode=ro',uri=True)
