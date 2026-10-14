@@ -48,7 +48,7 @@ def main():
     for x in roots:
         _,sha=command(['git','-C',x,'rev-parse','HEAD']);_,status=command(['git','-C',x,'status','--porcelain=v1']);checkouts.append({'root':x,'head':sha,'dirty_path_count':len(status.splitlines())})
     candidates=[]
-    for base in [home/'.local/share',home/'.local/state',home/'funlab']:
+    for base in [home,home/'.local/share',home/'.local/state',home/'.cache',home/'funlab']:
         if base.is_dir():
             for p in sorted(base.glob('*')):
                 if p.is_dir() and any(word in p.name.lower() for word in ['ditto','g3','subscription']):
@@ -112,7 +112,8 @@ def main():
     if template_text and any(x in template_text for x in ['BEGIN PRIVATE','Authorization:','Bearer ','sk-']):template_text=None
     # Credential values, account identifiers and raw environments never emitted.
     report={'format_version':1,'phase':'read-only-preflight','hostname':socket.gethostname(),'uid':uid,'units':units,'checkouts':checkouts,'data_dir':data,'normal_store_schema':readonly_schema(data),'private_store_candidates':candidates,'sessions':physical,'profile':profile,'keyring':keyring,'sudo_available':sudo_rc==0,'gdm_sha256':gdm_sha,'overrides':overrides,'tools':tool_paths,'global_addresses':addresses,'disruption_started':False,'provider_called':False}
-    report.update(ssh_host_ed25519_public_key=public_key,verification_relay_template=template_text,metadata_directories_scanned=searched)
+    gh_rc,_=command(['gh','auth','status'],env)
+    report.update(ssh_host_ed25519_public_key=public_key,verification_relay_template=template_text,metadata_directories_scanned=searched,github_cli_authenticated=gh_rc==0)
     out=pathlib.Path(args.out);out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2));out.chmod(0o600)
     print(json.dumps({'phase':report['phase'],'disruption_started':False,'provider_called':False,'core_active':core.get('ActiveState')=='active','profile_readable':profile is not None,'store_candidates':len(candidates)}))
 
