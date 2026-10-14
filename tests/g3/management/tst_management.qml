@@ -58,6 +58,14 @@ TestCase {
         client.jobs=[job("validate-one","generation.validate","succeeded","interaction"),job("preview-one","generation.preview","running","preview_opened"),job("preview-two","generation.preview","running","preview_opened")];
     }
     function page() { return createTemporaryObject(factory,testCase,{client:client,tokens:testCase.tokens}); }
+    function test_completed_job_does_not_claim_failed_validation_succeeded() {
+        const view=page();
+        const completed=job("failed-validation","generation.validate","succeeded","syntax");
+        completed.result={boundary:{enforcement:"full"},stages:[{stage:"syntax",result:"failed"}]};
+        compare(view.jobText(completed),view.stateText("failed"));
+        completed.result.boundary.enforcement="partial";
+        compare(view.jobText(completed),view.stateText("inspect_only"));
+    }
     function test_reopen_restores_both_previews_and_keyboard_cancellation() {
         let view=page();
         verify(view!==null);

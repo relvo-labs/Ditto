@@ -8,6 +8,6 @@ for name in sorted(set(names)):
     p=root/os.fsdecode(name)
     if p.is_file():h.update(name+b'\0');h.update(hashlib.sha256(p.read_bytes()).digest())
 result={'commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'dirty':bool(subprocess.check_output(['git','status','--porcelain'],cwd=root)),'source_tree_sha256':h.hexdigest(),'kernel':os.uname().release}
-binary=root/'target/debug/ditto-generation-runner'
+binary=pathlib.Path(os.environ.get('DITTO_BINARIES',root/'target/debug'))/'ditto-generation-runner'
 if binary.is_file():result['native_runner_sha256']=hashlib.sha256(binary.read_bytes()).hexdigest()
 print(json.dumps(result))

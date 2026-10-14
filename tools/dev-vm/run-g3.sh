@@ -46,6 +46,7 @@ if [[ "${DITTO_G3_EXPECT_OLD_ABI:-0}" == 1 ]]; then
 else
   step rejection 'python3 tests/g3/host/rejection.py'
   step native-failures 'python3 tests/g3/native-failures/driver.py'
+  step native-pipeline-failures 'bash tests/g3/native-failures/run-pipeline.sh'
   step host 'DITTO_ENVIRONMENT_LABEL=development-vm timeout -k 5 180 bash tests/g3/host/run.sh'
   step production 'node tests/g3/integration/run.mjs'
   step dependencies 'pnpm install --frozen-lockfile'

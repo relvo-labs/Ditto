@@ -68,6 +68,7 @@ int main(int argc,char** argv) {
     const auto parsed=QJsonDocument::fromJson(input.readAll(),&error);
     const auto stage=[&](const char* name,bool passed,const char* reason){
         stages.append(QJsonObject{{"stage",name},{"result",passed?"passed":"failed"},{"diagnostic",reason}});
+        emitJson({{"stage_result",stages.last()}});
         emitJson({{"stage_timing",QJsonObject{{"format_version",1},{"stage",name},
             {"started_at",stageStarted.toString(Qt::ISODateWithMs)},
             {"finished_at",QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
@@ -91,6 +92,8 @@ int main(int argc,char** argv) {
     if(syscall(SYS_execve,"/usr/bin/true",nullptr,nullptr)!=-1 || errno!=EPERM){finish(false);return 1;}
     errno=0;
     if(syscall(SYS_fork)!=-1 || errno!=EPERM){finish(false);return 1;}
+    // Persist actual restrictions before QML can hang or exhaust its scope.
+    emitJson({{"native_execution_attested",true}});
     const auto description=parsed.object();
     const auto content=description["content"].toObject();
     const bool tasks=content["template"]=="tasks_summary_v1";

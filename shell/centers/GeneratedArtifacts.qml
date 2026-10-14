@@ -56,7 +56,12 @@ Section {
         case "cancelling":return client.t(qsTr("正在取消並清理"));
         case "cancelled":return client.t(qsTr("已取消並完成清理"));
         case "failed":return client.t(qsTr("工作未完成，請檢查診斷後再試"));
-        case "succeeded":return client.t(qsTr("工作已完成"));
+        case "succeeded":
+            if(job.kind==="generation.validate" && job.result) {
+                if(!job.result.boundary || job.result.boundary.enforcement!=="full") return stateText("inspect_only");
+                if((job.result.stages || []).some(stage=>stage.result!=="passed")) return stateText("failed");
+            }
+            return client.t(qsTr("工作已完成"));
         default:return stageText(job.phase);
         }
     }
@@ -124,7 +129,7 @@ Section {
             width:parent.width
             spacing:page.tokens.space
             Text {width:parent.width;text:item.modelData.description.title+" · "+item.modelData.description.version;textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foreground;font.bold:true}
-            Text {width:parent.width;text:page.stateText(item.modelData.state);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foregroundMuted}
+            Text {objectName:"generationState_"+item.modelData.artifact_id;width:parent.width;text:page.stateText(item.modelData.state);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foregroundMuted}
             Text {width:parent.width;text:page.client.t(qsTr("需求：%1")).arg(item.modelData.origin.request_summary);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foreground}
             Text {width:parent.width;visible:!!item.modelData.parent_id;text:page.client.t(qsTr("本版本修改：%1")).arg(item.modelData.changed_fields.map(field=>page.fieldName(field)).join(", "));textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foregroundMuted}
             Text {width:parent.width;visible:item.modelData.repair.stopped;text:page.client.t(qsTr("已停止自動修復。請檢查診斷，重新說明需求後再試。"));textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.warning}

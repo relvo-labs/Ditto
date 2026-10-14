@@ -45,6 +45,66 @@ struct NativeResult {
     preview_opened: bool,
     test_data: bool,
 }
+#[derive(Default)]
+struct NativeProgress {
+    exec_attested: bool,
+    phase: Option<ValidationStage>,
+    stages: Vec<StageEvidence>,
+}
+impl NativeProgress {
+    fn observe(&mut self, value: &Value) {
+        if value["native_execution_attested"] == true {
+            self.exec_attested = true;
+        }
+        if let Ok(phase) = serde_json::from_value(value["phase"].clone()) {
+            self.phase = Some(phase);
+        }
+        if let Ok(stage) = serde_json::from_value::<StageEvidence>(value["stage_result"].clone()) {
+            if self.exec_attested
+                && VALIDATION_STAGES.get(self.stages.len()) == Some(&stage.stage)
+                && self.stages.iter().all(|s| s.result == StageResult::Passed)
+                && stage.result != StageResult::NotRun
+            {
+                self.stages.push(stage);
+            }
+        }
+    }
+    fn interrupted(&self) -> Vec<StageEvidence> {
+        VALIDATION_STAGES
+            .iter()
+            .enumerate()
+            .map(|(index, stage)| {
+                if let Some(done) = self.stages.get(index) {
+                    // A missing final result must never validate a candidate.
+                    if self.stages.len() == 5 && index == 4 {
+                        return StageEvidence {
+                            stage: *stage,
+                            result: StageResult::Failed,
+                            diagnostic: "native_completion_missing".into(),
+                        };
+                    }
+                    return done.clone();
+                }
+                let failed =
+                    self.exec_attested && index == self.stages.len() && self.phase == Some(*stage);
+                StageEvidence {
+                    stage: *stage,
+                    result: if failed {
+                        StageResult::Failed
+                    } else {
+                        StageResult::NotRun
+                    },
+                    diagnostic: if failed {
+                        "native_runner_interrupted"
+                    } else {
+                        "host_unavailable"
+                    }
+                    .into(),
+                }
+            })
+            .collect()
+    }
+}
 fn emit(v: Value) {
     let mut out = io::stdout().lock();
     let _ = writeln!(out, "{v}");
@@ -161,6 +221,8 @@ fn inside(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     {
         return Err("native runner integrity".into());
     }
+    #[cfg(feature = "fault-injection")]
+    inject_fixed_fixture(root)?;
     deny_inet_sockets()?;
     let (ours, theirs) = UnixStream::pair()?;
     ours.set_read_timeout(Some(Duration::from_secs(5)))?;
@@ -281,6 +343,12 @@ fn inside(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
             }
             if v.get("stage_timing").is_some() {
                 emit(json!({"stage_timing":v["stage_timing"]}));
+            }
+            if v.get("native_execution_attested").is_some() {
+                emit(json!({"native_execution_attested":v["native_execution_attested"]}));
+            }
+            if v.get("stage_result").is_some() {
+                emit(json!({"stage_result":v["stage_result"]}));
             }
             if v["phase"].as_str().is_some_and(|s| {
                 [
@@ -424,12 +492,14 @@ fn run(mode: &str, input: Input) -> Result<GenerationValidation, Box<dyn std::er
         let mut boundary = unavailable("runner_did_not_attest", deadline);
         let mut cgroup = None;
         let mut completion = None;
+        let native_progress = std::cell::RefCell::new(NativeProgress::default());
         let native_diagnostics = std::cell::RefCell::new(Vec::<String>::new());
         let consume = |line: String,
                        boundary: &mut GenerationBoundary,
                        cgroup: &mut Option<String>,
                        completion: &mut Option<NativeResult>| {
             if let Ok(v) = serde_json::from_str::<Value>(&line) {
+                native_progress.borrow_mut().observe(&v);
                 if let Ok(b) =
                     serde_json::from_value::<GenerationBoundary>(v["host_boundary"].clone())
                 {
@@ -488,6 +558,15 @@ fn run(mode: &str, input: Input) -> Result<GenerationValidation, Box<dyn std::er
             thread::sleep(Duration::from_millis(2));
         }
         let diagnostics = stderr.join().unwrap_or_default();
+        let service_result = ctl(&[
+            "show",
+            &format!("{unit}.service"),
+            "-p",
+            "Result",
+            "--value",
+        ])
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned());
         let _ = ctl(&["stop", &format!("{unit}.service")]);
         boundary.cleanup_complete = cgroup.is_some_and(|s| {
             if !s.ends_with(&format!("/{unit}.service")) {
@@ -503,19 +582,19 @@ fn run(mode: &str, input: Input) -> Result<GenerationValidation, Box<dyn std::er
             }
         });
         let _ = ctl(&["reset-failed", &format!("{unit}.service")]);
-        let mut stages = VALIDATION_STAGES
-            .iter()
-            .map(|s| StageEvidence {
-                stage: *s,
-                result: StageResult::NotRun,
-                diagnostic: "host_unavailable".into(),
-            })
-            .collect();
+        let progress = native_progress.into_inner();
+        let mut stages = progress.interrupted();
         let mut preview = false;
         if let Some(n) = completion {
             boundary.process_exec_blocked = n.exec_blocked;
             stages = n.stages;
             preview = n.preview_opened;
+        } else if progress.exec_attested {
+            boundary.process_exec_blocked = true;
+            native_diagnostics.borrow_mut().push(format!(
+                "native_runner_interrupted:{}",
+                service_result.as_deref().unwrap_or("unknown")
+            ));
         }
         if boundary.files
             && boundary.network
@@ -550,6 +629,25 @@ fn run(mode: &str, input: Input) -> Result<GenerationValidation, Box<dyn std::er
     }
     let _ = fs::remove_dir_all(root);
     outcome
+}
+
+#[cfg(feature = "fault-injection")]
+fn inject_fixed_fixture(root: &Path) -> io::Result<()> {
+    // Private sibling file of a separately built test binary. A Description
+    // cannot select a fixture or supply code. Production never reads it.
+    let path = std::env::current_exe()?.with_file_name("generation-fault.txt");
+    let fault = match fs::read_to_string(path) {
+        Ok(value) => value,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let source = match fault.trim() {
+        "syntax" => "import QtQuick\nItem {",
+        "illegal-import" => "import Ditto.Forbidden 1.0\nItem {}",
+        "timeout" => "import QtQuick\nItem { Component.onCompleted: { while (true) {} } }",
+        _ => return Err(io::Error::other("unknown fixed generation fault")),
+    };
+    fs::write(root.join("Panel.qml"), source)
 }
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -604,4 +702,59 @@ fn core_alive() -> bool {
         return false;
     };
     pid.parse::<u32>().ok().and_then(start_time).as_deref() == Some(expected)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn interruption_keeps_real_passed_prefix_and_fails_running_stage() {
+        let mut p = NativeProgress::default();
+        p.observe(&json!({"native_execution_attested":true}));
+        p.observe(
+            &json!({"stage_result":{"stage":"syntax","result":"passed","diagnostic":"compiled"}}),
+        );
+        p.observe(&json!({"phase":"contract"}));
+        assert_eq!(
+            p.interrupted().iter().map(|s| s.result).collect::<Vec<_>>(),
+            [
+                StageResult::Passed,
+                StageResult::Failed,
+                StageResult::NotRun,
+                StageResult::NotRun,
+                StageResult::NotRun
+            ]
+        );
+    }
+    #[test]
+    fn no_exec_proof_or_out_of_order_result_cannot_promote_progress() {
+        let mut p = NativeProgress::default();
+        p.observe(&json!({"phase":"syntax"}));
+        p.observe(
+            &json!({"stage_result":{"stage":"syntax","result":"passed","diagnostic":"claimed"}}),
+        );
+        assert!(p
+            .interrupted()
+            .iter()
+            .all(|s| s.result == StageResult::NotRun));
+        p.observe(&json!({"native_execution_attested":true}));
+        p.observe(
+            &json!({"stage_result":{"stage":"load","result":"passed","diagnostic":"out_of_order"}}),
+        );
+        assert_eq!(p.interrupted()[0].result, StageResult::Failed);
+        assert!(p.interrupted()[1..]
+            .iter()
+            .all(|s| s.result == StageResult::NotRun));
+    }
+    #[test]
+    fn missing_final_completion_never_passes_all_stages() {
+        let mut p = NativeProgress::default();
+        p.observe(&json!({"native_execution_attested":true}));
+        for stage in VALIDATION_STAGES {
+            p.observe(
+                &json!({"stage_result":{"stage":stage,"result":"passed","diagnostic":"actual"}}),
+            );
+        }
+        assert_eq!(p.interrupted()[4].result, StageResult::Failed);
+    }
 }

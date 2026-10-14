@@ -9,7 +9,10 @@ const line=(path,text)=>new Promise((resolve,reject)=>{
  const socket=createConnection(path),timer=setTimeout(()=>{socket.destroy();reject(new Error('relay timeout'))},90000);let buffer=''
  socket.on('connect',()=>socket.write(text+'\n'));socket.on('error',reject);socket.on('data',data=>{buffer+=data;if(buffer.includes('\n')){clearTimeout(timer);socket.destroy();resolve(JSON.parse(buffer.split('\n')[0]))}})
 })
-const call=(method,params={})=>line(process.env.DITTO_G1_RELAY,JSON.stringify({method,params}))
+const call=(method,params={})=>{
+ if(process.env.DITTO_G3_RUN_SUFFIX&&params.idempotency_key)params={...params,idempotency_key:process.env.DITTO_G3_RUN_SUFFIX+'-'+params.idempotency_key}
+ return line(process.env.DITTO_G1_RELAY,JSON.stringify({method,params}))
+}
 const must=async(method,params)=>{const r=await call(method,params);if(r.error)throw new Error(method+': '+JSON.stringify(r.error));return r.result}
 const shell=command=>line(process.env.DITTO_RUNTIME_DIR+'/shell.sock',command)
 const eventually=async(fn)=>{for(let i=0;i<800;i++){const v=await fn();if(v)return v;await sleep(50)}throw new Error('condition timed out')}
@@ -30,6 +33,7 @@ try{
  await must("desktop.tasks.add",{text:"G3 service-backed task",source:"own"})
  const workspaces=await must('desktop.workspaces.list');facts.workspaces=workspaces
  const tasks=JSON.parse(readFileSync('crates/ditto-generation/examples/tasks-summary.json','utf8'));tasks.data={schema_version:1,fields:{note:'text'}}
+ if(process.env.DITTO_G3_RUN_SUFFIX)tasks.plugin_id+='.'+process.env.DITTO_G3_RUN_SUFFIX
  const a=await prepare(tasks)
  await activate(a,'tasks-activate')
  const mounted=await eventually(async()=>{const l=await must('desktop.plugins.list');return l.entries.find(e=>e.package===tasks.plugin_id&&e.state.kind==='active')})
@@ -41,6 +45,7 @@ try{
  const preview=await must('desktop.plugins.development.preview',{artifact_id:a.artifact_id,idempotency_key:'real-preview'})
  const opened=await eventually(async()=>{const j=await must('desktop.jobs.get',{job_id:preview.job_id});if(['failed','cancelled'].includes(j.state))throw new Error('preview failed: '+JSON.stringify(j));return j.phase==='preview_opened'?j:false})
  facts.previewOpened=opened;verify('real confined Wayland preview opens',!!opened)
+ if(process.env.DITTO_G3_PHYSICAL_CONTEXT)execFileSync('python3',['tests/g3/reference/observe.py','preview'],{stdio:'inherit'})
  const second=await must('desktop.plugins.development.preview',{artifact_id:a.artifact_id,idempotency_key:'second-preview'});
  await eventually(async()=>{const j=await must('desktop.jobs.get',{job_id:second.job_id});return j.phase==='preview_opened'});
  const thirdDescription=structuredClone(tasks);thirdDescription.version='0.1.1';thirdDescription.title='Queued candidate';
@@ -51,7 +56,8 @@ try{
  verify('global pool admits only two jobs',(await must('desktop.jobs.list')).jobs.filter(j=>j.state==='running').length===2);
  await must('desktop.jobs.cancel',{job_id:queued.job_id});
  verify('queued cancellation reconciles artifact',(await must('desktop.plugins.development.get',{artifact_id:queuedArtifact.artifact_id})).state==='failed');
- for(const job of [preview,second]){await must('desktop.jobs.cancel',{job_id:job.job_id});verify('preview '+job.job_id+' cancellation finishes',(await waitJob(job)).state==='cancelled');}
+ if(process.env.DITTO_G3_PHYSICAL_CONTEXT)execFileSync('python3',['tests/g3/reference/observe.py','cancel-previews',preview.job_id,second.job_id],{stdio:'inherit'})
+ for(const job of [preview,second]){if((await must('desktop.jobs.get',{job_id:job.job_id})).state!=='cancelled')await must('desktop.jobs.cancel',{job_id:job.job_id});verify('preview '+job.job_id+' cancellation finishes',(await waitJob(job)).state==='cancelled');}
 
  verify('cancelled preview retains opening evidence',(await must('desktop.plugins.development.get',{artifact_id:a.artifact_id})).previews.filter(p=>p.opened&&p.state==='cancelled').length===2);
  const modified=structuredClone(tasks);modified.version='0.2.0';modified.title='修改後的待辦摘要';modified.width=360;modified.content.max_items=2;modified.data={schema_version:2,fields:{title:'text'},migration:{from_version:1,rename:{note:'title'},defaults:{},remove:[],rollback:'snapshot'}}
@@ -79,6 +85,7 @@ try{
  verify('two modifications can return to the first data snapshot',(await must('desktop.plugins.development.data_get',{artifact_id:a.artifact_id})).payload.note==='retain this note')
  verify('first version appearance returns after two modifications',!!(await eventually(async()=>(await shell('generated')).find(e=>e.artifact_id===a.artifact_id&&e.width===tasks.width&&e.title===tasks.title))))
  const actions=JSON.parse(readFileSync('crates/ditto-generation/examples/workspace-actions.json','utf8'));actions.content.actions=workspaces.workspaces.slice(0,2).map((w,i)=>({workspace_id:w.id,label:'G3 工作區 '+i}))
+ if(process.env.DITTO_G3_RUN_SUFFIX)actions.plugin_id+='.'+process.env.DITTO_G3_RUN_SUFFIX
  const w=await prepare(actions);await activate(w,'workspaces-activate')
  verify('both generated panels coexist',(await shell('generated')).filter(e=>e.shown&&e.ready).length===2)
  await sleep(300);
@@ -104,5 +111,6 @@ try{
  const history=await must('desktop.plugins.development.get',{artifact_id:b.artifact_id});verify('activation journal includes commit and preserved immutable source',history.activations.some(x=>x.state==='committed')&&history.parent_id===a.artifact_id)
  process.kill(facts.application_pid,0);verify('native application survives generation and rollback',(await must('desktop.windows.list')).windows.some(window=>window.app_id==='ditto-g3-survival'));
  facts.initial=initial;facts.final=await head()
- writeFileSync(process.env.DITTO_G3_DESKTOP_OUT,JSON.stringify({ok:true,evidence_class:'development-headless-wayfire',checks,facts},null,2))
+ if(process.env.DITTO_G3_PHYSICAL_CONTEXT)facts.physical_context=JSON.parse(readFileSync(process.env.DITTO_G3_PHYSICAL_CONTEXT,'utf8'))
+ writeFileSync(process.env.DITTO_G3_DESKTOP_OUT,JSON.stringify({ok:true,evidence_class:process.env.DITTO_G3_PHYSICAL_CONTEXT?'reference-physical-seat':'development-headless-wayfire',checks,facts},null,2))
 }catch(error){writeFileSync(process.env.DITTO_G3_DESKTOP_OUT,JSON.stringify({ok:false,checks,facts,error:String(error)},null,2));console.error(error);process.exitCode=1}

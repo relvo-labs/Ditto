@@ -12,8 +12,9 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-NATIVE = ROOT / "target/debug/ditto-generation-runner"
-CONFINE = ROOT / "target/debug/ditto-confine"
+BINARIES = pathlib.Path(os.environ.get("DITTO_BINARIES", ROOT / "target/debug"))
+NATIVE = BINARIES / "ditto-generation-runner"
+CONFINE = BINARIES / "ditto-confine"
 PIN = json.loads(NATIVE.with_suffix(".json").read_text())
 STAGES = ["syntax", "contract", "load", "focus", "interaction"]
 
@@ -69,14 +70,21 @@ def inside(work):
 
 def main():
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = ROOT / "artifacts/g3" / f"native-failures-{stamp}-{os.getpid()}"
+    out = pathlib.Path(os.environ.get("DITTO_ARTIFACTS", ROOT / "artifacts/g3")) / f"native-failures-{stamp}-{os.getpid()}"
     out.mkdir(mode=0o700, parents=True)
     summary = {"evidence_class": "development-fixed-native-failures", "source": json.loads(subprocess.check_output(["python3", str(ROOT / "tests/g3/source.py")], text=True)), "witness_pid": os.getpid(), "checks": [], "candidate_activation": False}
+    physical = None
+    if os.environ.get("DITTO_G3_PHYSICAL_CONTEXT"):
+        sys.path.insert(0, str(ROOT / "tests/g3/reference"))
+        import observe as physical
+        physical.guard()
+        summary["evidence_class"] = "reference-physical-fixed-native-failures"
     env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path=/run/user/{os.getuid()}/bus")
     base = json.loads((ROOT / "crates/ditto-generation/examples/tasks-summary.json").read_text())
     minimal = "import QtQuick\nItem { width:320; height:120; property var config: ({}); property var tasks: []; property bool testData:false; property bool dataAvailable:false; property bool ready:READY; property var displayedTasks: []; function healthy() { return ready }\n ENABLED }\n"
     try:
         for case in ["control", *STAGES, "illegal-import"]:
+            before = physical.snapshot() if physical else None
             work = out / case
             work.mkdir()
             description = dict(base)
@@ -118,6 +126,10 @@ def main():
             assert [s["result"] for s in report["native"]["stages"]] == expected, report
             assert len(report["timings"]) == min(failure_index + 1, 5), report
             os.kill(os.getpid(), 0)
+            if physical:
+                after = physical.snapshot()
+                physical.unchanged(before, after)
+                summary.setdefault("desktop_witnesses", []).append({"case": case, "before": before, "after": after})
             summary["checks"].append({"check": case, "status": "pass", "failure_stage": expected_failure, "cleanup_complete": True})
             print(f"PASS native {case}: {expected}", flush=True)
     except Exception as error:

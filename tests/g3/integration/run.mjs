@@ -10,7 +10,9 @@ const root=mkdtempSync(workspace+'/artifacts/g3/integration-')
 const log=openSync(root+'/core.log','w')
 const env={...process.env,XDG_RUNTIME_DIR:process.env.XDG_RUNTIME_DIR??'/run/user/'+process.getuid(),DITTO_RUNTIME_DIR:root+'/run',DITTO_DATA_DIR:root+'/store',DITTO_SYSTEM:'none',DITTO_G3_TEST_OUT:root+'/result.json'}
 for(const key of ['DITTO_DEV_TOKEN','DITTO_LAUNCH_SCOPE_PREFIX','DITTO_REQUIRE_QUOTA','WAYFIRE_SOCKET','SWAYSOCK'])delete env[key]
-const child=spawn(workspace+'/target/debug/ditto-core',['serve','--compositor','fixture','--launch',`dittoctl 0.3.0 ${process.execPath} ${workspace}/tests/g3/integration/driver.mjs`],{cwd:workspace,env,stdio:['ignore',log,log],detached:true})
+const binaries=process.env.DITTO_BINARIES??workspace+'/target/debug'
+const driver=process.env.DITTO_G3_FIXED_FAILURES==='1'?'failures-driver.mjs':'driver.mjs'
+const child=spawn(binaries+'/ditto-core',['serve','--compositor','fixture','--launch',`dittoctl 0.3.0 ${process.execPath} ${workspace}/tests/g3/integration/${driver}`],{cwd:workspace,env,stdio:['ignore',log,log],detached:true})
 closeSync(log)
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 try{

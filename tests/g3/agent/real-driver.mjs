@@ -1,6 +1,6 @@
 // Real model oracle. Fixture Profile, natural requests, real Core readback.
 import {createConnection} from 'node:net'
-import {writeFileSync} from 'node:fs'
+import {readFileSync,writeFileSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
 import {descriptionChecks} from './description-checks.mjs'
 const checks=[],facts={source:JSON.parse(execFileSync('python3',['tests/g3/source.py']))},sleep=ms=>new Promise(r=>setTimeout(r,ms)),run=Date.now().toString()
@@ -17,6 +17,7 @@ try{
  facts.original_profile=await must('desktop.profiles.get');original=facts.original_profile.profile;preferences=await must('agent.settings.describe')
  const {_meta,...s}=preferences
  await must('agent.settings.patch',{expected_revision:s.revision,settings:{...s,enabled:true,max_tool_calls:24,turn_timeout_ms:120000}})
+ const effective=await must('agent.settings.describe');facts.model_settings={provider:effective.provider,model:effective.model,reasoning_effort:effective.reasoning_effort,revision:effective.revision,max_tool_calls:effective.max_tool_calls,turn_timeout_ms:effective.turn_timeout_ms}
  await must('agent.runtime.ensure');await eventually(async()=>(await must('agent.runtime.get')).phase==='ready',120)
  const status=await must('agent.providers.status',{provider:'codex-app-server'})
  if(!status.authenticated){facts.not_run='Existing test account is not signed in; no model request sent';process.exitCode=2}
@@ -69,5 +70,6 @@ finally{
  if(preferences)await restore('settings',async()=>{const now=await must('agent.settings.describe');const {_meta,...s}=preferences;await must('agent.settings.patch',{expected_revision:now.revision,settings:{...s,revision:now.revision}});const normalize=({_meta,revision,...settings})=>settings;verify('original settings restored by readback',JSON.stringify(normalize(await must('agent.settings.describe')))===JSON.stringify(normalize(preferences)))})
  await restore('grants readback',async()=>{const permissions=await must('desktop.permissions.list',{subject:'agent',include_revoked:true});verify('all test grants revoked by readback',createdGrants.every(id=>permissions.grants.some(g=>g.grant_id===id&&g.revoked_at)))})
  await restore('stop Agent',()=>must('agent.runtime.stop'))
- writeFileSync(process.env.DITTO_G3_AGENT_OUT,JSON.stringify({ok:!process.exitCode,evidence_class:'development-headless-real-subscription',checks,facts},null,2))
+ if(process.env.DITTO_G3_PHYSICAL_CONTEXT)facts.physical_context=JSON.parse(readFileSync(process.env.DITTO_G3_PHYSICAL_CONTEXT,'utf8'))
+ writeFileSync(process.env.DITTO_G3_AGENT_OUT,JSON.stringify({ok:!process.exitCode,evidence_class:process.env.DITTO_G3_PHYSICAL_CONTEXT?'reference-physical-real-subscription':'development-headless-real-subscription',checks,facts},null,2))
 }

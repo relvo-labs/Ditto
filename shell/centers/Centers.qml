@@ -41,6 +41,7 @@ FloatingWindow {
     /// Shell's control socket (a keyboard-driven verification run asks it
     /// where Tab has taken it, the way a screen reader would).
     readonly property Item focusedItem: centersRoot.Window.activeFocusItem
+    readonly property Item diagnosticRoot: centersRoot
 
     /// A control that disappears while it has focus (「套用」 once applied,
     /// a confirm row once confirmed, 「使用這個組合」 once in use) would

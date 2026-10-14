@@ -20,6 +20,8 @@ Agent 的 develop、data 與配置授權分開檢查；帶 resource 的授予由
 
 固定 native runner 在每個實際關卡開始時回報 phase，結束時量測起訖與耗時。Core 保存於既有 `validation.diagnostics` 的 `stage_timing:` 前綴 JSON：`format_version:1`、`stage`、UTC ISO `started_at／finished_at`、單調時鐘量測的 `elapsed_ms`。未執行的關卡沒有時間紀錄；時間不加入錯誤指紋，也不授予 full 或發布資格。這是相容的診斷資料，不增加 wire 欄位或改動契約版本；與模型回合耗時分開記錄。
 
+native runner 在實際證實 exec／fork 被拒絕後立即送出內部 attestation，每關完成也送出有序結果。候選逾時或程序被終止時，controller 保留已通過的連續關卡，正在執行的關卡記失敗，後續記未執行；不再把已執行的逾時誤報為隔離不足。`full` 仍須同時有實際檔案／網路／程序限制及整組清理回讀，且不能代替五關通過；缺少最終 native completion 絕不授予發布資格。終止原因另存於既有 diagnostics，不增加公開契約欄位。
+
 ## 生產候選政策
 
 宿主在啟動 native runner 前讀回 Landlock ABI（至少 6）、私有 confine status fd、實際 cgroup 與 RuntimeMaxUSec。固定額度：512 MiB、零 swap、1 CPU、64 tasks；驗證 service 15 秒，預覽 service 30 秒，內層預覽 20 秒自動關閉。工作池全產品至多兩項；Core 重啟先確認舊 worker scope 已清空才開放新工作；controller 以 PID／starttime 見證 Core，Core 退出即清理。worker scope 和候選 service 分開列入程序與資源統計，不能只計其中之一。

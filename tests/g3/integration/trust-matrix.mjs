@@ -8,8 +8,9 @@ export async function trustMatrix(core,head,verify){
  const root=join(dirname(process.env.DITTO_G3_TEST_OUT),'untrusted')
  mkdirSync(root)
  const results=[]
+ const suffix=process.env.DITTO_G3_RUN_SUFFIX??''
  for(const kind of ['qml','node','native']){
-  const source=join(root,kind),witness=join(root,kind+'.executed'),id='local.untrusted.'+kind
+  const source=join(root,kind),witness=join(root,kind+'.executed'),id='local.untrusted.'+kind+(suffix?'.'+suffix:'')
   mkdirSync(source)
   const manifest={manifest_version:1,id,version:'1.0.0',name:id,author:'Ditto test',license:'UNLICENSED',source:'generated',trust_level:'untrusted',required_protocol_version:'^0.3',plugin_kind:kind==='qml'?'qml_provider':'service',host_kind:kind==='qml'?'qml':kind==='node'?'cordis':'native',slots:[kind==='qml'?'ui.generated_panel':'svc.tasks'],hot_swap:'instant',health:{timeout_ms:2000},cleanup:{timeout_ms:2000},idle_policy:'resident'}
   if(kind==='qml'){
@@ -25,14 +26,14 @@ export async function trustMatrix(core,head,verify){
   writeFileSync(join(source,'manifest.json'),JSON.stringify(manifest))
   const archive=join(root,kind+'.dittopkg')
   execFileSync('tar',['--zstd','-cf',archive,'-C',source,'.'])
-  const installed=await core.must('desktop.plugins.install',{path:archive,idempotency_key:'untrusted-'+kind})
+  const installed=await core.must('desktop.plugins.install',{path:archive,idempotency_key:'untrusted-'+kind+suffix})
   let refusal
   if(kind==='native'){
    verify('untrusted native ELF is refused during installation',installed.state==='failed'&&installed.error_key==='install.invalid_package')
    refusal={install_state:installed.state,error_key:installed.error_key}
   }else{
    verify('untrusted '+kind+' archive installs without executing',installed.state==='succeeded'&&!existsSync(witness))
-   const response=await core.call('desktop.changes.propose',{base_revision:head,ops:[{op:'add_entry',entry:{package:id,version:'1.0.0',host:manifest.host_kind},slot:manifest.slots[0]}],idempotency_key:'untrusted-activate-'+kind})
+   const response=await core.call('desktop.changes.propose',{base_revision:head,ops:[{op:'add_entry',entry:{package:id,version:'1.0.0',host:manifest.host_kind},slot:manifest.slots[0]}],idempotency_key:'untrusted-activate-'+kind+suffix})
    verify('untrusted '+kind+' never enters a desktop host',response.error?.name==='preflight_rejected')
    const change=await core.must('desktop.changes.get',{change_id:response.error.data.change_id})
    verify('untrusted '+kind+' rejection has authoritative trust-policy evidence',change.state==='rejected'&&change.operations.length===0&&change.reasons.some(r=>r.detail.why==='trust_policy'))
