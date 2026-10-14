@@ -99,7 +99,7 @@ AT-26：兩個生成工作、第三個排隊、排隊取消、雙預覽鍵盤取
 
 ## 獨立審查與修正（2026-10-14）
 
-Claude Opus 5.5 High 對 `d49387f94cea3f37207224463895be1b4e95d8ec` 的唯讀審查結論為 **FAIL**：Class A（AT-22／#21）多跳回退未檢查中間不可逆政策及快照實際分支；Class B（GEN-08／#26）預建候選可繞過只在 create 檢查的回合停止。既有實體與開發證據未覆蓋這兩個反例，不能據此宣告阻擋項已通過。
+Claude Opus 5.5（原生模型已驗證；High 為請求值，未有原生 applied effort 證據）對 `d49387f94cea3f37207224463895be1b4e95d8ec` 的唯讀審查結論為 **FAIL**：Class A（AT-22／#21）多跳回退未檢查中間不可逆政策及快照實際分支；Class B（GEN-08／#26）預建候選可繞過只在 create 檢查的回合停止。既有實體與開發證據未覆蓋這兩個反例，不能據此宣告阻擋項已通過。
 
 本次以既有快照表保存實際資料鏈，逐跳核對回退政策、artifact 端點與 schema；不可證明時預檢拒絕。回退提交移除退出鏈結，相容保留目前值，快照依原政策回復該跳升版前資料。新增九格政策、過期兄弟快照、兩跳快照及損壞／缺失鏈結回歸。create／validate 共用序列化回合預算，入列／validating 先占額度，初始生成加三輪修復；新增預建候選與停止後拒絕入列、預覽與新回合回歸。Shell 投影另拒絕非完整或未核可 generated 套件，無 `file://` 退路，新增純投影測試。
 
@@ -108,3 +108,19 @@ Claude Opus 5.5 High 對 `d49387f94cea3f37207224463895be1b4e95d8ec` 的唯讀審
 **Writer 結束時 BLOCKED：完整 workspace gate 與依 gates 通過條件的本地提交。** 修正尚在工作樹，提交後的新 HEAD 仍須 fresh delta review；本節不裁定 Ready 或 owner 出口。救援與資料政策語意、其他非阻擋追蹤項未改，未重跑 VM／實體座位／Node／Qt，未改 wire／TS／QML／證據 JSON。
 
 後續 coordinator 套用本段 patch 並解除執行環境阻擋：同一修正內容在本機重跑 fmt、workspace clippy（0 warning）及 `cargo test --locked --workspace --no-fail-fast`，**266 通過、0 失敗**；新 Core 拒絕旅程與原兩次修改回第一版皆通過。Node 22.23.2／pnpm 10.11.0 的 workspace build／typecheck 通過，**184 測試通過、2 個既有 skip**。runner 原失敗與 Node 缺 Core 二進位的前置失敗保留，詳見完成盤點；不冒充本機 Qt／VM／實體重驗，修正 head 仍待 fresh delta review。救援語意由 [#41](https://github.com/relvo-labs/Ditto/issues/41) 追蹤。
+
+## 第二輪獨立審查與修正（2026-10-14）
+
+獨立 reviewer 對 `618f62cb100709b6f9cfa5a7bcf4cae6d19ace18` 結論仍為 **FAIL**。Neil 明確授權「採用 A 方案，並一起修 B」，來源 `/data/hermes/ditto-runs/g3-pr40/repair2/authority.md`（#34 comment 6167219232）。原 FAIL 與第一輪實際證據保留；C 已關閉，#41 救援語意不在本輪範圍。
+
+A：Store v4→v5 將全部歷史快照保留並標為 unproven，不能根據端點／schema／rowid 補證明。只有與資料所有者及 Profile 同筆原子提交的新邊為 proved，回退每跳都須證明；最新未知邊不能跳過取更舊快照。真 v4 備份／payload bytes 保留、新同 schema 切換、九格政策、兩快照旅程、混合新舊鏈、缺失／無效 proof 與 commit 失敗無副作用均有測試。舊 build 不開啟 v5；跨未知 v4 歷史的回退拒絕，現役資料及 Profile 不被遷移改寫。
+
+B：每筆非冪等 validate job 持久占額度，取消／中斷／inspect_only 重驗不抹除舊工作。只有該筆 succeeded 且 full／hash 相符報告釋放自身，先前失敗保留；preview／same-key replay 免扣，多個成功插件及明確新 turn 可通行。同錯讀個別工作歷史，原 stopped／no-progress 保留。私人 turn 識別留在 Core，worker 傳給 native host 的封閉 input 維持 artifact／work_root。
+
+兩個最新反例 `v4_abandoned_snapshot_is_unproven_after_migration`、`revalidation_cancel_and_restart_cannot_enqueue_a_fifth_build` 在 618f62c production 上均可編譯，實際 RED（各 0 通過、1 失敗、exit 101），修正後 GREEN。A 真 v4 journey 及 B 正式 enqueue／finish／cancel／restart reconcile 不是純記憶體推算；RED logs／diff 保留。全狀態／決策表、具名 row→regression witnesses、呼叫路徑與命令見 [完成盤點](../../../plan/05/07-completion-audit.md#第二輪獨立審查與修正2026-10-14)。
+
+本輪指定離線 Rust 環境：fmt／workspace clippy exit 0（0 warning）；Store 51、Core generation 8、worker 1、純投影 1 項通過，全部 0 失敗／exit 0。Unix socket preflight exit 1／Operation not permitted，故完整 workspace 與 Core RPC **BLOCKED**，依指示未重跑失敗 suites，交由 coordinator。原 Core 兩次修改回第一版測試原碼未改，其本輪 RPC 執行仍待補驗。Logs 位於 `/data/hermes/ditto-runs/g3-pr40/repair2/gates/`，中間測試 fixture 結算失敗也保留。
+
+本輪授權允許 focused gates 通過即建立 `[skip ci]` 本地 checkpoint，無 push／PR／merge 操作。Node／Qt／VM／實體流程未執行，RPC／TS／QML／native input 型別與證據 JSON 未改，不以單元數字代替原生隔離或 owner 驗收。新 HEAD 仍需 fresh delta review；保持未裁定 Ready／G3 出口。
+
+Coordinator 已推送實作 `45a4eba`（checkpoint 略過 CI），套用本段 patch 並完成本機十二關：Rust workspace **277 通過、0 失敗**（含原兩次修改回第一版的 RPC）、workspace build／fmt／clippy、Rust schema／TS generated／模板同步、Node workspace build／typecheck 與 **184 通過、2 個既有 skip**、skills／i18n lint 全部 exit 0；skills 保留一個既有主文件長度警訊。來源 hash 在各 gate 前後一致，原 writer socket 阻擋記錄保留；新 head 的 Qt／VM／實體驗收未由此推定，獨立差異審查仍待完成。
