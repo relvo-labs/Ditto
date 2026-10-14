@@ -36,3 +36,5 @@ VM 收集使用 `vm_collect_artifacts`，只增加接收證據副本的 owner �
 `observe.py guard` 檢查 logind seat0／Wayland／active、實際 HDMI 輸出與已連接 DRM、Core 執行路徑及私有資料目錄。實體預覽有原生視窗、截圖與合成 Tab／Space 輸入；各故障保存 Core／Shell／hostd／Wayfire／原生應用 PID、starttime、cgroup、前後 revision。合成輸入不算人工鍵盤、中文或錄影驗收，也不算效能量測。
 
 其他模式用 `prepare-contexts.py NEW_PRIVATE_DIRECTORY` 複製實際 release；先另建 `cargo build --locked -p ditto-test-host --bin ditto-generation-host --features fault-injection --target-dir target/g3-fault-fixtures`。`faults` 僅替換私有副本的測試宿主；其 sibling `generation-fault.txt` 只接受三個固定 fixture 名稱，Description 無法選取或提供 QML，正式 release 沒有該讀取器且 CI 有正／負控制。`partial` 使用實際空 Qt 允許目錄使 native 無法啟動；`unavailable` 實際缺 native helper。以 `DITTO_BINARIES=NEW_PRIVATE_DIRECTORY/MODE` 指向各副本，逐一執行且等待恢復完成，不偽造 ABI、驗證報告或 full。
+
+2026-10-14 最新[實體座位證據](../../.agents/notes/gate-reviews/G3-reference-seat-2026-10-14.md)已包含真模型 19 項、桌面 45 項、原生 7 案例、OS 十探針、雙預覽鍵盤取消及三態九格封鎖；新實作的乾淨 G3 VM 回歸 15 步全通過。舊 headless／15 項紀錄仍按原時間點保留，正式 G3 出口由 owner 審查。

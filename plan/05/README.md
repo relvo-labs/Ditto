@@ -29,3 +29,5 @@
 先提交本計畫（#15 的文件交付），再提交獨立宿主與宣告式 SDK。owner 後續以 D-46 裁定 G2 功能完成並要求繼續實完 G3，正式 Core／Store／協定／Agent／Shell 接線依此進行。不得拿本分支的提交當作 G2 的量測證據。
 
 2026-10-13 首批獨立實作與兩種核心的 VM 證據已整理於 [G3-exit](../../.agents/notes/gate-reviews/G3-exit.md)。正式生成能力、五關原生驗證／預覽、啟用交易、版本及資料回退已有實作與開發證據；真實模型及參考機出口仍須逐項記錄，不能由 fixture 取代。生產政策見 [generated-template-boundary](../../docs/platform/generated-template-boundary.md)。
+
+2026-10-14 已完成使用者明確授權的[實體座位驗收](../../.agents/notes/gate-reviews/G3-reference-seat-2026-10-14.md)：真訂閱四回合、可見預覽／雙預覽鍵盤取消、schema 回退、故障存活與三態信任矩陣；實測揭露的逾時關卡遺失與失敗文案亦已修正。逐 issue 交付見 [07](07-completion-audit.md)，五項出口交由 owner 依證據裁定，不代替 D-38／D-46 量測及 G4 發行工作。

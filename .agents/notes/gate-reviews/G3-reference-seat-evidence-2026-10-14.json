@@ -1,0 +1,1599 @@
+{
+  "format_version": 1,
+  "recorded_at": "2026-10-14T08:50:07.593593+00:00",
+  "implementation_commit": "bcc7264a65f8debfadba45a091f54c6b0f4775a1",
+  "authorization": {
+    "real_model": "授權使用既有登入執行真模型測試",
+    "physical_login": "授權安排可中斷的實體測試登入，繼續驗收"
+  },
+  "owner_gate": "pending owner decision; issues not closed or PR merged",
+  "reference_machine": "ditto-ref-ws-rtx4060-01",
+  "model": {
+    "ok": true,
+    "checks": 19,
+    "models": [
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1045,
+        "turn_id": "turn-01M4WRBQVZ52FS8M211B5QPGAP"
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1045,
+        "turn_id": "turn-01M4WRD8V8RAHH6ZF2J407X6S0"
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1045,
+        "turn_id": "turn-01M4WRF2MKJAYR14TM5WTX2A8A"
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1045,
+        "turn_id": "turn-01M4WRH674MD2PXKBK37YHR5F1"
+      }
+    ],
+    "source": {
+      "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+      "dirty": true,
+      "source_tree_sha256": "40d521701968881956b950b5b90c46d598f80d712fcc97519cded6aed8447a51",
+      "kernel": "6.17.0-40-generic",
+      "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+    },
+    "restore_errors": [],
+    "effort_observation": {
+      "observation": "Read-only private Core preferences after verified restoration; real-driver preserved model and effort throughout its patch/restore. Not a historical settings snapshot.",
+      "revision": 1046,
+      "provider": "codex-app-server",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
+    "subscription_cost": "quota consumed; billing cost and complete token usage not available; not zero",
+    "turns": {
+      "tasks-create": {
+        "turn_id": "turn-01M4WRBQVZ52FS8M211B5QPGAP",
+        "state": "succeeded",
+        "seconds": 50.132,
+        "tool_calls": 11
+      },
+      "workspaces-create": {
+        "turn_id": "turn-01M4WRD8V8RAHH6ZF2J407X6S0",
+        "state": "succeeded",
+        "seconds": 59.157,
+        "tool_calls": 12
+      },
+      "tasks-modify": {
+        "turn_id": "turn-01M4WRF2MKJAYR14TM5WTX2A8A",
+        "state": "succeeded",
+        "seconds": 69.18,
+        "tool_calls": 8
+      },
+      "workspaces-modify": {
+        "turn_id": "turn-01M4WRH674MD2PXKBK37YHR5F1",
+        "state": "succeeded",
+        "seconds": 74.689,
+        "tool_calls": 8
+      }
+    }
+  },
+  "physical_fault_and_os": {
+    "host-2026-10-14T08-31-34Z-1068671": {
+      "evidence_class": "development-host",
+      "checks": [
+        {
+          "check": "files",
+          "status": "pass"
+        },
+        {
+          "check": "network",
+          "status": "pass"
+        },
+        {
+          "check": "signals",
+          "status": "pass"
+        },
+        {
+          "check": "spawn",
+          "status": "pass"
+        },
+        {
+          "check": "spoof",
+          "status": "pass"
+        },
+        {
+          "check": "memory",
+          "status": "pass"
+        },
+        {
+          "check": "busy",
+          "status": "pass"
+        },
+        {
+          "check": "timeout",
+          "status": "pass"
+        },
+        {
+          "check": "orphan",
+          "status": "pass"
+        },
+        {
+          "check": "cancel",
+          "status": "pass"
+        }
+      ],
+      "desktop_acceptance": "reference-physical-seat",
+      "per_case_desktop_witnesses": 10
+    },
+    "native-failures-20261014T083130Z-1067374": {
+      "evidence_class": "reference-physical-fixed-native-failures",
+      "checks": [
+        {
+          "check": "control",
+          "status": "pass",
+          "failure_stage": null,
+          "cleanup_complete": true
+        },
+        {
+          "check": "syntax",
+          "status": "pass",
+          "failure_stage": "syntax",
+          "cleanup_complete": true
+        },
+        {
+          "check": "contract",
+          "status": "pass",
+          "failure_stage": "contract",
+          "cleanup_complete": true
+        },
+        {
+          "check": "load",
+          "status": "pass",
+          "failure_stage": "load",
+          "cleanup_complete": true
+        },
+        {
+          "check": "focus",
+          "status": "pass",
+          "failure_stage": "focus",
+          "cleanup_complete": true
+        },
+        {
+          "check": "interaction",
+          "status": "pass",
+          "failure_stage": "interaction",
+          "cleanup_complete": true
+        },
+        {
+          "check": "illegal-import",
+          "status": "pass",
+          "failure_stage": "syntax",
+          "cleanup_complete": true
+        }
+      ],
+      "desktop_acceptance": null,
+      "per_case_desktop_witnesses": 7
+    }
+  },
+  "runs": {
+    "reference-20261014-physical-01": {
+      "path": "artifacts/g3/reference-20261014-physical-01",
+      "summary.json": {
+        "ok": false,
+        "checks_count": 12,
+        "error": "Error: physical real subscription: two new plugins and conversational modifications"
+      },
+      "desktop.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 45,
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "029b2ffa01cf8fb8365c29f032e08cf5bc1518c2d013cfea8c28b2bf1ab742e6",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+        }
+      },
+      "real-model.json": {
+        "ok": false,
+        "evidence_class": "reference-physical-real-subscription",
+        "checks_count": 7,
+        "error": "Error: tasks-modify real model turn succeeded",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "029b2ffa01cf8fb8365c29f032e08cf5bc1518c2d013cfea8c28b2bf1ab742e6",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+        }
+      },
+      "recovery.json": {
+        "test_exit": 1,
+        "restore_exit": 1,
+        "session": "1339"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1338",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "029b2ffa01cf8fb8365c29f032e08cf5bc1518c2d013cfea8c28b2bf1ab742e6",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+      }
+    },
+    "reference-20261014-physical-02": {
+      "path": "artifacts/g3/reference-20261014-physical-02",
+      "summary.json": {
+        "ok": false,
+        "checks_count": 1,
+        "error": "Error: physical generation, preview, two modifications and schema rollback"
+      },
+      "desktop.json": {
+        "ok": false,
+        "checks_count": 1,
+        "error": "Error: desktop.plugins.development.activate: {\"code\":-32006,\"name\":\"conflict\",\"message\":\"activation key has another target\"}",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "735160baa2e4ac84618d018dd8a4a69c734fe393e008b62f6737d97920bed353",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      },
+      "recovery.json": {
+        "test_exit": 1,
+        "restore_exit": 0,
+        "session": "1356"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1355",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "735160baa2e4ac84618d018dd8a4a69c734fe393e008b62f6737d97920bed353",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-physical-03": {
+      "path": "artifacts/g3/reference-20261014-physical-03",
+      "summary.json": {
+        "ok": true,
+        "checks_count": 13
+      },
+      "desktop.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 45,
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "40d521701968881956b950b5b90c46d598f80d712fcc97519cded6aed8447a51",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      },
+      "real-model.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-real-subscription",
+        "checks_count": 19,
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "40d521701968881956b950b5b90c46d598f80d712fcc97519cded6aed8447a51",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1359"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1357",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "336356a244143c3642d80be1b6f531858d813f336717c8d42de1a0d4f7bfc2ce",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 1,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-faults-02": {
+      "path": "artifacts/g3/reference-20261014-faults-02",
+      "summary.json": {
+        "ok": false,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 0,
+        "error": "Error: syntax reports the actual first failure"
+      },
+      "recovery.json": {
+        "test_exit": 1,
+        "restore_exit": 0,
+        "session": "1342"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1341",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "4f1d279569d417dc22b8446d7b2a22493c62f1fb1cf8c34584c40719b59d48c1",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+      }
+    },
+    "reference-20261014-faults-03": {
+      "path": "artifacts/g3/reference-20261014-faults-03",
+      "summary.json": {
+        "ok": false,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 16,
+        "error": "Error: timeout reports the actual first failure"
+      },
+      "recovery.json": {
+        "test_exit": 1,
+        "restore_exit": 0,
+        "session": "1344"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1343",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "69c9e996cf859442ab93a3e8a063a0f99219e2c330dcd50f0e2abff4df4d4641",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+      }
+    },
+    "reference-20261014-faults-04": {
+      "path": "artifacts/g3/reference-20261014-faults-04",
+      "summary.json": {
+        "ok": false,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 24,
+        "error": "Error: actual management shows failure and next step"
+      },
+      "recovery.json": {
+        "test_exit": 1,
+        "restore_exit": 0,
+        "session": "1347"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1346",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "70e8de07405e337e7243edbb6a3210a9062be8f6f4e9e6b331fb350ec1c182a3",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-faults-05": {
+      "path": "artifacts/g3/reference-20261014-faults-05",
+      "summary.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 25
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1349"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1348",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "5df47d1a79c126daa7a7dc29731062900ae219e7d77a5c4298630dff92625475",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-partial-01": {
+      "path": "artifacts/g3/reference-20261014-partial-01",
+      "summary.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 18
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1351"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1350",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "5df47d1a79c126daa7a7dc29731062900ae219e7d77a5c4298630dff92625475",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-unavailable-01": {
+      "path": "artifacts/g3/reference-20261014-unavailable-01",
+      "summary.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 18
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1353"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1352",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "5df47d1a79c126daa7a7dc29731062900ae219e7d77a5c4298630dff92625475",
+          "kernel": "6.17.0-40-generic"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": null
+      }
+    },
+    "reference-20261014-final-desktop-01": {
+      "path": "artifacts/g3/reference-20261014-final-desktop-01",
+      "summary.json": {
+        "ok": true,
+        "checks_count": 12
+      },
+      "desktop.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 45,
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "eda91fc106d04f49f0bbed8690df3ba26864cd0bd316beb1a0066c4b0ac2599e",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1361"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1360",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "eda91fc106d04f49f0bbed8690df3ba26864cd0bd316beb1a0066c4b0ac2599e",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-final-faults-01": {
+      "path": "artifacts/g3/reference-20261014-final-faults-01",
+      "summary.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 25
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1363"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1362",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "eda91fc106d04f49f0bbed8690df3ba26864cd0bd316beb1a0066c4b0ac2599e",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-final-partial-01": {
+      "path": "artifacts/g3/reference-20261014-final-partial-01",
+      "summary.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 18
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1366"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1364",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "eda91fc106d04f49f0bbed8690df3ba26864cd0bd316beb1a0066c4b0ac2599e",
+          "kernel": "6.17.0-40-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+      }
+    },
+    "reference-20261014-final-unavailable-01": {
+      "path": "artifacts/g3/reference-20261014-final-unavailable-01",
+      "summary.json": {
+        "ok": true,
+        "evidence_class": "reference-physical-seat",
+        "checks_count": 18
+      },
+      "recovery.json": {
+        "test_exit": 0,
+        "restore_exit": 0,
+        "session": "1368"
+      },
+      "physical-context.json": {
+        "evidence_class": "reference-physical-seat",
+        "session": "1367",
+        "source": {
+          "commit": "88507b7a14dbe499f636469b00dafea5a7487b0f",
+          "dirty": true,
+          "source_tree_sha256": "eda91fc106d04f49f0bbed8690df3ba26864cd0bd316beb1a0066c4b0ac2599e",
+          "kernel": "6.17.0-40-generic"
+        },
+        "logind": {
+          "Name": "neil",
+          "Seat": "seat0",
+          "Type": "wayland",
+          "Active": "yes"
+        },
+        "outputs": [
+          {
+            "id": 1,
+            "name": "HDMI-A-3",
+            "geometry": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 1920.0,
+              "height": 1080.0
+            },
+            "workarea": {
+              "x": 0.0,
+              "y": 34.0,
+              "width": 1920.0,
+              "height": 990.0
+            },
+            "wset-index": 1,
+            "workspace": {
+              "x": 0,
+              "y": 0,
+              "grid_width": 3,
+              "grid_height": 3
+            }
+          }
+        ],
+        "native_sha256": null
+      }
+    },
+    "reference-followup-20261014": {
+      "path": "artifacts/g3/reference-followup-20261014"
+    }
+  },
+  "vm": {
+    "path": "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264",
+    "steps": [
+      {
+        "check": "restore",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "sync",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "build",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "foundation",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "unavailable-trust",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "rejection",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "native-failures",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "native-pipeline-failures",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "host",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "production",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "dependencies",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "packages",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "desktop",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "restart",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      },
+      {
+        "check": "agent",
+        "status": "pass",
+        "evidence_class": "development-vm"
+      }
+    ],
+    "reports": {
+      "production": {
+        "ok": true,
+        "checks": 37,
+        "source": {
+          "commit": "bcc7264a65f8debfadba45a091f54c6b0f4775a1",
+          "dirty": false,
+          "source_tree_sha256": "b57f16c0c3ac4158b28924683a05cf332399d161297ff3443b788cd0c000fdd0",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      },
+      "native-pipeline-failures": {
+        "ok": true,
+        "checks": 13,
+        "source": {
+          "commit": "bcc7264a65f8debfadba45a091f54c6b0f4775a1",
+          "dirty": false,
+          "source_tree_sha256": "b57f16c0c3ac4158b28924683a05cf332399d161297ff3443b788cd0c000fdd0",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      },
+      "unavailable-trust": {
+        "ok": true,
+        "checks": 14,
+        "source": {
+          "commit": "bcc7264a65f8debfadba45a091f54c6b0f4775a1",
+          "dirty": false,
+          "source_tree_sha256": "b57f16c0c3ac4158b28924683a05cf332399d161297ff3443b788cd0c000fdd0",
+          "kernel": "7.0.0-38-generic",
+          "native_runner_sha256": "5190157e20e00e5b3c008ad4a8a8f6e7d6156e82bac799d52d631b25b68c60fe"
+        }
+      }
+    }
+  },
+  "local_checks": {
+    "rust_workspace_passed": 258,
+    "node_passed": 184,
+    "node_existing_skipped": 2,
+    "qt_templates_passed": 5,
+    "qt_management_passed": 8,
+    "fixed_core_native_failures_passed": 13,
+    "fmt": "pass",
+    "workspace_clippy": "pass",
+    "typecheck": "pass",
+    "schema_types_templates_fresh": "pass",
+    "i18n": {
+      "strings": 569,
+      "core_keys": 181,
+      "languages": 2
+    },
+    "skills": {
+      "errors": 0,
+      "existing_warnings": 1
+    },
+    "upstream_unchanged_files": 9,
+    "vendor_changed_files": 0,
+    "release_fault_guard": "four shipping binaries pass; dedicated test fixture rejected as expected"
+  },
+  "excluded_claims": [
+    "human physical keyboard and Chinese input",
+    "recorded human interaction",
+    "dual monitor",
+    "PSS/CPU/frame-time targets",
+    "G4 shipping rights",
+    "owner phase acceptance"
+  ],
+  "implementation_files_sha256": {
+    ".github/workflows/g3-foundation.yml": "2fdfe5a13e99ad66cbcd7005189c9a0c277d0dacedc839aea6e2bf190010bff2",
+    ".github/workflows/rust.yml": "25e87845ef7ee4e56e6ec1e5f1118facaa0d979209dbc998a3aa2095ef549ef5",
+    "crates/ditto-test-host/Cargo.toml": "48cbe1b4b3366ccda3678d517f4f7971901314db7209a90279f701478629c071",
+    "crates/ditto-test-host/src/bin/generation.rs": "6f2232a1e87f73d3370c475ab0ba83ebc77dcb3513eebbe3ae6032dfd73d70a9",
+    "docs/platform/generated-template-boundary.md": "e4ed254dd0bd2a9a702d33ee09847005178e195388a57663e3fbb8c9aa59f80b",
+    "scripts/check-release-fault-points.sh": "db39acd28a32c6ac144dc6977d01c0d11615e2826df9cb0540305da03e70d8cb",
+    "shell/centers/Centers.qml": "d89005f6537b7a9d69f1219d4dde6ba28b7c62caf4cb3d8ebcaa92f9e2c06aae",
+    "shell/centers/GeneratedArtifacts.qml": "24b82cde0e5a0b513e8918ccdf33e91af19d68354d8f3499e320b1d0f61200a8",
+    "shell/shell.qml": "02f77461fb10ecfec3e4fd5376592548370c06d323784a548fc733d0fccf5f8b",
+    "tests/g3/README.md": "980ac808ee077e33afe91dec301f1a63bb9efc5c88093b26acf190a84cd60985",
+    "tests/g3/agent/real-driver.mjs": "620383fc83a2e8439cdbd03c8495545c51f9cc3b3386397832876398b1c74921",
+    "tests/g3/desktop/driver.mjs": "836b117dc19b196e2e16b8f188ef0a4d5217670238163801ac6a9c1f31424d2e",
+    "tests/g3/host/driver.py": "93dced67260473df2bddd8e55330c192ff3c3c1206fd91e6bae53d178f73d791",
+    "tests/g3/integration/failures-driver.mjs": "17d49964fb4c71eff701cebb4f911ce78b440aae7ca714fc99b39105346400eb",
+    "tests/g3/integration/run.mjs": "c5ea775e1407779c415c877e95e2fa62b69f5ee5add369ba626280fa04d538bd",
+    "tests/g3/integration/trust-matrix.mjs": "dacc0d00a6415651bfcd149fbda37e766574ec726d3671c1b292349927368dda",
+    "tests/g3/management/tst_management.qml": "f9ab81b2c71af5ad837e15d2cc76dd4b22bf512cc6a5466cb71359103cadb021",
+    "tests/g3/native-failures/driver.py": "fadc57093deb46c3e3361d326237b315b2c9e499e0201d0adcee53a1d76e6bba",
+    "tests/g3/native-failures/run-pipeline.sh": "767e6a06f4d960b48bb512d16863be5e77017e8a00b77a63d6e5e3b7a36181b9",
+    "tests/g3/reference/contexts.mjs": "c5c978196bf08d0732288c9727917d77c81513783e7b61cd25f6110eb294e62c",
+    "tests/g3/reference/driver.mjs": "2498d1e4bcb08b917ab6377a94f311a6b0ed2999258ae5117dd8c7deb3637819",
+    "tests/g3/reference/launch.sh": "230cf3816236fd8bbc4b1edf74da0da8612e2712fc86cec25ece29637e084721",
+    "tests/g3/reference/observe.py": "a16b7957cc44c3e07847fcf791f754449e88fc9247d91b8c3a0a76997ebbb747",
+    "tests/g3/reference/prepare-contexts.py": "aa0123382a9a5654f1d0bfbb29227d1c46ebaa43c621bd25e35047fe5c73c43b",
+    "tests/g3/reference/seat.sh": "b34879ef9a8b3dedf308afd1183c9fb42183fe2faff8399b6e2af9ccec89f18d",
+    "tests/g3/source.py": "f38bec6b1acc8f44cdd9180086f52e0eccde8900d252c4ed7cfc3d87c84bf147",
+    "tools/dev-vm/run-g3.sh": "a710900eda8daee5e27a67981bcfdc719ae1909be085b18d3bcb49a70734aa67",
+    "tools/generation-host/runner.cpp": "9dfabdab3a25125527d46f54d33614f030d74ec99b0a46a81ba1008643885363"
+  },
+  "raw_files_sha256": {
+    "artifacts/g3/reference-20261014-physical-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-physical-01/ci-before.json": "d2745e22d93185057aef1b1cafc8e99886be489784bf97bba3eeca1b9919a4d3",
+    "artifacts/g3/reference-20261014-physical-01/core.journal.log": "cb56f29e4cff6f3da104163e65ebab9228ceda63e7f964539b8e0f1a659c536e",
+    "artifacts/g3/reference-20261014-physical-01/desktop.json": "2b68afd2af70c7c7edd83d0a53821b6a62c2e40accc5477e9ac8ec93d8b1ef68",
+    "artifacts/g3/reference-20261014-physical-01/ditto-g3-physical-preflight.log": "90493a175e6e4dc4dfeae2adeb5f304a996a95f0d282372dda071ce167ebf690",
+    "artifacts/g3/reference-20261014-physical-01/ditto-g3-reference-install.log": "4ea24da477c5b01ad44fc8d0b8eb9956cbf2a321a0a2f6fec65bcbf1d63fd327",
+    "artifacts/g3/reference-20261014-physical-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-physical-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-physical-01/normal-after-independent.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-physical-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-physical-01/physical-context.json": "20705228f3dcee4e325c31434df409e4a3b6d7256cab106133426fa74a7f6a55",
+    "artifacts/g3/reference-20261014-physical-01/real-model.json": "527aa3339a33e1de381a3fb1b046a49b8256c65d5c82ef64c614fd747dd43958",
+    "artifacts/g3/reference-20261014-physical-01/recovery.json": "8efa57173e79161420dbbb613b7999d1a95971536056796997c8b5ba749a19e1",
+    "artifacts/g3/reference-20261014-physical-01/run.log": "a7da2618759ca8d6d6f3b05d6dfa36a5af10936f26fc96ddfae5db5f3852a186",
+    "artifacts/g3/reference-20261014-physical-01/summary.json": "4ae364ddcc0562f5d6424377d7a9cad2d159ae6c5cf0a11c230f3af9ea772eb1",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/native/manifest.json": "3a1fcf1ba90d4885a3e24af7d5b21f9d7a44ef92e01bb5944bbd7d2a879beb16",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/native.dittopkg": "089fb00af6dcadf9d3d18e0c43c9ba39c88831d8e449f3a303b7fcac3b974f22",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/node/manifest.json": "98974727fd7d48cad1abb70ed25fd97c3388a9159b78e90e94ed3fea24e985f6",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/node.dittopkg": "8b7558512800052e214088f4e670f6a5a3bb29cc34072473bd1f199f77b0bcc8",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/qml/Panel.qml": "7df742a6c6d86291d232776cc915adbe62a85a3b0b4305e4498086259b5d40af",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/qml/manifest.json": "ed1bc5bd5b246d57a1693b4dde48ba152e7faf60354e9f67891f79a44e4ad198",
+    "artifacts/g3/reference-20261014-physical-01/untrusted/qml.dittopkg": "8bdefbb3640014309bee7c3e358b0f6dbf8c7072b566aa03f53492d3e73f25c9",
+    "artifacts/g3/reference-20261014-physical-01/visible-preview.json": "fb14d077faa17401a7f523ae6814c7eb3b0cc46a83ff4e2d2314a110e62c57bc",
+    "artifacts/g3/reference-20261014-physical-01/visible-preview.png": "c6c071630e1be20c3ab9d440245265db0621ae62fdbb330e49cb4d96fcbe927c",
+    "artifacts/g3/reference-20261014-physical-02/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-physical-02/core.journal.log": "d217a2333f689268fa910087df801d7eda80db0c3e14f5cb9f981fd406aff895",
+    "artifacts/g3/reference-20261014-physical-02/desktop.json": "9b2e4e3b1ab0d274016e3c247d86c5c5ee5f2269ea2f704d6755f564f4feee32",
+    "artifacts/g3/reference-20261014-physical-02/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-physical-02/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/busy.json": "ab2bf86c1a843d673275e09f0a10bced975e018f4ea8469924b0123846f3c9c9",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/busy.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/cancel.json": "c6dbea020481631f0918184bde26ae74e4d91a22ebb2e26d9b9b7439bc799db9",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/cancel.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/files.json": "fda6a016da0e39beb09a9c308ce4b9bbd5c3b08cdbc7a15476bbf1106db3b56b",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/files.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/memory.json": "52e549b26189bf13032148973682f27718c2b1a379001f47fe09921210d9464d",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/memory.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/network.json": "86ac0b1644bdc08db9d1ea133665dac65f929b42fa3214487123031c65b4d691",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/network.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/orphan.json": "4983811ca3cc6fbe0e9a57b63b9644132147b289183c17a37993e0f9c6d6f01a",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/orphan.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/signals.json": "8cbf5cb734c7897e11ea19fc8fd3f14518dc37cc60730c10f87024d8206316d5",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/signals.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/spawn.json": "88be14c4780aaeab3df19668445dc45fdc652f33425a39b38e2126b7d1d2d99b",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/spawn.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/spoof.json": "6e53b5b0dca1290cfa36fae086ee998f1c4dcff819374f4f3484cfea844fb58e",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/spoof.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/summary.json": "6e47193e42f22674dc0559559c6d03ec741f8882d2d944a72566030fe7ff9b26",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/timeout.json": "6db54a27f5b879222201e73f989abdd758962d6f1569c9bbcb4a8549b189752f",
+    "artifacts/g3/reference-20261014-physical-02/host-2026-10-14T08-25-34Z-981638/timeout.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/contract/Panel.qml": "026acdc8042dcaf2bd6088664fa3283ba963ecab560e066db489371794096084",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/contract/description.json": "36866f950140b5ff1ec0efe8f06158996eff8dc522366d75b640bca488da3b07",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/contract/stdout.json": "eb52e1b3b92db8cea9745cd948e4b6a679ee08c369bc5369ee0f86e8b255661c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/control/Panel.qml": "026acdc8042dcaf2bd6088664fa3283ba963ecab560e066db489371794096084",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/control/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/control/stdout.json": "b244c9db3c5aabeed6719b0c4fb13cbad0ef8673b7bb5cf39c8ada10539caea5",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/focus/Panel.qml": "365251170a213417ade327afacecf366fdfe4806c56f00754566eb0ff93b8f2f",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/focus/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/focus/stdout.json": "8a3c7d1c96059082e88589ece0ca49cc96f2d0b7059907d519a89d5e8948b66e",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/illegal-import/Panel.qml": "be5771ff6c8bffba59749b98d7e11f305554cef6ca393040e9a978e03be7b7c4",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/illegal-import/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/illegal-import/stdout.json": "dbfcc8630189e531ab29a83ba1004c375d3087512854c0364d2e706de2730d08",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/interaction/Panel.qml": "9ce56784265c0bb2b2382ff68856268278c89d5a96f61dce7ffcbccc5af073f2",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/interaction/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/interaction/stdout.json": "e24abcfc1cd37f2a928eeb6f16176ae9aac489b1986122ea410917da922fdb13",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/load/Panel.qml": "95b0996a7c1c46e2d1757f4849306fe17f2fd9a48176b3800836e82ce72983af",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/load/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/load/stdout.json": "4fafe11d7335744f6e12038abd83235da3d4fcef3bf18ccadb94155e7402f8ad",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/summary.json": "f4968dbb6b26d0d64129af93b8b709cca6969b61c41ae1a106c69b0ef10f5ca3",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/syntax/Panel.qml": "6c83d593051e8a6d092c237a2d63d2b79a3e65e00533a359fbbe04faaea93c86",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/syntax/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-02/native-failures-20261014T082529Z-980578/syntax/stdout.json": "8c2b2bb9cff24b7fe77c027591b4ad6794a383d5e17ce6e838e6beefa0998743",
+    "artifacts/g3/reference-20261014-physical-02/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-physical-02/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-physical-02/physical-context.json": "210b6190467a66fd996c945afb617ef39285a862666a0bb820fef8763bc8bee7",
+    "artifacts/g3/reference-20261014-physical-02/recovery.json": "6445d1e3bee7bcf0adab1993d722b807ec87d6cca6857013a7366647cb94a689",
+    "artifacts/g3/reference-20261014-physical-02/run.log": "efeaa55383b5870e5b5f17067dff812de7b70479ee3928d193f691154e7436f4",
+    "artifacts/g3/reference-20261014-physical-02/summary.json": "841dee40c058e5cf73726d21fc41da5e8afedea85a0072a1718a62b0f7c71384",
+    "artifacts/g3/reference-20261014-physical-03/application.log": "ed14ce11909498d309b232303a39e71ce7757b062918439d921c91df88eb5b42",
+    "artifacts/g3/reference-20261014-physical-03/core.journal.log": "de0ebc4b43978044f7ecd8d56e608f3bd543999cb6135fd81e5a805199d663df",
+    "artifacts/g3/reference-20261014-physical-03/desktop.json": "2cebcb7531e42e615fd966fb62ec9146581b546ebbec494f4a63d402a6d6c31d",
+    "artifacts/g3/reference-20261014-physical-03/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-physical-03/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/busy.json": "084e95dab85cef81e5c938032191bad4711975660a89e28dc2514830d98544d7",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/busy.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/cancel.json": "a0bccf88ab3882d03e785be1c4cfe831a785b12b389f61507fb2340095671e6a",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/cancel.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/files.json": "fc7498bbba78c5ef3516edbc4dde2d3b960157a9c4e7092d796e042a3ab8f234",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/files.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/memory.json": "e764efdc321797b8d290d8783a823c176f43b045945f826564db0213ad187d97",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/memory.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/network.json": "04850c16381eb80f305c2e48c0ffbbdfc1206045d67ccb2f15aa101cf7949bbb",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/network.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/orphan.json": "17b37efb9cead998b7b5e8ea7ac7345077e6a19dbd3e2fb734998fe4f13435c5",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/orphan.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/signals.json": "832e67e420cf3ebb554ae20fc0c569a526928954d28c7b5dcb2e0e6c01160be3",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/signals.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/spawn.json": "7f0e72543635c695db559d6b1be9197aa96d4a02a8aab79660b04409aad74817",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/spawn.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/spoof.json": "3f2248abca57385155f96b6647fb8e9728dcd90cedee5961375e8124f09bfa8d",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/spoof.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/summary.json": "ce713eff63380b17a11f82bfa3aabe788ec41e84ba9522e0e782bc8f60c9a34e",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/timeout.json": "92360127306055e54c4320b9e0cfd417c5b8cd57d4df1eced3d9f6f61317b7f8",
+    "artifacts/g3/reference-20261014-physical-03/host-2026-10-14T08-31-34Z-1068671/timeout.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/model-settings-restored-observation.json": "f7c0a770501243cceea63fd460d3f3dca5cefb4e2f84c0ab4a8e2ab3e53f1dd8",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/contract/Panel.qml": "026acdc8042dcaf2bd6088664fa3283ba963ecab560e066db489371794096084",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/contract/description.json": "36866f950140b5ff1ec0efe8f06158996eff8dc522366d75b640bca488da3b07",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/contract/stdout.json": "5c67ac6c7dcf5237d0fd0520f62b5e6e5aff364d2103b26c3b0019a9fb6a7769",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/control/Panel.qml": "026acdc8042dcaf2bd6088664fa3283ba963ecab560e066db489371794096084",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/control/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/control/stdout.json": "a88a6596e435c9f84a6505e3f9a12badb35c647b9c5ca64670ea86e7f44086f2",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/focus/Panel.qml": "365251170a213417ade327afacecf366fdfe4806c56f00754566eb0ff93b8f2f",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/focus/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/focus/stdout.json": "4df6c6f51bb89b263864a9c39ffb93b91693199b7646d769be7fa852578bbea3",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/illegal-import/Panel.qml": "be5771ff6c8bffba59749b98d7e11f305554cef6ca393040e9a978e03be7b7c4",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/illegal-import/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/illegal-import/stdout.json": "0986468da49eeadf923fbd7ff9bb22ca21ccd24c7723a38850ec80f9f995b62d",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/interaction/Panel.qml": "9ce56784265c0bb2b2382ff68856268278c89d5a96f61dce7ffcbccc5af073f2",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/interaction/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/interaction/stdout.json": "b5aeed1716aa50aa09a9b77f65e544de8e1dc3720741b4a23f71fb7962be7699",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/load/Panel.qml": "95b0996a7c1c46e2d1757f4849306fe17f2fd9a48176b3800836e82ce72983af",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/load/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/load/stdout.json": "c293cad18875fa1e06b3196f547e61c332d1c988409abe17d1227cbc5d5d727e",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/summary.json": "e2ee9f629410234331584dc42f32629a680544f5f8368aceb2f21d70f3c61fc9",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/syntax/Panel.qml": "6c83d593051e8a6d092c237a2d63d2b79a3e65e00533a359fbbe04faaea93c86",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/syntax/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-20261014-physical-03/native-failures-20261014T083130Z-1067374/syntax/stdout.json": "24ecacb19532dc0c746a01c7295b196b5511723e04563ca446faeb2b8dba26f8",
+    "artifacts/g3/reference-20261014-physical-03/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-physical-03/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-physical-03/physical-context.json": "1f63eabd7ac9c30ec3930100d4e986fcf4e7063561ccc0d6884c48a010f542ac",
+    "artifacts/g3/reference-20261014-physical-03/real-model.json": "682a37b7303523fae9e004e0ea9fee253735806e84f1062692797dbcb7d5115a",
+    "artifacts/g3/reference-20261014-physical-03/recovery.json": "47e9e812a1a3ed50c58ea2ba83ec5d40bde83e9336abc55b7b140cc3cbc131f0",
+    "artifacts/g3/reference-20261014-physical-03/run.log": "1b8520036154bed9a1e0ed510c2bffc30e0549a3b3c08aa992a10f7bee890c78",
+    "artifacts/g3/reference-20261014-physical-03/summary.json": "80f1316effdc00a69320a020d14a9ad50e32a1c2acf498985b748c64612094bf",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/native/manifest.json": "836894c2e1b06d40f75b337d871f5447720e109a320492d4fc66e37f93ae1a07",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/native.dittopkg": "c896051766c23ae3c8bb6528f87b082581f44deb2286064b0e792d84407cda96",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/node/manifest.json": "06997f1d0042a1bf9dc5911d138040235e503a50b86f319b7752069cbe26cecc",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/node.dittopkg": "e2bdfba819f469caedfb7009625bc8a81af66482d5f0049ede1a779b4002d384",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/qml/Panel.qml": "490a08c3f13404dd738f25404610095ab2a0edb604adb0700a2352910b63eee2",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/qml/manifest.json": "15be65f3ce55f42d88af3bf3f21bfed0843ed88d07f8409659fc015890fd40d3",
+    "artifacts/g3/reference-20261014-physical-03/untrusted/qml.dittopkg": "66366ba723affaf6f798c83460b3121c77f30cfe9028a30f1ec01ca3e42fb9a5",
+    "artifacts/g3/reference-20261014-physical-03/visible-preview.json": "5f010d9aa781d05ad0e61c82076ee0d1ccb92920e62a3909872b7d19a504f8a7",
+    "artifacts/g3/reference-20261014-physical-03/visible-preview.png": "7a06f4d3aafcac033f1d155688c44995b6f4453e9e536d3d798d424594edb82d",
+    "artifacts/g3/reference-20261014-faults-02/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-faults-02/core.journal.log": "8dc7eb8f58edc09504ff33e1b876a3b1269c197535da8e32dc3c13fdd076df7a",
+    "artifacts/g3/reference-20261014-faults-02/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-faults-02/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-faults-02/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-02/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-02/physical-context.json": "1d14359465dfa283274a6c9b095fc9bb7876fb2f16882058d35447827c2dbfef",
+    "artifacts/g3/reference-20261014-faults-02/recovery.json": "71fc66f7f34065e0869f41db299b749613b57f7316cf17390ed7c080e32ca243",
+    "artifacts/g3/reference-20261014-faults-02/run.log": "43b0e42367dd3c7e15376c52846d1c5f6d889149772a3c8e25527982f473088e",
+    "artifacts/g3/reference-20261014-faults-02/summary.json": "4c8e0dc369db0204b78c48171864bbd64aa8f9d377ab82d7f9f0ed4d58de2866",
+    "artifacts/g3/reference-20261014-faults-03/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-faults-03/core.journal.log": "d5c059f5b219d9019e633596ff7f95cd65666f5e3e75e2c6c738a20937789f7c",
+    "artifacts/g3/reference-20261014-faults-03/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-faults-03/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-faults-03/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-03/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-03/physical-context.json": "8e5748a4a8c97859a2da387bf5346892eaf938127d582ba7aa500019ae231b0e",
+    "artifacts/g3/reference-20261014-faults-03/recovery.json": "a9a66a52c39b29fb172ba4d167a69c8d35abde9190cac12d35a009cec89d64ae",
+    "artifacts/g3/reference-20261014-faults-03/run.log": "4b9634966c18763f83d2352bcfcf1f3675ac12fc2dff66b6732a7e9415014cf1",
+    "artifacts/g3/reference-20261014-faults-03/summary.json": "61d3e05d2c8ecf5a28326277abcda0263c09aea501d7885ffc377a2ee24e049d",
+    "artifacts/g3/reference-20261014-faults-04/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-faults-04/core.journal.log": "641c4e83f481bf5a5d355a94b1d08b07059e3375b0baffbc7602ff520f048210",
+    "artifacts/g3/reference-20261014-faults-04/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-faults-04/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-faults-04/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-04/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-04/physical-context.json": "088efcf39cd39605e318a9627fec91fd7393f36fb2fea57e2e5da16965c9470b",
+    "artifacts/g3/reference-20261014-faults-04/recovery.json": "bc360e9fac18d09fd610538e6b2b66352c66c3d30ee6a19b33729ae7a49d2d66",
+    "artifacts/g3/reference-20261014-faults-04/run.log": "e5e9c7d85e7d3fa56e47d6dcd4961f5804c16876e8c64b1c9259084bebef2e72",
+    "artifacts/g3/reference-20261014-faults-04/summary.json": "06aa387287d4fc87f428d9ce871301a66256e07241497373aac63bb95a12500e",
+    "artifacts/g3/reference-20261014-faults-05/application.log": "ed14ce11909498d309b232303a39e71ce7757b062918439d921c91df88eb5b42",
+    "artifacts/g3/reference-20261014-faults-05/core.journal.log": "b44d019ebe2337d9a47087f97af16cafe5cec707cb4749e2e5cefc84180e2f61",
+    "artifacts/g3/reference-20261014-faults-05/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-faults-05/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-faults-05/management.png": "2aa66a453499ce7dc4e192d0d2b9d2c76b1dd99077bcc121e6004d474e58a9bb",
+    "artifacts/g3/reference-20261014-faults-05/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-05/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-faults-05/physical-context.json": "0f6fe6f69765e01c993a09188354e49d5ac52a19cbcf26e5d2f286fcc5cd21d0",
+    "artifacts/g3/reference-20261014-faults-05/recovery.json": "db2baa0e7fdbe134f2ef95a2d3b145aa63b178e956143706bf8740b76e82ac19",
+    "artifacts/g3/reference-20261014-faults-05/run.log": "e9d566288e633feaa3dec1e4ce2890e87746d57a8d8c8a67e4d0c7bd84112183",
+    "artifacts/g3/reference-20261014-faults-05/summary.json": "e136480111474579ad71879ebfb6358502eb80939d4ace8a2f8f4f2423332ade",
+    "artifacts/g3/reference-20261014-partial-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-partial-01/core.journal.log": "e547b18230f6ebeae639628454da5dc2ad21b864bc7f910cad2cd00bad8004f4",
+    "artifacts/g3/reference-20261014-partial-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-partial-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-partial-01/management.png": "e22c11592bc5fde2c1158c9a2030d8db517a2432beb17e32c89d200a62862b27",
+    "artifacts/g3/reference-20261014-partial-01/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-partial-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-partial-01/physical-context.json": "7ac7fc0c9c0f3edb7a7d5678a99be04fef59b400b00de592fadb805e7315116c",
+    "artifacts/g3/reference-20261014-partial-01/recovery.json": "58fb7705cfd2bf2a48cc2a6fd518fae4a08ea209ac8aecaf530d8d68b3428c96",
+    "artifacts/g3/reference-20261014-partial-01/run.log": "70135646ed075eeb53f97d5abcd2d73a3ea2538e53de53af4366f5c433a9a5b5",
+    "artifacts/g3/reference-20261014-partial-01/summary.json": "1b891af850c0e8698b5ab7ecad4644c22629e4ead4ed7b5cfeb9f073a9a669b9",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/native/manifest.json": "3a1fcf1ba90d4885a3e24af7d5b21f9d7a44ef92e01bb5944bbd7d2a879beb16",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/native.dittopkg": "98daa70a5ac9872950e6df5ffd26c346a5143c1151a40874874eec1923988111",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/node/manifest.json": "98974727fd7d48cad1abb70ed25fd97c3388a9159b78e90e94ed3fea24e985f6",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/node.dittopkg": "54b32f1a3d43ebd4980de57425a0bd79b8add2c9aabfaa77ffcd9aa93c162ba4",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/qml/Panel.qml": "992eec0bddafadf5a732e7dad6fadc164e08068a88963c1a893314277ad5a495",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/qml/manifest.json": "ed1bc5bd5b246d57a1693b4dde48ba152e7faf60354e9f67891f79a44e4ad198",
+    "artifacts/g3/reference-20261014-partial-01/untrusted/qml.dittopkg": "6b6497a3a6d52af9ff70379d836b70830bd718bc602cd5f7fd479be8bf00bfdb",
+    "artifacts/g3/reference-20261014-unavailable-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-unavailable-01/core.journal.log": "12670c080bbbb8ef18ee7bc575f484a35d4ead3ec2990834e7e6656345630e0a",
+    "artifacts/g3/reference-20261014-unavailable-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-unavailable-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-unavailable-01/management.png": "69b1f1f677a1a0c9120b43e2878ddb7ec1b0f3ed7e1a139a6951d89f6a38cc47",
+    "artifacts/g3/reference-20261014-unavailable-01/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-unavailable-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-unavailable-01/physical-context.json": "eb8366cb898a22f67f080c1d3579b183c7a5204c59506663fdabb9e0572431f3",
+    "artifacts/g3/reference-20261014-unavailable-01/recovery.json": "85538a8a77d7f2135aa1e6e5fe76ce5200ee58ae339b57c12cdfb66a66d06893",
+    "artifacts/g3/reference-20261014-unavailable-01/run.log": "dec37945427649c3887951e9f64183ae7b2bec4029abb39b9e09a4544a4e4a4a",
+    "artifacts/g3/reference-20261014-unavailable-01/summary.json": "cd34387b6f6483b197a951d3c6518acf158983a2ca91dc96474d11609832c78c",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/native/manifest.json": "3a1fcf1ba90d4885a3e24af7d5b21f9d7a44ef92e01bb5944bbd7d2a879beb16",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/native.dittopkg": "cad1f0202f5ee093590a338dd885fc69ffa0755a61d4afae7bdf34b8fe4ded24",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/node/manifest.json": "98974727fd7d48cad1abb70ed25fd97c3388a9159b78e90e94ed3fea24e985f6",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/node.dittopkg": "f3df264a36ff393290773e6260f6c071cf6384e491a337028e468fb82127b742",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/qml/Panel.qml": "abd3adbcef43821a7a9720c26a574fb8600a618888b9393d2cabd8fe34773e47",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/qml/manifest.json": "ed1bc5bd5b246d57a1693b4dde48ba152e7faf60354e9f67891f79a44e4ad198",
+    "artifacts/g3/reference-20261014-unavailable-01/untrusted/qml.dittopkg": "c0cdd8f88780323b829e1e33169259c31e9deaacd6f18e4c0701ac63ab144ee6",
+    "artifacts/g3/reference-20261014-final-desktop-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-final-desktop-01/core.journal.log": "4dfbf4479a0b83321589d57f67c978f98a251b89ab6d2163938da12d2832945b",
+    "artifacts/g3/reference-20261014-final-desktop-01/desktop.json": "fbb30fdee8975581ca69626f0956b3ad6decb93488a9a695cb547faeb433d1b6",
+    "artifacts/g3/reference-20261014-final-desktop-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-final-desktop-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-final-desktop-01/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-desktop-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-desktop-01/physical-context.json": "1a07f4e2a535d99f06d5f76a183e73b1a5c075e23567d17f5f562c67eb1b1f22",
+    "artifacts/g3/reference-20261014-final-desktop-01/preview-cancel-0.png": "d40a3e7e23cc0889f51ac5ce2dcc43ccf6c34113613ce3cc818c40ef3312ca0f",
+    "artifacts/g3/reference-20261014-final-desktop-01/preview-cancel-1.png": "772b35e6b2ef0fde3e8a868b9bb0e91ac2efc139447ff1a2a9068b874a469da1",
+    "artifacts/g3/reference-20261014-final-desktop-01/preview-keyboard-cancellation.json": "a2b12231b73c960e2912db2db699251c57582338a5c9bf75c783ab8d9b9bae2c",
+    "artifacts/g3/reference-20261014-final-desktop-01/recovery.json": "edd27e217bab5e0f6fc4b941919212cbc5165e3bbe88440c06119163c256178e",
+    "artifacts/g3/reference-20261014-final-desktop-01/run.log": "e2bd75272db4f3c76814e43e13b23325dfa07fec66564199c8e7f6ff187bca51",
+    "artifacts/g3/reference-20261014-final-desktop-01/summary.json": "d701225afcd83df9be55e2806d18b8125c3d0233e5ebc01966d41dfdaf777f86",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/native/manifest.json": "6fc1233d58853b748a0c350c67ea90b2e7083ceeb86a516fba16fb0e757dc57c",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/native.dittopkg": "0be122fff75ec55708b597c5ddda1185b8072be7fb14148f8ffccf6dd590873b",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/node/manifest.json": "7fa50044cb0d5b2329fd467566318a3a44a3762425f3cc278a6187163d47d95c",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/node.dittopkg": "a69f4d8c14eb29b25e28b4301a9acf6bc48555cc8f5b59e3b7ca283c774614c6",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/qml/Panel.qml": "b40a6bc54e6f585f20a4bb6a158c26e28bb2888e08065a2ae01a75c072043617",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/qml/manifest.json": "a3095f9c238215e299d9d08eee088eb96e4575f8c33230d2ad87c406238e00d1",
+    "artifacts/g3/reference-20261014-final-desktop-01/untrusted/qml.dittopkg": "75f38ef7faa344fc6c9c4fc58ac7ad618a01885645d10d34f18d52c3581121c5",
+    "artifacts/g3/reference-20261014-final-desktop-01/visible-preview.json": "ad51899eb410ef69a71e9839097d4c204220028936466764193a8a70e1ffc434",
+    "artifacts/g3/reference-20261014-final-desktop-01/visible-preview.png": "615b7681661bfe4a371ee8e34068a5c96e23c2e75b93031fe8c5d1be9e37151c",
+    "artifacts/g3/reference-20261014-final-faults-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-final-faults-01/core.journal.log": "43a3929efcdc815521826a6037f676347481fa664e6279317eab4d8d4d2d1246",
+    "artifacts/g3/reference-20261014-final-faults-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-final-faults-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-final-faults-01/management.png": "45af4f3954ca22d66aedb349ef4c23eb96b5b3548dc65875bb25cc7a86a41f64",
+    "artifacts/g3/reference-20261014-final-faults-01/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-faults-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-faults-01/physical-context.json": "a71b896f5568de4531e4b344cf1183794839571a8a53cc679d1d7f9c79a3b711",
+    "artifacts/g3/reference-20261014-final-faults-01/recovery.json": "4c13e444573cae48fecb4510f913e1eda2eb56819bf7f9894e3a7030a3359645",
+    "artifacts/g3/reference-20261014-final-faults-01/run.log": "004b65b0187d9f86bb83ef3b4561de8645b8b79cdbe6fc1086c43ff367b9dcb1",
+    "artifacts/g3/reference-20261014-final-faults-01/summary.json": "0b15aa1c0703a17f9326cd9754ee3995dee865fc4415bf7a67304cd5db1fa2a5",
+    "artifacts/g3/reference-20261014-final-partial-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-final-partial-01/core.journal.log": "9df6783e6b4fe5d29cf176adc971d7f58e0e4a30fb64bf8f6b75b47e8f78ad0e",
+    "artifacts/g3/reference-20261014-final-partial-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-final-partial-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-final-partial-01/management.png": "6eee9a0e0f2d538f31779b0211e0429db6dd993381a79d49b753edc486dc9a8c",
+    "artifacts/g3/reference-20261014-final-partial-01/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-partial-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-partial-01/physical-context.json": "759b77418b9e80901116e920297b905a2b04f6930b7f5a57727172058e84f658",
+    "artifacts/g3/reference-20261014-final-partial-01/recovery.json": "9693bac84c2379c5c24aefbd0e1bb528488032318658223d954c05c767afb624",
+    "artifacts/g3/reference-20261014-final-partial-01/run.log": "1456a99c2dcf7863574805b6a44a1784674239ffe845f0ed40e3391d11580fe5",
+    "artifacts/g3/reference-20261014-final-partial-01/summary.json": "02208e0c89da83f5325bdbd496d332f497d9a1e40f1cfb329c4f6d807123f71d",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/native/manifest.json": "de4e1328044ebb3991232a213a0e267a51ad8d9f9aeed6509c36558ac7b49ad8",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/native.dittopkg": "87fbbdadca17f4957db3aa0b72408e48fab162bf18abdd9330a9aaa3c61e0a4c",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/node/manifest.json": "99f0fa19de95d3fa33fd428493d9723629a58c69680ff9ee4096bc9ce6876559",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/node.dittopkg": "f9345eb49d05f0e7f4f8f417723e3088647b21ab590d07a88f8001480d9f4b67",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/qml/Panel.qml": "4a7b98d01b327ba29a103e94ff77177f194949bb70edbe2eaed95ac02db7581d",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/qml/manifest.json": "c808a0e8e709a9fc26b0c2055a4d23216bd794423bd1b5d071521335e290bd9f",
+    "artifacts/g3/reference-20261014-final-partial-01/untrusted/qml.dittopkg": "3c94b609519e3d5dd6c080a302b6e1fab623d6137a9b384687330364bb9d8336",
+    "artifacts/g3/reference-20261014-final-unavailable-01/application.log": "7da2d556a780a12aeffbdeb2169ef065d26edf9aa5194c23d54ba2485d90fef0",
+    "artifacts/g3/reference-20261014-final-unavailable-01/core.journal.log": "32d90375710234e94d83ffe663ba350b63dcbb38d2623c68740c5a4c79130016",
+    "artifacts/g3/reference-20261014-final-unavailable-01/gdm-original.conf": "ceee968ce021213814ef4f87e19f6e76fcb0333170786dd0c006760ad61810af",
+    "artifacts/g3/reference-20261014-final-unavailable-01/gdm-test.conf": "e6e67736c6e474be55dace1994006de4a7450a36cbef17184bcf64b3f231fe53",
+    "artifacts/g3/reference-20261014-final-unavailable-01/management.png": "adb67ca01705b035145cf66226c1871939a2349d3d38bb3164342e7a9a8dbe5a",
+    "artifacts/g3/reference-20261014-final-unavailable-01/normal-after.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-unavailable-01/normal-before.json": "8825e4e0d1e2c9e8566ef02d754c924bdc0bcbda1511189f940829043820afcf",
+    "artifacts/g3/reference-20261014-final-unavailable-01/physical-context.json": "8e928ccbac9fefb8d7dade2b2d33a562803178506b066be759a34b6f1698c978",
+    "artifacts/g3/reference-20261014-final-unavailable-01/recovery.json": "443fa91476106b277f6ec7d3bf012edaa5d8e237e995b57c6068f5302f2601f5",
+    "artifacts/g3/reference-20261014-final-unavailable-01/run.log": "69fec9287625e7df6528c902c698596ca65828d433432050baef1acd34b97a9c",
+    "artifacts/g3/reference-20261014-final-unavailable-01/summary.json": "9bb78063be5f3fe13b7c4d1e6b4ff617399540590c73f09d18d809adb189b1f7",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/native/manifest.json": "392b144332e5ed68fcccc595da19882b9b1c3382dced473e7787ba8cf178fd34",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/native.dittopkg": "4ebd8a0338a41b29f87e9bf5c8102ae154246bf7bcf13593697b03c499732fb2",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/node/manifest.json": "4ec91a215a86c775eea40ce140c76f0af024820e5977b708afee6d5268e1b990",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/node.dittopkg": "e2c3c535c892b9b8405beccd6e1da700a50246cd0eb776ebe9aee346a64dd6e2",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/qml/Panel.qml": "2d4350214c0309d9659937893f523a25cd816439020796a995cc4f6404d73374",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/qml/manifest.json": "46bf1ddebcef500ad38d6350631b7a72912d6039badecebddf919bec16ccb2df",
+    "artifacts/g3/reference-20261014-final-unavailable-01/untrusted/qml.dittopkg": "4504857c2632bcecdead17d8b889c130a488aa504274239460b74ab9aeb5341b",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-fixed-pipeline-final.log": "ed2aea7177713a112cc21672cc25647d477a2a20ca833e6719857f320f5a661d",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-fixed-pipeline.log": "763360fd00f31d18e82a7e04e9e9308e4b9dd2f3515be835c48c4382b859c144",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-clippy.log": "5984dfb3817299867fb7439259be437751a915a2414689974181571971beb271",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-foundation.log": "1bae73038ee9958d6d5394f9e8526a348feb902e84cf0a82b494dd3c0786eb78",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-generated.log": "4d7d86c1283f7534768b3c056dcf322f643bcac6d28c060937869da530d9dc76",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-i18n.log": "408bc7c109b2ff97581d208135cc79e476152db878d658d07b7a369760f3d755",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-node.log": "4a87c502dc972ab5d80b6f1f3800d2570f20bf2f046cb62ed88390b3eb3e0146",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-release-guard.log": "c320c2fafd0a1ed7b6bddf035349087ef6a7c39b82a742ed2e709dfe2ee75354",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-rust.log": "8a797123429981aa9222c3004a978a435a7edda89989a6c45c1ea94eaa38eb27",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-schema.log": "7682e5e8ea0d20eac81878e42780b2a11c51da3a66caa4fa3d52174c1896b56e",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-skills.log": "5bd935dcfd2f13bce4f5fd2c952e6b061cf75c9e19d5944bc1ad4e44fa3c7e32",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-typecheck.log": "35f564d1adf893ff23977adc0208e624175f94c273b4f7dc65dcdbd3edeaf02b",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-upstream.log": "d54f086709be3fd89f43daf22187e7229b6ac569ef851a687e2ca0bfd7c308e4",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-vendor.log": "d547058829924712d62325c5372489a867f99bb98cba04f9689095bb38d0926b",
+    "artifacts/g3/reference-followup-20261014/ditto-g3-seat-vm.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/reference-followup-20261014/fault-guard-positive.log": "d95f20fe6762c421b72d1116d252e940640884c7f0b0e787ae30d01069b63b27",
+    "artifacts/g3/reference-followup-20261014/vm-final.log": "d89e01ae3f929926b0e38e1901375ed934e6363412bf4bc8497be10c5ff177dc",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/agent.log": "8461dd7da216f695e684e7f0f6fc667e3919fa8f07476c5f021b97de933e7495",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/build.log": "6601feb6082eed5c2c6247d7512c152e7499c7048c1c03da13473bb6f1bf3d43",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/dependencies.log": "b36f8b51acb0610616194739190bb08f05e57530afba3497c04c9ad542b03061",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/desktop.log": "d7549a4e6a469d2ab7e424e754c4bc1b216910c596892435e2ea1cd9d53bfab6",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/foundation.log": "fdbf76e2ec7e65917580a368073e3f40220b934139653296c33a0907046420a3",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/host.log": "ade2c268365494d2e2ee51b3aec2394107b0665f590a6805a6178657c4de38df",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/native-failures.log": "e8c9d466162b1f45043614731f0a285fea1c44f9ea4ef03b9f44a04441129db6",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/native-pipeline-failures.log": "c40254416072eb494604e6149b8f5207c20a0ad6b4da5f54fb752ba19b8e9413",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/production.log": "72b72172b6ecaecbf36fb990a8b6f02f53954d4b7c368e41bf59856c5d47c04d",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/rejection.log": "96b1f5b9965a885d3bacef4f71d681e68d84d8698a26ca1eb609cbe1b7407d44",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/restart.log": "e6653c9b5fe8d1082b43a723ee76bbe4d5206b7bf742c39f6dc0631caa0d9d5f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/agent-20261014T084207Z.core.log": "f13935c0b06a212b7572722faeab11fb6f6feaebdb7e013482265e5144529541",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/agent-20261014T084207Z.json": "ee47a9dc9ee90c2b29715e303ccd73be6eeeedcc08fe3f5953fecee8c8963f76",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/agent-20261014T084207Z.requests.jsonl": "8d91ba5f13f273041d339d87d0902551a53c3e22357ae0d6016c44eed826b4a5",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/desktop-20261014T084155Z.core.log": "0590e25fe61cc1828eee3bfa4a8c7ea5fc8dd0f82e1ba07673af64ccc715cf37",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/desktop-20261014T084155Z.json": "34d4f0e512c46b37cbb5e2051488161356990adbe925faf7199c1a72a46289dd",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/desktop-20261014T084155Z.json.core.log": "0590e25fe61cc1828eee3bfa4a8c7ea5fc8dd0f82e1ba07673af64ccc715cf37",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/busy.json": "eb644b345b7ef3fdbf49a33f5917518a79e8cd78c062b4cd916e18be97771551",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/busy.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/cancel.json": "cc0f1e6b96b63eef35a0c26c737ed72147304ff7ec7ca57569e90d5589dc3973",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/cancel.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/files.json": "4309413a7a713d096b0a98846872e5592fb1024663a592dc0d36774fda396eff",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/files.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/memory.json": "de3673602c2e35631cdabda786d0d64c56496e9b9f0a3a88239079ce78fda962",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/memory.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/network.json": "f353547b44252a0a709ccce238ce0f1eef1f4b6230772d1ba179974daf894d5f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/network.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/orphan.json": "f24492be75ae89a8905b829870cf4a38bda4571c6bc931c62a40967f78a58da8",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/orphan.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/signals.json": "1bd2090a6a8b0ee5ae0835addf04189a987f612b1e28cc2f8bed2a6c6eb3f385",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/signals.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/spawn.json": "540c41c2f35a360c2b3f764157f669ece2867fb281771a094215c079695bb9d8",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/spawn.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/spoof.json": "cf3d2334ae49aa9f51853eb88fe54bc9f12a53a136b36fd5eb945efb3af3c5ca",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/spoof.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/summary.json": "a68adb0f5b2ddbe9fd3f66666bb429019959d48395c599f662b3843f684eb901",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/timeout.json": "d146140a4221d9af82e282a0cf32683f3315656c73730e0c4a8a6f6cb1eb69f5",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/host-2026-10-14T08-41-24Z-8676/timeout.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-rJDBgk/core.log": "f8a46c99e1097575130b2711f04c8b80aad99b941de9ce54782afdd14905e430",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-rJDBgk/result.json": "1529497116bc65601f3fb8719b5d7ea701802571e9088bdc76a493ccc43b93c1",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/core.log": "cefbc15dbacd7b1f23f323cc7618a1075155f42516f8496887b0eda4bc82b105",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/result.json": "4003af570b01c96254e2563fe15bff38bcc23f31b14893238209605557da86f8",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/native/manifest.json": "3a1fcf1ba90d4885a3e24af7d5b21f9d7a44ef92e01bb5944bbd7d2a879beb16",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/native.dittopkg": "ada293ce2306fedaf6fd2cde53b86e0ec565b6fccfa7aeda74f54ba33e7587e4",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/node/manifest.json": "98974727fd7d48cad1abb70ed25fd97c3388a9159b78e90e94ed3fea24e985f6",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/node.dittopkg": "eb3c7e414afe88871251eaddc9b20872b4b468f4402b7f1f1a98e9b331ddb7aa",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/qml/Panel.qml": "950b0e32e83f5095753e5ac18195141565b91c9f7b7e00f17e62d226e3e7d5d2",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/qml/manifest.json": "ed1bc5bd5b246d57a1693b4dde48ba152e7faf60354e9f67891f79a44e4ad198",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-tiECIY/untrusted/qml.dittopkg": "579d2e9ac6814b075167435c2e5fe5f602d9ac435cdfc0e32fa1e2c1f6d85492",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/core.log": "1aca0cb7927454ff908ab589b06c79d33dbd14ec3e5bff78c7a5587b4cc7fedc",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/result.json": "c38e939c23f527f91f253c1a793bd45f736ca1939b19ccf812a02a50753a440f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/native/manifest.json": "3a1fcf1ba90d4885a3e24af7d5b21f9d7a44ef92e01bb5944bbd7d2a879beb16",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/native.dittopkg": "afb9cc5d050a36c138311e4c55f19bc4a108bae33e5e85f3620f535e4253f37e",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/node/manifest.json": "98974727fd7d48cad1abb70ed25fd97c3388a9159b78e90e94ed3fea24e985f6",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/node.dittopkg": "9bed973672b87fba340fd6fc9f4d39545a64568fafb428c0a3bad8f36aed20d5",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/qml/Panel.qml": "c92673ac3c03906d979cbc13175c8a2200ad6f1283e0d870c5b56a11211d9432",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/qml/manifest.json": "ed1bc5bd5b246d57a1693b4dde48ba152e7faf60354e9f67891f79a44e4ad198",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/integration-uUo8k1/untrusted/qml.dittopkg": "a794d0feabfc5b7cb6674a14a2f49e1152f2fc5428bd824086bd63e3d4442261",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/contract/Panel.qml": "026acdc8042dcaf2bd6088664fa3283ba963ecab560e066db489371794096084",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/contract/description.json": "36866f950140b5ff1ec0efe8f06158996eff8dc522366d75b640bca488da3b07",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/contract/stdout.json": "a2c202d3cd6bebdd9945876dc2abe82a6053c52c160ebb94c8e42bab3cdfba87",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/control/Panel.qml": "026acdc8042dcaf2bd6088664fa3283ba963ecab560e066db489371794096084",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/control/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/control/stdout.json": "e7326818c65ee179a04fe0e0e49fd5f7e0390f75d3fc79c3e8b8e4a5bf5d4ebc",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/focus/Panel.qml": "365251170a213417ade327afacecf366fdfe4806c56f00754566eb0ff93b8f2f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/focus/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/focus/stdout.json": "3d29247a430d91c243432c0f352f4d0c69978d98a6a1cd97dc33fa838adc1a70",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/illegal-import/Panel.qml": "be5771ff6c8bffba59749b98d7e11f305554cef6ca393040e9a978e03be7b7c4",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/illegal-import/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/illegal-import/stdout.json": "8b7e0fe5376cee15a430da40eacdb0e237fb2027d2b769d979305b6c9af2b72e",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/interaction/Panel.qml": "9ce56784265c0bb2b2382ff68856268278c89d5a96f61dce7ffcbccc5af073f2",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/interaction/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/interaction/stdout.json": "fe115fff1e80f08c3b07ca478219bbac7c9905158b2c489f954d62b2d13b4bd6",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/load/Panel.qml": "95b0996a7c1c46e2d1757f4849306fe17f2fd9a48176b3800836e82ce72983af",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/load/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/load/stdout.json": "42c375fda5e9221641be3eee27e782c1bd4caf02a0a0b053920282923b902e0e",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/summary.json": "47cda19e8ebac104fee065dba8cd2a1abc0af0b9504034cd0561eee805eb0d7f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/syntax/Panel.qml": "6c83d593051e8a6d092c237a2d63d2b79a3e65e00533a359fbbe04faaea93c86",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/syntax/description.json": "f8600d0122cf16ccd485c619288fbacdee2303f5ee498376c3da9221c67ba99c",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/native-failures-20261014T084050Z-7236/syntax/stdout.json": "3fa5a34e2ae0ab40a62456324211880997f1b1f7232e024c9964c3b80d99278f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/rejection-7153/early/report.json": "c358618545f2d2547e25996682855e6fef7dc3e336fd67b60068ace8d5bbd0af",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/rejection-7153/long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-/report.json": "d89c4dd750305ae2a0f736d54c80e8ab471c0911fcfbebf9d0edd7e707412df4",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/restart-4ogRAU/core-1.log": "d8bb9d611c41a1e7b97b7471da9a9be668b82d3ba7f6b19791280f6a3aed2e98",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/restart-4ogRAU/core-2.log": "20abf5d20673fd324b317ca510c3ed7029c8485bde08b32582e547e6f05cc1eb",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/restart-4ogRAU/result.json": "4d366e1c63ba67c059f9f992aba486b1fe4dbfc91bf565e877e45277de1a7c64",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.4xaX13/core.log": "31dfdf695f811f42a265a74eda438fb70b2ace1192c1177a09a0d3dc32cb23ae",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.4xaX13/ditto-fixture-dbus-9620.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.4xaX13/ditto-g0-wayfire-9620.log": "77fbbbaa64045f01ab3bd16bbd638f9777d41cc478c46fa55674500266071c34",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.4xaX13/ditto-g3-survival.log": "205e2fbb4f0a59d8abbaf8fadb8f0cebe94ba8e081923284d99b2527eb250375",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.4xaX13/quickshell/by-id/ei7vt2wmt/log.log": "855d28256f1e0d30cf624edcc6f7a71cfaf3451b8a6d047b56a435eddc5bd83b",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.GzjABc/ditto-fixture-dbus-10251.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.GzjABc/ditto-g0-wayfire-10251.log": "5ced1c08264d0fe18661f57456ea7f482f22ab7a3919089cb8307fa1d163a2ee",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.P3FiRv/core.log": "63f3da12103e13e361df48e742c769e5807a97ad8b20cc42acd32ad501ab5c8f",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.P3FiRv/ditto-fixture-dbus-10649.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.P3FiRv/ditto-g0-wayfire-10649.log": "668aa7f4b8e355bb0b23431d95ae7331b90777b9e0dd649d53dde743bd1f91c7",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.P3FiRv/provider.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/suite-records/runtime/ditto-g0.P3FiRv/quickshell/by-id/ib87u2wmt/log.log": "115de3299c0a1f1d60a47bafc3c55f0b51e3058ba757eeed7a8ae3a7434faecb",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/summary.jsonl": "2eae5fb1489f9fe42f15bd2f68083221781cc84dd531a9f37b13c2f40b06f598",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T08-40-03Z-bcc7264/unavailable-trust.log": "3666be89f7349a046f9b929eac2869be4850475bafc97dd6fc923f51d71fe802"
+  },
+  "raw_index_excludes": "compiled build caches, executables and SQLite stores; immutable artifact content remains in the indexed JSON reports"
+}
