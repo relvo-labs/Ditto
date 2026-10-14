@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Bounded G3 operational qualification; never a product installer.
 
 Production CLI has fixed host, source, tools, units and command vectors.
@@ -471,10 +472,10 @@ def preflight(root, host):
     require(sha(CODEX) == CODEX_SHA, "existing pinned Codex executable mismatch")
     # Never inspect gh credential files or return auth status output/identity.
     gh = host.command(["gh", "auth", "status"], check=False).returncode == 0
-    selected = "BLOCKED_PRIVATE_STORE_SELECTION"
-    if (root / "selection.json").exists():
-        select_store(read(root / "selection.json"))
-        selected = "selected_pending_live_auth_readback"
+    selected = "fresh_realm_auth_pending"
+    if (root / "auth-state.json").exists():
+        from g3_auth import public_status
+        selected = public_status(root)["status"]
     report = {"source": SOURCE, "normal": normal, "seat0": True, "private_store_status": selected,
               "github_cli_authenticated": gh, "codex_sha256": CODEX_SHA, "provider_called": False, "disruption_started": False}
     write(root / "preflight.json", report)
@@ -575,8 +576,8 @@ def origin_worker(host):
 def launch(root, host):
     verify_stage(root)
     require(not (root / "state.json").exists(), "launch is single-use")
-    require((root / "selection.json").exists(), "BLOCKED_PRIVATE_STORE_SELECTION: parent selection not yet available")
-    store = select_store(read(root / "selection.json"))
+    from g3_auth import verified_realm
+    store = verified_realm(root, host)
     report = preflight(root, host)
     origin = origin_worker(host)
     state = {"source": SOURCE, "origin": origin, "store": str(store), "deadline": time.time() + 2400,
@@ -659,7 +660,8 @@ def control(root, host):
         require(not host.workers() and host.system("is-active", RUNNER, check=False) == "inactive", "runner pause failed")
         require(host.normal() == state["normal_before"], "normal baseline changed since launch")
         require(not DROPIN.exists(), "existing override before disruption")
-        require(str(select_store(read(root / "selection.json"))) == state["store"], "private selection changed after launch")
+        from g3_auth import verified_realm
+        require(str(verified_realm(root, host)) == state["store"], "private auth binding changed after launch")
         host.command(["sudo", "-n", "cp", "-p", str(GDM), str(root / "gdm-original.conf")])
         # Bounded host-local SQLite snapshot; no auth files/keyring are copied.
         # Post-test v5 remains at exactly the original root; no downgrade.
@@ -777,7 +779,7 @@ def publish(root, destination):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("preflight", "stage", "launch", "collect", "control", "recover", "override", "enter", "leave"))
+    parser.add_argument("phase", choices=("preflight", "stage", "launch", "collect", "control", "recover", "override", "enter", "leave", "auth_prepare", "auth_login", "auth_status", "auth_supervise", "auth_cleanup"))
     parser.add_argument("--id", required=True)
     args = parser.parse_args()
     require(os.getuid() == 1000 and Path.home() == Path("/home/neil") and socket.gethostname() == "neil-MotherBoard-Series", "fixed reference host required")
@@ -788,9 +790,36 @@ def main():
         root.mkdir(mode=0o700, exist_ok=True)
     require(root.is_dir() and root.stat().st_mode & 0o777 == 0o700, "private task root required")
     host = Host(root)
-    if args.phase in ("control", "recover", "override", "enter", "leave"):
+    if args.phase in ("launch", "auth_prepare", "auth_login", "auth_status", "collect"):
+        built = verify_stage(root)
+        require(os.environ.get("GITHUB_SHA") == built["ops_sha"], "workflow SHA differs from staged operation")
+    if args.phase in ("control", "recover", "override", "enter", "leave", "auth_supervise", "auth_cleanup"):
         require(HERE == root / "ops", "controller must use frozen task copy")
-    if args.phase == "control":
+    if args.phase.startswith("auth_"):
+        import g3_auth as auth
+        if args.phase == "auth_supervise":
+            def cancel(signum, frame):
+                raise Refused("BLOCKED_AUTH_SIGNAL")
+            signal.signal(signal.SIGTERM, cancel)
+            signal.signal(signal.SIGINT, cancel)
+            auth.supervisor(root, host)
+            require(auth.public_status(root)["status"] == "verified", "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
+        elif args.phase == "auth_cleanup":
+            require(auth.cleanup(root, host)["status"] != "needs_human", "BLOCKED_AUTH_CLEANUP")
+        elif args.phase == "auth_status":
+            print(json.dumps(auth.public_status(root)))
+            return
+        else:
+            with (BASE / "qualification.lock").open("a") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if args.phase == "auth_prepare":
+                    result = auth.prepare(root, host)
+                    print(json.dumps(result))  # public certificate, never code
+                    return
+                config_raw = os.environ.get("DITTO_G3_AUTH_TRANSPORT", "")
+                require(len(config_raw) <= 16384, "BLOCKED_AUTH_TRANSPORT_SIZE")
+                auth.start_login(root, host, json.loads(config_raw))
+    elif args.phase == "control":
         def terminate(signum, frame):
             raise Refused("controller signal")
         signal.signal(signal.SIGTERM, terminate)
@@ -825,7 +854,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (Refused, OSError, ValueError, subprocess.SubprocessError, sqlite3.Error) as error:
+    except Exception as error:
         # No arbitrary command output, paths, account identity or environment.
         print(json.dumps({"status": "BLOCKED_OR_FAILED", "reason": str(error) if isinstance(error, Refused) else type(error).__name__, "physical_success": False}))
         sys.exit(2)

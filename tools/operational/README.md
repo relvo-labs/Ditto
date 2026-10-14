@@ -3,13 +3,13 @@
 This is an operational scaffold for source
 `17f5d76dc043d7d8117f1e99458a9a0c9255354b`. It does not install that source
 globally, repair product code, accept G3 exits, or establish physical PASS.
-Authority is the parent's durable `physical/authority.md` and `plan.md`.
+Authority is the parent's durable `physical/authority.md`, `auth-authority.md` and `plan.md`. The newer auth authority supersedes the old-store selection step.
 The installed d49387f checkout, release executable and normal schema4 database
 must survive unchanged. User-service WorkingDirectory is not a source root.
 
 The workflow is manual only, on `hermes/g3-physical-qualification`, with read
 permissions and one exclusive qualification group. Inputs are just a closed
-phase choice and a numeric ID. There is no command/ref/binary/store input.
+phase choice, a numeric ID, and public mTLS transport metadata for auth_login. There is no command/ref/binary/store/code/private-key input.
 Use one ID through all phases, for example the first preflight workflow run ID.
 Parent must independently review this operation commit before push/dispatch.
 
@@ -20,6 +20,10 @@ On the existing reference runner, the workflow executes these commands:
 ```sh
 python3 tools/operational/g3_ops.py preflight --id QUALIFICATION_ID
 python3 tools/operational/g3_ops.py stage --id QUALIFICATION_ID
+python3 tools/operational/g3_ops.py auth_prepare --id QUALIFICATION_ID
+# Parent sets reviewed PUBLIC transport metadata as workflow input.
+python3 tools/operational/g3_ops.py auth_login --id QUALIFICATION_ID
+python3 tools/operational/g3_ops.py auth_status --id QUALIFICATION_ID
 python3 tools/operational/g3_ops.py launch --id QUALIFICATION_ID
 python3 tools/operational/g3_ops.py collect --id QUALIFICATION_ID
 ```
@@ -49,38 +53,121 @@ Candidate's unmodified `prepare-contexts.py` constructs faults/partial/unavailab
 contexts. Source tree, compiler versions, binaries, bundles, templates, original
 seat script, adapted script and diff have provenance hashes in `stage.json`.
 
-## Store selection gate — currently BLOCKED
+## Fresh realm and device bridge
 
-Neither supplied preflight proves the subscribed private store. A false
-`auth_ref` flag does not prove missing keyring auth. There is no auto-search,
-credential copy, new identity, or test-store relocation in this harness.
-Parent must inspect the third host-local inventory and obtain any necessary
-human selection. It then supplies **one** host-local `selection.json` under
-the task root, containing metadata only:
+Old-store discovery is **closed**. The retained inventory phase now returns a
+closed/not_run receipt without searching. `selection.json` and manually asserted
+`existing_subscription_proved` are never consulted by production phases.
+The new authority explicitly permits one new realm:
+`/home/neil/.cache/ditto/g3-auth-q<ID>` (0700), with database `data/core.db` and
+exact future backend `state/agent/backend/{home,codex}` paths. An existing realm,
+alias, normal-store link, stale receipt or unknown native identity is refused.
+There is no credential/reference transplant, API-key path or new default CLI
+home. Normal installed source/target, schema4 and Profile/hash are read back
+unchanged before/after initialization, auth and cleanup.
 
-```json
-{
-  "source": "17f5d76dc043d7d8117f1e99458a9a0c9255354b",
-  "stores": [{
-    "root": "EXACT_EXISTING_DITTO_DATA_DIR_FROM_PARENT_SELECTION",
-    "codex_home": "SAME_ROOT/state/agent/backend/codex",
-    "database_sha256": "CURRENT_SHA256_OF_SAME_ROOT/data/core.db",
-    "existing_subscription_proved": true,
-    "test_content_only": true
-  }]
-}
+`auth_prepare` requires successful stage, checks the exact pinned0.160 binary
+hash/version and app-server help using an empty task-owned help home (no login),
+then starts **candidate Core** with the fixture compositor and `DITTO_SYSTEM=none`.
+Core initializes schema5 and configures gpt-6.1-sol/high through managed settings;
+no DB rows are authored. Core launches the unmodified private relay as dittoctl.
+No GUI, normal Core, GDM or CI runner is stopped. The fixture Core is stopped
+before returning its native/public preparation receipt. It creates only a
+reference-local ephemeral client key and public certificate; keys are 0600 under
+0700 directories and never returned. A task-only 890s cleanup timer covers abandoned reference preparation (no CI queries). There is no auth during prepare.
+
+Parent obtains the public preparation JSON from the known authenticated runner,
+checks its qualification/source/operation SHA, and performs these commands
+**outside the repository** after fresh independent source-read-only review:
+
+```sh
+# Absolute helper path; cwd and output directory are task-owned, outside repo.
+python3 /ABS/OPS/tools/operational/g3_device_bridge.py prepare \
+  --client-receipt /TASK/auth-prepare.json --directory /TASK/receiver-q<ID>
+python3 /ABS/OPS/tools/operational/g3_device_bridge.py serve \
+  --directory /TASK/receiver-q<ID>
 ```
 
-These placeholders are not invented executable paths. Only already inspected
-task subdirectories below `/home/neil/funlab/Ditto/artifacts/g3` or
-`/home/neil/.cache/ditto` are admitted. A store elsewhere is
-`BLOCKED_UNPROVED_TASK_ROOT` and needs a further scoped operation review;
-do not move it into an admitted path. The root is the original DITTO_DATA_DIR,
-**not** the discovered `data/` directory. Symlink/hardlink/normal-store aliases,
-stale hashes and absent/multiple selections are refused. Parent's metadata
-selection does not substitute for live `agent.providers.status` authentication
-readback, which occurs at the unchanged CODEX_HOME before the four model turns.
-No provider login endpoint is called.
+Prepare emits only `qualification_id`, `flow_id`, exact parent host192.168.1.102,
+a random high task port, certificate fingerprints/public server certificate and
+expiry. Parent's private key stays on parent. Parent starts serve, then places
+that **public JSON only** in the manual auth_login workflow's `auth_transport`
+input. No branch/source modification after stage is needed or admitted: auth,
+launch and collector workflow SHA must equal staged operation SHA. Receiver CLI
+refuses GitHub Actions execution and repository cwd. It does not run on reference
+or via a remote workflow. A port conflict is a blocker; no alternate endpoint
+or routing fallback is inferred.
+
+The receiver uses standard-library HTTPS/SSL, TLS>=1.2, CERT_REQUIRED, hostname
+verification on client plus exact peer fingerprints. Public transport accepts
+only parent192.168.1.102, high bounded port, qualification/flow IDs and public
+certificate metadata. Its authorization lifetime is <=15 minutes; X509 has
+one-day encoding validity but gives no authorization past that application
+expiry, and local key files are deleted on terminal exit/signal/deadline. A task-only parent disposal child also removes keys if prepare is abandoned before serve. The child has no network or sender and stops when serve cleans up.
+Only fixed POST `/login_code` and `/status` exist, with <=4096-byte closed JSON.
+No query/bearer/code path, redirects, URL proxy, recipient, shell, file or admin
+operation is accepted. Login URL is exactly https://auth.openai.com/codex/device;
+code is 4–16 uppercase letters/digits/hyphens. Unknown fields, peer/flow mismatch,
+replay and expiry refuse. Sender failures are terminal, never retried.
+
+Receiver forwards directly using the already verified supported command:
+`/home/neil/.local/bin/hermes send --to telegram:8016167934 --quiet --file -`.
+Message text goes only to stdin; sender stdout/stderr are discarded. Neither
+HTTP response nor receipts contain code, code hash, account identity or message.
+The parent cannot infer subscription access from successful delivery alone.
+
+`auth_login` starts a separate user service (900-second deadline, no restart,
+stdout/stderr null, LimitCORE=0, 1GiB/128-task controller limit) with independent
+180-second ExecStopPost cleanup. Candidate backend retains its own pinned
+1GiB/200%-CPU/256-task limits; actual cgroup, executable, strict keyring config
+and final HOME/CODEX_HOME are checked before login. Task-only scope prefix
+`ditto-g3-auth-q<ID>` keeps it separate from the normal desktop's scopes.
+Managed APIs are `agent.providers.login/status/cancel_login`; they use the pinned
+`chatgptDeviceCode` method, Unix socket transit only, strict keyring storage and
+no auto/file fallback. Direct `codex login` is deliberately avoided because
+[official authentication documentation](https://developers.openai.com/codex/auth)
+notes direct login diagnostics. Official page snapshot is in durable
+`physical/openai-auth-doc.html`; the exact0.160 native help/API gate remains
+mandatory and is not inferred from newer documentation.
+
+Code/URL/login response stays in memory and is sent once over mTLS. The provider
+process stays alive for bounded **local provider** status polling; no Actions
+status queries/timers are used. Neil opens the official URL and authenticates
+directly to OpenAI, never returning password/token/callback to an agent. Official
+device-code settings may require personal security/workspace-admin enablement.
+On transport failure, signal or expiry, cancel the exact managed login and stop
+its task Core/backend scopes before returning a blocker. No replacement code,
+artifact/group fallback or login retry is issued for the same ID.
+
+Pinned CodexBackend.status accepts only ChatGPT account type; fixture-model flag
+and API-key inputs are absent. A login-complete receipt is separate from model
+verification. One bounded synthetic no-tool request uses **gpt-6.1-sol/high**,
+no fallback, 30s turn budget and the smallest supported tool-call budget (1).
+Core turn/trace must show zero observed tools, the actual model/settings revision
+must match, and private Profile/hash must remain unchanged. This is **observed
+zero tools**, not an enforced zero-tool runtime: the pinned managed Agent still
+advertises its discovered tools and retains existing Core authorization/sandbox
+rules. Any observed tool, wrong model/method, unknown status, locked keyring or
+failed minimal probe keeps launch closed. Account identity and model text are
+not exported. Credentials remain solely reference Secret Service, keyed by the
+same future CODEX_HOME; physical relogin never relocates it.
+
+| Safe state | What it proves | Physical launch |
+| --- | --- | --- |
+| prepared | native Core initialized fixed schema5 realm; public client cert | refused |
+| starting / awaiting_browser | detached auth service / code privately delivered | refused |
+| login_complete | pinned managed status accepts ChatGPT subscription | refused |
+| verified | exact minimal model/high, zero observed tools, native stopped, normal unchanged | admitted only with source/path/DB/service readbacks |
+| blocked / needs_human | failed auth/probe or incomplete cleanup | refused; no retries |
+
+`auth_status` exports only these states/booleans plus fixed model/source/id.
+TEST ONLY / fixture receipts are not admitted. Raw auth status, login_id, account
+label, model response and code fields are never put in receipt/log/artifact.
+Auth cleanup erases client cert/key before potentially slow native readback;
+parent receiver erases its local key on terminal status/expiry. Installed source,
+normal store and normal services remain untouched by authentication. Host-native
+proof of pinned backend logging behavior, keyring and real cleanup is still
+required: local logic/TLS tests cannot establish provider-internal behavior.
 
 ## Launch, recovery and evidence
 
@@ -132,7 +219,7 @@ The runner is restored once, after all modes/failure cleanup. A collector
 dispatch is possible only after verified recovery and all modes passed, using
 the host's existing gh authentication, with no job tokens, polling or retries.
 The branch head is checked against staged operation SHA; the collector also
-refuses any workflow SHA mismatch. Missing auth or uncertain dispatch is
+refuses any workflow SHA mismatch. Host gh authentication is proven by inventory38583908188; it is rechecked at dispatch. A later missing auth or uncertain dispatch is
 `BLOCKED_AUTO_DELIVERY`; parent must explicitly collect host-local evidence.
 No webhook is configured or promised.
 
@@ -148,7 +235,8 @@ Secret sentinels/credential markers in admitted JSON refuse publication.
 
 ```sh
 python3 -m unittest discover -s tools/operational/tests -v
-python3 -m py_compile tools/operational/g3_ops.py tools/operational/tests/test_g3_ops.py
+python3 -m py_compile tools/operational/g3_ops.py tools/operational/g3_auth.py tools/operational/g3_device_bridge.py
+python3 tools/operational/g3_device_bridge.py selftest
 bash -n tools/operational/build-g3.sh
 git diff --check
 ```
@@ -156,7 +244,6 @@ git diff --check
 Tests are TEST ONLY temporary file/SQLite/process fakes. They exercise real
 rewrite, admission, witness, recovery, sanitizer and workflow boundary logic;
 they establish no physical recovery, OS isolation or subscription result.
-Actual local counts and logs are in the parent's durable `physical/writer/`
-directory. Parent must review this implementation afresh, run real stage,
+The standalone selftest binds loopback only and injects an in-memory TEST ONLY sender; it never invokes Hermes or a provider. Actual counts and logs for this extension are in durable `physical/auth-extension/gates/`. Native Core initialization, account login, model request, LAN bridge and physical recovery remain not_run in the writer session. Parent must review this implementation afresh, run real stage,
 read the native host evidence and preserve recovery failures before claiming
 any G3 requirement completed.

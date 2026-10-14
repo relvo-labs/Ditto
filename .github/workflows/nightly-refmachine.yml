@@ -7,9 +7,13 @@ on:
         required: true
         type: choice
         default: preflight
-        options: [inventory, preflight, stage, launch, collect]
+        options: [inventory, preflight, stage, auth_prepare, auth_login, auth_status, launch, collect]
       qualification_id:
         description: Numeric task ID from preflight; empty uses this workflow run ID
+        required: false
+        type: string
+      auth_transport:
+        description: Public mTLS endpoint/certificate metadata only, for auth_login
         required: false
         type: string
 permissions:
@@ -32,12 +36,13 @@ jobs:
         env:
           QUALIFICATION_PHASE: ${{ inputs.phase }}
           QUALIFICATION_ID: ${{ inputs.qualification_id }}
+          DITTO_G3_AUTH_TRANSPORT: ${{ inputs.auth_transport }}
         run: |
           set -euo pipefail
-          case "$QUALIFICATION_PHASE" in inventory|preflight|stage|launch|collect) ;; *) exit 64 ;; esac
+          case "$QUALIFICATION_PHASE" in inventory|preflight|stage|auth_prepare|auth_login|auth_status|launch|collect) ;; *) exit 64 ;; esac
           mkdir -p artifacts/g3-qualification/publish
           if [ "$QUALIFICATION_PHASE" = inventory ]; then
-            python3 tools/operational/g3_reference_probe.py --out artifacts/g3-qualification/publish/receipt.json > artifacts/g3-qualification/phase.json
+            python3 -c 'import json; print(json.dumps({"phase":"inventory","status":"closed","old_store_discovery":"not_run"}))' > artifacts/g3-qualification/phase.json
             exit 0
           fi
           python3 tools/operational/g3_ops.py "$QUALIFICATION_PHASE" --id "${QUALIFICATION_ID:-$GITHUB_RUN_ID}" > artifacts/g3-qualification/phase.json

@@ -582,7 +582,7 @@ class Boundaries(unittest.TestCase):
         self.assertNotIn("push:", text)
         self.assertIn("contents: read", text)
         self.assertNotIn("write", text)
-        self.assertIn("options: [preflight, stage, launch, collect]", text)
+        self.assertIn("options: [inventory, preflight, stage, auth_prepare, auth_login, auth_status, launch, collect]", text)
         self.assertIn("refs/heads/" + ops.BRANCH, text)
         self.assertIn("persist-credentials: false", text)
         self.assertIn("cancel-in-progress: false", text)
