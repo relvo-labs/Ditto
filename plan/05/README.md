@@ -7,7 +7,7 @@
 | 狀態 | 功能整合實作與開發驗證中；出口未評審 |
 | 上位權威 | [PRD v0.4.0](../../docs/product/Ditto-PRD-v0.4.0.md) §9、12.1、14～17、19、21；[milestones/01 G3](../../milestones/01/03-phases.md#g3受限生成與移植) |
 | 追蹤 | [#34](https://github.com/relvo-labs/Ditto/issues/34)，子 issue #15～#33（2026-10-13 已逐項閱讀，均無補充留言） |
-| 分支／基底 | `codex/g3-restricted-generation`，疊在 `codex/g2-agent-foundation@a88bce89b8976d546497345777c642d9f2b7de59`；PR #13 尚未合併 |
+| 分支／基底 | `codex/g3-restricted-generation`；開工基底為 `codex/g2-agent-foundation@a88bce89b8976d546497345777c642d9f2b7de59`。PR #13 已合併，PR #40 現以 `main` 為基底 |
 | 前置 | G1 依 D-38 已完成；G2 功能由 owner 依 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受；原量測缺口繼續追蹤 |
 
 目標是透過對話產出兩種原先未安裝、可運作且可繼續修改的新插件，失敗時桌面維持可用。這份計畫不宣告 G2 或 G3 出口，不更改資源門檻。
@@ -22,6 +22,7 @@
 | [04 驗證與量測](04-verification-and-measurement.md) | AT-06／07／18／22／26／29、故障矩陣與證據分類 |
 | [05 工作包與順序](05-workplan.md) | 全部子 issue、依賴、相對週序、估算與分批提交 |
 | [06 決策與交接](06-decisions-risks-and-handoff.md) | 提前開工、待決策、上游取用、風險與 G4 交接 |
+| [07 實作與完成缺口盤點](07-completion-audit.md) | 對照 #15～#33 的實作、此次修正、驗證入口與出口剩餘工作 |
 
 順序固定：**隔離基礎設施 → 受限模板 → 生成管線 → 版本升級與回退**。隔離建立前僅產出固定模板引用與受限描述；模板外的程式碼不得執行。開發 CLI 不是正式能力，沒有權限寫入 Profile、授權、安裝表或正式生成紀錄。
 

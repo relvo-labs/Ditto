@@ -1,6 +1,6 @@
 # G3 契約與生成流程
 
-本檔為 Core 接線提案，**尚無可呼叫的 development RPC**；#19／20／21／24～28。適用 skills：`ditto-capability-contract`、`ditto-authority-boundaries`、`ditto-agent-changeset`、`ditto-changeset-transaction`、`ditto-generation-safety`。
+本檔保留 Core 接線時的設計提案；#19／20／21／24～28。正式 development 能力現已在 PR #40 實作，實際介面與限制見 [生產邊界](../../docs/platform/generated-template-boundary.md)，逐項證據與未完成驗收見 [完成缺口盤點](07-completion-audit.md)。下文的「提案」描述設計基準，不代表目前尚無 RPC。適用 skills：`ditto-capability-contract`、`ditto-authority-boundaries`、`ditto-agent-changeset`、`ditto-changeset-transaction`、`ditto-generation-safety`。
 
 ## 1. 狀態所有權與產物
 
