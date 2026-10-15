@@ -18,6 +18,7 @@ import time
 
 import g3_ops as ops
 import g3_device_bridge as bridge
+import g3_diagnostics as diag
 
 MODEL, EFFORT = "gpt-6.1-sol", "high"
 PROVIDER = {"provider": "codex-app-server"}
@@ -124,7 +125,7 @@ class NativeCore:
                 raw += part
         try:
             reply = json.loads(raw.split(b"\n", 1)[0])
-            ops.require("error" not in reply and "result" in reply, "BLOCKED_NATIVE_MANAGED_API")
+            ops.require("error" not in reply and "result" in reply, "BLOCKED_DEVICE_LOGIN_PROVIDER" if method == "agent.providers.login" else "BLOCKED_NATIVE_MANAGED_API")
             return reply["result"]
         except (ValueError, TypeError):
             raise ops.Refused("BLOCKED_NATIVE_MANAGED_API") from None
@@ -222,7 +223,7 @@ def scope_readbacks(root, identifier):
         try:
             scope_snapshot(host, unit)
         except Exception as error:
-            errors.append(unit + (":budget_exhausted" if isinstance(error, ops.Refused) and str(error) == "BLOCKED_AUTH_CLEANUP_BUDGET" else ":readback"))
+            errors.append(unit + (":budget_exhausted" if isinstance(error, ops.Refused) and error.args == ("BLOCKED_AUTH_CLEANUP_BUDGET",) else ":readback"))
     return errors
 
 
@@ -244,7 +245,7 @@ def stop_scopes(root, identifier):
         except Exception as error:
             if failed:
                 errors.append(unit + ":stop")
-            errors.append(unit + (":budget_exhausted" if isinstance(error, ops.Refused) and str(error) == "BLOCKED_AUTH_CLEANUP_BUDGET" else ":readback"))
+            errors.append(unit + (":budget_exhausted" if isinstance(error, ops.Refused) and error.args == ("BLOCKED_AUTH_CLEANUP_BUDGET",) else ":readback"))
     return errors
 
 
@@ -406,33 +407,37 @@ def device_flow(core, transport, receipt, safe_update):
     lifecycle = "unknown"
     try:
         safe_update(auth_lifecycle=lifecycle)
-        safe_update(native_runtime=core.ready())
+        safe_update(native_runtime=core.ready(), last_marker="native_ready")
         ops.require(not status_guard(core.call("agent.providers.status", PROVIDER)), "BLOCKED_FRESH_REALM_ALREADY_AUTHENTICATED")
-        safe_update(auth_lifecycle="pending")
+        safe_update(last_marker="preauth_checked")
+        safe_update(auth_lifecycle="pending", last_marker="login_requested")
         login = core.call("agent.providers.login", PROVIDER)
         ops.require(type(login) is dict and set(login) == {"login_id", "auth_url", "user_code", "expires_at_ms"} and type(login["login_id"]) is str and 0 < len(login["login_id"]) <= 128,
                     "BLOCKED_DEVICE_LOGIN_METHOD")
         payload = {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"],
                    "auth_url": login["auth_url"], "user_code": login["user_code"], "expires_at_ms": login["expires_at_ms"]}
         bridge.login_payload(payload, receipt["qualification_id"], receipt["flow_id"])
-        ops.require(payload["expires_at_ms"] <= receipt["expires_at_ms"], "BLOCKED_DEVICE_LOGIN_EXPIRY")
+        ops.require(payload["expires_at_ms"] <= receipt["expires_at_ms"], "BLOCKED_DEVICE_PAYLOAD_EXPIRY")
+        safe_update(last_marker="payload_validated")
         transport.post("/login_code", payload)
         del payload
-        safe_update(status="awaiting_browser")
+        safe_update(last_marker="code_forwarded")
+        safe_update(status="awaiting_browser", last_marker="awaiting_browser")
         # Managed API offers no public login event stream through the relay;
         # bounded local status polling retains the original provider process.
         while bridge.now_ms() < login["expires_at_ms"] - 60_000:
             status = core.call("agent.providers.status", PROVIDER)
             if status_guard(status):
-                safe_update(status="login_complete", login_complete=True, auth_lifecycle="completed")
+                safe_update(status="login_complete", login_complete=True, auth_lifecycle="completed", last_marker="login_complete")
                 transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "login_complete"})
                 model_guard(status)
                 proof = minimal_probe(core)
+                safe_update(last_marker="probe_done")
                 return proof
             time.sleep(3)
         raise ops.Refused("BLOCKED_DEVICE_LOGIN_EXPIRED")
     except BaseException as error:
-        reason = str(error) if isinstance(error, ops.Refused) and str(error).startswith("BLOCKED_") else "BLOCKED_DEVICE_LOGIN_OR_PROBE"
+        reason = diag.exception_reason(error, "BLOCKED_DEVICE_LOGIN_OR_PROBE")
         safe_update(reason=reason)
         try:
             revoke(core, login)
@@ -448,16 +453,26 @@ def device_flow(core, transport, receipt, safe_update):
 
 
 def supervisor(root, host):
-    built = ops.verify_stage(root)
     state = ops.read(root / "auth-state.json")
-    receipt = ops.read(root / "auth-prepare.json")
-    transport = bridge.Client(root / "auth-bridge", ops.read(root / "auth-transport.json"), root.name[1:], receipt["flow_id"])
-    realm = realm_path(root.name[1:])
-    ops.require(state["realm"] == str(realm) and state["ops_sha"] == built["ops_sha"] and state["status"] == "starting", "BLOCKED_AUTH_BINDING")
+    transport = receipt = None
     def update(**safe):
+        if "reason" in safe:
+            if state.get("reason") is not None:
+                safe.pop("reason")  # original first failure is sticky
+            else:
+                safe["reason"] = diag.reason(safe["reason"])
+        if "last_marker" in safe:
+            ops.require(safe["last_marker"] in diag.MARKERS, "BLOCKED_UNLISTED_REASON")
         state.update(safe)
         ops.write(root / "auth-state.json", state)
     try:
+        update(last_marker="supervisor_started")
+        built = ops.verify_stage(root)
+        receipt = ops.read(root / "auth-prepare.json")
+        transport = bridge.Client(root / "auth-bridge", ops.read(root / "auth-transport.json"), root.name[1:], receipt["flow_id"])
+        update(last_marker="transport_ready")
+        realm = realm_path(root.name[1:])
+        ops.require(state["realm"] == str(realm) and state["ops_sha"] == built["ops_sha"] and state["status"] == "starting", "BLOCKED_AUTH_BINDING")
         # Remove only prior, stopped initialization sockets before restart.
         runtime = ops.RUNTIME / ("ditto-g3-auth-q" + root.name[1:])
         if runtime.exists():
@@ -482,12 +497,13 @@ def supervisor(root, host):
         update(status="verified", native_stopped=True, auth_method="chatgpt_subscription",
                database_sha256=ops.sha(realm / "data/core.db"), evidence_class="native-core-auth-verified")
     except BaseException as error:
-        reason = str(error) if isinstance(error, ops.Refused) and str(error).startswith("BLOCKED_") else "BLOCKED_AUTH_OR_MODEL_VERIFICATION"
+        reason = diag.exception_reason(error, "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
         if isinstance(error, CleanupFailed):
             update(resource_errors=error.errors)
         update(status="needs_human" if state.get("revocation_error") or state.get("resource_errors") else "blocked", reason=state.get("reason", reason))  # original failure retained
         try:
-            transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "blocked"})
+            if transport is not None and receipt is not None:
+                transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "blocked"})
         except Exception:
             pass
     finally:
@@ -662,9 +678,35 @@ def verified_realm(root, host=None):
     return realm
 
 
-def public_status(root):
-    state = ops.read(root / "auth-state.json")
+def public_status(root, *, binding=None):
+    # Only the selected auth-state; no auth-prepare/transport, database,
+    # backend home, environment or provider request is opened here.
+    path = root / "auth-state.json"
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd) as stream:
+        ops.require(os.fstat(stream.fileno()).st_size <= 1024 * 1024, "BLOCKED_AUTH_UNKNOWN_STATE")
+        state = json.load(stream)
+    if binding is not None:
+        ops.require(state.get("source") == ops.SOURCE and state.get("ops_sha") == binding["ops_sha"] and state.get("qualification_id") == root.name[1:], "BLOCKED_AUTH_BINDING")
     ops.require(state.get("status") in STATES, "BLOCKED_AUTH_UNKNOWN_STATE")
-    return {"qualification_id": root.name[1:], "source": ops.SOURCE, "status": state["status"],
-            "login_complete": state["login_complete"], "model_verified": state["model_verified"], "native_stopped": state["native_stopped"],
-            "model": MODEL, "effort": EFFORT, "physical_success": False}
+    result = {"qualification_id": root.name[1:], "source": ops.SOURCE, "status": state["status"],
+              "model": MODEL, "effort": EFFORT, "physical_success": False}
+    for key in ("login_complete", "model_verified", "native_stopped"):
+        ops.require(type(state.get(key)) is bool, "BLOCKED_AUTH_UNKNOWN_STATE")
+        result[key] = state[key]
+    result["reason"] = diag.reason(state.get("reason"))
+    marker = state.get("last_marker", "not_recorded")
+    lifecycle = state.get("auth_lifecycle", "not_recorded")
+    result["last_marker"] = marker if type(marker) is str and marker in diag.MARKERS else "BLOCKED_UNLISTED_REASON"
+    result["auth_lifecycle"] = lifecycle if type(lifecycle) is str and lifecycle in diag.LIFECYCLES else "BLOCKED_UNLISTED_REASON"
+    errors = state.get("cleanup_errors", [])
+    result["cleanup_errors"] = sorted(set(diag.cleanup_code(v, root.name[1:]) for v in errors)) if type(errors) is list and len(errors) <= 128 else ["BLOCKED_UNLISTED_REASON"]
+    ops.require(not ops.SECRET.search(json.dumps(result)), "BLOCKED_UNLISTED_REASON")
+    return result
+
+
+def auth_reason(root):
+    # Deliberately no workflow-SHA equality, mutation, normal readback, auth
+    # discovery or lock. Selected staged hashes/source are still mandatory.
+    binding = ops.verify_stage(root, read_only=True)
+    return public_status(root, binding=binding)

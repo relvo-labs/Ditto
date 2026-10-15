@@ -7,7 +7,7 @@ on:
         required: true
         type: choice
         default: preflight
-        options: [inventory, preflight, stage, auth_prepare, auth_login, auth_status, launch, collect]
+        options: [inventory, preflight, stage, auth_prepare, auth_login, auth_status, auth_reason, bridge_probe_prepare, bridge_probe, launch, collect]
       qualification_id:
         description: Numeric task ID from preflight; empty uses this workflow run ID
         required: false
@@ -39,7 +39,7 @@ jobs:
           DITTO_G3_AUTH_TRANSPORT: ${{ inputs.auth_transport }}
         run: |
           set -euo pipefail
-          case "$QUALIFICATION_PHASE" in inventory|preflight|stage|auth_prepare|auth_login|auth_status|launch|collect) ;; *) exit 64 ;; esac
+          case "$QUALIFICATION_PHASE" in inventory|preflight|stage|auth_prepare|auth_login|auth_status|auth_reason|bridge_probe_prepare|bridge_probe|launch|collect) ;; *) exit 64 ;; esac
           mkdir -p artifacts/g3-qualification/publish
           if [ "$QUALIFICATION_PHASE" = inventory ]; then
             python3 -c 'import json; print(json.dumps({"phase":"inventory","status":"closed","old_store_discovery":"not_run"}))' > artifacts/g3-qualification/phase.json

@@ -163,7 +163,7 @@ same future CODEX_HOME; physical relogin never relocates it.
 | verified | exact minimal model/high, zero observed tools, native stopped, normal unchanged | admitted only with source/path/DB/service readbacks |
 | blocked / needs_human | failed auth/probe or incomplete cleanup | refused; no retries |
 
-`auth_status` exports only these states/booleans plus fixed model/source/id.
+`auth_status` exports these states/booleans, fixed model/source/id and the closed diagnostic fields described below.
 TEST ONLY / fixture receipts are not admitted. Raw auth status, login_id, account
 label, model response and code fields are never put in receipt/log/artifact.
 Auth cleanup erases client cert/key before potentially slow native readback;
@@ -359,3 +359,110 @@ from old TEST ONLY adapters lacking the purpose flag/structured readback shape;
 assertions for the three new RED tests remain byte-identical on GREEN.
 Independent delta review remains required; real auth/Home/model/physical are
 not_run and these gates do not certify physical readiness.
+
+## Diagnostics 1: closed reasons and no-login reachability
+
+Authority: durable `physical/auth-diagnostics-authority.md`. The observed old
+qualification38668800746 is blocked with no model/login completion and proved
+cleanup; zero receiver connections do not establish the cause. Preserve that
+failure. This writer runs no live host/provider/Home action. Independent delta
+review is required before parent uses these new phases.
+
+| Row | Implementation / witness |
+| --- | --- |
+| D1 | login_payload validates URL/code/expiry/shape at their sites; Client reports TCP errno/type, SSL wrap/alert, peer pin and receiver refusal; test_ops_diag1.test_D1_* and test_ops_diag1_surfaces.test_D1_* |
+| D2 | supervisor try includes Client construction, first reason stays sticky, last_marker advances only through fixed sites; test_D2_constructor_failure_recorded, test_D2_cleanup_failure_keeps_original_first_reason, test_D2_real_flow_markers_are_closed_and_secret_free |
+| D3 | public_status constructs typed constants only; unknown fields become BLOCKED_UNLISTED_REASON, absent old fields are NOT_RECORDED/not_recorded; test_D3_* |
+| D4 | auth_reason verifies existing staged source/file hashes with Git optional writes disabled, then reads only auth-state among private auth files; no Host, lock, normal readback, service, current-SHA equality or login; test_D4_* |
+| E1 | probe.prepare/run/cleanup: own namespace, public-only cert,5min deletion lease, one request, key erasure readback; test_E1_* and test_probe_phase_real_client_receipt_proves_key_cleanup |
+| E2 | prepare-probe/serve-probe and ProbeReceiverState accept only probe, never a sender; normal receiver rejects probe; test_probe_* loopback tests and test_E2_wrong_receiver_mode_never_touches_auth_receiver_keys |
+| E3 | probe IDs/dirs refuse auth-root collisions in both directions; only workflow phase lists changed; test_E3_* |
+
+Full closed sets are in [diagnostic-codes.json](diagnostic-codes.json), enforced
+by g3_diagnostics.py. New diagnostic reasons are:
+
+- BLOCKED_DEVICE_PAYLOAD_{URL,CODE,EXPIRY,SHAPE}.
+- BLOCKED_MTLS_{TCP_TIMEOUT,TCP_REFUSED,NO_ROUTE,TCP_OTHER,HANDSHAKE,PEER_MISMATCH}.
+- BLOCKED_RECEIVER_REFUSED, BLOCKED_TRANSPORT_EXPIRED,
+  BLOCKED_DEVICE_LOGIN_PROVIDER, BLOCKED_UNLISTED_REASON.
+- Existing fixed auth/native/probe-local guard reasons and cleanup codes are
+  enumerated in the same catalog; arbitrary exception messages, paths, peer
+  values, account, login_id, URL, user_code or hashes of codes are never exported.
+
+Markers: not_recorded, supervisor_started, transport_ready, native_ready,
+preauth_checked, login_requested, payload_validated, code_forwarded,
+awaiting_browser, login_complete, probe_done; invalid→BLOCKED_UNLISTED_REASON.
+Auth lifecycles: none/pending/completed/unknown/revoked; missing old value is
+not_recorded, invalid is BLOCKED_UNLISTED_REASON. Missing old reason is
+NOT_RECORDED; historical coarse reasons remain coarse, never inferred.
+Cleanup's private per-unit witnesses are mapped to fixed cleanup codes.
+
+These codes describe the observed failure boundary. An SSL error or a timeout
+inside SSL wrap is HANDSHAKE; a reset/closure after the client handshake may be
+RECEIVER_REFUSED (including late TLS1.3 client-certificate rejection). No code
+claims an unobserved server policy or proves device login was disabled.
+
+After review and parent publication, manually dispatch on the ops branch:
+
+```sh
+# Existing root; do NOT stage, prepare or log in again for this ID.
+gh workflow run nightly-refmachine.yml --ref hermes/g3-physical-qualification \
+  -f phase=auth_reason -f qualification_id=38668800746
+```
+
+The workflow invokes `python3 tools/operational/g3_ops.py auth_reason --id
+38668800746`. Its phase.json contains only the allowlisted export. A mismatched
+staged tree refuses. It reads the existing root with no cleanup-blocking lock
+and permits the old staged ops SHA; every mutable auth/physical gate stays
+unchanged. Do not infer missing markers from the old root.
+
+Use a **different, never-used numeric PROBE_ID** for this no-login sequence.
+The probe needs no stage/build/Core/realm/keyring/provider. Its root is
+`/home/neil/.local/state/ditto-g3-qualification/bridge-probes/p<ID>`0700; client
+keys are0600 under client/. An auth q<ID> or a prior probe tombstone refuses
+ID reuse; a probe ID is never used for later authentication.
+
+1. Manual workflow: phase=bridge_probe_prepare, qualification_id=PROBE_ID.
+   Obtain its public preparation JSON from the authenticated runner. It has
+   source/ops SHA, flow, certificate/fingerprint and expiry, no private key.
+2. Parent, cwd and directory outside repo, using the reviewed absolute helper:
+
+```sh
+python3 /ABS/OPS/tools/operational/g3_device_bridge.py prepare-probe \
+  --client-receipt /TASK/probe-prepare.json --directory /TASK/probe-receiver
+python3 /ABS/OPS/tools/operational/g3_device_bridge.py serve-probe \
+  --directory /TASK/probe-receiver
+```
+
+3. Use prepare-probe's **public JSON only** as auth_transport in a manual
+   phase=bridge_probe workflow with that same PROBE_ID and same ops commit.
+   Parent IP is fixed192.168.1.102; high task port is selected at preparation.
+   Existing workflow transport label is retained; no new input is introduced.
+4. Reference posts one fixed reachability-v1 body to /probe. Success requires
+   TCP, mTLS, both peer pins and flow agreement. phase.json returns PROBE_OK
+   plus keys_erased=true; failure returns only a closed code and erasure result.
+   The parent probe receiver exits after one accepted request and also emits a
+   public PROBE_OK/keys_erased receipt. Other paths refuse. No Home sender or
+   provider is ever constructed by the probe.
+
+Reference's frozen task cleanup lease deletes its client keys after290s even
+if the probe job is abandoned; parent disposal/receiver expiry covers parent
+keys. Neither lease queries Actions. Failed/expired attempts are single-use,
+not retried; cleanup aliases refuse. No extra SSH/tunnel/service configuration.
+PROBE_OK proves only current reachability at that selected endpoint. It neither
+proves the cause of38668800746 nor subscription/model/physical readiness. Parent
+must identify/remove the actual cause before the separately authorized ONE new
+device-code request under another new auth ID. Stop rules remain unchanged.
+
+RED/GREEN and gate evidence is under durable `physical/ops-diag1/gates/`.
+Intermediate failures are retained, including the TLS1.3 late-rejection test
+correction. The original four counterexamples remain byte-identical on GREEN.
+Local tests are TEST ONLY; actual reverse route, receiver/host execution and
+real provider diagnosis remain pending parent review/dispatch.
+
+Diagnostics1 final local gates: original4 counterexamples RED exit1
+(failures4/errors0) then byte-identical GREEN exit0; prior repair1=7, repair2=3
+and repair2 surfaces=16 all exit0; full237 tests exit0; standalone selftest44
+tests exit0 (includes real loopback TLS and overlaps the full suite). Python
+AST/compile, bash syntax, YAML/embedded-shell parse, phase-only workflow diff
+and git diff checks exit0. No native/live readiness claim.

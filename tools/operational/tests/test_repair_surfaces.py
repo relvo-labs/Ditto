@@ -24,7 +24,7 @@ class Surfaces(unittest.TestCase):
         self.receipt = {'qualification_id': ID, 'flow_id': 'a'*32, 'expires_at_ms': b.now_ms()+180000}
     def flow_failure(self, core, transport=None, probe=None):
         updates=[]
-        with patch.object(a, 'minimal_probe', side_effect=probe or o.Refused('BLOCKED_TEST_ONLY_PROBE')):
+        with patch.object(a, 'minimal_probe', side_effect=probe or o.Refused('BLOCKED_MINIMAL_PROBE_MODEL')):
             with self.assertRaises(o.Refused) as failure:
                 a.device_flow(core, transport or Mock(), self.receipt, lambda **v: updates.append(v))
         self.assertNotIn('TEST-1234', str(failure.exception)+json.dumps(updates))
@@ -70,7 +70,7 @@ class Surfaces(unittest.TestCase):
         core.call=rpc;updates=self.flow_failure(core)
         self.assertTrue(core.authenticated)
         self.assertTrue(any(v.get('status')=='needs_human' for v in updates))
-        self.assertTrue(any(v.get('reason')=='BLOCKED_TEST_ONLY_PROBE' for v in updates))
+        self.assertTrue(any(v.get('reason')=='BLOCKED_MINIMAL_PROBE_MODEL' for v in updates))
     def test_status_still_authenticated_after_logout_needs_human(self):
         core=RealmCore();call=core.call
         def rpc(method,*args,**kw):

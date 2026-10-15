@@ -100,6 +100,7 @@ def read(path):
 
 def run_root(identifier):
     require(re.fullmatch(r"[1-9][0-9]{5,19}", identifier), "invalid qualification ID")
+    require(not (BASE / "bridge-probes" / ("p" + identifier)).exists(), "BLOCKED_PROBE_COLLISION")
     root = BASE / ("q" + identifier)
     require(not BASE.is_symlink() and not root.is_symlink(), "task root alias")
     return root
@@ -110,9 +111,10 @@ def schema(database):
         return conn.execute("PRAGMA user_version").fetchone()[0]
 
 
-def assert_source(root, receipt=None):
-    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True, timeout=bounded_timeout(10) if AUTH_CLEANUP_END.get() is not None else None).strip()
-    dirty = subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], timeout=bounded_timeout(10) if AUTH_CLEANUP_END.get() is not None else None)
+def assert_source(root, receipt=None, *, read_only=False):
+    source_env = dict(os.environ, GIT_OPTIONAL_LOCKS="0") if read_only else None
+    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True, timeout=bounded_timeout(10) if AUTH_CLEANUP_END.get() is not None else None, env=source_env, stderr=subprocess.DEVNULL if read_only else None).strip()
+    dirty = subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], timeout=bounded_timeout(10) if AUTH_CLEANUP_END.get() is not None else None, env=source_env, stderr=subprocess.DEVNULL if read_only else None)
     require(head == SOURCE and not dirty, "source mismatch or candidate changed")
     require(receipt is None or receipt.get("source") == head, "source/receipt mismatch")
 
@@ -637,13 +639,16 @@ def stage(root, host):
           "ops_files": {str(p.relative_to(root)): sha(p) for p in sorted((root / "ops").rglob("*")) if p.is_file()}, "build_status": "built"})
 
 
-def verify_stage(root):
+def verify_stage(root, *, read_only=False):
     receipt = read(root / "stage.json")
-    assert_source(root / "candidate", receipt)
+    assert_source(root / "candidate", receipt, read_only=read_only)
     require(sha(root / "seat.sh") == receipt["seat_sha256"] and sha(root / "seat.diff") == receipt["diff_sha256"], "seat copy changed")
     require(receipt["original_seat_sha256"] == SEAT_SHA and receipt["template_sha256"] == TEMPLATE_SHA, "stage pin mismatch")
     for key in ("files", "ops_files"):
         for name, expected in receipt[key].items():
+            if read_only:
+                prefixes = ("ops/",) if key == "ops_files" else ("candidate/target/", "candidate/packages/", "candidate/crates/ditto-generation/templates/", "contexts/")
+                require(type(name) is str and name.startswith(prefixes), "BLOCKED_AUTH_BINDING")
             path = root / name
             require(path.resolve().is_relative_to(root.resolve()) and sha(path) == expected, "stage file mismatch")
     return receipt
@@ -892,11 +897,27 @@ def publish(root, destination):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("preflight", "stage", "launch", "collect", "control", "recover", "override", "enter", "leave", "auth_prepare", "auth_login", "auth_status", "auth_supervise", "auth_cleanup"))
+    parser.add_argument("phase", choices=("preflight", "stage", "launch", "collect", "control", "recover", "override", "enter", "leave", "auth_prepare", "auth_login", "auth_status", "auth_supervise", "auth_cleanup", "auth_reason", "bridge_probe_prepare", "bridge_probe", "bridge_probe_cleanup"))
     parser.add_argument("--id", required=True)
     args = parser.parse_args()
     require(os.getuid() == 1000 and Path.home() == Path("/home/neil") and socket.gethostname() == "neil-MotherBoard-Series", "fixed reference host required")
     os.umask(0o077)
+    if args.phase.startswith("bridge_probe"):
+        import g3_bridge_probe as probe
+        probe.phase(args.phase, args.id)
+        return
+    if args.phase == "auth_reason":
+        from g3_auth import auth_reason
+        from g3_diagnostics import exception_reason
+        try:
+            root = run_root(args.id)
+            require(root.is_dir() and root.stat().st_mode & 0o777 == 0o700, "BLOCKED_AUTH_BINDING")
+            result = auth_reason(root)
+        except Exception as error:
+            print(json.dumps({"status": "BLOCKED_OR_FAILED", "reason": exception_reason(error, "BLOCKED_UNLISTED_REASON")}))
+            sys.exit(2)
+        print(json.dumps(result))
+        return
     root = run_root(args.id)
     if args.phase in ("preflight", "stage"):
         BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -969,5 +990,10 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         # No arbitrary command output, paths, account identity or environment.
-        print(json.dumps({"status": "BLOCKED_OR_FAILED", "reason": str(error) if isinstance(error, Refused) else type(error).__name__, "physical_success": False}))
+        if len(sys.argv) > 1 and sys.argv[1] in ("auth_prepare", "auth_login", "auth_status", "auth_supervise", "auth_cleanup", "auth_reason", "bridge_probe_prepare", "bridge_probe", "bridge_probe_cleanup"):
+            from g3_diagnostics import exception_reason
+            reason = exception_reason(error, "BLOCKED_UNLISTED_REASON")
+        else:
+            reason = str(error) if isinstance(error, Refused) else type(error).__name__
+        print(json.dumps({"status": "BLOCKED_OR_FAILED", "reason": reason, "physical_success": False}))
         sys.exit(2)

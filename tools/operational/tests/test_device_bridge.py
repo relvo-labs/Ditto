@@ -73,6 +73,106 @@ class LoopbackBridge(unittest.TestCase):
     def payload(self):
         return {"qualification_id": IDENTIFIER, "flow_id": FLOW, "auth_url": "https://auth.openai.com/codex/device", "user_code": CODE, "expires_at_ms": b.now_ms() + 120_000}
 
+    def test_probe_phase_real_client_receipt_proves_key_cleanup(self):
+        import shutil
+        import g3_ops as ops
+        import g3_bridge_probe as probe
+        self.server.state=b.ProbeReceiverState(IDENTIFIER,FLOW,self.certs["client"]["sha256"],self.config["expires_at_ms"])
+        with tempfile.TemporaryDirectory(prefix="TEST_ONLY_probe_phase_") as temp:
+            root=Path(temp)/("p"+IDENTIFIER);root.mkdir(mode=0o700)
+            (root/"client").mkdir(mode=0o700);(root/"ops").mkdir(mode=0o700)
+            for name in ("client.key","client.pem"):
+                shutil.copyfile(self.root/"client"/name,root/"client"/name);(root/"client"/name).chmod(0o600)
+            hashes={}
+            for name in probe.FILES:
+                shutil.copyfile(ops.HERE/name,root/"ops"/name);hashes[name]=ops.sha(root/"ops"/name)
+            ops.write(root/"probe-state.json",{"test_only":True,"qualification_id":IDENTIFIER,"flow_id":FLOW,"source":ops.SOURCE,"ops_sha":"a"*40,"status":"prepared","attempted":False,"expires_at_ms":self.config["expires_at_ms"],"ops_files":hashes})
+            ops.write(root/"probe-prepare.json",{"client_sha256":self.config["client_sha256"]})
+            real=b.Client
+            with patch.dict(os.environ,{"GITHUB_SHA":"a"*40}),patch.object(b,"Client",side_effect=lambda *args,**kw: real(*args,**kw,loopback=True)),patch.object(b,"send_home") as sender:
+                result=probe.run(root,ops.Host(root),json.dumps(self.config))
+            self.assertEqual(result["result"],"PROBE_OK");self.assertTrue(result["keys_erased"])
+            self.assertFalse((root/"client/client.key").exists());sender.assert_not_called()
+            self.assertFalse(result["provider_called"]);self.assertFalse(result["home_called"])
+            with self.assertRaises(ops.Refused):probe.run(root,ops.Host(root),json.dumps(self.config))
+
+    def test_probe_receiver_terminal_cleanup_receipt_logic(self):
+        # TEST ONLY accept loop; real TLS/peer exchange covered by the other
+        # loopback tests. No bind to parent/LAN address and no actual sender.
+        import shutil
+        with tempfile.TemporaryDirectory(prefix="TEST_ONLY_parent_probe_") as temp:
+            directory=Path(temp);directory.chmod(0o700)
+            for name in ("server.key","server.pem"):
+                shutil.copyfile(self.root/"server"/name,directory/name);(directory/name).chmod(0o600)
+            (directory/"client.pem").write_text(self.certs["client"]["certificate"])
+            (directory/"purpose.json").write_text('{"purpose":"probe"}')
+            (directory/"transport.json").write_text(json.dumps({**self.config,"host":b.PARENT_IP}))
+            class TestOnlyServer:
+                def __init__(inner,address,context,state):inner.state=state
+                def handle_request(inner):inner.state.accept("/probe",self.certs["client"]["sha256"],json.dumps(self.probe_body()).encode())
+                def server_close(inner):pass
+            with patch.object(b,"QuietServer",TestOnlyServer),patch.object(b,"send_home") as sender,redirect_stdout(io.StringIO()):
+                result=b.serve_receiver(directory,probe=True)
+            self.assertEqual(result,{"result":"PROBE_OK","keys_erased":True});sender.assert_not_called()
+            self.assertFalse((directory/"server.key").exists())
+
+    def probe_client(self):
+        return b.Client(self.root / "client", self.config, IDENTIFIER, FLOW, loopback=True, probe=True)
+
+    def probe_body(self):
+        return {"qualification_id": IDENTIFIER, "flow_id": FLOW, "probe": "reachability-v1"}
+
+    def test_probe_real_mtls_never_calls_sender(self):
+        self.server.state = b.ProbeReceiverState(IDENTIFIER,FLOW,self.certs["client"]["sha256"],self.config["expires_at_ms"])
+        with patch.object(b,"send_home") as sender:
+            result=self.probe_client().post("/probe",self.probe_body())
+        self.assertEqual(result,{"status":"PROBE_OK"})
+        sender.assert_not_called();self.assertEqual(self.messages,[])
+        self.assertTrue(self.server.state.done)
+
+    def test_normal_receiver_refuses_probe_path_over_mtls(self):
+        with self.assertRaisesRegex(b.BridgeRefused,"BLOCKED_RECEIVER_REFUSED"):
+            self.probe_client().post("/probe",self.probe_body())
+        self.assertEqual(self.messages,[])
+
+    def test_probe_receiver_refuses_login_and_status_over_mtls(self):
+        self.server.state=b.ProbeReceiverState(IDENTIFIER,FLOW,self.certs["client"]["sha256"],self.config["expires_at_ms"])
+        for path,value in (("/login_code",self.payload()),("/status",{"qualification_id":IDENTIFIER,"flow_id":FLOW,"status":"blocked"})):
+            with self.subTest(path=path),self.assertRaisesRegex(b.BridgeRefused,"BLOCKED_RECEIVER_REFUSED"):
+                self.client.post(path,value)
+        self.assertFalse(self.server.state.done);self.assertEqual(self.messages,[])
+
+    def test_probe_mtls_flow_mismatch_and_replay_refused(self):
+        self.server.state=b.ProbeReceiverState(IDENTIFIER,FLOW,self.certs["client"]["sha256"],self.config["expires_at_ms"])
+        client=self.probe_client()
+        with self.assertRaises(b.BridgeRefused):client.post("/probe",{**self.probe_body(),"flow_id":"b"*32})
+        self.assertEqual(client.post("/probe",self.probe_body()),{"status":"PROBE_OK"})
+        with self.assertRaises(b.BridgeRefused):client.post("/probe",self.probe_body())
+        self.assertEqual(self.messages,[])
+
+    def test_probe_untrusted_client_refused(self):
+        self.server.state=b.ProbeReceiverState(IDENTIFIER,FLOW,self.certs["client"]["sha256"],self.config["expires_at_ms"])
+        client=b.Client(self.root/"wrong-client",{**self.config,"client_sha256":self.certs["wrong-client"]["sha256"]},IDENTIFIER,FLOW,loopback=True,probe=True)
+        with self.assertRaises(b.BridgeRefused) as refusal:client.post("/probe",self.probe_body())
+        self.assertIn(refusal.exception.args[0], {"BLOCKED_MTLS_HANDSHAKE", "BLOCKED_RECEIVER_REFUSED"})
+        self.assertFalse(self.server.state.done)
+        self.assertEqual(self.messages,[])
+
+    def test_probe_expiry_and_fields_refused(self):
+        self.server.state=b.ProbeReceiverState(IDENTIFIER,FLOW,self.certs["client"]["sha256"],self.config["expires_at_ms"])
+        client=self.probe_client()
+        with self.assertRaises(b.BridgeRefused):client.post("/probe",{**self.probe_body(),"recipient":"SECRET_SENTINEL"})
+        self.server.state.deadline=b.now_ms()-1
+        with self.assertRaises(b.BridgeRefused):client.post("/probe",self.probe_body())
+        self.assertEqual(self.messages,[])
+
+    def test_client_handshake_reason_and_peer_pin_reason(self):
+        config={**self.config,"server_certificate":self.certs["wrong-server"]["certificate"],"server_sha256":self.certs["wrong-server"]["sha256"]}
+        client=b.Client(self.root/"client",config,IDENTIFIER,FLOW,loopback=True)
+        with self.assertRaisesRegex(b.BridgeRefused,"BLOCKED_MTLS_HANDSHAKE"):client.post("/login_code",self.payload())
+        self.client.config={**self.config,"server_sha256":"f"*64}
+        with self.assertRaisesRegex(b.BridgeRefused,"BLOCKED_MTLS_PEER_MISMATCH"):self.client.post("/login_code",self.payload())
+
     def test_actual_correct_mtls_handshake_and_private_delivery(self):
         self.client.post("/login_code", self.payload())
         self.assertEqual(len(self.messages), 1)

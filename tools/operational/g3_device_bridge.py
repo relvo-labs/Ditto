@@ -5,6 +5,7 @@ The receiver is started ONLY by the parent. Tests bind only loopback and
 inject a TEST ONLY sender; no test invokes Hermes. Secret bodies stay in RAM.
 """
 import argparse
+import errno
 import hashlib
 import http.client
 import http.server
@@ -32,9 +33,9 @@ class BridgeRefused(RuntimeError):
     """All messages are constant; never put body/exception values here."""
 
 
-def need(ok):
+def need(ok, reason="BLOCKED_BRIDGE_INPUT_OR_STATE"):
     if not ok:
-        raise BridgeRefused("BLOCKED_BRIDGE_INPUT_OR_STATE")
+        raise BridgeRefused(reason)
 
 
 def now_ms():
@@ -125,14 +126,17 @@ def strict_json(raw):
 
 
 def login_payload(value, identifier, flow_id):
-    fields(value, {"qualification_id", "flow_id", "auth_url", "user_code", "expires_at_ms"})
-    need(qualification(value["qualification_id"]) == identifier and flow(value["flow_id"]) == flow_id)
-    need(type(value["auth_url"]) is str and len(value["auth_url"]) <= 256)
-    url = urlsplit(value["auth_url"])
-    # Exact official device destination; no callback/code/query proxy.
-    need(url.scheme == "https" and url.netloc == "auth.openai.com" and url.path == "/codex/device" and not url.query and not url.fragment)
-    need(type(value["user_code"]) is str and re.fullmatch(r"[A-Z0-9-]{4,16}", value["user_code"]))
-    lifetime(value["expires_at_ms"], 600_000)
+    need(type(value) is dict and set(value) == {"qualification_id", "flow_id", "auth_url", "user_code", "expires_at_ms"}, "BLOCKED_DEVICE_PAYLOAD_SHAPE")
+    need(value["qualification_id"] == identifier and value["flow_id"] == flow_id, "BLOCKED_DEVICE_PAYLOAD_SHAPE")
+    need(type(value["auth_url"]) is str and len(value["auth_url"]) <= 256, "BLOCKED_DEVICE_PAYLOAD_URL")
+    try:
+        url = urlsplit(value["auth_url"])
+        valid = url.scheme == "https" and url.netloc == "auth.openai.com" and url.path == "/codex/device" and not url.query and not url.fragment
+    except (ValueError, TypeError):
+        valid = False
+    need(valid, "BLOCKED_DEVICE_PAYLOAD_URL")
+    need(type(value["user_code"]) is str and re.fullmatch(r"[A-Z0-9-]{4,16}", value["user_code"]), "BLOCKED_DEVICE_PAYLOAD_CODE")
+    need(type(value["expires_at_ms"]) is int and 0 < value["expires_at_ms"] - now_ms() <= 600_000, "BLOCKED_DEVICE_PAYLOAD_EXPIRY")
 
 
 def validate_transport(config, identifier, flow_id, *, loopback=False):
@@ -142,7 +146,7 @@ def validate_transport(config, identifier, flow_id, *, loopback=False):
     need(type(config["port"]) is int and 49152 <= config["port"] <= 65535)
     need(fingerprint(config["server_certificate"]) == config["server_sha256"])
     need(type(config["client_sha256"]) is str and re.fullmatch(r"[a-f0-9]{64}", config["client_sha256"]))
-    lifetime(config["expires_at_ms"])
+    need(type(config["expires_at_ms"]) is int and 0 < config["expires_at_ms"] - now_ms() <= MAX_LIFE_MS, "BLOCKED_TRANSPORT_EXPIRED")
     return config
 
 
@@ -153,6 +157,7 @@ def send_home(message):
 
 
 class ReceiverState:
+    paths = frozenset({"/login_code", "/status"})
     def __init__(self, identifier, flow_id, client_sha, expiry, sender):
         self.identifier, self.flow_id, self.client_sha = qualification(identifier), flow(flow_id), client_sha
         lifetime(expiry)
@@ -244,7 +249,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            need(self.path in ("/login_code", "/status"))
+            need(self.path in self.server.state.paths)
             need(not self.headers.get("Transfer-Encoding") and self.headers.get("Content-Type") == "application/json")
             sizes = self.headers.get_all("Content-Length", [])
             need(len(sizes) == 1 and sizes[0].isdigit() and 0 < int(sizes[0]) <= MAX_BODY)
@@ -269,48 +274,112 @@ def server_context(directory, client_certificate):
 
 
 class Client:
-    def __init__(self, directory, config, identifier, flow_id, *, loopback=False):
+    def __init__(self, directory, config, identifier, flow_id, *, loopback=False, probe=False):
+        self.probe = probe
+        try:
+            self._initialize(directory, config, identifier, flow_id, loopback=loopback)
+        except BridgeRefused:
+            raise
+        except (ssl.SSLError, ValueError, OSError, TypeError):
+            raise BridgeRefused("BLOCKED_BRIDGE_CERTIFICATE") from None
+
+    def _initialize(self, directory, config, identifier, flow_id, *, loopback=False):
         self.config = validate_transport(config, identifier, flow_id, loopback=loopback)
         self.directory = private_directory(directory)
         key_guard(self.directory, "client")
-        need(fingerprint((self.directory / "client.pem").read_text()) == config["client_sha256"])
+        need(fingerprint((self.directory / "client.pem").read_text()) == config["client_sha256"], "BLOCKED_MTLS_PEER_MISMATCH")
         ctx = ssl.create_default_context(cadata=config["server_certificate"])
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.load_cert_chain(str(self.directory / "client.pem"), str(self.directory / "client.key"))
+        # Mark handshake failures at the actual wrap boundary. This retains
+        # SSLContext certificate/hostname verification and TLS>=1.2; a socket
+        # timeout here must not be misreported as a TCP-route timeout.
+        wrap = ctx.wrap_socket
+        def handshake(*args, **kwargs):
+            try:
+                return wrap(*args, **kwargs)
+            except Exception:
+                raise BridgeRefused("BLOCKED_MTLS_HANDSHAKE") from None
+        ctx.wrap_socket = handshake
         self.context = ctx
 
     def post(self, path, value):
-        need(path in ("/login_code", "/status") and now_ms() < self.config["expires_at_ms"])
+        probe = getattr(self, "probe", False)
+        need(path in (("/probe",) if probe else ("/login_code", "/status")), "BLOCKED_RECEIVER_REFUSED")
+        need(now_ms() < self.config["expires_at_ms"], "BLOCKED_TRANSPORT_EXPIRED")
         raw = json.dumps(value).encode()
-        need(len(raw) <= MAX_BODY)
+        need(len(raw) <= MAX_BODY, "BLOCKED_BRIDGE_BODY")
         connection = http.client.HTTPSConnection(self.config["host"], self.config["port"], context=self.context, timeout=5)
         try:
-            connection.connect()
-            need(hashlib.sha256(connection.sock.getpeercert(binary_form=True)).hexdigest() == self.config["server_sha256"])
+            try:
+                connection.connect()
+            except BridgeRefused:
+                raise
+            except ssl.SSLError:
+                raise BridgeRefused("BLOCKED_MTLS_HANDSHAKE") from None
+            except (TimeoutError, socket.timeout):
+                raise BridgeRefused("BLOCKED_MTLS_TCP_TIMEOUT") from None
+            except ConnectionRefusedError:
+                raise BridgeRefused("BLOCKED_MTLS_TCP_REFUSED") from None
+            except OSError as error:
+                code = {errno.ECONNREFUSED: "BLOCKED_MTLS_TCP_REFUSED", errno.ENETUNREACH: "BLOCKED_MTLS_NO_ROUTE", errno.EHOSTUNREACH: "BLOCKED_MTLS_NO_ROUTE", errno.ETIMEDOUT: "BLOCKED_MTLS_TCP_TIMEOUT"}.get(error.errno, "BLOCKED_MTLS_TCP_OTHER")
+                raise BridgeRefused(code) from None
+            need(hashlib.sha256(connection.sock.getpeercert(binary_form=True)).hexdigest() == self.config["server_sha256"], "BLOCKED_MTLS_PEER_MISMATCH")
             connection.request("POST", path, body=raw, headers={"Content-Type": "application/json"})
             reply = connection.getresponse()
-            answer = strict_json(reply.read(128))
-            need(reply.status == 200 and answer == {"status": "delivered"})
+            try:
+                answer = strict_json(reply.read(128))
+            except BridgeRefused:
+                raise BridgeRefused("BLOCKED_RECEIVER_REFUSED") from None
+            need(reply.status == 200 and answer == {"status": "PROBE_OK" if probe else "delivered"}, "BLOCKED_RECEIVER_REFUSED")
+            return answer
+        except BridgeRefused:
+            raise
+        except ssl.SSLError:
+            raise BridgeRefused("BLOCKED_MTLS_HANDSHAKE") from None
         except Exception:
-            raise BridgeRefused("BLOCKED_MTLS_OR_PRIVATE_HOME_ROUTE") from None
+            raise BridgeRefused("BLOCKED_RECEIVER_REFUSED") from None
         finally:
-            connection.close()
+            try:
+                connection.close()
+            except Exception:
+                pass  # never overwrite the original transport refusal
 
 
-def prepare_receiver(receipt, directory):
+class ProbeReceiverState:
+    paths = frozenset({"/probe"})
+    def __init__(self, identifier, flow_id, client_sha, expiry):
+        self.identifier, self.flow_id = qualification(identifier), flow(flow_id)
+        lifetime(expiry, 300_000)
+        self.client_sha, self.deadline = client_sha, expiry
+        self.monotonic_deadline = time.monotonic() + (expiry - now_ms()) / 1000
+        self.done = self.failed = False
+
+    def accept(self, path, peer_sha, raw):
+        need(path == "/probe" and not self.done and peer_sha == self.client_sha and now_ms() < self.deadline and time.monotonic() < self.monotonic_deadline)
+        value = strict_json(raw)
+        fields(value, {"qualification_id", "flow_id", "probe"})
+        need(value == {"qualification_id": self.identifier, "flow_id": self.flow_id, "probe": "reachability-v1"})
+        self.done = True
+        return {"status": "PROBE_OK"}
+
+
+def prepare_receiver(receipt, directory, *, probe=False):
     # Receipt must arrive via parent-authenticated runner artifact, not from
     # an unknown endpoint. No private key or account/code fields admitted.
     fields(receipt, {"qualification_id", "flow_id", "source", "ops_sha", "evidence_class", "client_certificate", "client_sha256", "expires_at_ms"})
-    need(receipt["evidence_class"] == "native-core-auth-prepare")
+    need(receipt["evidence_class"] == ("mtls-probe-prepare" if probe else "native-core-auth-prepare"))
     need(receipt["source"] == "17f5d76dc043d7d8117f1e99458a9a0c9255354b" and re.fullmatch(r"[a-f0-9]{40}", receipt["ops_sha"]))
     identifier, flow_id = qualification(receipt["qualification_id"]), flow(receipt["flow_id"])
-    lifetime(receipt["expires_at_ms"])
+    lifetime(receipt["expires_at_ms"], 300_000 if probe else MAX_LIFE_MS)
     need(fingerprint(receipt["client_certificate"]) == receipt["client_sha256"])
     directory = private_directory(directory, create=True)
     public = certificate(directory, "server", PARENT_IP)
     config = {"qualification_id": identifier, "flow_id": flow_id, "host": PARENT_IP, "port": 49152 + secrets.randbelow(16384),
               "server_certificate": public["certificate"], "server_sha256": public["sha256"], "client_sha256": receipt["client_sha256"], "expires_at_ms": receipt["expires_at_ms"]}
     try:
+        (directory / "purpose.json").write_text(json.dumps({"purpose": "probe" if probe else "auth"}))
+        (directory / "purpose.json").chmod(0o600)
         (directory / "client.pem").write_text(receipt["client_certificate"])
         (directory / "client.pem").chmod(0o600)
         (directory / "transport.json").write_text(json.dumps(config))
@@ -364,15 +433,17 @@ def expire_preparation(directory):
             (directory / name).unlink(missing_ok=True)
 
 
-def serve_receiver(directory):
+def serve_receiver(directory, *, probe=False):
     directory = private_directory(directory)
+    purpose = json.loads((directory / "purpose.json").read_text()) if (directory / "purpose.json").exists() else {"purpose": "auth"}
+    need(purpose == {"purpose": "probe" if probe else "auth"})
     server = None
     try:
         config = json.loads((directory / "transport.json").read_text())
         validate_transport(config, config["qualification_id"], config["flow_id"])
         client = (directory / "client.pem").read_text()
         need(fingerprint(client) == config["client_sha256"])
-        state = ReceiverState(config["qualification_id"], config["flow_id"], config["client_sha256"], config["expires_at_ms"], send_home)
+        state = ProbeReceiverState(config["qualification_id"], config["flow_id"], config["client_sha256"], config["expires_at_ms"]) if probe else ReceiverState(config["qualification_id"], config["flow_id"], config["client_sha256"], config["expires_at_ms"], send_home)
         server = QuietServer((PARENT_IP, config["port"]), server_context(directory, client), state)
         print(json.dumps({"status": "listening", "qualification_id": config["qualification_id"]}), flush=True)
         while not state.done and now_ms() < state.deadline and time.monotonic() < state.monotonic_deadline:
@@ -385,11 +456,15 @@ def serve_receiver(directory):
         (directory / "transport.json").unlink(missing_ok=True)
         stop_disposal(directory)
     need(state.done and not state.failed)
+    if probe:
+        erased = all(not (directory / name).exists() and not (directory / name).is_symlink() for name in ("server.key", "server.pem", "client.pem", "transport.json"))
+        need(erased, "BLOCKED_PROBE_CLEANUP")
+        return {"result": "PROBE_OK", "keys_erased": True}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("command", choices=("prepare", "serve", "selftest", "expire"))
+    ap.add_argument("command", choices=("prepare", "serve", "prepare-probe", "serve-probe", "selftest", "expire"))
     ap.add_argument("--directory")
     ap.add_argument("--client-receipt")
     args = ap.parse_args()
@@ -399,10 +474,10 @@ def main():
         suite = unittest.defaultTestLoader.discover(str(Path(__file__).parent / "tests"), pattern="test_device_bridge.py")
         result = unittest.TextTestRunner(verbosity=2).run(suite)
         need(result.wasSuccessful())
-    elif args.command == "prepare":
+    elif args.command in ("prepare", "prepare-probe"):
         need(not os.environ.get("GITHUB_ACTIONS") and not Path.cwd().is_relative_to(Path(__file__).resolve().parents[2]))
         need(args.directory and args.client_receipt)
-        print(json.dumps(prepare_receiver(json.loads(Path(args.client_receipt).read_text()), Path(args.directory))))
+        print(json.dumps(prepare_receiver(json.loads(Path(args.client_receipt).read_text()), Path(args.directory), probe=args.command == "prepare-probe")))
     elif args.command == "expire":
         need(args.directory and not args.client_receipt)
         def dispose(signum, frame):
@@ -420,7 +495,9 @@ def main():
         signal.signal(signal.SIGALRM, stop)
         signal.alarm(900)
         try:
-            serve_receiver(Path(args.directory))
+            result = serve_receiver(Path(args.directory), probe=args.command == "serve-probe")
+            if result is not None:
+                print(json.dumps(result))
         finally:
             signal.alarm(0)
 
@@ -428,6 +505,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        print('{"status":"BLOCKED_BRIDGE"}')
+    except Exception as error:
+        from g3_diagnostics import exception_reason
+        print(json.dumps({"status": "BLOCKED_BRIDGE", "reason": exception_reason(error, "BLOCKED_BRIDGE_INPUT_OR_STATE")}))
         sys.exit(2)
