@@ -95,7 +95,7 @@ class NativeCore:
         state["core_witness"] = self.saved
         ops.write(self.root / "auth-state.json", state)
         try:
-            end = time.monotonic() + 30
+            end = time.monotonic() + ops.bounded_timeout(30)
             while time.monotonic() < end:
                 ops.require(self.child.poll() is None, "BLOCKED_NATIVE_CORE_START")
                 if (self.runtime / "relay.sock").is_socket():
@@ -109,12 +109,16 @@ class NativeCore:
     def call(self, method, params=None, timeout=20):
         # Only a task-owned Unix socket. No shell, provider body, or code in
         # argv, file, journal, exceptions or Agent transcript.
+        end = time.monotonic() + ops.bounded_timeout(timeout)
         with socket.socket(socket.AF_UNIX) as sock:
-            sock.settimeout(timeout)
+            sock.settimeout(ops.bounded_timeout(max(0, end - time.monotonic())))
             sock.connect(str(self.runtime / "relay.sock"))
+            sock.settimeout(ops.bounded_timeout(max(0, end - time.monotonic())))
             sock.sendall(json.dumps({"method": method, "params": params or {}}).encode() + b"\n")
             raw = b""
             while b"\n" not in raw:
+                ops.require(time.monotonic() < end, "BLOCKED_NATIVE_RPC_DEADLINE")
+                sock.settimeout(ops.bounded_timeout(end - time.monotonic()))
                 part = sock.recv(65536)
                 ops.require(part and len(raw) + len(part) <= 1024 * 1024, "BLOCKED_NATIVE_RPC_SIZE_OR_DISCONNECT")
                 raw += part
@@ -125,8 +129,8 @@ class NativeCore:
         except (ValueError, TypeError):
             raise ops.Refused("BLOCKED_NATIVE_MANAGED_API") from None
 
-    def ready(self):
-        runtime = ops.wait_ready(self.call)
+    def ready(self, *, for_revoke=False):
+        runtime = ops.wait_ready(self.call, allow_draining=for_revoke)
         ops.require(runtime.get("isolation_verified") is True, "BLOCKED_NATIVE_BACKEND_BOUNDARY")
         pid = runtime["backend_pid"]
         ops.require(Path(f"/proc/{pid}/exe").resolve(strict=True) == ops.CODEX and ops.sha(ops.CODEX) == ops.CODEX_SHA, "BLOCKED_NATIVE_BACKEND_BINARY")
@@ -159,10 +163,10 @@ class NativeCore:
             if self.child and self.child.poll() is None:
                 self.child.terminate()
                 try:
-                    self.child.wait(timeout=5)
+                    self.child.wait(timeout=ops.bounded_timeout(5))
                 except subprocess.TimeoutExpired:
                     self.child.kill()
-                    self.child.wait(timeout=5)
+                    self.child.wait(timeout=ops.bounded_timeout(5))
         except Exception:
             errors.append("core_stop")
         try:
@@ -193,33 +197,54 @@ def owned_units(identifier):
     return ["ditto-g3-auth-q" + identifier + "-" + kind + ".scope" for kind in ("agent", "agent-backend", "dittoctl")]
 
 
+def scope_snapshot(host, unit):
+    # Parse structured properties even when systemctl reports not-found with
+    # nonzero status. Empty/error text alone never proves absence.
+    result = host.command(["systemctl", "--user", "show", unit, "-p", "LoadState", "-p", "ActiveState", "-p", "ControlGroup", "--no-pager"], check=False)
+    fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    ops.require(set(fields) == {"LoadState", "ActiveState", "ControlGroup"}, "BLOCKED_AUTH_SCOPE_READBACK")
+    absent = fields["LoadState"] == "not-found"
+    ops.require(result.returncode == 0 or absent, "BLOCKED_AUTH_SCOPE_READBACK")
+    group = fields["ControlGroup"]
+    if absent:
+        ops.require(fields["ActiveState"] == "inactive" and not group, "BLOCKED_AUTH_SCOPE_ABSENCE_UNPROVED")
+    if group:
+        ops.require(group.startswith("/user.slice/user-1000.slice/user@1000.service/") and group.endswith("/" + unit), "BLOCKED_AUTH_SCOPE_IDENTITY")
+        procs = Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs"
+        ops.require(not procs.exists() or not procs.read_text().strip(), "BLOCKED_AUTH_SCOPE_CLEANUP")
+    ops.require(fields["ActiveState"] in ("inactive", "failed") and fields["LoadState"] in ("loaded", "not-found"), "BLOCKED_AUTH_SCOPE_STILL_ACTIVE")
+    return absent
+
+
 def scope_readbacks(root, identifier):
     host, errors = ops.Host(root), []
     for unit in owned_units(identifier):
         try:
-            active = host.system("is-active", unit, check=False)
-            ops.require(active in ("inactive", "failed", "unknown"), "BLOCKED_AUTH_SCOPE_STILL_ACTIVE")
-        except Exception:
-            errors.append(unit + ":active_readback")
-        try:
-            group = host.system("show", unit, "-p", "ControlGroup", "--value", check=False)
-            if group:
-                ops.require(group.startswith("/user.slice/user-1000.slice/user@1000.service/") and unit in group, "BLOCKED_AUTH_SCOPE_IDENTITY")
-                procs = Path("/sys/fs/cgroup") / group.lstrip("/") / "cgroup.procs"
-                ops.require(not procs.exists() or not procs.read_text().strip(), "BLOCKED_AUTH_SCOPE_CLEANUP")
-        except Exception:
-            errors.append(unit + ":process_readback")
+            scope_snapshot(host, unit)
+        except Exception as error:
+            errors.append(unit + (":budget_exhausted" if isinstance(error, ops.Refused) and str(error) == "BLOCKED_AUTH_CLEANUP_BUDGET" else ":readback"))
     return errors
 
 
 def stop_scopes(root, identifier):
     host, errors = ops.Host(root), []
+    # Each stop outcome has its own explicit final unit/process witness. A
+    # reaped or never-created unit is idempotently clean; loaded stop failure
+    # remains failure even when its cgroup happens to be empty.
     for unit in owned_units(identifier):
+        failed = False
         try:
-            host.system("stop", unit)  # nonzero/timeout is retained, not ignored
+            failed = host.command(["systemctl", "--user", "stop", unit], check=False).returncode != 0
         except Exception:
-            errors.append(unit + ":stop")
-    errors.extend(scope_readbacks(root, identifier))
+            failed = True
+        try:
+            absent = scope_snapshot(host, unit)
+            if failed and not absent:
+                errors.append(unit + ":stop")
+        except Exception as error:
+            if failed:
+                errors.append(unit + ":stop")
+            errors.append(unit + (":budget_exhausted" if isinstance(error, ops.Refused) and str(error) == "BLOCKED_AUTH_CLEANUP_BUDGET" else ":readback"))
     return errors
 
 
@@ -236,9 +261,9 @@ def stop_owned_core(root, saved):
         signal.pidfd_send_signal(fd, signal.SIGTERM)
     finally:
         os.close(fd)
-    end = time.monotonic() + 5
+    end = time.monotonic() + ops.bounded_timeout(5)
     while ops.witness(saved["pid"]) is not None and time.monotonic() < end:
-        time.sleep(.1)
+        time.sleep(ops.bounded_timeout(.1))
     ops.require(ops.witness(saved["pid"]) is None, "BLOCKED_AUTH_CORE_STILL_RUNNING")
 
 
@@ -248,7 +273,7 @@ def revoke(core, login=None):
     cancel:false and process exit never prove keyring revocation. Logout also
     clears the provider's pending flow. No normal/default backend is reachable.
     """
-    core.ready()  # settings restoration may have stopped Agent; same realm only
+    core.ready(for_revoke=True)  # disabled old generation may still be draining
     if type(login) is dict and type(login.get("login_id")) is str:
         try:
             core.call("agent.providers.cancel_login", {**PROVIDER, "login_id": login["login_id"]}, timeout=5)
@@ -509,65 +534,100 @@ def revoke_live_core(root, state):
     return True
 
 
+# One deadline strictly inside the existing 180s ExecStopPost limit. Phase
+# caps sum to140s; reserve10s for result writes and controller overhead. Slow
+# I/O gets remaining time, never a fresh per-command180s allowance.
+CLEANUP_SECONDS, CLEANUP_TAIL = 150, 10
+CLEANUP_PHASES = {
+    "bridge_keys": 1, "bridge_transport": 1, "prepare_deadline_timer": 2,
+    "live_auth_revocation": 35, "scope_stop": 25, "core_stop": 7,
+    "scope_final_readback": 15, "core_final_readback": 2,
+    "backend_final_readback": 2, "auth_revocation": 35,
+    "normal_final_readback": 15,
+}
+
+
 def cleanup(root, host):
+    end = time.monotonic() + CLEANUP_SECONDS
     state = ops.read(root / "auth-state.json")
     errors = list(state.get("cleanup_errors", state.get("resource_errors", [])))
-    def attempt(name, fn):
-        try:
-            result = fn()
-            if isinstance(result, list):
-                errors.extend(result)
-            return result
-        except Exception as error:
-            errors.extend(error.errors if isinstance(error, CleanupFailed) else [name])
+    pending = list(CLEANUP_PHASES)
+    steps = {}
+    # Initial write is fail-closed even if a kill interrupts the first action.
+    def persist(in_progress=True):
+        state.update(cleanup_in_progress=in_progress, cleanup_pending=list(pending), cleanup_steps=dict(steps),
+                     native_stopped=False, cleanup_errors=list(dict.fromkeys(errors + (["cleanup_incomplete"] if in_progress else []))))
+        ops.write(root / "auth-state.json", state)
+    persist()
+
+    def attempt(name, fn, enabled=True):
+        if not enabled:
+            steps[name] = "not_applicable"
+        else:
+            # Earlier auth/scope work cannot spend the independent cleanup
+            # tail. Reopening/logout cannot spend the normal readback tail.
+            reserve = 60 if name in ("bridge_keys", "bridge_transport", "prepare_deadline_timer", "live_auth_revocation", "scope_stop") else 25
+            if name == "normal_final_readback":
+                reserve = CLEANUP_TAIL
+            phase_end = min(end - reserve, time.monotonic() + CLEANUP_PHASES[name])
+            token = ops.AUTH_CLEANUP_END.set(phase_end)
+            try:
+                ops.bounded_timeout(1)
+                result = fn()
+                if isinstance(result, list):
+                    errors.extend(result)
+                steps[name] = "failed" if isinstance(result, list) and result else "passed"
+            except Exception as error:
+                errors.extend(error.errors if isinstance(error, CleanupFailed) else [name])
+                steps[name] = "failed"
+            finally:
+                ops.AUTH_CLEANUP_END.reset(token)
+            if time.monotonic() >= phase_end:
+                errors.append(name + ":budget_exhausted")
+                steps[name] = "budget_exhausted"
+        pending.remove(name)
+        persist()  # never lose an earlier failure to a later hung step
+
     if state.get("auth_lifecycle", "none") not in ("none", "pending", "completed", "unknown", "revoked"):
         errors.append("auth_lifecycle_unknown")
-    # Keys are disposed even when native cleanup fails; no exception values.
+    def needs_revocation():
+        return state.get("status") != "verified" and state.get("auth_lifecycle") in ("pending", "completed", "unknown")
     attempt("bridge_keys", lambda: bridge.erase_keys(root / "auth-bridge", "client"))
     attempt("bridge_transport", lambda: (root / "auth-transport.json").unlink(missing_ok=True))
     attempt("prepare_deadline_timer", lambda: host.system("stop", "ditto-g3-auth-lease-q" + root.name[1:] + ".timer", check=False))
-    if state.get("status") != "verified" and state.get("auth_lifecycle") in ("pending", "completed", "unknown"):
-        attempt("live_auth_revocation", lambda: revoke_live_core(root, state))
+    attempt("live_auth_revocation", lambda: revoke_live_core(root, state), needs_revocation())
     attempt("scope_stop", lambda: stop_scopes(root, root.name[1:]))
     attempt("core_stop", lambda: stop_owned_core(root, state.get("core_witness")))
     attempt("scope_final_readback", lambda: scope_readbacks(root, root.name[1:]))
     saved = state.get("core_witness")
-    if saved:
-        attempt("core_final_readback", lambda: ops.require(ops.witness(saved["pid"]) is None, "BLOCKED_AUTH_CORE_STILL_RUNNING"))
+    attempt("core_final_readback", lambda: ops.require(ops.witness(saved["pid"]) is None, "BLOCKED_AUTH_CORE_STILL_RUNNING"), bool(saved))
     backend = state.get("native_runtime", {}).get("backend_witness")
-    if backend:
-        attempt("backend_final_readback", lambda: ops.require(ops.witness(backend["pid"]) is None, "BLOCKED_AUTH_BACKEND_STILL_RUNNING"))
-    # On abrupt supervisor death pending/possibly completed keyring auth is
-    # not assumed revoked. Reopen ONLY this sole initialized fresh realm,
-    # after exact owned processes/scopes are proved stopped, using same paths.
-    if state.get("status") != "verified" and state.get("auth_lifecycle") in ("pending", "completed", "unknown"):
-        if not errors:
-            try:
-                built = ops.verify_stage(root)
-                ops.require(state.get("source") == ops.SOURCE and state.get("ops_sha") == built["ops_sha"], "BLOCKED_AUTH_BINDING")
-                realm = realm_path(root.name[1:])
-                ops.require(state.get("realm") == str(realm), "BLOCKED_AUTH_BINDING")
-                realm_guard(realm)
-                runtime = ops.RUNTIME / ("ditto-g3-auth-q" + root.name[1:])
-                ops.require(runtime == runtime.resolve(), "BLOCKED_AUTH_RUNTIME_ALIAS")
-                for name in ("relay.sock", "core.sock"):
-                    (runtime / name).unlink(missing_ok=True)
-                with NativeCore(root, realm, root.name[1:]) as core:
-                    core.ready()
-                    revoke(core)
-                    state.update(auth_lifecycle="revoked")
-                state["core_witness"] = ops.read(root / "auth-state.json")["core_witness"]
-            except Exception:
-                errors.append("auth_revocation")
-        else:
-            errors.append("auth_revocation_unproved")
+    attempt("backend_final_readback", lambda: ops.require(ops.witness(backend["pid"]) is None, "BLOCKED_AUTH_BACKEND_STILL_RUNNING"), bool(backend))
+
+    def revoke_stopped_realm():
+        ops.require(not errors, "BLOCKED_AUTH_REVOCATION_UNPROVED")
+        built = ops.verify_stage(root)
+        ops.require(state.get("source") == ops.SOURCE and state.get("ops_sha") == built["ops_sha"], "BLOCKED_AUTH_BINDING")
+        realm = realm_path(root.name[1:])
+        ops.require(state.get("realm") == str(realm), "BLOCKED_AUTH_BINDING")
+        realm_guard(realm)
+        runtime = ops.RUNTIME / ("ditto-g3-auth-q" + root.name[1:])
+        ops.require(runtime == runtime.resolve(), "BLOCKED_AUTH_RUNTIME_ALIAS")
+        for name in ("relay.sock", "core.sock"):
+            (runtime / name).unlink(missing_ok=True)
+        with NativeCore(root, realm, root.name[1:]) as core:
+            revoke(core)
+            state.update(auth_lifecycle="revoked")
+        state["core_witness"] = ops.read(root / "auth-state.json")["core_witness"]
+    attempt("auth_revocation", revoke_stopped_realm, needs_revocation())
     if state.get("revocation_error"):
-        errors.append("auth_revocation_failed")  # failures remain sticky
+        errors.append("auth_revocation_failed")
     attempt("normal_final_readback", lambda: ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED"))
     if state.get("status") not in ("verified", "blocked", "needs_human"):
         state.update(status="blocked", reason="BLOCKED_AUTH_INTERRUPTED_OR_EXPIRED")
     errors = list(dict.fromkeys(errors))
-    state.update(native_stopped=not errors, cleanup_errors=errors)
+    persist(False)
+    state.update(native_stopped=not errors)
     if errors:
         state.update(status="needs_human", model_verified=False)
     ops.write(root / "auth-state.json", state)

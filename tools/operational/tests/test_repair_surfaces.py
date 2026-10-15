@@ -124,16 +124,18 @@ class Surfaces(unittest.TestCase):
         self.assertNotIn('TEST-1234',json.dumps(result))
     def scopes(self, failure):
         events=[]
-        def system(*args,**kw):
-            events.append(args)
-            if args[0]=='stop' and args[1].endswith('-agent.scope') and failure!='residual':
+        def command(argv, **kw):
+            action, unit = argv[2], argv[3]
+            events.append((action, unit))
+            if action=='stop' and unit.endswith('-agent.scope') and failure!='residual':
                 raise subprocess.TimeoutExpired('TEST ONLY',1) if failure=='timeout' else o.Refused('TEST ONLY')
-            if args[0]=='is-active': return 'active' if failure=='residual' and args[1].endswith('-agent.scope') else 'inactive'
-            return ''
-        host=Mock();host.system.side_effect=system
+            if action=='stop': return subprocess.CompletedProcess(argv,0,'','')
+            active = 'active' if failure=='residual' and unit.endswith('-agent.scope') else 'inactive'
+            return subprocess.CompletedProcess(argv,0,'LoadState=loaded\nActiveState='+active+'\nControlGroup=\n','')
+        host=Mock();host.command.side_effect=command
         with patch.object(o,'Host',return_value=host): errors=a.stop_scopes(self.root,ID)
         self.assertEqual([e[1] for e in events if e[0]=='stop'],a.owned_units(ID))
-        self.assertEqual([e[1] for e in events if e[0]=='is-active'],a.owned_units(ID))
+        self.assertEqual([e[1] for e in events if e[0]=='show'],a.owned_units(ID))
         self.assertTrue(errors)
     def test_first_scope_raises_later_scopes_and_readbacks_attempted(self): self.scopes('raises')
     def test_first_scope_timeout_later_scopes_and_readbacks_attempted(self): self.scopes('timeout')
@@ -290,15 +292,17 @@ class FinalLifecycleEdges(unittest.TestCase):
         self.assertFalse(calls[-1][1]['settings']['enabled'])
     def test_revoke_rechecks_ready_after_disabled_preferences(self):
         events=[];core=RealmCore();core.authenticated=True;call=core.call
-        core.ready=lambda: events.append('ready')
+        core.ready=lambda **kw: events.append('ready')
         core.call=lambda method,*args,**kw: (events.append(method),call(method,*args,**kw))[1]
         a.revoke(core)
         self.assertEqual(events,['ready','agent.providers.logout','agent.providers.status'])
         self.assertFalse(core.authenticated)
     def test_scope_active_error_does_not_skip_process_readback(self):
         host=Mock();events=[]
-        def system(*args,**kw): events.append(args);return 'active' if args[0]=='is-active' else ''
-        host.system.side_effect=system
+        def command(argv, **kw):
+            events.append((argv[2],argv[3]))
+            return subprocess.CompletedProcess(argv,0,'LoadState=loaded\nActiveState=active\nControlGroup=\n','')
+        host.command.side_effect=command
         with patch.object(o,'Host',return_value=host): errors=a.scope_readbacks(self.root,ID)
         self.assertEqual(len(errors),3)
         self.assertEqual([e[1] for e in events if e[0]=='show'],a.owned_units(ID))

@@ -18,7 +18,7 @@ class RealmCore:
     def __init__(self):
         self.authenticated = False
         self.calls = []
-    def ready(self):
+    def ready(self, **kwargs):
         return {'test_only': True}
     def call(self, method, params=None, **kw):
         self.calls.append(method)

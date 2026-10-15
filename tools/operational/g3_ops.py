@@ -7,6 +7,7 @@ Private state/logs stay host-local; publish() constructs a small typed receipt.
 """
 import argparse
 from contextlib import closing
+from contextvars import ContextVar
 import difflib
 import fcntl
 import hashlib
@@ -42,6 +43,21 @@ HERE = Path(__file__).resolve().parent
 SECRET = re.compile(r"(?i)(SECRET_SENTINEL|BEGIN .*PRIVATE KEY|Bearer\s|sk-[a-z0-9]|gh[pousr]_|authorization\s*:|access_token|refresh_token)")
 
 
+# Set only during this task's auth cleanup/readiness. Never exported to child
+# environments or persisted as a credential/configuration override.
+AUTH_CLEANUP_END = ContextVar("g3_auth_cleanup_end", default=None)
+
+
+def bounded_timeout(cap):
+    require(cap > 0, "BLOCKED_AUTH_CLEANUP_BUDGET")
+    end = AUTH_CLEANUP_END.get()
+    if end is None:
+        return cap
+    remaining = end - time.monotonic()
+    require(remaining > 0, "BLOCKED_AUTH_CLEANUP_BUDGET")
+    return min(cap, remaining)
+
+
 class Refused(RuntimeError):
     pass
 
@@ -55,6 +71,7 @@ def sha(path):
     h = hashlib.sha256()
     with Path(path).open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
+            bounded_timeout(1)  # fail closed if task cleanup budget expired
             h.update(block)
     return h.hexdigest()
 
@@ -89,13 +106,13 @@ def run_root(identifier):
 
 
 def schema(database):
-    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True)) as conn:
+    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=bounded_timeout(5))) as conn:
         return conn.execute("PRAGMA user_version").fetchone()[0]
 
 
 def assert_source(root, receipt=None):
-    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    dirty = subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"])
+    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True, timeout=bounded_timeout(10) if AUTH_CLEANUP_END.get() is not None else None).strip()
+    dirty = subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], timeout=bounded_timeout(10) if AUTH_CLEANUP_END.get() is not None else None)
     require(head == SOURCE and not dirty, "source mismatch or candidate changed")
     require(receipt is None or receipt.get("source") == head, "source/receipt mismatch")
 
@@ -209,18 +226,44 @@ def worker_gate(origin, workers):
     return current is None and not workers
 
 
-def wait_ready(call, timeout=30):
-    """Bounded local runtime readback; relay exposes no readiness event."""
-    end = time.monotonic() + timeout
-    call("agent.runtime.ensure")
-    while time.monotonic() < end:
-        runtime = call("agent.runtime.get")
-        phase = runtime.get("phase")
-        if phase == "ready":
-            return runtime
-        require(phase in ("starting",), "Agent failed/cancelled/unknown before ready")
-        time.sleep(.2)
-    raise Refused("Agent readiness deadline")
+def wait_ready(call, timeout=30, *, allow_draining=False):
+    """Only revocation may finish a disabled old generation before ensure.
+
+    The public relay has no readiness event. This is one bounded transition,
+    not a login/model retry. A second ensure is legal only after old stopped.
+    """
+    end = time.monotonic() + bounded_timeout(timeout)
+    token = AUTH_CLEANUP_END.set(end)
+    try:
+        initial = call("agent.runtime.ensure")
+        draining = initial.get("phase") == "draining"
+        require(not draining or allow_draining, "Agent draining before ready")
+        restarted = False
+        while time.monotonic() < end:
+            runtime = call("agent.runtime.get")
+            phase = runtime.get("phase")
+            if phase == "ready":
+                require(not draining, "old draining generation did not stop")
+                return runtime
+            if phase == "draining":
+                require(allow_draining and not restarted, "Agent draining before ready")
+                draining = True
+            elif phase == "stopped":
+                require(allow_draining and draining and not restarted, "Agent stopped before ready")
+                # Core ensure preserves the fixed specification/realm and
+                # increments its generation. No alternate process/ref input.
+                call("agent.runtime.ensure")
+                restarted, draining = True, False
+            else:
+                require(phase == "starting" and not draining, "Agent failed/cancelled/unknown before ready")
+            time.sleep(min(.2, bounded_timeout(.2)))
+        raise Refused("Agent readiness deadline")
+    except Refused as error:
+        if str(error) == "BLOCKED_AUTH_CLEANUP_BUDGET":
+            raise Refused("Agent readiness deadline") from None
+        raise
+    finally:
+        AUTH_CLEANUP_END.reset(token)
 
 
 BOOTSTRAP_HASHES = {
@@ -249,7 +292,7 @@ class Host:
 
     def command(self, argv, timeout=10, check=True, env=None):
         try:
-            result = subprocess.run(argv, env=env or self.env, text=True, capture_output=True, timeout=timeout)
+            result = subprocess.run(argv, env=env or self.env, text=True, capture_output=True, timeout=bounded_timeout(timeout))
         except OSError:
             if check:
                 raise Refused("required command unavailable: " + Path(argv[0]).name)

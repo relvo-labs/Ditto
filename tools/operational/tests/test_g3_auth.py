@@ -28,7 +28,7 @@ class TestOnlyCore:
         self.logged_out = False
         self.login = {"login_id": "TEST_ONLY_LOGIN", "auth_url": "https://auth.openai.com/codex/device", "user_code": CODE, "expires_at_ms": b.now_ms() + 90_000}
 
-    def ready(self):
+    def ready(self, **kwargs):
         return {"test_only": True}
 
     def call(self, method, params=None, **kw):

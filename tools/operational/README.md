@@ -317,3 +317,45 @@ retained separately (old Listener fixture did not distinguish origin PID; one
 TEST ONLY shell witness had a syntax error); these are not new baseline REDs.
 The prior semantic FAIL and provider503 ledger remain unchanged. Independent
 delta review is required before parent uses any native phase.
+
+## Operations repair 2: scoped auth cleanup closure
+
+Review2 at85b954e was FAIL for B1/B2/B3; F4–F7 were independently fixed and
+are unchanged here. Durable `physical/ops-repair2/repair-plan.md` records the
+pre-fix decisions and counterexample names. Commands/phases and receiver
+crypto/quotas/templates remain unchanged.
+
+| Class | Readback / transition | Production sibling callers audited | Tests |
+| --- | --- | --- | --- |
+| A/B1 | nonzero stop is clean only with explicit not-found/inactive/no cgroup; empty output is unknown, loaded stop failure/residue fails | owned_units, scope_snapshot, stop_scopes, scope_readbacks; NativeCore.stop prepare/supervisor exit and cleanup/ExecStopPost | test_ops_repair2.test_A_absent_scopes_prepare_and_repeated_cleanup; test_ops_repair2_surfaces.test_A_* |
+| B/B2 | revoke may wait old draining→stopped, ensure same realm once, then starting→ready; failed/unknown/cancelled/deadline refuse | wait_ready, NativeCore.ready, device_flow, revoke, revoke_live_core, stopped-realm recovery, physical enter | test_ops_repair2.test_B_real_ready_drains_before_logout; test_ops_repair2_surfaces.test_B_* |
+| C/B3 | one150s cleanup deadline inside180s unit limit; phase caps and reserved cleanup/normal/write tail; incomplete/expired steps persisted | cleanup journal, Host.command, source checks/hash/schema, NativeCore socket/start/reap, stop_owned_core, normal provenance | test_ops_repair2.test_C_total_deadline_persists_attempt_all; test_ops_repair2_surfaces.test_C_* |
+
+Only revocation passes `for_revoke=True`; login/device_flow and physical enter
+keep strict starting→ready admission. Prepare does not start Agent/backend;
+its disabled initialization can now leave never-created scopes idempotently.
+Probe still makes one request only; preference restoration may drain Agent,
+and that legal old-generation transition no longer blocks logout. A second
+drain after restart refuses; no login/model retry or alternate realm exists.
+
+Cleanup phase caps sum140s with10s reserved for writes/overhead. Early auth/
+scope work cannot spend the last60s; later recovery cannot spend the last25s
+(normal readback15s plus write tail10s). Commands, the whole socket exchange,
+readiness, child waits, source checks and SQLite busy waits use remaining
+time. The existing auth-state is written fail-closed before effects and after
+each phase: cleanup_in_progress, cleanup_pending, cleanup_steps and errors.
+Budget exhaustion is explicit needs_human, never an inferred clean result.
+A kill retains cleanup_incomplete and unattempted names; successful repeated
+cleanup does not invent errors for reaped scopes. No new persistence layer.
+Kernel/filesystem stalls and real unit/keyring behavior still need native host
+proof; local virtual-clock tests establish cooperative budget/control logic.
+
+Repair2 gates: 3 unchanged counterexamples RED(exit1)/GREEN(exit0), prior7
+GREEN, full207 tests(exit0, including35 TLS tests), standalone35 loopback TLS
+selftest(exit0; overlaps full suite), Python AST/compile, bash syntax, unchanged
+manual workflow boundaries and git diff --check. Logs: durable
+`physical/ops-repair2/gates/`. One intermediate full run retained failures
+from old TEST ONLY adapters lacking the purpose flag/structured readback shape;
+assertions for the three new RED tests remain byte-identical on GREEN.
+Independent delta review remains required; real auth/Home/model/physical are
+not_run and these gates do not certify physical readiness.
