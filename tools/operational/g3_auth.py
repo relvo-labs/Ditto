@@ -79,6 +79,18 @@ def core_contract(root, realm, identifier):
     return argv, env, runtime
 
 
+def record_failure(root, error, fallback):
+    """Persist first closed cause before effects; cleanup has a separate field."""
+    state = ops.read(root / "auth-state.json")
+    if state.get("reason") is None:
+        state["reason"] = diag.exception_reason(error, fallback)
+    if isinstance(error, CleanupFailed):
+        state["resource_errors"] = list(dict.fromkeys(state.get("resource_errors", []) + error.errors))
+        state["status"] = "needs_human"
+    ops.write(root / "auth-state.json", state)
+    return diag.reason(state["reason"])
+
+
 class NativeCore:
     def __init__(self, root, realm, identifier):
         self.root, self.realm, self.identifier = root, realm, identifier
@@ -89,13 +101,13 @@ class NativeCore:
         ops.require(self.runtime.stat().st_mode & 0o777 == 0o700 and not any((self.runtime / n).exists() for n in ("core.sock", "relay.sock")), "BLOCKED_AUTH_RUNTIME_IN_USE")
 
     def __enter__(self):
-        self.child = subprocess.Popen(self.argv, cwd=self.root / "candidate", env=self.env,
-                                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        self.saved = ops.witness(self.child.pid)
-        state = ops.read(self.root / "auth-state.json")
-        state["core_witness"] = self.saved
-        ops.write(self.root / "auth-state.json", state)
         try:
+            self.child = subprocess.Popen(self.argv, cwd=self.root / "candidate", env=self.env,
+                                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            self.saved = ops.witness(self.child.pid)
+            state = ops.read(self.root / "auth-state.json")
+            state["core_witness"] = self.saved
+            ops.write(self.root / "auth-state.json", state)
             end = time.monotonic() + ops.bounded_timeout(30)
             while time.monotonic() < end:
                 ops.require(self.child.poll() is None, "BLOCKED_NATIVE_CORE_START")
@@ -103,9 +115,13 @@ class NativeCore:
                     return self
                 time.sleep(.1)
             raise ops.Refused("BLOCKED_NATIVE_CORE_START")
-        except BaseException:
-            self.stop()
-            raise
+        except BaseException as error:
+            reason = record_failure(self.root, error, "BLOCKED_NATIVE_CORE_START")
+            try:
+                self.stop()
+            except CleanupFailed as cleanup_error:
+                record_failure(self.root, cleanup_error, "BLOCKED_AUTH_CLEANUP")
+            raise ops.Refused(reason) from None
 
     def call(self, method, params=None, timeout=20):
         # Only a task-owned Unix socket. No shell, provider body, or code in
@@ -183,8 +199,17 @@ class NativeCore:
         if errors:
             raise CleanupFailed(errors)
 
-    def __exit__(self, *args):
-        self.stop()
+    def __exit__(self, kind, error, traceback):
+        if error is not None:
+            record_failure(self.root, error, "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
+        try:
+            self.stop()
+        except CleanupFailed as cleanup_error:
+            record_failure(self.root, cleanup_error, "BLOCKED_AUTH_CLEANUP")
+            if error is None:
+                raise
+            # Returning false propagates the original failure, never stop's.
+        return False
 
 
 class CleanupFailed(ops.Refused):
@@ -334,11 +359,16 @@ def prepare(root, host):
                       "--property=Type=oneshot", "--property=RuntimeMaxSec=180", "--property=StandardOutput=null", "--property=StandardError=null",
                       "/usr/bin/python3", str(helper), "auth_cleanup", "--id", identifier])
         return receipt
-    except Exception:
-        state.update(status="blocked", reason="BLOCKED_AUTH_PREPARE")
+    except Exception as error:
+        reason = record_failure(root, error, "BLOCKED_AUTH_PREPARE")
+        try:
+            bridge.erase_keys(directory, "client")
+        except Exception:
+            record_failure(root, CleanupFailed(["bridge_keys"]), "BLOCKED_AUTH_CLEANUP")
+        state = ops.read(root / "auth-state.json")
+        state["status"] = "needs_human" if state.get("resource_errors") else "blocked"
         ops.write(root / "auth-state.json", state)
-        bridge.erase_keys(directory, "client")
-        raise ops.Refused("BLOCKED_AUTH_PREPARE") from None
+        raise ops.Refused(reason) from None
 
 
 def minimal_probe(core):
@@ -456,6 +486,8 @@ def supervisor(root, host):
     state = ops.read(root / "auth-state.json")
     transport = receipt = None
     def update(**safe):
+        # NativeCore may have recorded a start/exit failure independently.
+        state.update(ops.read(root / "auth-state.json"))
         if "reason" in safe:
             if state.get("reason") is not None:
                 safe.pop("reason")  # original first failure is sticky
@@ -486,7 +518,8 @@ def supervisor(root, host):
                 realm_guard(realm)
                 ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED")
                 transport.post("/status", {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"], "status": "verified"})
-            except BaseException:
+            except BaseException as error:
+                update(reason=diag.exception_reason(error, "BLOCKED_AUTH_OR_MODEL_VERIFICATION"))
                 if state.get("auth_lifecycle") != "revoked":
                     try:
                         revoke(core)
@@ -497,9 +530,9 @@ def supervisor(root, host):
         update(status="verified", native_stopped=True, auth_method="chatgpt_subscription",
                database_sha256=ops.sha(realm / "data/core.db"), evidence_class="native-core-auth-verified")
     except BaseException as error:
+        record_failure(root, error, "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
+        state.update(ops.read(root / "auth-state.json"))
         reason = diag.exception_reason(error, "BLOCKED_AUTH_OR_MODEL_VERIFICATION")
-        if isinstance(error, CleanupFailed):
-            update(resource_errors=error.errors)
         update(status="needs_human" if state.get("revocation_error") or state.get("resource_errors") else "blocked", reason=state.get("reason", reason))  # original failure retained
         try:
             if transport is not None and receipt is not None:
@@ -566,11 +599,16 @@ CLEANUP_PHASES = {
 def cleanup(root, host):
     end = time.monotonic() + CLEANUP_SECONDS
     state = ops.read(root / "auth-state.json")
-    errors = list(state.get("cleanup_errors", state.get("resource_errors", [])))
+    errors = list(dict.fromkeys(state.get("cleanup_errors", []) + state.get("resource_errors", [])))
     pending = list(CLEANUP_PHASES)
     steps = {}
     # Initial write is fail-closed even if a kill interrupts the first action.
     def persist(in_progress=True):
+        # Reopened NativeCore may record a failure during an attempt.
+        recorded = ops.read(root / "auth-state.json")
+        if state.get("reason") is None and recorded.get("reason") is not None:
+            state["reason"] = recorded["reason"]
+        errors.extend(v for v in recorded.get("resource_errors", []) if v not in errors)
         state.update(cleanup_in_progress=in_progress, cleanup_pending=list(pending), cleanup_steps=dict(steps),
                      native_stopped=False, cleanup_errors=list(dict.fromkeys(errors + (["cleanup_incomplete"] if in_progress else []))))
         ops.write(root / "auth-state.json", state)
@@ -640,7 +678,8 @@ def cleanup(root, host):
         errors.append("auth_revocation_failed")
     attempt("normal_final_readback", lambda: ops.require(host.normal() == state["normal_before"], "BLOCKED_NORMAL_PROVENANCE_CHANGED"))
     if state.get("status") not in ("verified", "blocked", "needs_human"):
-        state.update(status="blocked", reason="BLOCKED_AUTH_INTERRUPTED_OR_EXPIRED")
+        state.update(status="blocked")
+        state.setdefault("reason", "BLOCKED_AUTH_INTERRUPTED_OR_EXPIRED")
     errors = list(dict.fromkeys(errors))
     persist(False)
     state.update(native_stopped=not errors)

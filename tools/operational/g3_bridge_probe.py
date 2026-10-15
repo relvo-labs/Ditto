@@ -58,11 +58,19 @@ def prepare(root, identifier, host):
                       '--property=Type=oneshot','--property=RuntimeMaxSec=20','--property=StandardOutput=null','--property=StandardError=null',
                       '/usr/bin/python3',str(frozen/'g3_ops.py'),'bridge_probe_cleanup','--id',identifier])
         return receipt
-    except BaseException:
-        if (root / 'client').exists(): cleanup(root)
-        state.update(status='blocked', result='BLOCKED_PROBE_PREPARE')
+    except BaseException as error:
+        result = diag.exception_reason(error, 'BLOCKED_PROBE_PREPARE')
+        state.update(status='blocked', result=result)
+        ops.write(root/'probe-state.json',state)  # before potentially failing erase
+        errors = []
+        try:
+            erased = cleanup(root) if (root / 'client').exists() else True
+        except Exception:
+            erased = False
+            errors.append('BLOCKED_CLEANUP_PROBE_KEYS')
+        state.update(keys_erased=erased, cleanup_errors=errors)
         ops.write(root/'probe-state.json',state)
-        raise ops.Refused('BLOCKED_PROBE_PREPARE') from None
+        raise ops.Refused(result) from None
 
 def run(root, host, raw_transport):
     bridge.private_directory(root)
@@ -86,15 +94,18 @@ def run(root, host, raw_transport):
     except Exception as error:
         result = diag.exception_reason(error,'BLOCKED_PROBE_INPUT')
     finally:
+        state.update(result=result)
+        ops.write(root/'probe-state.json',state)  # first transport outcome before erase
+        errors = []
         try:
             erased = cleanup(root)
         except Exception:
             erased = False
-            result = 'BLOCKED_PROBE_CLEANUP'
-        state.update(status='complete', result=result, keys_erased=erased)
+            errors.append('BLOCKED_CLEANUP_PROBE_KEYS')
+        state.update(status='complete', result=result, keys_erased=erased, cleanup_errors=errors)
         ops.write(root/'probe-state.json',state)
     # No transport/cert/flow/account/code data in the result.
-    public = {'qualification_id':root.name[1:],'source':ops.SOURCE,'result':result,'keys_erased':erased,'provider_called':False,'home_called':False}
+    public = {'qualification_id':root.name[1:],'source':ops.SOURCE,'result':result,'keys_erased':erased,'cleanup_errors':errors,'provider_called':False,'home_called':False}
     ops.require(not ops.SECRET.search(json.dumps(public)), 'BLOCKED_UNLISTED_REASON')
     return public
 

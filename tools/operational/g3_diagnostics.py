@@ -96,7 +96,7 @@ REASONS = frozenset({
 })
 MARKERS = frozenset({"BLOCKED_UNLISTED_REASON","not_recorded", "supervisor_started", "transport_ready", "native_ready", "preauth_checked", "login_requested", "payload_validated", "code_forwarded", "awaiting_browser", "login_complete", "probe_done"})
 LIFECYCLES = frozenset({"BLOCKED_UNLISTED_REASON","not_recorded", "none", "pending", "completed", "unknown", "revoked"})
-CLEANUP_STEPS = frozenset({'scope_final_readback', 'auth_lifecycle_unknown', 'auth_revocation_failed', 'core_readback', 'bridge_transport', 'live_auth_revocation', 'scope_readback', 'normal_final_readback', 'cleanup_incomplete', 'scope_stop', 'core_stop', 'auth_revocation', 'prepare_deadline_timer', 'bridge_keys', 'runtime_stop', 'core_final_readback', 'backend_final_readback', 'auth_revocation_unproved'})
+CLEANUP_STEPS = frozenset({'probe_keys', 'scope_final_readback', 'auth_lifecycle_unknown', 'auth_revocation_failed', 'core_readback', 'bridge_transport', 'live_auth_revocation', 'scope_readback', 'normal_final_readback', 'cleanup_incomplete', 'scope_stop', 'core_stop', 'auth_revocation', 'prepare_deadline_timer', 'bridge_keys', 'runtime_stop', 'core_final_readback', 'backend_final_readback', 'auth_revocation_unproved'})
 CLEANUP_CODES = frozenset({"BLOCKED_CLEANUP_" + name.upper() for name in CLEANUP_STEPS} | {"BLOCKED_CLEANUP_SCOPE_STOP", "BLOCKED_CLEANUP_SCOPE_READBACK", "BLOCKED_CLEANUP_BUDGET_EXHAUSTED", "BLOCKED_UNLISTED_REASON"})
 
 

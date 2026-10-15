@@ -466,3 +466,40 @@ and repair2 surfaces=16 all exit0; full237 tests exit0; standalone selftest44
 tests exit0 (includes real loopback TLS and overlaps the full suite). Python
 AST/compile, bash syntax, YAML/embedded-shell parse, phase-only workflow diff
 and git diff checks exit0. No native/live readiness claim.
+
+## Diagnostics repair: preserve the first failure through cleanup
+
+Review4 at c40e670 is FAIL for F1/F2; D1/D3/D4/E2/E3 remain closed.
+Auth now records the first closed reason before revocation, context exit and
+start-failure stop. NativeCore cleanup errors accumulate separately and force
+needs_human; prepare and supervisor reload that state rather than overwriting
+it with a wrapper error. Cleanup merges reopened-Core failures and retains an
+earlier cause when marking an interrupted operation blocked.
+
+| Row | Production siblings audited | Witness |
+| --- | --- | --- |
+| F1a | supervisor postflow/outer except/finally, device_flow revoke, NativeCore.__exit__/stop | test_ops_diag1_repair.test_F1_supervisor_postflow_then_exit_failure; repair_surfaces real_context_exit / successful_context_cleanup |
+| F1b | NativeCore.__enter__ (Popen/witness/readiness), prepare wrapper/key erase, cleanup persist/attempt/reopened Core | test_F1_start_then_stop_failure; repair_surfaces popen_failure / auth_prepare_wrapper / cleanup_merges |
+| F2 | probe run/finally, prepare failure/erase, cleanup and cleanup phase | test_F2_probe_transport_then_key_failure; repair_surfaces probe_prepare_failure / probe_success_transport |
+| unchanged | minimal_probe original_failure/finally, device_flow first-reason update; g3_ops auth_supervise/auth_cleanup and constant-only outer reporting | existing repair/diagnostics suites plus closed catalog witness |
+
+Probe `result` describes the transport outcome, including PROBE_OK even if
+later deletion fails. Always inspect `keys_erased` and `cleanup_errors` too:
+failed deletion returns false and BLOCKED_CLEANUP_PROBE_KEYS separately.
+It is not a fully clean probe. The first transport result is persisted before
+erasure. Probe prepare similarly persists its failure before attempting erase.
+Only this cleanup constant is added; reasons, markers, TLS, routing, quotas,
+workflow inputs, source17f and normal runtime are unchanged.
+
+Evidence: durable `physical/ops-diag1-repair/gates/`. The three specified
+counterexamples have no pre-filled reason and stay byte-identical RED→GREEN.
+Sibling tests are TEST ONLY injected API/process/file failures. No native
+account, Home, model or physical evidence is produced; independent delta review
+is still required before parent use.
+
+Diagnostics repair local gates: required RED3 exit1 (failures3/errors0),
+byte-identical GREEN3 exit0; sibling8 exit0; prior five suites47 exit0;
+full248 exit0; standalone bridge selftest44 exit0 (real loopback TLS plus
+logic, overlapping full suite). Python AST/compile19 files, bash syntax,
+workflow YAML/manual inputs/embedded shell and git diff --check all exit0.
+No product/workflow bytes changed. These are logic and loopback evidence only.
