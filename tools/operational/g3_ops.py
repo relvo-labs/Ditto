@@ -67,6 +67,14 @@ def require(ok, reason):
         raise Refused(reason)
 
 
+def core_result(value, reason="BLOCKED_NATIVE_MANAGED_API"):
+    """Remove only Core's top-level ResultMeta, never application fields."""
+    if type(value) is not dict:
+        return value  # the caller's existing shape guard remains authoritative
+    require("_meta" not in value or type(value["_meta"]) is dict, reason)
+    return {key: item for key, item in value.items() if key != "_meta"}
+
+
 def sha(path):
     h = hashlib.sha256()
     with Path(path).open("rb") as stream:
@@ -315,7 +323,7 @@ class Host:
         result = self.command(["python3", str(helper), "relay", method, json.dumps(params or {})], timeout=budget)
         reply = json.loads(result.stdout)
         require("error" not in reply, "relay refused " + method)
-        return reply["result"]
+        return core_result(reply["result"])
 
     def private_relay(self, method, params=None):
         state = read(self.root / "state.json")
@@ -464,8 +472,7 @@ class Host:
         self.private_relay("desktop.changes.propose", {"base_revision": current["profile"]["head_revision"],
                    "ops": [{"op": "switch_profile", "to_profile": target["profile"]["profile_id"], "to_revision": target["profile"]["head_revision"]}],
                    "idempotency_key": "ops-private-restore-" + self.root.name + "-" + state["mode"]})
-        settings = dict(before["preferences"])
-        settings.pop("_meta", None)
+        settings = core_result(before["preferences"])
         settings["revision"] = self.private_relay("agent.settings.describe")["revision"]
         self.private_relay("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
         grants = self.private_relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]
@@ -475,7 +482,7 @@ class Host:
                 self.private_relay("desktop.permissions.revoke", {"grant_id": grant["grant_id"]})
         after = self.private_relay("desktop.profiles.get")
         require(after["profile"]["profile_id"] == target["profile"]["profile_id"] and after["revision"]["document_sha256"] == target["revision"]["document_sha256"], "private profile restore mismatch")
-        normalize = lambda p: {k: v for k, v in p.items() if k not in ("revision", "_meta")}
+        normalize = lambda p: {k: v for k, v in core_result(p).items() if k != "revision"}
         require(normalize(self.private_relay("agent.settings.describe")) == normalize(before["preferences"]), "private settings restore mismatch")
         after_grants = self.private_relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]
         require(all(g["grant_id"] in original or g.get("revoked_at") for g in after_grants), "private test grants remain")
@@ -723,7 +730,7 @@ def enter(root, host):
     if mode == "full":
         wait_ready(host.private_relay)
     directory = root / "evidence" / mode
-    write(directory / "private-before.json", {"profile": host.private_relay("desktop.profiles.get"), "preferences": host.private_relay("agent.settings.describe"),
+    write(directory / "private-before.json", {"profile": core_result(host.private_relay("desktop.profiles.get")), "preferences": core_result(host.private_relay("agent.settings.describe")),
           "grant_ids": [g["grant_id"] for g in host.private_relay("desktop.permissions.list", {"subject": "agent", "include_revoked": True})["grants"]]})
     if mode == "full":
         require(host.private_relay("agent.providers.status", {"provider": "codex-app-server"}).get("authenticated") is True, "BLOCKED_EXISTING_SUBSCRIPTION_AUTH: no model call")

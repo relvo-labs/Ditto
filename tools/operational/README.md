@@ -503,3 +503,46 @@ full248 exit0; standalone bridge selftest44 exit0 (real loopback TLS plus
 logic, overlapping full suite). Python AST/compile19 files, bash syntax,
 workflow YAML/manual inputs/embedded shell and git diff --check all exit0.
 No product/workflow bytes changed. These are logic and loopback evidence only.
+
+## Core result envelope repair (Class G)
+
+Observed qualification38668800746 failed BLOCKED_DEVICE_LOGIN_METHOD after a
+valid provider response because pinned17f Core inserts ResultMeta under _meta
+in EVERY object result (lib.rs dispatch; ditto-protocol ResultMeta). This does
+not authorize another live login in this writer. The prior failed receipt and
+revocation evidence remain unchanged.
+
+`g3_ops.core_result` removes only top-level _meta and requires it to be a dict
+when present. It keeps every application field. NativeCore.call and Host.relay
+normalize at their transport boundaries; device_flow also normalizes before
+its unchanged exact four-key guard. Unknown application keys still refuse.
+No metadata is forwarded, saved in snapshots or replayed as settings.
+
+| Row / audited siblings | Effect / witness |
+| --- | --- |
+| G1 login | valid envelope reaches real TEST ONLY loopback receiver/sender; malformed meta and unknown fields refuse: test_ops_meta_repair.test_G1_* |
+| G2 NativeCore.call / Host.relay | normalization at socket/command boundaries: test_native_socket_boundary, test_native_bad_login_meta_preserves_method_code, test_host_relay_boundary |
+| status_guard/model_guard/logout/cancel | selected-field checks unaffected; no whole result stored; realistic Core + prior lifecycle tests |
+| runtime ensure/get/ready | phase checks unaffected; NativeCore.ready selects its proof fields, physical wait discards result: test_runtime_envelope + prior readiness tests |
+| settings describe/patch/restore | existing stripping uses shared helper, validation added: test_settings_probe_envelope |
+| session/turn/trace/events and profile comparisons | selected nested fields unaffected; no whole result exported: test_settings_probe_envelope |
+| physical enter snapshots / restore_private | whole profile/preferences would retain meta; snapshot and legacy preferences normalized: test_physical_snapshot_envelope + prior restore tests |
+| collect/publish / g3_bridge_probe | explicit allowlisted receipt / no Core calls; no envelope change needed; prior sanitizer/probe/TLS tests |
+| G3 fixtures | RealmCore and TestOnlyCore wrap every object result like pinned17f: test_fake_envelope_contract; all prior tests |
+
+Evidence under durable `physical/ops-meta-repair/gates/`. Initial test setup
+corrections (status-message count and matching the JSON key rather than a temp
+path substring) are retained as failures. Final test bytes were rerun against
+frozen c631b88 production files and the repair unchanged; red-binding.json
+records the baseline production hashes. All Core/provider/process adapters
+are TEST ONLY; TLS uses loopback and an in-memory sender. Real auth/Home/model/
+physical remain not_run, with independent delta review required before use.
+
+Class G final local gates: four unchanged envelope counterexamples RED exit1
+(failures2/errors0, two rejection cases already pass), then GREEN4 exit0;
+eight sibling tests exit0; required prior seven suites58 exit0; full260 exit0;
+standalone TLS selftest44 exit0 (overlapping full suite). The two valid-envelope
+cases perform actual loopback mTLS forwarding with a TEST ONLY sender. Python
+AST/compile21 files, bash syntax and git diff --check exit0. A sibling fixture
+attribute mismatch was corrected to assert provider status readback; its full
+and targeted failure logs are retained. No product/workflow bytes changed.

@@ -21,6 +21,13 @@ class RealmCore:
     def ready(self, **kwargs):
         return {'test_only': True}
     def call(self, method, params=None, **kw):
+        value = self._result(method, params, **kw)
+        # Pinned17f Core dispatch wraps EVERY object result; no native proof.
+        if type(value) is dict:
+            return {**value, "_meta": {"observed_seq": 1, "profile_revision": None,
+                                      "readback_verified": False, "handled_us": 1}}
+        return value
+    def _result(self, method, params=None, **kw):
         self.calls.append(method)
         if method == 'agent.providers.status':
             return {'available': True, 'provider': 'codex-app-server', 'authenticated': self.authenticated,

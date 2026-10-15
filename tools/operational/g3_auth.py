@@ -142,7 +142,7 @@ class NativeCore:
         try:
             reply = json.loads(raw.split(b"\n", 1)[0])
             ops.require("error" not in reply and "result" in reply, "BLOCKED_DEVICE_LOGIN_PROVIDER" if method == "agent.providers.login" else "BLOCKED_NATIVE_MANAGED_API")
-            return reply["result"]
+            return ops.core_result(reply["result"], "BLOCKED_DEVICE_LOGIN_METHOD" if method == "agent.providers.login" else "BLOCKED_NATIVE_MANAGED_API")
         except (ValueError, TypeError):
             raise ops.Refused("BLOCKED_NATIVE_MANAGED_API") from None
 
@@ -338,8 +338,7 @@ def prepare(root, host):
         state["pinned_help_sha256"] = hashlib.sha256(help_text.encode()).hexdigest()
         with NativeCore(root, realm, identifier) as core:
             state.update(ops.read(root / "auth-state.json"))
-            settings = core.call("agent.settings.describe")
-            settings.pop("_meta", None)
+            settings = ops.core_result(core.call("agent.settings.describe"))
             settings.update(provider="codex-app-server", model=MODEL, reasoning_effort=EFFORT, enabled=False)
             core.call("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
             core.call("desktop.profiles.get")
@@ -372,8 +371,8 @@ def prepare(root, host):
 
 
 def minimal_probe(core):
-    original = core.call("agent.settings.describe")
-    settings = {k: v for k, v in original.items() if k != "_meta"}
+    original = ops.core_result(core.call("agent.settings.describe"))
+    settings = dict(original)
     settings.update(enabled=True, provider="codex-app-server", model=MODEL, reasoning_effort=EFFORT, turn_timeout_ms=30000, max_tool_calls=1, approval_mode="never")
     turn = None
     original_failure = None
@@ -422,7 +421,7 @@ def minimal_probe(core):
             except Exception:
                 cleanup_failed = True
         try:
-            settings = {k: v for k, v in original.items() if k != "_meta"}
+            settings = ops.core_result(original)
             settings["revision"] = core.call("agent.settings.describe")["revision"]
             core.call("agent.settings.patch", {"expected_revision": settings["revision"], "settings": settings})
         except Exception:
@@ -441,7 +440,7 @@ def device_flow(core, transport, receipt, safe_update):
         ops.require(not status_guard(core.call("agent.providers.status", PROVIDER)), "BLOCKED_FRESH_REALM_ALREADY_AUTHENTICATED")
         safe_update(last_marker="preauth_checked")
         safe_update(auth_lifecycle="pending", last_marker="login_requested")
-        login = core.call("agent.providers.login", PROVIDER)
+        login = ops.core_result(core.call("agent.providers.login", PROVIDER), "BLOCKED_DEVICE_LOGIN_METHOD")
         ops.require(type(login) is dict and set(login) == {"login_id", "auth_url", "user_code", "expires_at_ms"} and type(login["login_id"]) is str and 0 < len(login["login_id"]) <= 128,
                     "BLOCKED_DEVICE_LOGIN_METHOD")
         payload = {"qualification_id": receipt["qualification_id"], "flow_id": receipt["flow_id"],

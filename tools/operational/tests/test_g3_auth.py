@@ -32,6 +32,14 @@ class TestOnlyCore:
         return {"test_only": True}
 
     def call(self, method, params=None, **kw):
+        value = self._result(method, params, **kw)
+        # Pinned17f object-result envelope; TEST ONLY, never native evidence.
+        if type(value) is dict:
+            return {**value, "_meta": {"observed_seq": 1, "profile_revision": None,
+                                      "readback_verified": False, "handled_us": 1}}
+        return value
+
+    def _result(self, method, params=None, **kw):
         self.calls.append((method, params))
         if method == "agent.providers.status":
             self.status_count += 1
