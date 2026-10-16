@@ -88,7 +88,7 @@ python3 /ABS/OPS/tools/operational/g3_device_bridge.py serve \
   --directory /TASK/receiver-q<ID>
 ```
 
-Prepare emits only `qualification_id`, `flow_id`, exact parent host192.168.1.102,
+Prepare emits only `qualification_id`, `flow_id`, exact parent host100.88.143.32,
 a random high task port, certificate fingerprints/public server certificate and
 expiry. Parent's private key stays on parent. Parent starts serve, then places
 that **public JSON only** in the manual auth_login workflow's `auth_transport`
@@ -100,7 +100,7 @@ or routing fallback is inferred.
 
 The receiver uses standard-library HTTPS/SSL, TLS>=1.2, CERT_REQUIRED, hostname
 verification on client plus exact peer fingerprints. Public transport accepts
-only parent192.168.1.102, high bounded port, qualification/flow IDs and public
+only parent100.88.143.32, high bounded port, qualification/flow IDs and public
 certificate metadata. Its authorization lifetime is <=15 minutes; X509 has
 one-day encoding validity but gives no authorization past that application
 expiry, and local key files are deleted on terminal exit/signal/deadline. A task-only parent disposal child also removes keys if prepare is abandoned before serve. The child has no network or sender and stops when serve cleans up.
@@ -436,7 +436,7 @@ python3 /ABS/OPS/tools/operational/g3_device_bridge.py serve-probe \
 
 3. Use prepare-probe's **public JSON only** as auth_transport in a manual
    phase=bridge_probe workflow with that same PROBE_ID and same ops commit.
-   Parent IP is fixed192.168.1.102; high task port is selected at preparation.
+   Parent IP is fixed100.88.143.32; high task port is selected at preparation.
    Existing workflow transport label is retained; no new input is introduced.
 4. Reference posts one fixed reachability-v1 body to /probe. Success requires
    TCP, mTLS, both peer pins and flow agreement. phase.json returns PROBE_OK
@@ -546,3 +546,45 @@ cases perform actual loopback mTLS forwarding with a TEST ONLY sender. Python
 AST/compile21 files, bash syntax and git diff --check exit0. A sibling fixture
 attribute mismatch was corrected to assert provider status readback; its full
 and targeted failure logs are retained. No product/workflow bytes changed.
+
+## Fixed parent Tailscale endpoint amendment
+
+The sole production parent endpoint is now **100.88.143.32**. The old LAN
+endpoint is refused; there is no alternate host, environment override or LAN
+fallback. `PARENT_IP` supplies certificate generation, transport admission,
+parent preparation/public endpoint and auth/probe receiver bind. Existing
+loopback opt-in remains TEST ONLY. No reference listening port is added.
+
+Reference client certificate SAN remains10.0.1.234 in auth_prepare and
+bridge_probe_prepare. It identifies the task certificate; it is not a source
+IP restriction. Server SSLContext requires the pinned client certificate and
+Handler checks its fingerprint, with no client socket-address/SAN comparison.
+Client still verifies server hostname/SAN100.88.143.32 and its fingerprint,
+with TLS>=1.2 and mutual certificate validation. A real loopback test uses the
+client SAN10.0.1.234 from source127.0.0.1 and verifies the no-login probe succeeds.
+That establishes protocol semantics only, not Tailscale route reachability.
+
+| Row | Witness in test_ops_tailscale.FixedParentEndpoint |
+| --- | --- |
+| fixed admission | test_authorized_parent_accepted, test_stale_lan_refused, test_arbitrary_hosts_refused |
+| real certificate SAN / stale refusal | test_server_certificate_san, test_stale_certificate_address_refused |
+| auth/probe public preparation | test_prepare_advertises_and_certifies_parent |
+| auth/probe bind and cleanup | test_serve_binds_parent_and_cleans (TEST ONLY socket boundary; no overlay bind) |
+| client SAN identity | test_client_san_identity_over_real_loopback (actual mTLS; no Home sender) |
+
+Evidence: durable `physical/ops-tailscale/gates/`, with causal content reads in
+`physical/ops-tailscale/causal-reads.json`. The initial disposal mock setup errors
+are preserved and are not counted as RED. Eight unchanged tests give valid
+baseline RED(exit1, failures8/errors0), then GREEN(exit0). No TLS/pin/hostname,
+port/lease, no-login path separation or cleanup rules are weakened. Existing
+receipts stay bound to their old ops SHA; parent uses fresh public preparation
+and a never-used probe ID after coordinator-owned independent delta review.
+Real reverse probe/login/Home/model/physical remain not_run by this writer.
+
+Endpoint amendment gates: GREEN8 exit0 after RED8 exit1 (failures8/errors0);
+full268 exit0; prior counterexample/sibling suites124 exit0; standalone TLS
+selftest44 exit0 (overlaps full suite). Python AST/compile22 files, bash syntax
+and diff checks exit0. Helper delta is exactly the one PARENT_IP literal;
+production Tailscale socket binding is TEST ONLY boundary evidence, not a real
+cross-machine connection. Tested file hashes are frozen before checkpoint and
+compared with committed blobs under `physical/ops-tailscale/`.

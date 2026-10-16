@@ -22,7 +22,7 @@ import sys
 import time
 from urllib.parse import urlsplit
 
-PARENT_IP = "192.168.1.102"
+PARENT_IP = "100.88.143.32"
 MAX_BODY = 4096
 MAX_LIFE_MS = 900_000
 HOME_SENDER = ("/home/neil/.local/bin/hermes", "send", "--to", "telegram:8016167934", "--quiet", "--file", "-")

@@ -328,7 +328,7 @@ class LoopbackBridge(unittest.TestCase):
         self.assertEqual(kw["stderr"], b.subprocess.DEVNULL)
 
     def test_public_transport_cannot_select_lan_or_arbitrary_host_in_test(self):
-        for value in ("example.invalid", "10.0.1.234", "192.168.1.102"):
+        for value in ("example.invalid", "10.0.1.234", "192.168.1.102", "100.88.143.32"):
             with self.assertRaises(b.BridgeRefused):
                 b.validate_transport({**self.config, "host": value}, IDENTIFIER, FLOW, loopback=True)
 
