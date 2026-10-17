@@ -348,6 +348,10 @@ pub fn appearance_tokens() -> Vec<AppearanceToken> {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AvatarSettings {
+    /// D-48: absent preserves legacy rendering and its document digest.
+    /// Older readers reject this field; see the explicit downgrade policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<AvatarPresentation>,
     pub enabled: bool,
     #[serde(default)]
     pub hidden: bool,
@@ -372,6 +376,7 @@ pub struct AvatarSettings {
 impl Default for AvatarSettings {
     fn default() -> Self {
         Self {
+            presentation: None,
             enabled: true,
             hidden: false,
             scale: 1.0,
@@ -380,6 +385,13 @@ impl Default for AvatarSettings {
             corner: AvatarCorner::default(),
         }
     }
+}
+
+/// An explicit rendering choice; absence retains the optional legacy avatar.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AvatarPresentation {
+    Assistant,
 }
 
 /// Where on its output the character sits.
@@ -721,4 +733,69 @@ pub struct ProfilesImportInput {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency_key: Option<String>,
+}
+
+#[cfg(test)]
+mod assistant_compatibility {
+    use super::*;
+    use serde_json::json;
+
+    // Frozen 25c0b72 reader shape. It intentionally retains deny_unknown_fields.
+    #[derive(Deserialize, Serialize)]
+    #[serde(deny_unknown_fields)]
+    struct LegacyAvatar {
+        enabled: bool,
+        #[serde(default)]
+        hidden: bool,
+        scale: f64,
+        #[serde(default = "yes")]
+        animations: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+        #[serde(default, skip_serializing_if = "AvatarCorner::is_default")]
+        corner: AvatarCorner,
+    }
+
+    #[test]
+    fn assistant_absent_keeps_legacy_values_and_digest() {
+        for enabled in [false, true] {
+            for hidden in [false, true] {
+                for animations in [false, true] {
+                    let value = json!({"enabled": enabled, "hidden": hidden, "scale": 1.75,
+                        "animations": animations, "output": "HDMI-A-2", "corner": "top_left"});
+                    let legacy: LegacyAvatar = serde_json::from_value(value.clone()).unwrap();
+                    let current: AvatarSettings = serde_json::from_value(value.clone()).unwrap();
+                    assert_eq!(current.presentation, None);
+                    let back = serde_json::to_value(current).unwrap();
+                    assert_eq!(back, value);
+                    assert_eq!(
+                        crate::jcs::digest(&back),
+                        crate::jcs::digest(&serde_json::to_value(legacy).unwrap())
+                    );
+                }
+            }
+        }
+        assert_eq!(AvatarSettings::default().presentation, None);
+    }
+
+    #[test]
+    fn assistant_old_reader_refuses_until_explicit_downgrade() {
+        let mut value = serde_json::to_value(AvatarSettings::default()).unwrap();
+        value["presentation"] = json!("assistant");
+        let current: AvatarSettings = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(current.presentation, Some(AvatarPresentation::Assistant));
+        assert_eq!(serde_json::to_value(current).unwrap(), value);
+        let error = serde_json::from_value::<LegacyAvatar>(value.clone())
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("unknown field `presentation`"));
+        value.as_object_mut().unwrap().remove("presentation");
+        assert!(serde_json::from_value::<LegacyAvatar>(value.clone()).is_ok());
+        assert_eq!(
+            value,
+            serde_json::to_value(AvatarSettings::default()).unwrap()
+        );
+        value["presentation"] = json!("invented");
+        assert!(serde_json::from_value::<AvatarSettings>(value).is_err());
+    }
 }

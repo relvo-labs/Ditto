@@ -86,6 +86,13 @@
       ],
       "type": "string"
     },
+    "AvatarPresentation": {
+      "description": "An explicit rendering choice; absence retains the optional legacy avatar.",
+      "enum": [
+        "assistant"
+      ],
+      "type": "string"
+    },
     "AvatarSettings": {
       "additionalProperties": false,
       "properties": {
@@ -110,6 +117,17 @@
             "string",
             "null"
           ]
+        },
+        "presentation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AvatarPresentation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "D-48: absent preserves legacy rendering and its document digest.\nOlder readers reject this field; see the explicit downgrade policy."
         },
         "scale": {
           "format": "double",

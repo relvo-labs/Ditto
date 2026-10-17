@@ -1,0 +1,19 @@
+{
+  "kind": "shape",
+  "description": "D-48 rendering intent assistant",
+  "type": "shell-report-input",
+  "valid": true,
+  "value": {
+    "mounts": [],
+    "appearance": null,
+    "avatar": {
+      "enabled": true,
+      "hidden": false,
+      "scale": 1.0,
+      "animations": true,
+      "output": "HDMI-A-2",
+      "corner": "top_left",
+      "presentation": "assistant"
+    }
+  }
+}

@@ -77,7 +77,14 @@ fn first_login_seeds_three_exportable_compositions_once() {
     for name in ["預設", "開發", "簡報"] {
         let summary = profiles.iter().find(|p| p["name"] == name).unwrap();
         let saved = stored_get(&harness.core, &summary["profile_id"]);
-        assert_eq!(saved["document"]["appearance"]["theme"], "soft-jelly");
+        assert_eq!(
+            saved["document"]["appearance"]["theme"],
+            if name == "預設" {
+                "soft-jelly-light"
+            } else {
+                "soft-jelly"
+            }
+        );
         assert_eq!(saved["history"].as_array().unwrap().len(), 1);
         let doc: ProfileDocument = serde_json::from_value(saved["document"].clone()).unwrap();
         let export_doc = doc.clone();
@@ -101,7 +108,10 @@ fn first_login_seeds_three_exportable_compositions_once() {
             assert_eq!(summary["profile_id"], listed["active_profile"]);
             assert_eq!(
                 doc.avatar,
-                ditto_protocol::profile::AvatarSettings::default()
+                ditto_protocol::profile::AvatarSettings {
+                    presentation: Some(ditto_protocol::profile::AvatarPresentation::Assistant),
+                    ..Default::default()
+                }
             );
         }
         before.push((summary["profile_id"].clone(), saved));
@@ -431,7 +441,14 @@ fn builtin_compositions_pass_preflight_with_shipped_config_schemas() {
                     "{name}: {:?}",
                     validation.reasons
                 );
-                assert_eq!(doc.appearance, documents[0].1.appearance);
+                assert_eq!(
+                    doc.appearance.theme,
+                    if *name == "預設" {
+                        "soft-jelly-light"
+                    } else {
+                        "soft-jelly"
+                    }
+                );
                 assert_eq!(doc.shortcuts, documents[0].1.shortcuts);
             }
             assert_eq!(
@@ -567,6 +584,70 @@ fn switch_undo_restores_profile_identity_and_refuses_newer_edits_without_ipc() {
                 profiles::active_profile(co.store_ref().connection()).unwrap(),
                 Some(target.profile_id)
             );
+        })
+        .unwrap();
+}
+
+#[test]
+fn assistant_legacy_export_switch_undo_and_restart_store_roundtrip() {
+    let harness = shipped_harness("assistant-roundtrip");
+    harness
+        .core
+        .coordinate(Duration::from_secs(10), |co| {
+            let packages = co.packages();
+            let mut legacy = crate::defaults::empty_document();
+            legacy.avatar.enabled = false;
+            legacy.avatar.hidden = true;
+            legacy.avatar.scale = 1.75;
+            legacy.avatar.animations = false;
+            legacy.avatar.output = Some("HDMI-A-2".into());
+            legacy.avatar.corner = ditto_protocol::profile::AvatarCorner::TopLeft;
+            let mut assistant = legacy.clone();
+            assistant.avatar.presentation =
+                Some(ditto_protocol::profile::AvatarPresentation::Assistant);
+            for (name, doc) in [("legacy", &legacy), ("assistant", &assistant)] {
+                let export = crate::exports::export(name, doc, &packages).unwrap();
+                let (import, problems) =
+                    crate::exports::validate(&serde_json::to_value(export).unwrap(), &packages);
+                assert!(problems.is_empty(), "{problems:?}");
+                assert_eq!(import.unwrap().document.digest(), doc.digest());
+            }
+            let paths = co.store_ref().paths().clone();
+            let (old, new) = co
+                .store()
+                .write(|tx| {
+                    let (old, _) =
+                        profiles::create(tx, "legacy-check", &legacy, &RevisionOrigin::Import)?;
+                    let (new, _) = profiles::create(
+                        tx,
+                        "assistant-check",
+                        &assistant,
+                        &RevisionOrigin::Import,
+                    )?;
+                    Ok((old, new))
+                })
+                .unwrap();
+            // The storage operations used by profile switching and undo; the IPC
+            // participant transaction is exercised by builtin_switches_* separately.
+            for (id, expected) in [
+                (&old.profile_id, &legacy),
+                (&new.profile_id, &assistant),
+                (&old.profile_id, &legacy),
+            ] {
+                co.store()
+                    .write(|tx| profiles::set_active_profile(tx, id))
+                    .unwrap();
+                let reader = ditto_store::Store::open_reader(&paths).unwrap();
+                assert_eq!(
+                    profiles::active_profile(reader.connection())
+                        .unwrap()
+                        .as_deref(),
+                    Some(id.as_str())
+                );
+                let (_, revision, doc) = profiles::head_document(reader.connection(), id).unwrap();
+                assert_eq!(&doc, expected);
+                assert_eq!(revision.document_sha256, expected.digest());
+            }
         })
         .unwrap();
 }

@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use ditto_protocol::{
     ids,
     profile::{
-        Appearance, AvatarSettings, EntrySpec, HostKind, LayoutIntent, ProfileDocument,
-        ShortcutBinding, SCHEMA_VERSION,
+        Appearance, AvatarPresentation, AvatarSettings, EntrySpec, HostKind, LayoutIntent,
+        ProfileDocument, ShortcutBinding, SCHEMA_VERSION,
     },
 };
 use serde_json::json;
@@ -64,7 +64,7 @@ fn newest_version(packages: &PackageSet, package: &str) -> Option<String> {
         .map(|version| version.to_string())
 }
 
-pub fn default_document(packages: &PackageSet) -> ProfileDocument {
+fn legacy_document(packages: &PackageSet) -> ProfileDocument {
     let mut entries = Vec::new();
     let mut slots = BTreeMap::new();
     for (slot, package, host) in DEFAULT_SLOTS {
@@ -107,12 +107,21 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
     }
 }
 
+/// D-48: only newly created defaults opt in; existing stores are never rewritten.
+pub fn default_document(packages: &PackageSet) -> ProfileDocument {
+    let mut document = legacy_document(packages);
+    document.avatar.presentation = Some(AvatarPresentation::Assistant);
+    document.appearance.theme = "soft-jelly-light".into();
+    replace_slot(&mut document, packages, "ui.dock", "ditto.dock.pill");
+    document
+}
+
 /// First-login compositions, in activation order. Purpose-specific choices
 /// are agent proposals pending owner confirmation (PRD §20.1); names are
 /// display data, never inputs to routing or intent interpretation.
 pub fn builtin_documents(packages: &PackageSet) -> [(&'static str, ProfileDocument); 3] {
     let default = default_document(packages);
-    let mut development = default.clone();
+    let mut development = legacy_document(packages);
     replace_slot(&mut development, packages, "ui.dock", "ditto.dock.pill");
     replace_slot(
         &mut development,
@@ -136,7 +145,7 @@ pub fn builtin_documents(packages: &PackageSet) -> [(&'static str, ProfileDocume
             entry.config = json!({"position": "left"});
         }
     }
-    let mut presentation = default.clone();
+    let mut presentation = legacy_document(packages);
     if let Some(entry) = presentation
         .slots
         .get("svc.notification_policy")

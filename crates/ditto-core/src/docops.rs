@@ -820,6 +820,35 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn assistant_change_and_undo_preserve_selected_avatar() {
+        let mut base = document();
+        base.avatar.enabled = false;
+        base.avatar.hidden = true;
+        base.avatar.scale = 1.75;
+        base.avatar.animations = false;
+        base.avatar.output = Some("HDMI-A-2".into());
+        base.avatar.corner = ditto_protocol::profile::AvatarCorner::TopLeft;
+        let mut after = serde_json::to_value(&base.avatar).unwrap();
+        after["presentation"] = json!("assistant");
+        let applied = apply(
+            &base,
+            &[ChangeOp::SetValue {
+                path: "/avatar".into(),
+                before: None,
+                after,
+            }],
+        );
+        assert!(applied.reasons.is_empty(), "{:?}", applied.reasons);
+        let mut expected = base.avatar.clone();
+        expected.presentation = Some(ditto_protocol::profile::AvatarPresentation::Assistant);
+        assert_eq!(applied.document.avatar, expected);
+        let back = apply(&applied.document, &ops_between(&applied.document, &base));
+        assert!(back.reasons.is_empty());
+        assert_eq!(back.document, base);
+        assert_eq!(back.document.digest(), base.digest());
+    }
+
+    #[test]
     fn avatar_position_is_a_set_value_with_labelled_diff_items() {
         let base = document();
         let mut after = serde_json::to_value(&base.avatar).unwrap();
