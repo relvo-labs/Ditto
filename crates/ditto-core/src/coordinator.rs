@@ -193,7 +193,13 @@ impl Coordinator {
                 );
             }
             Ok(_) => {}
-            Err(error) => crate::log::event("retention.failed", &[("reason", &error.to_string())]),
+            Err(error) => crate::log::event(
+                "retention.failed",
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", crate::log::store_error_code(&error)),
+                ],
+            ),
         }
     }
 
@@ -266,7 +272,10 @@ impl Coordinator {
                 .store(true, std::sync::atomic::Ordering::SeqCst),
             Err(error) => crate::log::event(
                 "jobs.recovery_cleanup_failed",
-                &[("reason", &error.to_string())],
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", crate::log::store_error_code(&error)),
+                ],
             ),
         }
         let _ = self.store.write(|tx| {
@@ -279,7 +288,13 @@ impl Coordinator {
             self.seed_builtin(directory);
         }
         if let Err(error) = self.ensure_active_profile() {
-            crate::log::event("boot.profile_failed", &[("reason", &error.to_string())]);
+            crate::log::event(
+                "boot.profile_failed",
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", crate::log::store_error_code(&error)),
+                ],
+            );
         }
         self.refresh_host_needs();
         self.core.shell.launch();
@@ -297,7 +312,10 @@ impl Coordinator {
             }
             Err(error) => crate::log::event(
                 "agent.tools_reconcile_failed",
-                &[("reason", &error.to_string())],
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", crate::log::store_error_code(&error)),
+                ],
             ),
         }
         self.core.finish_recovery();
@@ -342,6 +360,7 @@ impl Coordinator {
                             &[
                                 ("package", &unpacked.manifest.id),
                                 ("reason", &error.to_string()),
+                                ("reason_code", crate::log::store_error_code(&error)),
                             ],
                         );
                     }
@@ -351,6 +370,7 @@ impl Coordinator {
                     &[
                         ("path", &archive.display().to_string()),
                         ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
                     ],
                 ),
             }
@@ -743,7 +763,11 @@ impl Coordinator {
         }
         crate::log::event(
             "change.draft",
-            &[("change_id", &change_id), ("subject", &proposal.subject)],
+            &[
+                ("change_id", &change_id),
+                ("subject", &proposal.subject),
+                ("subject_kind", crate::log::subject_kind(&proposal.subject)),
+            ],
         );
         if !validation.reasons.is_empty() {
             self.store.write(|tx| {
@@ -800,6 +824,7 @@ impl Coordinator {
                 &[
                     ("change_id", &record.change_id),
                     ("reason", &error.to_string()),
+                    ("reason_code", crate::log::store_error_code(&error)),
                 ],
             );
         }
@@ -1515,7 +1540,11 @@ impl Coordinator {
                 // Put the participants back and report why.
                 crate::log::event(
                     "change.commit_write_failed",
-                    &[("change_id", change_id), ("reason", &error.to_string())],
+                    &[
+                        ("change_id", change_id),
+                        ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
+                    ],
                 );
                 self.transition(change_id, ChangeState::Verifying, ChangeState::RollingBack)?;
                 let base_document =
@@ -1730,7 +1759,11 @@ impl Coordinator {
             }
             Err(error) => crate::log::event(
                 "change.timed_revert_failed",
-                &[("change_id", change_id), ("reason", &error.message)],
+                &[
+                    ("change_id", change_id),
+                    ("reason", &error.message),
+                    ("reason_code", &format!("{:?}", error.name)),
+                ],
             ),
         }
     }
@@ -2117,7 +2150,13 @@ impl Coordinator {
         let in_flight = match changes::in_flight(self.store.connection()) {
             Ok(changes) => changes,
             Err(error) => {
-                crate::log::event("recovery.read_failed", &[("reason", &error.to_string())]);
+                crate::log::event(
+                    "recovery.read_failed",
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
+                    ],
+                );
                 return;
             }
         };

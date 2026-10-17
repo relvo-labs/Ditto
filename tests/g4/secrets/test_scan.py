@@ -84,7 +84,8 @@ class ScannerTests(unittest.TestCase):
                  ("failed-flow", False, False, True, 1),
                  ("unexpected-leak", True, True, True, 1),
                  ("clean-positive", True, False, False, 0),
-                 ("leaking-positive", True, True, False, 1)]
+                 ("leaking-positive", True, True, False, 1),
+                 ("private-proposal-leak", True, "proposal", False, 1)]
         for name, flow_ok, unexpected, inject, expected in cases:
             with self.subTest(name=name):
                 output = self.root / name
@@ -100,9 +101,11 @@ class ScannerTests(unittest.TestCase):
                             db.execute("CREATE TABLE fixture (value TEXT)")
                         for category in ("exports", "diagnostics", "conversations", "generated"):
                             (product / category / "fixture.json").write_text("{}")
+                        (product / "conversations/proposal.json").write_text("QA04_PRIVATE_PROPOSAL_CONTENT")
                         stdout.write("fixture-only log\n")
                         if unexpected:
-                            sentinel = json.loads(env["DITTO_QA04_SENTINELS"])["token"]
+                            sentinel = ("QA04_PRIVATE_PROPOSAL_CONTENT" if unexpected == "proposal"
+                                        else json.loads(env["DITTO_QA04_SENTINELS"])["token"])
                             (product / "logs/unexpected.log").write_text(sentinel)
                         (output / "driver.json").write_text(json.dumps({"ok": flow_ok, "checks": ["simulated flow only"]}))
 
@@ -121,6 +124,10 @@ class ScannerTests(unittest.TestCase):
                 report = json.loads((output / "result.json").read_text())
                 self.assertEqual(report["flow"]["ok"], flow_ok)
                 self.assertEqual(exited.exception.code, expected)
+                if unexpected == "proposal":
+                    self.assertEqual(report["hit_count"], 0)
+                    self.assertGreater(report["default_privacy_scan"]["hit_count"], 0)
+                    self.assertFalse(report["ok"])
                 if inject and expected == 0:
                     self.assertTrue(report["negative_control_passed"])
                     self.assertGreater(report["hit_count"], 0)

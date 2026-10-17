@@ -1202,6 +1202,7 @@ pub(crate) fn run_proposal(
                 "change.dropped_before_acceptance",
                 &[
                     ("subject", &proposal.subject),
+                    ("subject_kind", crate::log::subject_kind(&proposal.subject)),
                     (
                         "operation_id",
                         proposal.request_operation_id.as_deref().unwrap_or(""),

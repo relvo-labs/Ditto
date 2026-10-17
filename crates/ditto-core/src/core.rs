@@ -160,7 +160,17 @@ impl HostEvents for Events {
 
     fn host_lost(&self, _generation: u64, reason: &str) {
         if let Some(core) = self.0.upgrade() {
-            crate::log::event("host.lost", &[("reason", reason)]);
+            crate::log::event(
+                "host.lost",
+                &[(
+                    "reason_code",
+                    match reason {
+                        "connection_closed" => "connection_closed",
+                        "heartbeat_timeout" => "heartbeat_timeout",
+                        _ => "unknown",
+                    },
+                )],
+            );
             // Anything that followed tasks events rebuilds from a snapshot
             // once a provider is back.
             core.resync_topic(ditto_protocol::EventTopic::Tasks, "host_unavailable");
@@ -476,7 +486,13 @@ impl Core {
                 true
             }
             Err(error) => {
-                crate::log::event("lock.start_failed", &[("reason", &error.to_string())]);
+                crate::log::event(
+                    "lock.start_failed",
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", &format!("{:?}", error.kind())),
+                    ],
+                );
                 false
             }
         }

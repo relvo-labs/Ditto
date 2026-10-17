@@ -168,7 +168,10 @@ impl AgentManager {
                     channel = Some(launched.channel);
                 }
                 Err(refusal) => {
-                    crate::log::event("agent.backend_refused", &[("reason", refusal.as_str())]);
+                    crate::log::event(
+                        "agent.backend_refused",
+                        &[("reason_code", refusal.as_str())],
+                    );
                     s.failure = Some(refusal.as_str().into());
                 }
             }

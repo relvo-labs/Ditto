@@ -559,6 +559,7 @@ pub fn reconcile(c: &rusqlite::Connection) -> ditto_store::StoreResult<()> {
                     &[
                         ("change_id", &stored.record.change_id),
                         ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
                     ],
                 );
             }

@@ -84,7 +84,13 @@ impl ShellManager {
                 inner.run = Run::Running;
             }
             Err(error) => {
-                crate::log::event("shell.start_failed", &[("reason", &error.to_string())]);
+                crate::log::event(
+                    "shell.start_failed",
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", &format!("{:?}", error.kind())),
+                    ],
+                );
                 inner.run = Run::Backoff {
                     until: Instant::now() + Duration::from_secs(SHELL_RESTART_BACKOFF[0]),
                 };
@@ -240,9 +246,13 @@ impl ShellManager {
         }
         match launcher::launch_parsed(&self.registry, spec, &self.socket, None, &[]) {
             Ok(child) => inner.rescue_child = Some(child),
-            Err(error) => {
-                crate::log::event("shell.rescue_ui_failed", &[("reason", &error.to_string())])
-            }
+            Err(error) => crate::log::event(
+                "shell.rescue_ui_failed",
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", &format!("{:?}", error.kind())),
+                ],
+            ),
         }
     }
 
