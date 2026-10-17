@@ -2,8 +2,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
   privateText: 'QA04_WINDOW_TITLE QA04_DOCUMENT_CONTENT QA04_CLIPBOARD_CONTENT QA04_CONVERSATION_CONTENT',
-  failStartup: false, failStop: false, holdHandshake: false,
+  failStartup: false, failStop: false, holdHandshake: false, holdHello: false, rejectInStartBackground: false,
   releaseHandshake: undefined as (() => void) | undefined,
+  releaseHello: undefined as (() => void) | undefined,
   closed: undefined as ((error?: Error) => void) | undefined,
   listeners: new Map<string, (...args: unknown[]) => void>(),
 }))
@@ -13,13 +14,17 @@ vi.mock('../../src/bridge/core-link.ts', () => ({CoreLink: {connectSocket: async
     handshake: async () => {
       if (state.holdHandshake) await new Promise<void>(resolve => { state.releaseHandshake = resolve })
       return {host_generation: 1}
-    }, request: async () => ({host_generation: 1, mode: 'normal'})}
+    }, request: async () => {
+      if (state.holdHello) await new Promise<void>(resolve => { state.releaseHello = resolve })
+      return {host_generation: 1, mode: 'normal'}
+    }}
 }}}))
 vi.mock('../../src/reclaim.ts', () => ({takeCollector: () => undefined,
   Reclaimer: class { available = false; stop() {} request() {} }}))
 vi.mock('../../src/runtime.ts', () => ({HostRuntime: class {
   strategy = 'isolate_rebuild'
-  async start() {} helloParams() { return {} } startBackground() {}
+  async start() {} helloParams() { return {} }
+  startBackground() { if (state.rejectInStartBackground) state.listeners.get('unhandledRejection')!(new Error(state.privateText)) }
   async stop() { if (state.failStop) throw new TypeError(state.privateText) }
 }}))
 
@@ -29,6 +34,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   state.failStartup = false; state.failStop = false; state.closed = undefined; state.listeners.clear()
   state.holdHandshake = false; state.releaseHandshake = undefined
+  state.holdHello = false; state.releaseHello = undefined; state.rejectInStartBackground = false
   chunks = []
   vi.stubEnv('DITTO_CORE_TOKEN_FD', undefined)
   vi.stubEnv('DITTO_DEV_TOKEN', 'synthetic-development-token')
@@ -52,6 +58,27 @@ it('a rejection while handshake is pending logs no private content and still exi
     state.releaseHandshake!()
     await vi.waitFor(() => expect(state.listeners.has('SIGTERM')).toBe(true))
   }
+})
+
+it.each(['host.hello pending', 'inside startBackground'] as const)('a rejection after the handshake but before startBackground completes (%s) still exits 1 with redacted logs', async window => {
+  state.holdHello = window === 'host.hello pending'
+  state.rejectInStartBackground = window === 'inside startBackground'
+  await import('../../src/main.ts')
+  if (window === 'host.hello pending') {
+    await vi.waitFor(() => expect(state.releaseHello).toBeDefined())
+    state.listeners.get('unhandledRejection')!(new Error(state.privateText))
+    state.releaseHello!()
+  }
+  await vi.waitFor(() => expect(state.listeners.has('SIGTERM')).toBe(true))
+  expect(process.exit).toHaveBeenCalledWith(1)
+  expect(chunks.join('')).not.toContain('QA04_')
+  expect(chunks.join('')).toContain('fingerprint')
+
+  // Once startBackground has returned, a stray rejection is logged but no longer fatal.
+  vi.mocked(process.exit).mockClear()
+  state.listeners.get('unhandledRejection')!(new Error(state.privateText))
+  expect(process.exit).not.toHaveBeenCalled()
+  expect(chunks.join('')).not.toContain('QA04_')
 })
 
 it.each(['startup', 'connection-close', 'stop-failure', 'unhandled-rejection', 'uncaught-exception'] as const)('main.ts %s preserves diagnostic metadata without private content', async path => {
