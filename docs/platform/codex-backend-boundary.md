@@ -55,6 +55,7 @@ controller 不選擇二進位、參數、帳號儲存方式或 OS 邊界。後�
 
 ## 5. 已知限制（未宣稱完成）
 
+- 刪除對話是 Core 權威紀錄的邏輯遮蔽，不是磁碟抹除。已刪除內容可能仍存在 SQLite 的舊頁／WAL、備份、先前匯出或其他副本；刪除不保證覆寫磁碟，也不自動撤銷已套用的組合。生成來源的刪除同樣沿用 [G3 已知限制第 4 項](../../.agents/notes/gate-reviews/G3-exit.md#4-已知限制與-g4-交接)。
 - 允許 TCP 443 到任何主機與 UDP 任意目的地；以 IP 為準，不能限定 OpenAI 網域。
 - Secret Service 對同一使用者不分應用：proxy 只限制到 `org.freedesktop.secrets`，無法限定只碰 Codex 自己的 keyring 項目。
 - 後端沒有 cgroup 硬限制：設定 `DITTO_LAUNCH_SCOPE_PREFIX` 時它有自己的 `<prefix>-agent-backend` scope，但未設 MemoryMax；D-44 依參考機量測決定，不沿用 D-06b 的 256MiB。

@@ -1,0 +1,57 @@
+// Launched by production Core; no development token or network provider.
+import assert from 'node:assert/strict'
+import {readFileSync, writeFileSync} from 'node:fs'
+import {connect, sleep} from '../../g1/lib/core-client.mjs'
+
+const root = process.env.DITTO_QA04_ROOT
+const sentinels = JSON.parse(process.env.DITTO_QA04_SENTINELS)
+const checks = []
+const verify = (name, value) => { assert.ok(value, name); checks.push(name) }
+const save = (path, value) => writeFileSync(`${root}/product/${path}.json`, JSON.stringify(value, null, 2))
+const eventually = async fn => {
+  for (let i = 0; i < 200; i++) { const value = await fn(); if (value) return value; await sleep(50) }
+  throw new Error('Core readback timed out')
+}
+let core
+try {
+  core = await connect()
+  await eventually(async () => (await core.call('desktop.profiles.get')).result)
+  for (const [label, secret] of Object.entries(sentinels)) {
+    const response = await core.call('agent.credentials.create', {provider: 'direct-model', secret, idempotency_key: `qa04-${label}`})
+    verify(`${label}: unavailable private keyring refuses credential`, response.error?.name === 'unavailable' && response.error?.message === 'keyring_unavailable')
+    save(`diagnostics/credential-${label}`, response)
+  }
+  const session = await core.must('agent.sessions.create', {title: 'QA04 private conversation', idempotency_key: 'qa04'})
+  const settings = await core.must('agent.settings.describe')
+  const {_meta, ...preferences} = settings
+  await core.must('agent.settings.patch', {expected_revision: settings.revision,
+    settings: {...preferences, enabled: true, provider: 'direct-model', endpoint: 'https://example.invalid/v1',
+      auth: {kind: 'api_key', credential_ref: 'cred-qa04-missing'}}})
+  const turn = await core.must('agent.turns.submit', {session_id: session.session_id, client_message_id: 'qa04-message', text: 'QA04_PRIVATE_CONVERSATION_CONTENT'})
+  const done = await eventually(async () => {
+    const value = await core.must('agent.turns.get', {turn_id: turn.turn_id})
+    return ['succeeded', 'failed', 'cancelled', 'unknown', 'partial'].includes(value.state) ? value : false
+  })
+  verify('real Agent fails closed without key', done.state === 'failed' && done.error_reason === 'provider_unavailable')
+  const page = await core.must('agent.sessions.read', {session_id: session.session_id, offset: 0, limit: 50})
+  verify('Core retains the conversation for scanner coverage', page.events.some(e => e.type === 'user/message'))
+  save('conversations/readback', page)
+  const description = JSON.parse(readFileSync(new URL('../../../crates/ditto-generation/examples/tasks-summary.json', import.meta.url)))
+  const artifact = await core.must('desktop.plugins.development.create', {description, request_summary: 'QA04 fixed template', idempotency_key: 'qa04-create'})
+  verify('generation creates source bundle', !!artifact.source_files['description.json'])
+  save('generated/artifact', await core.must('desktop.plugins.development.get', {artifact_id: artifact.artifact_id}))
+  save('exports/profile', await core.must('desktop.profiles.export', {}))
+  save('diagnostics/plugins', await core.must('desktop.plugins.diagnostics', {}))
+  save('diagnostics/rescue', await core.must('desktop.rescue.status', {}))
+  save('diagnostics/runtime', await core.must('agent.runtime.get', {}))
+  // Privacy content may exist in the explicitly saved conversation; it must
+  // not enter default diagnostic/export responses.
+  for (const capability of ['desktop.plugins.diagnostics', 'desktop.rescue.status', 'desktop.profiles.export']) {
+    verify(`${capability}: no private conversation content`, !JSON.stringify(await core.must(capability, {})).includes('QA04_PRIVATE_CONVERSATION_CONTENT'))
+  }
+  await core.must('agent.runtime.stop', {})
+  writeFileSync(`${root}/driver.json`, JSON.stringify({ok: true, checks}))
+} catch (error) {
+  writeFileSync(`${root}/driver.json`, JSON.stringify({ok: false, checks, error: String(error)}))
+  process.exitCode = 1
+} finally { core?.close() }

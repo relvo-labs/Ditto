@@ -2265,6 +2265,34 @@ fn a_session_lock_refuses_ordinary_changes() {
 }
 
 #[test]
+fn lock_without_a_client_stays_locked_during_shell_and_rescue_supervision() {
+    // No compositor, RPC peer or lock executable: failure to launch must not
+    // clear the authoritative lock bit. This does not prove pixel isolation.
+    let harness = harness("lock-no-client");
+    assert!(!harness.core.lock_session());
+    for _ in 0..3 {
+        harness.core.shell.tick();
+        harness.core.shell.start_rescue_ui();
+        let state = harness.core.session_state();
+        assert!(state.locked);
+        assert!(!state.lock_client_running);
+        thread::sleep(Duration::from_millis(300));
+    }
+}
+
+#[test]
+fn rescue_core_does_not_clear_a_requested_lock_when_the_ui_is_missing() {
+    let root = root("rescue-locked-no-ui");
+    let core = start_at(&root, true);
+    assert!(!core.lock_session());
+    core.shell.start_rescue_ui();
+    thread::sleep(Duration::from_millis(300));
+    assert!(core.session_locked());
+    assert!(core.session_state().locked);
+    assert_eq!(core.mode, ditto_protocol::rpc::CoreMode::Rescue);
+}
+
+#[test]
 fn a_client_operation_id_finds_its_change_after_a_lost_connection() {
     // L-10 shape: the stand-in sends a change and disappears; a new client
     // finds the real outcome by the operation id it chose.
