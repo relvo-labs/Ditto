@@ -1939,6 +1939,10 @@
         <translation>The pinned list did not change</translation>
     </message>
     <message>
+        <source>（使用中）</source>
+        <translation> (in use)</translation>
+    </message>
+    <message>
         <source>（執行中）</source>
         <translation> (running)</translation>
     </message>

@@ -501,6 +501,7 @@
   "驗證通過，尚未安裝": "Validation passed; not installed",
   "（不影響匯入）": " (does not prevent the import)",
   "（作用中）": " (focused)",
+  "（使用中）": " (in use)",
   "（執行中）": " (running)",
   "（已合併 %1 則）": " (%1 merged)",
   "（已截斷）": " (cut short)",
