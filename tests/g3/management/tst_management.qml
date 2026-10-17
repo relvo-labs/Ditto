@@ -11,7 +11,7 @@ TestCase {
     height: 1200
     visible: true
     when: windowShown
-    property var tokens: ({space:8,spaceTight:4,spaceWide:12,controlHeight:32,radiusSmall:6,fontBody:13,fontSmall:11,fontTitle:17,fontFamily:"",foreground:"#ffffff",foregroundMuted:"#aaaaaa",warning:"#ffcc00",surface:"#333333",surfaceStrong:"#444444",border:"#666666",focus:"#ffffff",accent:"#8B5CF6",onAccent:"#ffffff",danger:"#ff0000"})
+    property var tokens: ({space:8,spaceTight:4,spaceWide:12,controlHeight:32,radiusSmall:6,fontBody:13,fontSmall:11,fontTitle:17,fontFamily:"",foreground:"#ffffff",foregroundMuted:"#aaaaaa",warning:"#ffcc00",surface:"#333333",surfaceStrong:"#444444",border:"#666666",focus:"#ffffff",accent:"#8B5CF6",accentForeground:"#ffffff",statusForeground:"#ffffff",danger:"#ff0000"})
     QtObject {
         id: client
         property var artifacts: []

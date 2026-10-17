@@ -75,7 +75,8 @@ QtObject {
     // Light values: contrast against the composited surfaces is computed in
     // tests/g4/visual/tst_tokens.qml and listed in component-sheet.md.
     readonly property color accent: lightRecipe ? colorToken("accent", "#9d8cf0") : colorToken("accent", "#b9a4ff")
-    readonly property color onAccent: lightRecipe ? colorToken("on_accent", "#1c1830") : colorToken("on_accent", "#1a1626")
+    // Avoid on + uppercase: QML treats that spelling as a signal handler.
+    readonly property color accentForeground: lightRecipe ? colorToken("on_accent", "#1c1830") : colorToken("on_accent", "#1a1626")
     readonly property color background: lightRecipe ? colorToken("background", "#d3cff9") : colorToken("background", "#12121a")
     readonly property color surfaceBase: lightRecipe ? colorToken("surface", "#fbfaff") : colorToken("surface", "#1d1f2b")
     /// Alpha of the translucent surface colour (before `surfaceOpacity`).
@@ -104,6 +105,9 @@ QtObject {
         : (reducedTransparency ? "#12121a" : "#b312121a")
 
     // Derived values, not overridable on their own: they follow the tokens above.
+    /// Status fills are pale in the dark recipe and dark in the light one.
+    /// This is separate from the Profile-overridable foreground on accent.
+    readonly property color statusForeground: lightRecipe ? "#ffffff" : "#1a1626"
     /// The thin bright edge just inside a surface; none with reduced transparency.
     readonly property color highlight: reducedTransparency ? "transparent"
         : (lightRecipe ? Qt.rgba(1, 1, 1, 0.85) : Qt.rgba(1, 1, 1, 0.08))

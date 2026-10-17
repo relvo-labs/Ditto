@@ -19,14 +19,19 @@ mkdirSync(out, { recursive: true });
 const providers = [
   'shell/providers/dock_pill/qml/DockPill.qml',
   'shell/providers/panel_top/qml/PanelTop.qml',
+  'shell/providers/launcher_grid/qml/LauncherGrid.qml',
+  'shell/providers/launcher_search/qml/LauncherSearch.qml',
+  'shell/providers/tasks_panel/qml/TasksPanel.qml',
 ];
 // The legacy reference: the same files at the G4 base, before #65. The
 // legacy-presentation tests render them next to the current files with the
-// `soft-jelly` theme and require the same pixels and geometry.
+// `soft-jelly` theme and require the same geometry. #72 permits the fixed
+// accent foreground; pixels must match with an explicit black override.
 const LEGACY_BASE = 'f58242612d43506984cdfde8f303b73045a57617';
 const legacy = [
   { path: 'shell/providers/dock_pill/qml/DockPill.qml', stage: true },
   { path: 'shell/jelly/Material.qml', stage: false },
+  { path: 'shell/jelly/Tokens.qml', stage: false },
 ];
 mkdirSync(join(here, '.staged', 'base'), { recursive: true });
 const sha = (text) => createHash('sha256').update(text).digest('hex');
@@ -39,7 +44,7 @@ const strip = (source, path, removed) => source.split('\n').filter((line, index)
   return true;
 }).join('\n');
 for (const item of legacy) {
-  const source = execFileSync('git', ['-C', root, 'show', `${LEGACY_BASE}:${item.path}`], { encoding: 'utf8' });
+  const source = execFileSync('git', ['-C', root, 'show', `${LEGACY_BASE}:${item.path}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const removed = [];
   const staged = item.stage ? strip(source, item.path, removed) : source;
   const name = item.path.split('/').pop();

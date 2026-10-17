@@ -99,8 +99,8 @@ TestCase {
             lines.push({ mode: mode, text: "focus (ring)", ground: ground, groundHex: hex(grounds[ground]),
                          textHex: hex(t.focus), ratio: contrast(t.focus, grounds[ground]), minimum: 3 });
         }
-        lines.push({ mode: mode, text: "onAccent", ground: "accent", groundHex: hex(t.accent),
-                     textHex: hex(t.onAccent), ratio: contrast(t.onAccent, t.accent), minimum: 4.5 });
+        lines.push({ mode: mode, text: "accentForeground", ground: "accent", groundHex: hex(t.accent),
+                     textHex: hex(t.accentForeground), ratio: contrast(t.accentForeground, t.accent), minimum: 4.5 });
         for (const line of lines) {
             console.log("CONTRAST " + [line.mode, line.text, line.textHex, line.ground, line.groundHex,
                                        line.ratio.toFixed(2), line.minimum].join(" "));
@@ -180,7 +180,16 @@ TestCase {
         }
     }
 
-    function test_light_text_contrast_meets_aa() {
+    function test_each_recipe_accent_contrast_meets_aa() {
+        for (const theme of ["no-theme", "soft-jelly", "soft-jelly-light"]) {
+            const t = make(theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} });
+            const ratio = contrast(t.accentForeground, t.accent);
+            console.log("CONTRAST " + [theme, "accentForeground", hex(t.accentForeground), "accent", hex(t.accent), ratio.toFixed(2), 4.5].join(" "));
+            verify(ratio >= 4.5, theme + ": accent text contrast " + ratio);
+        }
+    }
+
+    function test_all_recipes_text_contrast_meets_aa() {
         const modes = {
             "normal": light(),
             "reduced-transparency": light({ reduced_transparency: true }),
@@ -188,6 +197,13 @@ TestCase {
             // The default Profile overrides only the accent (defaults.rs).
             "normal+profile-accent": light({ tokens: { accent: "#b9a4ff" } })
         };
+        for (const theme of ["no-theme", "soft-jelly"]) {
+            for (const mode of ["normal", "reduced-transparency", "low-power"]) {
+                const appearance = { tokens: {}, reduced_transparency: mode === "reduced-transparency", low_power_style: mode === "low-power" };
+                if (theme !== "no-theme") appearance.theme = theme;
+                modes[theme + "/" + mode] = appearance;
+            }
+        }
         const failures = [];
         for (const mode in modes) {
             for (const line of report(mode, make(modes[mode]))) {

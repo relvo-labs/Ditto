@@ -119,7 +119,7 @@ FloatingWindow {
                             anchors.left: parent.left
                             anchors.leftMargin: window.tokens.space
                             text: window.t(modelData.label)
-                            color: parent.current ? window.tokens.onAccent : window.tokens.foreground
+                            color: parent.current ? window.tokens.accentForeground : window.tokens.foreground
                             font.pixelSize: window.tokens.fontBody
                         }
 

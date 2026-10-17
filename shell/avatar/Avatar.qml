@@ -144,7 +144,7 @@ Item {
             Text {
                 anchors.centerIn: parent
                 text: "?"
-                color: "#2b2440"
+                color: avatar.tokens.statusForeground
                 font.pixelSize: parent.height * 0.7
                 font.bold: true
             }

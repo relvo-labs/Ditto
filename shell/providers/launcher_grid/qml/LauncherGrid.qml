@@ -168,7 +168,7 @@ Scope {
                             id: tabLabel
                             anchors.centerIn: parent
                             text: provider.categoryLabel(modelData)
-                            color: index === provider.categoryIndex ? provider.tokens.onAccent : provider.tokens.foreground
+                            color: index === provider.categoryIndex ? provider.tokens.accentForeground : provider.tokens.foreground
                             font.pixelSize: provider.tokens.fontBody
                         }
 
@@ -232,7 +232,7 @@ Scope {
                         Text {
                             anchors.centerIn: parent
                             text: modelData.name.substring(0, 1)
-                            color: provider.tokens.onAccent
+                            color: provider.tokens.accentForeground
                             font.pixelSize: provider.tokens.fontTitle
                             font.bold: true
                         }

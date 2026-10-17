@@ -168,7 +168,7 @@ Scope {
                         id: label
                         anchors.centerIn: parent
                         text: modelData.name
-                        color: modelData.active ? provider.tokens.onAccent : provider.tokens.foreground
+                        color: modelData.active ? provider.tokens.accentForeground : provider.tokens.foreground
                         font.pixelSize: provider.tokens.fontSmall
                     }
 
