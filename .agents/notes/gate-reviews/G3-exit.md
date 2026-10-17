@@ -2,7 +2,7 @@
 
 | 欄位 | 內容 |
 | --- | --- |
-| 日期／狀態 | 2026-10-14；**整合實作提交審查，G3 出口尚未裁定通過** |
+| 日期／狀態 | 2026-10-17；**owner 依 D-47 接受開發 VM 證據，G3 出口通過** |
 | 計畫／追蹤 | [plan/05](../../../plan/05/README.md)；[#34](https://github.com/relvo-labs/Ditto/issues/34)，相關 #15～#33 與 G2 follow-up #35～#39 已逐項閱讀 |
 | PR | [#40：受限生成、隔離驗證與版本回退](https://github.com/relvo-labs/Ditto/pull/40) |
 | 分支 | `codex/g3-restricted-generation`；整合實作 `5ed55b8c44d94bae6e3dd70841c7961b85b25eb2`；G2 PR #13 已合併，本次 PR 以 `main` 為基底 |
@@ -15,6 +15,10 @@
 同日再次功能盤點：實作 `9e6e37d` 修正實際 artifact 升版回讀、序列化接受點撤權檢查及管理中心工作恢復／進度／雙預覽取消。新增 Core 失敗補償、真 native 七負例、三態九格信任矩陣與兩次修改回第一版；最終完整 VM **14 步通過**，管理中心 QtTest **6 項**，新 Core 真模型 **19 項通過**。詳見 [功能補齊紀錄](G3-functional-completion-2026-10-14.md) 及其 evidence JSON；前段 15 項與未推送敘述保留其時間點，出口仍未由 owner 裁定。
 
 最新進度：使用者明確授權中斷實體測試登入後，已完成[實體座位驗收](G3-reference-seat-2026-10-14.md)及其[原始證據索引](G3-reference-seat-evidence-2026-10-14.json)。真訂閱 **19 項**、桌面 **45 項**、固定 Qt **7 案例**、OS 故障 **10 項**、三態九格信任矩陣與雙預覽實際鍵盤取消通過。實作 `bcc7264` 修正實際逾時誤報及失敗工作文案；本機 Rust **258 項**、Node **184 項**、Qt **13 項**。下表更新為目前證據狀態，§3 的首次交付歷史仍保留，不代替 owner 裁定。
+
+## 2026-10-17 當前裁定
+
+owner 依 [D-47](../decisions/2026-10-17-d47-g3-exit-vm-evidence.md) 接受 `17f5d76` 的開發 VM 證據（15 步 pass、exit 0），G3 出口通過；PR #40 合併為 `main@39da297`。此次 VM 沒有涵蓋的真模型訂閱登入、實體座位重新登入、參考機量測由 [#44](https://github.com/relvo-labs/Ditto/issues/44) 與 [plan/06](../../../plan/06/README.md) 承接。D-17 也已[補錄](../decisions/2026-10-14-d17-g3-generated-plugin-selection.md)。以下逐項表格與「待 owner」敘述保留 2026-10-14 的原始時間點，當前裁定以本節為準。
 
 ## 1. 五項出口
 

@@ -10,6 +10,8 @@ G2 證據只對應 G2 原 commit；G3 commit 不作 G2 證據；Core／協定接
 
 ## 2. 待決策／提案
 
+> 下表保留開工時的提案；D-17 已於 2026-10-14 [決定](../../.agents/notes/decisions/2026-10-14-d17-g3-generated-plugin-selection.md)，G3 出口依 [D-47](../../.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md) 通過。未結事項的現況與 G4 承接見 [plan/06/02](../06/02-handoff.md)。
+
 | 議題 | 提案與必要依據 | 最晚時點 |
 | --- | --- | --- |
 | D-17 兩類生成插件 | 沿用待辦摘要／工作區快捷動作；SDK 可先做，不宣告選型核定 | #28 真模型驗收前 |

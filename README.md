@@ -4,7 +4,7 @@
 
 Ditto 同時是專案名稱與預設角色。Soft Jelly／柔光果凍是預設桌面形象，並不限制其他組合的風格。
 
-**目前進度（2026-10-14）：G0／G1 已依 D-38 接受，G2 功能已由 owner 依 [D-46](.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受。** G3 正式生成、隔離驗證／預覽、版本與資料回退已有實作和開發證據；真實模型與參考機出口仍待驗證，見 [G3 評審紀錄](.agents/notes/gate-reviews/G3-exit.md)。
+**目前進度（2026-10-17）：G0／G1 依 D-38、G2 功能依 D-46、G3 出口依 [D-47](.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md) 接受。** PR #40 已合併。G4 從 `main@39da297` 開始規劃，見 [plan/06](plan/06/README.md) 與 [#42](https://github.com/relvo-labs/Ditto/issues/42)。G3 此次 VM 未涵蓋的真模型登入、實體座位重新登入、參考機量測轉給 G4，不把 VM 當成效能或資源出口證據。
 
 ## 文件與原型
 
@@ -16,6 +16,7 @@ Ditto 同時是專案名稱與預設角色。Soft Jelly／柔光果凍是預設�
 - [G1 執行計畫](plan/03/README.md)：組合底座、交易、宿主與驗證；[G0 評審](.agents/notes/gate-reviews/G0-exit.md)、[G1 評審](.agents/notes/gate-reviews/G1-exit.md)保存逐項接受與量測證據。
 - [G2 執行計畫](plan/04/README.md)：Codex 個人訂閱＋app-server、Core 會話、授權與上下文、按需 Agent、對話介面；44個工作包與十九項出口，選型與估算為待核定提案。
 - [G3 執行計畫](plan/05/README.md)：受限描述、固定模板、原生測試宿主、生成與回退；[生產邊界](docs/platform/generated-template-boundary.md)、[驗證入口](tests/g3/README.md)。
+- [G4 執行計畫](plan/06/README.md)：MVP 整合、G3 交接、驗證量測、工作包與決策。
 - [開發導覽 AGENTS.md](AGENTS.md)：權威文件位置、五條不可違反原則與 [skill 集合](.agents/skills/README.md)。
 - [已部署體驗](https://ditto-soft-jelly-desktop.neil0628.chatgpt.site)：依既有存取權限開放，並非 GitHub Pages。
 

@@ -36,20 +36,20 @@
 | D-01 | 發行版、GPU 與 XWayland 範圍 | **2026-09-22 已決定**：Ubuntu 24.04.2／kernel 6.17／RTX 4060；Firefox、foot、Kate；XWayland 僅診斷（[紀錄](../../.agents/notes/decisions/2026-09-22-d01-reference-platform.md)）；2026-09-26 Firefox 改為 156.0.1 rev 8969（[D-01a](../../.agents/notes/decisions/2026-09-26-d01a-firefox-156-0-1.md)） | G0 | 平台工程 |
 | D-02 | **合成器選擇**（Wayfire vs Sway／Hyprland vs 自寫轉接） | **2026-09-22 已決定：Wayfire，Sway 遺棄**（[紀錄](../../.agents/notes/decisions/2026-09-22-d02-compositor-wayfire.md)）。C-08 自動診斷未得到中文提交，出口門檻尚未通過 | **G0 出口** | 平台工程＋產品 |
 | D-03 | Qt／Quickshell／Rust／Node 版本 | **2026-09-22 已決定**：Qt 6.10.2、Quickshell 0.3.1、Rust 1.98.1、Node 22.23.2、pnpm 10.11.0（[紀錄](../../.agents/notes/decisions/2026-09-22-d03-toolchain-freeze.md)） | G0 | 全體 |
-| D-04 | **Cordis 來源**（Harness vendored fork vs 上游） | 沿用 Harness fork 的鎖定 commit；理由見 [02 §1](02-cordis-adoption.md#1-來源與版本鎖定) | G1 前 | Runtime |
+| D-04 | **Cordis 來源**（Harness vendored fork vs 上游） | 沿用 Harness fork 的鎖定 commit；理由見 [02 §1](02-cordis-adoption.md#1-來源與版本鎖定)；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 前 | Runtime |
 | D-05 | Harness 移植範圍（哪些具體套件） | 模型適配器、工具、會話三類；具體清單由 G0／G1 盤點決定 | G2 前 | Runtime＋Agent |
 | D-06 | 分層資源預算與工具硬上限 | **部分已決定**：D-06b 工具三類初始配額已核定（[紀錄](../../.agents/notes/decisions/2026-09-22-d06b-tool-quotas.md)）；D-06a Core／Shell PSS：2026-10-05 已取得合格三次冷登入量測，[提案](../../.agents/notes/decisions/2026-10-05-d06a-core-shell-pss.md)待核定 | G0／G1 | 全體 |
 | D-07 | 嵌入式腳本引擎（QuickJS／Lua） | **不列入 MVP**；P1 另行選型 | P1 | Runtime |
-| D-08 | 生成執行隔離實作 | 先受限模板與隔離試載入，不直接啟用任意程式 | G1 前 | Runtime＋安全 |
+| D-08 | 生成執行隔離實作 | 先受限模板與隔離試載入，不直接啟用任意程式；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 前 | Runtime＋安全 |
 | D-09 | 模型、預算與憑證儲存 | **2026-10-07 部分已決 D-09a**：支援 Codex 個人訂閱登入，以 app-server 為必要且優先後端（[紀錄](../../.agents/notes/decisions/2026-10-07-d09a-codex-subscription-app-server.md)）；API 可替換。模型／effort、quota、keyring 實測仍待定；不核定預算放寬 | G2 M1 真請求前 | Agent＋產品 |
-| D-10 | 套件格式與發布來源 | 核可來源＋本機包，固定版本與雜湊 | G1 | Runtime |
+| D-10 | 套件格式與發布來源 | 核可來源＋本機包，固定版本與雜湊；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 | Runtime |
 | D-11 | 商業授權與角色素材 | 以實際發行包完成審查 | 公開發布前 | 產品＋法務 |
 | D-12 | 團隊、owner 與工期 | G0 結果後估算 | G0 結束 | 管理 |
 | D-13 | **契約型別方向**（Rust-first schemars vs TS-first） | **2026-09-22 已決定**：Rust-first schemars → JSON Schema → TS（[紀錄](../../.agents/notes/decisions/2026-09-22-d13-rust-first-contracts.md)） | G0 | Core |
 | D-14 | **IPC 傳輸細節**（Unix socket 路徑、認證方式、事件佇列上限） | **2026-09-22 已決定**：Unix socket 0600、受控啟動器綁定身分、佇列 1024（[紀錄](../../.agents/notes/decisions/2026-09-22-d14-ipc-transport.md)） | G0 | Core |
-| D-15 | **Profile 儲存格式**（SQLite 結構與匯出文字格式） | SQLite 為權威，匯出採可審查文字格式 | G1 | Core |
-| D-16 | **兩個非 AI Cordis 服務插件的具體選型** | 任務／待辦資料服務 ＋ 通知策略服務 | G1 早期 | Host＋產品 |
-| D-17 | **兩種受限生成插件的具體選型** | 待辦摘要面板 ＋ 工作區快捷動作面板 | G3 前 | Agent＋產品 |
+| D-15 | **Profile 儲存格式**（SQLite 結構與匯出文字格式） | SQLite 為權威，匯出採可審查文字格式；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 | Core |
+| D-16 | **兩個非 AI Cordis 服務插件的具體選型** | 任務／待辦資料服務 ＋ 通知策略服務；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 早期 | Host＋產品 |
+| D-17 | **兩種受限生成插件的具體選型** | **2026-10-14 已決定**：待辦摘要面板＋工作區快捷動作面板（[補錄](../../.agents/notes/decisions/2026-10-14-d17-g3-generated-plugin-selection.md)） | G3 前 | owner |
 | D-18 | **安裝與發行形態**（原生套件 vs Flatpak vs tarball） | 工作階段安裝包＋systemd user units | G4 前 | 平台工程 |
 | D-19 | **真機 CI runner 的取得方式** | **2026-09-22 已決定並註冊**：主要參考機以 user systemd service 提供 `ditto-refmachine`／`ditto-ci`（[紀錄](../../.agents/notes/decisions/2026-09-22-d19-reference-runner.md)） | G0 | 管理＋QA |
 | D-20 | **語意任務集的模型版本固定策略** | 固定版本＋保留集；模型更新時重跑並記錄 | G2 | QA＋Agent |
@@ -59,16 +59,16 @@
 | D-24 | **`ditto-qml-shell` 轉 `stable` 的判定** | **2026-09-22 已決定**：生產 24 矩形遮罩雙向驗證後轉 stable（[紀錄](../../.agents/notes/decisions/2026-09-22-d24-qml-shell-stable.md)） | G0 出口 | Shell |
 | D-25 | **自動化測試的第一線環境** | **2026-09-27 已決定**：參考機上的 libvirt 開發 VM 為第一線自動化測試；結果只是開發證據，出口門檻不變（[紀錄](../../.agents/notes/decisions/2026-09-27-d25-vm-first-automation.md)） | G0 | 平台工程＋QA |
 | D-36 | **EX-09 的判定方式** | **2026-09-27 已決定（放寬）**：由連續 3 晚改為同一已進版 commit 的 3 次獨立參考機執行，可在同一天，並須先通過 3 輪 VM；只適用 G0（[紀錄](../../.agents/notes/decisions/2026-09-27-d36-ex09-same-day-runs.md)） | G0 出口 | 參考機 owner；產品 owner 於出口評審確認 |
-| D-26 | **Core 的並行模型與 SQLite 函式庫**（plan/03 提案） | 待決策提案：std 執行緒＋單一協調器＋唯讀連線池；`rusqlite` bundled；WAL＋`synchronous=FULL`。G1 實作暫採此值（[plan/03/08](../../plan/03/08-decisions-and-risks.md#12-本計畫新增的待決策提案)） | G1 M0 | Core |
-| D-27 | **hostd 的連線與身分**（plan/03 提案） | 待決策提案：共用 `core.sock`；kind `hostd` 經受控啟動器；`on_behalf_of` 以已分派條目表驗證 | G1 M0 | Core＋Host |
-| D-28 | **通知伺服端的擁有者**（plan/03 提案） | 待決策提案：Core 的 `ditto-system`；策略詢問 50 ms，失敗預設顯示 | G1 W3 | Core＋Shell |
-| D-29 | **救援介面形態與離線寫入**（plan/03 提案） | 待決策提案：`shell/rescue/` 獨立設定＋`dittoctl rescue` fallback；`--offline` 持 `core.lock` 只允許兩種寫入 | G1 W9 | Runtime＋平台 |
-| D-30 | **鎖定客戶端的程序形態**（plan/03 提案） | 待決策提案：獨立程序 `ditto-lock`，由 Core 啟動；依 C-19 實測 | G1 W6 | Shell＋平台 |
-| D-31 | **G1 估算與人力修正**（plan/03 提案） | 待決策提案：124 → 140.5 人週；選項 A（11 人、18 週） | G1 M0 | 管理＋產品 |
-| D-32 | **交易層的候選策略**（plan/03 提案） | 待決策提案：預設策略 A，依預先承諾判準決定是否改 B；兩者不混用 | 判準 G1 M0；定案 W3 | Host |
-| D-33 | **布局策略在 Wayfire 上的實作路徑**（plan/03 提案） | 待決策提案：依 C-15 探測決定受控交接或工作階段重啟等級 | G1 W3 | 平台＋產品 |
-| D-34 | **10 個簡單插件的固定集合**（plan/03 提案） | 待決策提案：5 個 QML 狀態型＋5 個 Cordis 設定型，版本鎖定 | G1 W8 | QA＋Host |
-| D-35 | **協定 0.2 的凍結政策**（plan/03 提案） | 待決策提案：M3 起只允許新增選用欄位；破壞性變更升 0.3 | G1 M3 | Core＋Agent |
+| D-26 | **Core 的並行模型與 SQLite 函式庫**（plan/03 提案） | 待決策提案：std 執行緒＋單一協調器＋唯讀連線池；`rusqlite` bundled；WAL＋`synchronous=FULL`。G1 實作暫採此值（[plan/03/08](../../plan/03/08-decisions-and-risks.md#12-本計畫新增的待決策提案)）；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 M0 | Core |
+| D-27 | **hostd 的連線與身分**（plan/03 提案） | 待決策提案：共用 `core.sock`；kind `hostd` 經受控啟動器；`on_behalf_of` 以已分派條目表驗證；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 M0 | Core＋Host |
+| D-28 | **通知伺服端的擁有者**（plan/03 提案） | 待決策提案：Core 的 `ditto-system`；策略詢問 50 ms，失敗預設顯示；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 W3 | Core＋Shell |
+| D-29 | **救援介面形態與離線寫入**（plan/03 提案） | 待決策提案：`shell/rescue/` 獨立設定＋`dittoctl rescue` fallback；`--offline` 持 `core.lock` 只允許兩種寫入；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 W9 | Runtime＋平台 |
+| D-30 | **鎖定客戶端的程序形態**（plan/03 提案） | 待決策提案：獨立程序 `ditto-lock`，由 Core 啟動；依 C-19 實測；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 W6 | Shell＋平台 |
+| D-31 | **G1 估算與人力修正**（plan/03 提案） | 待決策提案：124 → 140.5 人週；選項 A（11 人、18 週）；**2026-10-17 盤點：待 owner 核定；歷史估算併 D-12 核對**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 M0 | 管理＋產品 |
+| D-32 | **交易層的候選策略**（plan/03 提案） | 待決策提案：預設策略 A，依預先承諾判準決定是否改 B；兩者不混用；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | 判準 G1 M0；定案 W3 | Host |
+| D-33 | **布局策略在 Wayfire 上的實作路徑**（plan/03 提案） | 待決策提案：依 C-15 探測決定受控交接或工作階段重啟等級；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 W3 | 平台＋產品 |
+| D-34 | **10 個簡單插件的固定集合**（plan/03 提案） | 待決策提案：5 個 QML 狀態型＋5 個 Cordis 設定型，版本鎖定；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 W8 | QA＋Host |
+| D-35 | **協定 0.2 的凍結政策**（plan/03 提案） | **2026-10-17 盤點：已被取代**；0.2 提案保留為歷史，現行協定 0.3 依 2026-10-09 [D-39](../../.agents/notes/decisions/2026-10-09-d39-protocol-0-3-freeze.md)。來源核對見 [G4 盤點](../../plan/06/02-handoff.md#4-既有未核定決策盤點) | G1 M3 | Core＋Agent |
 | D-37 | **G0 出口評審前開始 G1 實作** | **2026-09-27 已決定（偏離 plan/03 開工條件）**：使用者判斷既有測試足以開工；G0 未通過項目帶進 G1 追蹤，G1 門檻不變（[紀錄](../../.agents/notes/decisions/2026-09-27-d37-g1-start-before-g0-exit.md)） | G1 開工 | 參考機 owner；產品 owner 於 G0 出口評審確認 |
 | D-38 | **G0／G1 階段完成裁定** | **2026-10-07 已決定**：owner 依實際使用接受 G0、G1 完成；後續重心為 G2，剩餘功能、證據與核定事項繼續追蹤，量測數字與門檻維持原樣（[紀錄](../../.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)） | G0／G1 結束 | 使用者／專案 owner Lei-k |
 | D-39 | **G2 跨程序契約與生命週期** | **2026-10-09 已決定**：協定 0.3 以目前形狀凍結，`agent.turns.trace` 與 approval 綁定（含刪除設定檔的 `profiles.delete`）列入契約（[紀錄](../../.agents/notes/decisions/2026-10-09-d39-protocol-0-3-freeze.md)） | G2 M0 契約凍結 | Core＋Agent＋Shell |
@@ -79,6 +79,11 @@
 | D-44 | **Codex app-server 程序與限制** | **2026-10-09 已決定**：1 controller＋至多 1 個 confine 內的 app-server；Agent scope 暫定 MemoryMax 256 MiB；2026-10-13 參考機活動中後端達 209 MiB，先給後端寬鬆上限 1G、收緊待 #35；暖態 ≤150 MiB 不變（[紀錄](../../.agents/notes/decisions/2026-10-09-d44-codex-process-and-limits.md)） | G2 M0 probe、M1 可寫之前 | Core＋平台＋Agent＋owner |
 | D-45 | **G2 出口前開始 G3 獨立基礎設施** | **2026-10-13 依使用者指示開始**：疊在 `a88bce8` 的 `codex/g3-restricted-generation`；G2／G3 證據分開，Core／協定等 G2 參考機量測結束（[紀錄](../../.agents/notes/decisions/2026-10-13-d45-g3-independent-foundation.md)） | G3 獨立工作開工；正式接線前重核 | 使用者／專案 owner |
 | D-46 | **G2 功能接受與完整 G3 整合** | **2026-10-13 owner 裁定**：「G2 目前功能已經算完成，你繼續實完G3」；取代 D-45 接線等待條件，未執行量測仍追蹤（[紀錄](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md)） | G3 正式接線 | 使用者／專案 owner |
+| D-47 | **G3 出口依開發 VM 證據通過** | **2026-10-17 owner 裁定**：接受 `17f5d76` VM 15/15，未涵蓋項轉 G4；G4 從合併後 main 開始（[紀錄](../../.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md)） | G3 出口 | owner |
+
+## 2.1 G4 開工時的既有決策盤點
+
+D-38 所列 D-04／08／10／15／16／26～35 已逐項對照 `39da297` 實作，見 [plan/06/02 §4](../../plan/06/02-handoff.md#4-既有未核定決策盤點)。D-17 已補錄；D-35 由 D-39 取代；其餘需 owner 核定的項目保持提案，不把程式碼選擇冒充決策。
 
 ## 3. 團隊與估算假設
 
