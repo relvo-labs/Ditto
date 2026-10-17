@@ -1,9 +1,14 @@
 import base64
+from contextlib import closing, redirect_stdout
+import io
+import json
 from pathlib import Path
+import runpy
 import sqlite3
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scan import scan
 
@@ -62,6 +67,65 @@ class ScannerTests(unittest.TestCase):
         (self.root / "log").write_text("safe")
         for sentinels in ({}, {"key": ""}):
             self.assertFalse(scan({"fixture": str(self.root)}, sentinels)["ok"])
+
+    def test_product_negative_control_exit_status_is_enforced_without_ipc(self):
+        # Only the product flow is simulated. The real runner creates its
+        # sentinel, scans real fixture files/SQLite and chooses its CLI exit.
+        # This is an exit-policy unit test, never product-flow evidence.
+        runner = Path(__file__).with_name("run.py")
+        real_glob = Path.glob
+
+        def builtin_glob(path, pattern, **kwargs):
+            if path.name == "ditto-packages" and pattern == "*.dittopkg":
+                return iter([path / "fixture.dittopkg"])
+            return real_glob(path, pattern, **kwargs)
+
+        cases = [("expected-only", True, False, True, 0),
+                 ("failed-flow", False, False, True, 1),
+                 ("unexpected-leak", True, True, True, 1),
+                 ("clean-positive", True, False, False, 0),
+                 ("leaking-positive", True, True, False, 1)]
+        for name, flow_ok, unexpected, inject, expected in cases:
+            with self.subTest(name=name):
+                output = self.root / name
+
+                class FlowFixture:
+                    pid = 999999
+
+                    def __init__(self, *_args, env, stdout, **_kwargs):
+                        product = Path(env["DITTO_QA04_ROOT"]) / "product"
+                        store = Path(env["DITTO_DATA_DIR"])
+                        store.mkdir()
+                        with closing(sqlite3.connect(store / "fixture.sqlite")) as db:
+                            db.execute("CREATE TABLE fixture (value TEXT)")
+                        for category in ("exports", "diagnostics", "conversations", "generated"):
+                            (product / category / "fixture.json").write_text("{}")
+                        stdout.write("fixture-only log\n")
+                        if unexpected:
+                            sentinel = json.loads(env["DITTO_QA04_SENTINELS"])["token"]
+                            (product / "logs/unexpected.log").write_text(sentinel)
+                        (output / "driver.json").write_text(json.dumps({"ok": flow_ok, "checks": ["simulated flow only"]}))
+
+                    def poll(self):
+                        return None
+
+                    def wait(self, timeout):
+                        return 0
+
+                argv = [str(runner), "--output", str(output)] + (["--inject-leak"] if inject else [])
+                with patch("sys.argv", argv), patch.object(Path, "glob", builtin_glob), \
+                     patch("subprocess.Popen", FlowFixture), patch("os.killpg"), \
+                     patch("resource.setrlimit"), redirect_stdout(io.StringIO()):
+                    with self.assertRaises(SystemExit) as exited:
+                        runpy.run_path(str(runner), run_name="__main__")
+                report = json.loads((output / "result.json").read_text())
+                self.assertEqual(report["flow"]["ok"], flow_ok)
+                self.assertEqual(exited.exception.code, expected)
+                if inject and expected == 0:
+                    self.assertTrue(report["negative_control_passed"])
+                    self.assertGreater(report["hit_count"], 0)
+                    self.assertTrue(all(hit["source"] == str(output / "product/logs/intentional-leak.log")
+                                        for hit in report["hits"]))
 
 
 if __name__ == "__main__":

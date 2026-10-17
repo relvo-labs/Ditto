@@ -9,6 +9,27 @@ const privateText = markers.join(' ')
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); resetFaultHits() })
 
 describe('default host log privacy', () => {
+  it('groups the same short message within one host instance but not across two startup keys', async () => {
+    // Reload the host module to exercise two independent startup key lifetimes, without IPC.
+    vi.resetModules()
+    const firstHost = await import('../../src/log.ts')
+    vi.resetModules()
+    const secondHost = await import('../../src/log.ts')
+    const first = firstHost.errorDiagnostic(new Error('4821'))
+    const second = secondHost.errorDiagnostic(new Error('4821'))
+    expect(first).toEqual(firstHost.errorDiagnostic(new Error('4821')))
+    expect(second).toEqual(secondHost.errorDiagnostic(new Error('4821')))
+    expect(first.fingerprint).not.toBe(second.fingerprint)
+  })
+
+  it('retains the fixed dependency_not_ready code and redacts its private detail', () => {
+    const records: LogRecord[] = []
+    new HostLog(record => records.push(record)).info('participant.result', {
+      items: [{key: 'ent-test', status: 'failed', reason: 'dependency_not_ready: ' + privateText}],
+    })
+    expect(records[0]).toMatchObject({items: [{reason: {code: 'dependency_not_ready'}}]})
+    expect(JSON.stringify(records)).not.toContain('QA04_')
+  })
   it.each(markers)('keeps error class/code/fingerprint and correlation without %s', marker => {
     const records: LogRecord[] = []
     const log = new HostLog(record => records.push(record), { plugin_id: 'test.plugin', entry_id: 'ent-test' })
@@ -16,7 +37,7 @@ describe('default host log privacy', () => {
     log.error('subscription refused', { error, change_id: 'chg-test', operation_id: 'op-test', session_id: 'sess-test' })
     expect(records[0]).toMatchObject({ plugin_id: 'test.plugin', entry_id: 'ent-test', change_id: 'chg-test',
       operation_id: 'op-test', session_id: 'sess-test', error: { name: 'DittoError', code: -32003,
-        fingerprint: expect.stringMatching(/^sha256:[a-f0-9]{64}$/) } })
+        fingerprint: expect.stringMatching(/^hmac-sha256:[a-f0-9]{64}$/) } })
     expect(JSON.stringify(records)).not.toContain(marker)
     expect(errorDiagnostic(error)).toEqual(errorDiagnostic(new DittoError('permission_denied', marker)))
     expect(errorDiagnostic(error).fingerprint).not.toBe(errorDiagnostic(new DittoError('permission_denied', marker + ' changed')).fingerprint)
@@ -58,7 +79,7 @@ describe('default host log privacy', () => {
     expect(records).toHaveLength(4)
     for (const record of records) {
       expect(record).toMatchObject({source: 'cordis', entry_id: 'ent-test', plugin_id: 'test.plugin',
-        error: {fingerprint: expect.stringMatching(/^sha256:/)} })
+        error: {fingerprint: expect.stringMatching(/^hmac-sha256:/)} })
       for (const marker of markers) expect(JSON.stringify(record)).not.toContain(marker)
     }
   })
@@ -74,7 +95,7 @@ describe('default host log privacy', () => {
   it('unknown free-text messages cannot bypass redaction via HostLog or a direct stderr sink call', () => {
     const records: LogRecord[] = []
     new HostLog(record => records.push(record)).error(privateText)
-    expect(records[0]).toMatchObject({msg: 'host.message', message_fingerprint: expect.stringMatching(/^sha256:/)})
+    expect(records[0]).toMatchObject({msg: 'host.message', message_fingerprint: expect.stringMatching(/^hmac-sha256:/)})
     const chunks: string[] = []
     vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
     stderrSink({ts: 'test', level: 'error', msg: privateText})

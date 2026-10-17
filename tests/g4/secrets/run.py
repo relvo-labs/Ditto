@@ -17,7 +17,7 @@ from scan import scan
 WORKSPACE = Path(__file__).resolve().parents[3]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", type=Path, required=True, help="new evidence directory")
-parser.add_argument("--inject-leak", action="store_true", help="negative control: must exit 1")
+parser.add_argument("--inject-leak", action="store_true", help="exit 0 only for a completed flow with exactly the expected leak source")
 args = parser.parse_args()
 root = args.output.resolve()
 root.mkdir(parents=True, exist_ok=False)
@@ -95,8 +95,15 @@ report.update({"flow": status, "injection_manifest": str(root / "manifest.json")
 coverage = all(report["scope"][category]["file_count"] > 0 for category in
                ("logs", "exports", "diagnostics", "conversations", "generated", "store"))
 report["ok"] = report["ok"] and status["ok"] and privacy["ok"] and coverage and bool(report["sqlite_databases"])
+passed = report["ok"]
+if args.inject_leak:
+    passed = (status["ok"] and privacy["ok"] and coverage and bool(report["sqlite_databases"])
+              and not report["errors"] and bool(report["hits"])
+              and all(hit["source"] == str(product / "logs/intentional-leak.log") for hit in report["hits"]))
+    report["negative_control_passed"] = bool(passed)
 (root / "result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
 print(json.dumps({"ok": report["ok"], "file_count": report["file_count"],
                   "hit_count": report["hit_count"], "flow_ok": status["ok"],
+                  "negative_control_passed": report.get("negative_control_passed"),
                   "result": str(root / "result.json")}))
-raise SystemExit(0 if report["ok"] else 1)
+raise SystemExit(0 if passed else 1)

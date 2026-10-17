@@ -10,7 +10,7 @@ afterEach(async () => { vi.restoreAllMocks(); await h?.close() })
 async function expectSafeFailure(msg: string, correlation: Record<string, unknown> = {}) {
   await vi.waitFor(() => expect(h.logs).toContainEqual(expect.objectContaining({msg})))
   const record = h.logs.find(item => item.msg === msg)!
-  expect(record).toMatchObject({...correlation, error: {fingerprint: expect.stringMatching(/^sha256:[a-f0-9]{64}$/)}})
+  expect(record).toMatchObject({...correlation, error: {fingerprint: expect.stringMatching(/^hmac-sha256:[a-f0-9]{64}$/)}})
   expect(JSON.stringify(h.logs)).not.toContain('QA04_')
 }
 
@@ -37,7 +37,7 @@ it('participant refusals and result item reasons are redacted only in logs', asy
   const result = await h.runtime.handleRequest('participant.prepare', {change_id: 'chg-log'})
   expect(result).toMatchObject({items: [{reason}]}) // Wire response is unchanged.
   expect(h.logs.find(item => item.msg === 'participant.result')).toMatchObject({change_id: 'chg-log',
-    method: 'participant.prepare', items: [{key: 'ent-private', status: 'failed', reason: {code: 'module_load_failed', fingerprint: expect.stringMatching(/^sha256:/)}}]})
+    method: 'participant.prepare', items: [{key: 'ent-private', status: 'failed', reason: {code: 'module_load_failed', fingerprint: expect.stringMatching(/^hmac-sha256:/)}}]})
   expect(JSON.stringify(h.logs)).not.toContain('QA04_')
 })
 

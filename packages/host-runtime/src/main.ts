@@ -17,6 +17,7 @@ import { hostdVersion } from './version.ts'
  * to start another one (host-protocol §3, §10).
  */
 const log = new HostLog(stderrSink, { component: 'ditto-hostd', pid: process.pid })
+let handshakeComplete = false
 
 // Install before plugin startup: Node's default fatal handler prints the raw
 // Error stack. Preserve its failure exit so Core's supervisor can recover.
@@ -24,7 +25,10 @@ process.on('uncaughtException', error => {
   log.error('uncaught exception', { error })
   process.exit(1)
 })
-process.on('unhandledRejection', reason => log.error('unhandled rejection', { error: reason }))
+process.on('unhandledRejection', reason => {
+  log.error('unhandled rejection', { error: reason })
+  if (!handshakeComplete) process.exit(1)
+})
 
 function readToken(env: NodeJS.ProcessEnv): string {
   const fd = env['DITTO_CORE_TOKEN_FD']
@@ -84,6 +88,7 @@ async function main(): Promise<void> {
     kind: env['DITTO_CLIENT_KIND'] ?? 'hostd',
     version: env['DITTO_CLIENT_VERSION'] ?? hostdVersion,
   })
+  handshakeComplete = true
   const hello = await link.request<HelloResult>('host.hello', runtime.helloParams())
   log.info('connected', { host_generation: hello.host_generation ?? handshake.host_generation, mode: hello.mode, strategy: runtime.strategy })
   runtime.startBackground(hello)

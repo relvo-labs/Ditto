@@ -17,7 +17,7 @@ timeout 120 python3 tests/g4/secrets/run.py --output /tmp/qa04-product-positive
 timeout 120 python3 tests/g4/secrets/run.py --inject-leak --output /tmp/qa04-product-negative
 ```
 
-正向 `run.py` 預期 exit 0、`ok=true`、`hit_count=0`；負向控制預期 exit 1、`flow.ok=true` 且 `hits` 指向 `intentional-leak.log`。若 `flow.ok=false`，代表流程根本沒完成，不能當成負向控制成功或外洩掃描通過。輸出目錄必須不存在，避免舊產物污染證據。
+正向 `run.py` 預期 exit 0、`ok=true`、`hit_count=0`；負向控制只有在 `flow.ok=true`、必要分類／SQLite 齊全、沒有掃描／隱私錯誤，且所有命中都來自 `intentional-leak.log` 時 exit 0、`negative_control_passed=true`（`ok=false` 仍表示檢出秘密）。流程失敗、其他來源命中或缺少命中均 exit 1。若 `flow.ok=false`，代表流程根本沒完成，不能當成負向控制成功或外洩掃描通過。輸出目錄必須不存在，避免舊產物污染證據。
 
 `manifest.json` 明列注入值與掃描根目錄；此測試輸入及 `driver.json` 位於 product 之外，不冒充產品輸出。產品產物與原始 log 都保留在 `product/`，`result.json` 列出每個範圍、檔案數、命中數及原始路徑，缺少必要分類或 SQLite 不通過。命中報告不複製秘密值或上下文。
 
@@ -92,7 +92,7 @@ coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id`
 | `log.ts::HostLog/child/write`、`stderrSink` | 可以：外部直接呼叫、繼承 fields、巢狀 items。共用遮蔽器在進入自訂 sink 前及 stderr 序列化前執行；未知 msg 只留固定 `host.message` 與指紋。沿用 Rust content keys、`[redacted]` 與 HOME→`~/…`，error/reason 保留安全診斷摘要。 |
 | `main.ts::stop` 的 cleanup catch | 可以：runtime.stop Error。傳 Error 本體給共同遮蔽器。 |
 | `main.ts` 的 `closed` callback | 可以：連線 Error.message 原先插進 why。why 改固定 `Core connection closed`，Error 獨立遮蔽。 |
-| `main.ts::unhandledRejection` | 可以：任意 rejection。僅類別／已知碼／指紋。 |
+| `main.ts::unhandledRejection` | 可以：任意 rejection。僅類別／已知碼／指紋；handshake 完成前記錄後 exit 1，完成後沿用只記錄的行為。 |
 | Node 預設 fatal handler → `main.ts::uncaughtException` | 可以：原先 Node 直接印 stack。現在插件啟動前安裝遮蔽 handler，記固定事件與安全摘要後仍 exit 1；rejection handler 也提前安裝。 |
 | `main.ts::main().catch` | 可以：啟動 Error 與路徑。僅類別／已知碼／指紋。 |
 | `runtime.ts::startBackground` | 可以：背景 request Error。傳 Error 本體遮蔽。 |
@@ -107,7 +107,7 @@ coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id`
 | `errors.ts::describe/toWireError/DittoError.toWire`、transaction 其餘 describe、`bridge/rpc.ts`、projection fail、runtime invoke/schema issue | 可以帶私人文字，但屬 RPC／狀態資料，不是 stderr/log 出口；本輪不改 wire 契約。進入 participant 日誌時由上述邊界遮蔽。 |
 | `testing/fake-core.ts` | 僅測試 RPC fault，非 production 日誌；同樣不直寫 stderr。 |
 
-既有 disposer 測試原以私人錯誤原文辨識 c1，現改驗證真實 Core-owned entry/plugin ID、Error 類別與指紋，並斷言原文缺席。數量／狀態／關聯欄位仍保留。指紋用於穩定分組，不保存原始內容；未知自訂 Error 類別或錯誤碼不直接信任。
+既有 disposer 測試原以私人錯誤原文辨識 c1，現改驗證真實 Core-owned entry/plugin ID、Error 類別與指紋，並斷言原文缺席。數量／狀態／關聯欄位仍保留。指紋使用 HMAC-SHA-256；hostd 啟動時產生 32-byte 隨機密鑰，只留在記憶體，不記錄或保存。同一次程序生命週期內可穩定分組，重啟後指紋改變，無法用公開的訊息雜湊表反查短文字；未知自訂 Error 類別或錯誤碼不直接信任。
 
 ```sh
 corepack pnpm --filter @ditto/host-runtime test
@@ -115,6 +115,25 @@ corepack pnpm --filter @ditto/host-runtime typecheck
 corepack pnpm --filter @ditto/host-runtime build
 node tests/g4/secrets/driver.test.mjs
 node --experimental-transform-types tests/g4/secrets/crash-audit.mjs /tmp/qa04-crash-audit.json
+```
+
+## repair2：無 IPC 回歸
+
+```sh
+node --experimental-transform-types tests/g4/secrets/lifecycle-consumer.test.mjs
+corepack pnpm --filter @ditto/host-runtime exec vitest run --exclude 'tests/process/**'
+cargo test --locked --no-run -p ditto-core --features fault-injection --test lifecycle
+```
+
+L-06 的 `msg` matcher 使用 `host.fault`，保留 `point`／`hit`；無 socket 測試直接比對真實 fault producer 與 Rust matcher。指紋測試重載兩個獨立 host log 模組，驗證各啟動密鑰內穩定、跨密鑰不同；不聲稱兩個完整 hostd 的 IPC 啟動。scanner 單元測試模擬 flow 產生 fixture，驗證實際 runner 的退出政策，不計為產品流程證據。RED 使用 `46cea3b` 的原始 production 檔案，GREEN 使用本輪修正。
+
+完整 lifecycle 需 socket，**未執行，交 coordinator**：
+
+```sh
+bash tests/g1/lifecycle/run.sh
+# 或先產出 fault-enabled host，再跑 Rust lifecycle：
+DITTO_HOST_FAULT_ENABLE=1 corepack pnpm --filter @ditto/host-runtime build
+cargo test --locked -p ditto-core --features fault-injection --test lifecycle
 ```
 
 ## AT-17：VM／參考機補跑

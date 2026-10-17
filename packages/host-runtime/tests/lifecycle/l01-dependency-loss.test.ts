@@ -70,7 +70,7 @@ describe('L-01 dependency loss', () => {
     expect(h.core.bindingOf('plugin.test.c2.read')).toBeUndefined()
     // The disposer remains attributable without retaining plugin error text.
     expect(h.logs).toContainEqual(expect.objectContaining({ level: 'error', source: 'cordis', msg: 'cordis.error',
-      entry_id: 'ent-c1', plugin_id: 'test.ent-c1', error: expect.objectContaining({ name: 'Error', fingerprint: expect.stringMatching(/^sha256:/) }) }))
+      entry_id: 'ent-c1', plugin_id: 'test.ent-c1', error: expect.objectContaining({ name: 'Error', fingerprint: expect.stringMatching(/^hmac-sha256:/) }) }))
     expect(JSON.stringify(h.logs)).not.toContain('c1 disposer failed')
 
     await h.core.apply(changeId(), entries(h, { consumers }))

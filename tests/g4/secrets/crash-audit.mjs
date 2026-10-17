@@ -13,7 +13,7 @@ exporter.export({level: 0, name: markers[0], args: ['%s %o', markers[1], {body: 
 exporter.export({level: 0, name: 'qa04-fixture-plugin', args: [{content: markers.join(' ')}]})
 const leaks = markers.filter(marker => JSON.stringify(records).includes(marker))
 const diagnosticsPresent = records.length === 3 && records.every(record =>
-  /^sha256:[a-f0-9]{64}$/.test(record.error?.fingerprint ?? ''))
+  /^hmac-sha256:[a-f0-9]{64}$/.test(record.error?.fingerprint ?? ''))
 const ok = leaks.length === 0 && diagnosticsPresent
 const output = process.argv[2]
 if (!output) throw new Error('usage: node --experimental-transform-types crash-audit.mjs <output.json>')

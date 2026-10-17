@@ -1,6 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
-import { createHash } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 import { errorCodes } from './errors.ts'
+
+// One private key per hostd process; never exported, logged or persisted.
+const fingerprintKey = randomBytes(32)
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug'
 
@@ -26,7 +29,7 @@ const reasonCodes = new Set([...Object.keys(errorCodes), 'module_load_failed', '
   'config_invalid', 'import_failed', 'registration_refused', 'volatile_update_failed',
   'volatile_update_remounted', 'apply_failed', 'apply_timeout', 'health_failed', 'health_timeout',
   'not_active', 'cleanup_timeout', 'candidate_cleanup_timeout', 'entry_faulted',
-  'unknown_change', 'change_in_progress', 'not_bound', 'host_unavailable'])
+  'unknown_change', 'change_in_progress', 'not_bound', 'host_unavailable', 'dependency_not_ready'])
 // Host-authored event labels. An unknown/free-text message is grouped by hash,
 // including when a caller uses HostLog or stderrSink directly.
 const hostMessages = new Set(['host.message', 'cordis.error', 'cordis.message', 'host.fault',
@@ -48,13 +51,13 @@ function safeCode(value: unknown): value is number | string {
     : typeof value === 'string' && (systemCodes.has(value) || reasonCodes.has(value))
 }
 
-/** Stable grouping without retaining the error's message, stack or payload. */
+/** Group within this process without exposing a public hash of private text. */
 export function errorDiagnostic(error: unknown): ErrorDiagnostic {
   const candidate = error as { name?: unknown; code?: unknown; errorName?: unknown; message?: unknown; fingerprint?: unknown } | null
   // Idempotent: stderrSink also guards callers that do not use HostLog.
   if (candidate && typeof candidate === 'object' && typeof candidate.name === 'string'
     && errorNames.has(candidate.name) && typeof candidate.fingerprint === 'string'
-    && /^sha256:[a-f0-9]{64}$/.test(candidate.fingerprint)
+    && /^hmac-sha256:[a-f0-9]{64}$/.test(candidate.fingerprint)
     && (candidate.code === undefined || safeCode(candidate.code))) {
     return { name: candidate.name, ...(candidate.code !== undefined ? { code: candidate.code } : {}), fingerprint: candidate.fingerprint }
   }
@@ -67,7 +70,7 @@ export function errorDiagnostic(error: unknown): ErrorDiagnostic {
   let detail: string
   try { detail = error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error) ?? String(typeof error) }
   catch { detail = '[unserializable]' }
-  const fingerprint = 'sha256:' + createHash('sha256').update(JSON.stringify([name, code, detail])).digest('hex')
+  const fingerprint = 'hmac-sha256:' + createHmac('sha256', fingerprintKey).update(JSON.stringify([name, code, detail])).digest('hex')
   return { name, ...(code !== undefined ? { code } : {}), fingerprint }
 }
 
