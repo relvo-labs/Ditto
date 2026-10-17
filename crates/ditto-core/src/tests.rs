@@ -2266,7 +2266,7 @@ fn a_session_lock_refuses_ordinary_changes() {
 
 #[test]
 fn lock_without_a_client_stays_locked_during_shell_and_rescue_supervision() {
-    // No compositor, RPC peer or lock executable: failure to launch must not
+    // No live compositor, RPC peer or lock executable: failure to launch must not
     // clear the authoritative lock bit. This does not prove pixel isolation.
     let harness = harness("lock-no-client");
     assert!(!harness.core.lock_session());
@@ -2283,7 +2283,11 @@ fn lock_without_a_client_stays_locked_during_shell_and_rescue_supervision() {
 #[test]
 fn rescue_core_does_not_clear_a_requested_lock_when_the_ui_is_missing() {
     let root = root("rescue-locked-no-ui");
-    let core = start_at(&root, true);
+    let harness = Harness {
+        core: start_at(&root, true),
+        root,
+    };
+    let core = &harness.core;
     assert!(!core.lock_session());
     core.shell.start_rescue_ui();
     thread::sleep(Duration::from_millis(300));

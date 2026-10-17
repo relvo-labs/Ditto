@@ -13,7 +13,12 @@ def scan(roots, sentinels):
     result = {"scope": {}, "files": [], "file_count": 0, "hit_count": 0,
               "hits": [], "errors": [], "sqlite_databases": [], "archives": []}
     needles = []
+    if not sentinels:
+        result["errors"].append("no injection sentinels configured")
     for label, value in sentinels.items():
+        if not isinstance(value, str) or not value:
+            result["errors"].append(f"invalid sentinel: {label}")
+            continue
         variants = set()
         for encoding, text in {"literal": value, "json": json.dumps(value)[1:-1],
                                "url": urllib.parse.quote(value, safe=""),

@@ -58,6 +58,11 @@ class ScannerTests(unittest.TestCase):
         (self.root / "bad.sqlite").write_bytes(b"SQLite format 3\0" + b"broken")
         self.assertTrue(self.run_scan()["errors"])
 
+    def test_missing_or_empty_sentinels_cannot_pass(self):
+        (self.root / "log").write_text("safe")
+        for sentinels in ({}, {"key": ""}):
+            self.assertFalse(scan({"fixture": str(self.root)}, sentinels)["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

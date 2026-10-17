@@ -47,7 +47,13 @@ for _ in $(seq 1 100); do
   sleep .1
 done
 if [[ -z "$secured" ]]; then
-  check initial-lock environment "no confirmed lock with readable, opaque capture"
+  if ! locked_state; then
+    check initial-lock fail "Core did not remain locked after the lock request"
+  elif [[ -n "$fraction" ]]; then
+    check initial-lock fail "desktop marker remains visible after the lock request"
+  else
+    check initial-lock environment "capture denied: desktop exposure undetermined"
+  fi
   g1_finish
 fi
 
