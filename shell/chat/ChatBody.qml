@@ -35,6 +35,12 @@ Item {
         input.focusInput();
     }
 
+    function handleEscape(inComposition) {
+        if (inComposition) return false;
+        closeRequested();
+        return true;
+    }
+
     /// Change records by id, read once per card from Core.
     property var records: ({})
     function record(changeId) {
@@ -68,7 +74,9 @@ Item {
         id: chatRoot
         anchors.fill: parent
         focus: true
-        Keys.onEscapePressed: window.closeRequested()
+        Keys.onEscapePressed: event => {
+            event.accepted = window.handleEscape(input.composing);
+        }
 
         Column {
             id: header
@@ -91,7 +99,7 @@ Item {
                 Badge {
                     tokens: window.tokens
                     width: Math.min(implicitWidth, window.width * 0.5)
-                    text: window.conversation.stateText
+                    text: window.conversation.stateText + (window.conversation.transportText ? " · " + window.conversation.transportText : "")
                     tone: window.conversation.taskState === "failed" ? "bad"
                         : window.conversation.taskState === "done" ? "good"
                         : window.conversation.taskState === "offline" ? "neutral" : "info"
@@ -526,7 +534,7 @@ Item {
                 width: parent.width
                 spacing: window.tokens.space
 
-                TextField {
+                ChatInput {
                     id: input
                     width: parent.width - send.width - stop.width - fresh.width - window.tokens.space * 3
                     tokens: window.tokens
@@ -535,7 +543,7 @@ Item {
                     enabled: window.conversation.enabled && window.conversation.connected
                     text: window.conversation.draft
                     onTextChanged: window.conversation.draft = text
-                    onAccepted: window.conversation.send()
+                    onAccepted: if (!input.composing) window.conversation.send()
                 }
                 Button {
                     id: send

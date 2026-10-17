@@ -67,6 +67,7 @@
   "diff.avatar.enabled": "角色",
   "diff.avatar.hidden": "隱藏角色",
   "diff.avatar.output": "角色所在螢幕",
+  "diff.avatar.presentation": "助理呈現",
   "diff.avatar.scale": "角色大小",
   "diff.entry.added": "加入「{package}」",
   "diff.entry.config": "「{package}」的設定",

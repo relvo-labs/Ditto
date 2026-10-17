@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import "core"
 import "jelly"
 import "avatar"
+import "assistant"
 import "change"
 import "centers"
 import "chat"
@@ -190,7 +191,7 @@ ShellRoot {
             return;
         case "chat.toggle":
             if (chat.open) {
-                chat.open = false;
+                root.closeChat();
             } else {
                 rpcCounter.mark("chat.open");
                 root.openChat();
@@ -205,9 +206,33 @@ ShellRoot {
 
     /// The chat opens beside the character, or as a window when there is no
     /// character to sit beside (AVA-07: every way in works without it).
+    property string chatReturnWindow: ""
+    property string lastFocusedApplication: ""
+    Connections {
+        target: client
+        function onWindowsChanged() {
+            const focused = client.windows.find(window => window.focused);
+            if (focused) root.lastFocusedApplication = focused.id;
+        }
+    }
+    function closeChat() {
+        chat.open = false;
+        // Restore only the explicitly opened assistant's previous application.
+        // Approval keeps its own keyboard and Escape=reject contract.
+        if (assistantPresentation && chatReturnWindow && !approvalLoader.item && !centers.open) {
+            const id = chatReturnWindow;
+            Qt.callLater(() => {
+                if (!chat.open && client.windows.some(window => window.id === id)) client.focusWindow(id);
+            });
+        }
+    }
     function openChat(mode) {
+        if (!chat.open && assistantPresentation) {
+            const previous = client.windows.find(window => window.focused);
+            chatReturnWindow = previous ? previous.id : lastFocusedApplication;
+        }
         conversation.open();
-        chat.mode = mode || (chat.open ? chat.mode : (avatarLoader.item && avatarLoader.item.visible ? "panel" : "window"));
+        chat.mode = mode || (chat.open ? chat.mode : ((assistantLoader.item && assistantLoader.item.visible) || (avatarLoader.item && avatarLoader.item.visible) ? "panel" : "window"));
         chat.open = true;
         // Already open: bring the keyboard back to the message field.
         const surface = chat.mode === "panel" ? chatPanelLoader.item : chatLoader.item;
@@ -245,6 +270,7 @@ ShellRoot {
     readonly property var shellTokens: tokens
     readonly property var shellProviders: providers
     readonly property var avatarSettings: providers.avatar
+    readonly property bool assistantPresentation: !!avatarSettings && avatarSettings.presentation === "assistant"
     readonly property bool avatarEnabled: Quickshell.env("DITTO_AVATAR") !== "off"
         && (!avatarSettings || avatarSettings.enabled !== false)
     property bool avatarRecalled: false
@@ -288,7 +314,7 @@ ShellRoot {
     /// (shell.report), which answers desktop.panels.list and reads changes
     /// back from it. Read from the surface, not copied from the settings.
     readonly property var avatarPlacement: {
-        const surface = avatarLoader.item;
+        const surface = root.assistantPresentation ? assistantLoader.item : avatarLoader.item;
         if (!surface || !surface.screen) {
             return { follows_primary: !namedScreen, corner: avatarCorner, x: 0, y: 0, width: 0, height: 0, visible: false };
         }
@@ -477,11 +503,12 @@ ShellRoot {
         active: chat.open && chat.mode === "window"
 
         ChatWindow {
+            assistantPresentation: root.assistantPresentation
             client: root.shellClient
             tokens: root.shellTokens
             conversation: root.shellConversation
             counter: rpcCounter
-            onCloseRequested: chat.open = false
+            onCloseRequested: root.closeChat()
             onCollapseRequested: chat.mode = "panel"
             onSettingsRequested: root.openAiSettings()
         }
@@ -498,8 +525,9 @@ ShellRoot {
             screen: root.avatarScreen
             corner: root.avatarCorner
             avatarHeight: avatarLoader.item ? avatarLoader.item.implicitHeight : 0
+            entryRect: root.assistantPresentation && root.avatarPlacement.visible ? root.avatarPlacement : null
             counter: rpcCounter
-            onCloseRequested: chat.open = false
+            onCloseRequested: root.closeChat()
             onExpandRequested: chat.mode = "window"
             onSettingsRequested: root.openAiSettings()
         }
@@ -516,12 +544,28 @@ ShellRoot {
         }
     }
 
+    LazyLoader {
+        id: assistantLoader
+        active: root.avatarEnabled && root.assistantPresentation
+        AssistantSurface {
+            tokens: root.shellTokens
+            client: root.shellClient
+            conversation: root.shellConversation
+            screen: root.avatarScreen
+            corner: root.avatarCorner
+            entryScale: root.avatarSettings && root.avatarSettings.scale > 0
+                ? Math.max(0.5, Math.min(2.0, root.avatarSettings.scale)) : 1
+            shown: !(root.avatarSettings && root.avatarSettings.hidden === true) || root.avatarRecalled
+            onActivated: root.openChat("panel")
+        }
+    }
+
     /// `DITTO_AVATAR=off` leaves the character out entirely: EX-05 measures the
     /// desktop with and without it, so "off" means no surface and no timers.
     /// The Profile's `avatar.enabled: false` does the same.
     LazyLoader {
         id: avatarLoader
-        active: root.avatarEnabled
+        active: root.avatarEnabled && !root.assistantPresentation
 
         PanelWindow {
             id: avatarSurface

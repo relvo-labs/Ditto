@@ -236,6 +236,17 @@
     </message>
 </context>
 <context>
+    <name>AssistantEntry</name>
+    <message>
+        <source>助理</source>
+        <translation>Assistant</translation>
+    </message>
+    <message>
+        <source>開啟助理對話</source>
+        <translation>Open assistant conversation</translation>
+    </message>
+</context>
+<context>
     <name>Avatar</name>
     <message>
         <source>待命中</source>
@@ -1139,6 +1150,10 @@
         <translation>Working out what you asked; you can stop it</translation>
     </message>
     <message>
+        <source>正在重新連線；將查詢實際結果</source>
+        <translation>Reconnecting; checking the actual result</translation>
+    </message>
+    <message>
         <source>沒有完成；可以再試一次</source>
         <translation>Not done; you can try again</translation>
     </message>
@@ -1188,6 +1203,10 @@
 </context>
 <context>
     <name>DittoKeys</name>
+    <message>
+        <source>diff.avatar.presentation</source>
+        <translation>Assistant presentation</translation>
+    </message>
     <message>
         <source>card.kind.appearance</source>
         <translation>Appearance</translation>

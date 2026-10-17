@@ -12,6 +12,7 @@ FloatingWindow {
     /// The Shell's RpcCounter: marks the first frame this surface shows
     /// (NFR-02: input → first visible frame).
     property var counter: null
+    property bool assistantPresentation: false
     property bool framed: false
     Connections {
         target: body.Window.window
@@ -30,7 +31,7 @@ FloatingWindow {
     implicitWidth: 560
     implicitHeight: 680
     minimumSize: Qt.size(420, 420)
-    color: tokens.background
+    color: assistantPresentation ? tokens.surface : tokens.background
     visible: true
     onClosed: window.closeRequested()
 
