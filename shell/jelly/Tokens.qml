@@ -150,6 +150,12 @@ QtObject {
     readonly property int controlHeight: Math.round(30 * fontScale)
 
     // ---- motion ----------------------------------------------------------------
+    /// #66 candidate policy; local scalar animation needs no shader, including
+    /// on software renderers and reduced-transparency surfaces. Legacy callers
+    /// retain the durations below. No persisted setting or new Profile token.
+    readonly property bool motionEnabled: !reducedMotion && !lowPower
+    readonly property int motionFeedback: 120
+    readonly property int motionPresent: 180
     /// Movement durations are 0 with reduced motion; fades stay short so a
     /// change is still noticeable without anything moving.
     readonly property int durationFast: reducedMotion ? 0 : 120

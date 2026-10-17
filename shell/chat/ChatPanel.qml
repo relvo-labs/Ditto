@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../jelly" as Jelly
 
 /// The compact chat beside the character (AVA-03). It is its own surface,
 /// so it takes clicks only inside its own rectangle; the character's
@@ -31,6 +32,7 @@ PanelWindow {
     /// Actual entry rectangle in output-local coordinates; null is the exact
     /// legacy layout. The output/corner selection remains the Shell's.
     property var entryRect: null
+    property bool animations: true
     readonly property real entryPanelTop: entryRect ? entryRect.y + entryRect.height + 8 : 0
     readonly property real entryPanelBottom: entryRect && screen ? screen.height - entryRect.y + 8 : 0
     signal closeRequested()
@@ -82,16 +84,36 @@ PanelWindow {
     readonly property Item focusedItem: body.Window.activeFocusItem
 
     Rectangle {
+        id: frame
+        objectName: "chatPresentationFrame"
         anchors.fill: parent
         radius: panel.tokens.radiusLarge
         color: panel.entryRect ? panel.tokens.surface : panel.tokens.background
         border.color: panel.tokens.border
         border.width: 1
+        Jelly.MotionValue {
+            id: presentation
+            value: panel.entryRect ? 0 : 1
+            active: !!panel.entryRect && frame.visible && panel.animations && panel.tokens.motionEnabled
+            duration: panel.tokens.motionPresent
+        }
+        // Output/corner changes are geometry corrections, never position
+        // smoothing. Finish the presentation immediately at the new anchor.
+        Connections {
+            target: panel
+            function onEntryRectChanged() { presentation.settle(); }
+            function onScreenChanged() { presentation.settle(); }
+            function onCornerChanged() { presentation.settle(); }
+        }
 
         ChatBody {
             id: body
+            objectName: "chatPresentationContent"
             anchors.fill: parent
             anchors.margins: 2
+            // Keep both the visible backplate and every control's exact hit
+            // size fixed. Content is already readable/interactive on frame one.
+            opacity: 0.92 + presentation.value * 0.08
             focus: true
             compact: true
             client: panel.client

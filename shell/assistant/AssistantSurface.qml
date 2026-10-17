@@ -13,6 +13,8 @@ PanelWindow {
     property string corner: "bottom_right"
     property real entryScale: 1
     property bool shown: true
+    property bool expanded: false
+    property bool animations: true
     signal activated()
     visible: shown
     anchors {
@@ -36,8 +38,11 @@ PanelWindow {
     // Define the region in output pixels, including the selected scale.
     mask: Region { item: inputShape; radius: surface.implicitHeight / 2 }
     Item { id: inputShape; width: surface.implicitWidth; height: surface.implicitHeight }
+    onShownChanged: if (!shown) reshow.stop()
     onVisibleChanged: if (!visible && shown) reshow.restart()
-    onScreenChanged: if (shown) reshow.restart()
+    onScreenChanged: { entry.settleMotion(); if (shown) reshow.restart(); }
+    onCornerChanged: entry.settleMotion()
+    onEntryScaleChanged: entry.settleMotion()
     Timer {
         id: reshow
         interval: 100
@@ -52,6 +57,8 @@ PanelWindow {
         tokens: surface.tokens
         conversation: surface.conversation
         client: surface.client
+        expanded: surface.expanded
+        animations: surface.animations
         onActivated: surface.activated()
     }
 }

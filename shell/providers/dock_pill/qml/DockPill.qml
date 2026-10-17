@@ -42,6 +42,20 @@ Scope {
 
     /// The light recipe's presentation; false keeps the earlier one.
     readonly property bool soft: tokens !== null && tokens.lightRecipe === true
+    readonly property bool motionEnabled: soft && tokens.motionEnabled && shown
+    property real reveal: 1
+    property NumberAnimation revealAnimation: NumberAnimation {
+        target: provider; property: "reveal"; from: 0.98; to: 1
+        duration: provider.tokens ? provider.tokens.motionPresent : 0
+        easing.type: Easing.OutCubic
+    }
+    function settlePresentation() {
+        revealAnimation.stop();
+        reveal = 1;
+    }
+    onMotionEnabledChanged: if (!motionEnabled) settlePresentation()
+    onPositionChanged: settlePresentation()
+    onScreenChanged: settlePresentation()
     readonly property int iconSize: 42
     readonly property int tileSize: soft ? 52 : 40
     readonly property int pillPadding: 8
@@ -167,7 +181,11 @@ Scope {
         });
     }
 
-    onShownChanged: if (shown) loadApps()
+    onShownChanged: {
+        settlePresentation();
+        if (shown) loadApps();
+        if (motionEnabled) revealAnimation.start();
+    }
     Component.onCompleted: ready = true
 
     PanelWindow {
@@ -242,7 +260,7 @@ Scope {
             /// Soft shadow from stacked translucent shapes (no shader); none
             /// in the low-power style.
             Repeater {
-                model: provider.soft && provider.tokens.shadowEnabled ? [0.30, 0.16, 0.07] : []
+                model: provider.shown && provider.soft && provider.tokens.shadowEnabled ? [0.30, 0.16, 0.07] : []
 
                 Rectangle {
                     required property real modelData
@@ -296,6 +314,55 @@ Scope {
                     required property var modelData
                     readonly property bool running: !!modelData.window
                     readonly property bool current: running && modelData.window.focused === true
+                    readonly property bool motionActive: provider.motionEnabled && visible
+                    readonly property real feedbackTarget: !visible || !provider.shown ? 1
+                        : area.pressed ? 0.90 : area.containsMouse || activeFocus ? 0.96 : 1
+                    property real feedbackScale: 1
+                    property real confirmedScale: 1
+                    readonly property bool motionRunning: feedbackAnimation.running || confirmationAnimation.running
+                    // Providers are standalone packages: use the same one-value
+                    // stop/retarget policy locally, without importing Shell paths.
+                    function retargetFeedback() {
+                        feedbackAnimation.stop();
+                        if (!motionActive) { feedbackScale = feedbackTarget; return; }
+                        feedbackAnimation.from = feedbackScale;
+                        feedbackAnimation.to = feedbackTarget;
+                        feedbackAnimation.start();
+                    }
+                    function settleMotion() {
+                        feedbackAnimation.stop();
+                        confirmationAnimation.stop();
+                        feedbackScale = feedbackTarget;
+                        confirmedScale = 1;
+                    }
+                    onFeedbackTargetChanged: retargetFeedback()
+                    onMotionActiveChanged: if (!motionActive) settleMotion()
+                    onCurrentChanged: {
+                        confirmationAnimation.stop();
+                        confirmedScale = 1;
+                        // Actual window readback only: accepting a launch click
+                        // is not evidence that an application has started.
+                        if (current && motionActive) confirmationAnimation.start();
+                    }
+                    NumberAnimation {
+                        id: feedbackAnimation
+                        target: tile; property: "feedbackScale"
+                        duration: provider.tokens.motionFeedback
+                        easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        id: confirmationAnimation
+                        target: tile; property: "confirmedScale"; from: 0.94; to: 1
+                        duration: provider.tokens.motionPresent
+                        easing.type: Easing.OutBack
+                        // A small return without exceeding the original icon size.
+                        easing.overshoot: 0
+                    }
+                    Connections {
+                        target: provider
+                        function onPositionChanged() { tile.settleMotion(); }
+                        function onScreenChanged() { tile.settleMotion(); }
+                    }
                     objectName: "dockTile_" + modelData.appId
                     width: provider.tileSize
                     height: provider.tileSize
@@ -371,12 +438,14 @@ Scope {
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         smooth: true
+                        scale: tile.feedbackScale * tile.confirmedScale * provider.reveal
                         visible: provider.soft && status === Image.Ready
                     }
 
                     /// Fallback: a lettered tile with the application's name.
                     Rectangle {
                         objectName: "dockIconFallback"
+                        scale: tile.feedbackScale * tile.confirmedScale * provider.reveal
                         anchors.centerIn: parent
                         width: provider.iconSize
                         height: provider.iconSize
