@@ -137,8 +137,9 @@ TestCase {
         const dock = mount("DockPill.qml", { position: "bottom", pinned: Data.pinned });
         const panel = mount("PanelTop.qml", {});
         tryCompare(dock, "appsLoaded", true);
-        const capsule = findChild(layer, "dockCapsule");
+        const capsule = findChild(layer, dock.soft ? "dockCapsule" : "dockLegacyPill");
         tryVerify(() => capsule.width > capsule.height * 2, 3000, "dock laid out");
+        const region = dock.data.find(item => item.mask !== undefined && item.mask !== null).mask;
         // Every icon has loaded or failed (then the lettered tile shows).
         tryVerify(() => {
             for (const entry of dock.entries) {
@@ -156,7 +157,7 @@ TestCase {
         image.save(path);
         const icons = dock.entries.map(entry => {
             const icon = findChild(findChild(layer, "dockTile_" + entry.appId), "dockIcon");
-            return { app_id: entry.appId, icon_status: icon.status === Image.Ready ? "ready" : "fallback",
+            return { app_id: entry.appId, icon_status: !dock.soft ? "legacy-initials" : icon.status === Image.Ready ? "ready" : "fallback",
                      source: String(icon.source) };
         });
         console.log("CAPTURE_META " + JSON.stringify({
@@ -168,7 +169,10 @@ TestCase {
                         panel_window: rect(layer.children.find(item => item.objectName === "stubPanelWindow" && item.visible
                                                                   && item !== capsule.parent && item.y === 0)),
                         sample_back: rect(findChild(screen, "materialSample_back")), sample_front: rect(findChild(screen, "materialSample_front")) },
-            dock_icons: icons, wallpaper_shown: backdrop.wallpaperShown
+            dock_icons: icons, wallpaper_shown: backdrop.wallpaperShown,
+            dock_presentation: dock.soft ? "light" : "legacy",
+            dock_input_region: { item: rect(region.item), radius: region.radius,
+                                 corner_inside: region.contains(1, 1), centre_inside: region.contains(region.item.width / 2, region.item.height / 2) }
         }));
         unmountAll();
         return path;
@@ -198,6 +202,12 @@ TestCase {
             { id: "fixture-2", app_id: Data.pinned[2], title: "fixture", focused: false }
         ];
         render("dock-states", light(), windows, Data.pinned[1]);
+    }
+
+    /// The earlier look, unchanged for Profiles with the `soft-jelly` theme
+    /// (or none): lettered Dock bubbles, the earlier material, flat canvas.
+    function test_5_legacy_soft_jelly() {
+        render("legacy-soft-jelly", { theme: "soft-jelly", tokens: {}, locale: "zh-TW" }, [], null);
     }
 
     function initTestCase() {

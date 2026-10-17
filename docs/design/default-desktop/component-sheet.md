@@ -20,7 +20,7 @@
 | 天氣／手寫字 | 右上 x≈1180–1255、y≈52–102；右側手寫字兩處 | 無 | **待 owner**：桌布還是 widget 未定；不做假天氣 |
 | 後方視窗（Files） | x≈37、y≈63、643×455；圓角≈14–16；標題列≈36；側欄≈120 寬 | 第三方應用。Ditto 只提供材質樣本 `shell/jelly/Material.qml` 供自有表面使用 | **待 owner**：實際應用與首次登入是否開啟；不重繪第三方 app |
 | 前方視窗（Notes） | x≈77、y≈465、535×230 | 同上 | 同上 |
-| Dock | 置中浮動膠囊，x≈379–901、y≈717–787（≈522×70），離底≈13；7 個彩色圖示≈44 px，間距≈75 | `shell/providers/dock_pill/qml/DockPill.qml` | 膠囊、應用圖示、fallback、使用中／執行中標示**已實作**；預設 Profile 仍綁 `dock_bottom`（§5 H3）；圖示風格待素材 |
+| Dock | 置中浮動膠囊，x≈379–901、y≈717–787（≈522×70），離底≈13；7 個彩色圖示≈44 px，間距≈75 | `shell/providers/dock_pill/qml/DockPill.qml` | 淺色 recipe 下：膠囊、應用圖示、fallback、使用中／執行中標示**已實作**；其他主題維持原樣（§2.2）。預設 Profile 仍綁 `dock_bottom`（§5 H3）；圖示風格待素材 |
 | 右下助理 | x≈1065–1260、y≈710–764（≈197×54） | 無（R3／#67） | **不在 R1**：錨點保留空白，不畫假入口 |
 | 留白 | 右半部留給桌布角色；視窗與 Dock 之間≈20 px；Dock 兩側大面積空白 | `Backdrop` 不放任何內容 | 已保留；無桌布時右側只有漸層（§4 D1） |
 
@@ -41,6 +41,7 @@
 | `focus` | `#4c3fb5` | 同 | 同 | 原圖未呈現焦點 |
 | `accent` | `#9d8cf0`（預設 Profile 覆寫為 `#b9a4ff`） | 同 | 同 | 作用中工作區 `#9f96e8` |
 | `warning`／`danger`／`success` | `#7a4a00`／`#a8231b`／`#17663a` | 同 | 同 | 原圖未呈現；保留各自色相，不染紫（測試要求與 accent 色相差 ≥60°） |
+| `scrim`（啟動器網格的全螢幕底） | `#fbfaff` α0.86（近白霧面） | `background` 不透明 | 同一般 | 原圖沒有啟動器 |
 | 衍生：`highlight`（內亮邊） | 白 α0.85 | 無 | 白 α0.85 | 視窗頂緣 `#f0efff` |
 | 衍生：canvas | 由左往右疊白 α0.42，底部疊白 α0.12 | 同 | 同 | — |
 | `blur_radius`／`shadow_radius` | 18／14 | 0／14 | 0／0 | — |
@@ -60,9 +61,37 @@
 | `focus` 環 | 7.14／7.53 | 6.78／7.53 | 6.52／6.18 | 5.24 |
 | `on_accent` 在 accent 上 | 7.44（`#9d8cf0`）；預設 Profile 的 `#b9a4ff` 為 9.82 | | | |
 
+各元件實際畫字的合成底色（`git grep scrim`，以及啟動器、通知、管理中心的全螢幕或疊層底）：
+
+| 合成底色（疊在 canvas 上） | 畫在上面的 | 一般 | 降透明 |
+| --- | --- | --- | --- |
+| LauncherGrid：`scrim`（字直接畫在上面） | `foreground` 名稱／`foreground_muted` 提示／`focus` 框 | 14.80／6.71／7.17 | 10.80／6.39／5.24 |
+| LauncherSearch：`surface` 疊在 `surface_strong` 面板 | `foreground`／`foreground_muted` | 15.31／6.94 | 15.53／9.19 |
+| NotificationArea：`surface_strong`×`surface_opacity` 卡片 | `foreground`／`foreground_muted`／`warning` | 13.28／6.02／6.16 | 12.75／7.54／5.91 |
+| 管理中心：視窗底色 `background`、`surface` 面板 | 全部文字色 | 見上表 canvas 欄；`surface` 上最低 6.52 | 最低 6.74 |
+
+每格五種文字色與焦點環都在測試裡斷言（≥4.5、焦點 ≥3），完整數值見證據 `contrast.txt`；全部配對的最低值仍是 4.69。舊版深色 `scrim` 讓啟動器網格的提示文字只有 2.16:1（review I6），現改為近白霧面。
+
 低效能模式的值與一般相同，但沒有陰影。限制：對比只對 canvas 計算；上了真實桌布後，半透明表面的實際底色會改變，要用桌布重算。降低透明度模式不受桌布影響。`on_accent` 實際是 `#000000`，見 §5 H5。
 
+### 2.2 舊版呈現不變（review I1）
+
+新外觀只在 `soft-jelly-light` 生效，由 `tokens.lightRecipe` 一個旗標決定。`soft-jelly` 與沒有 theme 的 Profile 必須與 `f582426` 逐像素相同；`tests/g4/visual/unit/tst_legacy.qml` 把 base 版檔案（由 `stage-providers.mjs` 從 git 取出）與現行檔案並排渲染比對。
+
+| 變更 | 分類 | 舊版主題的結果 |
+| --- | --- | --- |
+| Tokens：淺色值、`scrim`、`shadowColor`、canvas／`highlight` 衍生值 | 只在淺色 | 深色值逐字不變（Core 契約測試也比對） |
+| Tokens：`effectsEnabled`、`lightRecipe` | 中性，不是顏色 | 無畫面變化 |
+| Material：柔影三路徑、光澤、內亮邊 | 只在淺色 | 原本的偏移矩形陰影＋填色，逐像素相同（三種模式 × raised 真偽） |
+| Backdrop／`shell.qml` 背景 | 中性 | 漸層兩端同色、沒有光暈、沒有桌布：與原本純色逐像素相同 |
+| Surface.qml | 未改 | — |
+| DockPill：52 px 圖示格、厚度 84、浮動膠囊、圖示、底板／長條／圓點、尾段名稱比對 | 只在淺色 | 40 px 字母圓、厚度 60、原本的膠囊與圓點，逐像素相同（底部與左側） |
+| DockPill：輸入區＝可見膠囊（圓角） | 中性修正 | 不改像素；舊版膠囊外的透明邊與圓角外不再攔截點擊 |
+| DockPill：無障礙名稱加「（使用中）」 | 中性修正 | 不改像素；使用中原本只靠 accent 顏色表達 |
+
 ## 3. 柔光材質（`shell/jelly/Material.qml`）
+
+以下是淺色 recipe 的路徑；其他主題走 `legacy`，即原本的兩個矩形。
 
 - **一般模式＋硬體 renderer（`effect`）**：MultiEffect 只模糊 Material **自己的**陰影形狀（隱藏的 Rectangle），寬而淡、向下偏移。它不取樣表面後方的像素，**不是** compositor backdrop blur；Wayfire 0.11 上沒有可用的背景模糊協定，`blur_radius` 仍只是 token。
 - **降低透明度，或 software renderer（`layered`）**：四層半透明圓角矩形疊出柔影，不用 shader。表面不透明，沒有頂部光澤與內亮邊，邊線加深。
@@ -71,6 +100,7 @@
 - 頂部光澤是一般 Gradient，內亮邊是 1 px 邊線，兩者都不用 shader。
 - 目前 Shell 裡沒有任何表面使用 `Material`（管理中心、對話、試看列各自畫 Rectangle）。換用屬共用 UI 一致性工作，見 §5 H7。
 - Dock 供應者從套件庫載入，不能 import `shell/jelly`。它用同一組 token 自己畫三層疊影與內亮邊，不建立 shader。
+- Dock 的輸入區用 Quickshell 0.3.1 的 `Region { item; radius }`（型別資訊與參考機 lock 同為 revision `1a4716c`）：`item` 是可見的膠囊，`radius` 等於膠囊圓角。圓角外、陰影與透明邊都不攔截點擊（`tst_dock.qml`、`tst_legacy.qml` 以替身的 `contains()` 斷言角落在外、中心在內）。實際 Wayfire 上的命中尚未在座位驗證。
 
 ## 4. 偏離帳
 
@@ -109,7 +139,7 @@
 1. 把 `dock_pill`、`panel_top` 複製到 `.staged/`。只移除 layer-shell 的三行，逐行記在 `staging.json`。
 2. 跑 qmltestrunner 單元測試。
 3. 讀本機的 desktop entry 與圖示主題。
-4. 以 1280×800、scale 1 渲染四張圖：normal、reduced-transparency、low-power、dock-states。
+4. 以 1280×800、scale 1 渲染五張圖：normal、reduced-transparency、low-power、dock-states（淺色），以及 legacy-soft-jelly（舊版主題）。
 5. 產出 side-by-side、50/50 疊圖（標出元件框）與逐元件取樣 `comparison.json`。
 
 標明的測試資料：四個工作區（第一個作用中）、釘選清單、dock-states 圖中的兩筆視窗記錄。時鐘是執行當下的真實時間。不畫桌布、標題、天氣或助理。PNG 只放證據目錄，不進 git。

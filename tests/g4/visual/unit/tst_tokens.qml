@@ -61,11 +61,25 @@ TestCase {
         const canvas = t.background;
         const shadowed = over(t.shadowColor, t.shadowEnabled ? t.shadowColor.a : 0, canvas);
         const fillAlpha = t.surface.a * t.surfaceOpacity;
+        const strong = over(t.surfaceStrong, t.surfaceStrong.a, canvas);
         return {
             "material": over(t.surface, fillAlpha, canvas),
             "material+shadow": over(t.surface, fillAlpha, shadowed),
-            "surfaceStrong": over(t.surfaceStrong, t.surfaceStrong.a, canvas),
-            "canvas": canvas
+            "surfaceStrong": strong,
+            // Full-bleed window colour of the centers (Centers.qml).
+            "canvas": canvas,
+            // Every consumer that draws text on a composed background
+            // (`git grep scrim` and the full-bleed/stacked surfaces of the
+            // launchers, notifications and centers; component-sheet.md §2):
+            // LauncherGrid.qml: hint (foregroundMuted), names (foreground) and
+            // the current tile's focus border straight on the scrim.
+            "launcher_grid.scrim": over(t.scrim, t.scrim.a, canvas),
+            // LauncherSearch.qml: query field (surface) on its panel (surfaceStrong).
+            "launcher_search.field": over(t.surface, t.surface.a, strong),
+            // NotificationArea.qml: card (surfaceStrong × surfaceOpacity).
+            "notifications.card": over(t.surfaceStrong, t.surfaceStrong.a * t.surfaceOpacity, canvas),
+            // Centers' panels and rows (surface, no extra opacity) on the window colour.
+            "centers.surface": over(t.surface, t.surface.a, canvas)
         };
     }
 

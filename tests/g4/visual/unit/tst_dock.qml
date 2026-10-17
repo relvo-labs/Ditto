@@ -169,6 +169,13 @@ TestCase {
         // The input region is the capsule, not the window's transparent margin.
         const panel = provider.data.find(item => item.mask !== undefined && item.mask !== null);
         compare(panel.mask.item, capsule);
+        // Rounded like the capsule: its corners are not part of the region.
+        compare(panel.mask.radius, Math.round(capsule.radius));
+        verify(!panel.mask.contains(1, 1), "top-left corner outside");
+        verify(!panel.mask.contains(capsule.width - 2, capsule.height - 2), "bottom-right corner outside");
+        verify(panel.mask.contains(capsule.width / 2, capsule.height / 2), "centre inside");
+        verify(panel.mask.contains(capsule.width / 2, 1), "top edge middle inside");
+        verify(panel.mask.contains(capsule.radius, capsule.height / 2), "left end inside");
         compare(panel.exclusiveZone, provider.thickness);
         provider.release();
         verify(!window.visible);

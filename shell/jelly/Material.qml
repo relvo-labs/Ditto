@@ -18,6 +18,10 @@ import QtQuick.Effects
 /// - `none`: the low-power style (no shadow at all), or `raised: false`.
 /// The effect is created only on the `effect` path; on the others no
 /// MultiEffect exists.
+///
+/// All of this is the light recipe's (`tokens.lightRecipe`). Any other theme
+/// keeps the material as it was before (`legacy`): the fill and a plain
+/// offset rectangle for a shadow, pixel for pixel.
 Item {
     id: material
 
@@ -30,10 +34,27 @@ Item {
     property bool shaderCapable: GraphicsInfo.api !== GraphicsInfo.Software
         && GraphicsInfo.api !== GraphicsInfo.Unknown
 
+    /// The soft material is the light recipe's; other themes keep the old one.
+    readonly property bool soft: tokens.lightRecipe === true
     readonly property string shadowPath: !raised || !tokens.shadowEnabled ? "none"
+        : !soft ? "legacy"
         : (tokens.effectsEnabled && shaderCapable ? "effect" : "layered")
     /// Shadow reach below the surface, in pixels.
     readonly property real shadowOffset: Math.round(Math.max(2, tokens.shadowRadius * 0.4))
+
+    /// Legacy shadow: the second rectangle of the material before #65.
+    Rectangle {
+        objectName: "materialLegacyShadow"
+        visible: material.shadowPath === "legacy"
+        anchors.fill: parent
+        anchors.topMargin: 3
+        anchors.leftMargin: 1
+        anchors.rightMargin: -1
+        anchors.bottomMargin: -4
+        radius: material.radius + 2
+        color: material.tokens.shadowColor
+        opacity: 0.55
+    }
 
     Loader {
         id: effectShadow
@@ -102,7 +123,7 @@ Item {
     /// The faint top sheen: a plain gradient, no shader. Not drawn with
     /// reduced transparency, where the surface stays one opaque colour.
     Rectangle {
-        visible: !material.tokens.reducedTransparency
+        visible: material.soft && !material.tokens.reducedTransparency
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
@@ -117,6 +138,7 @@ Item {
 
     /// The bright inner edge.
     Rectangle {
+        visible: material.soft
         anchors.fill: parent
         anchors.margins: 1
         radius: Math.max(0, material.radius - 1)

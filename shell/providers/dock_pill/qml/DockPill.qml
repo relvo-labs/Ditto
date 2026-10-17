@@ -16,6 +16,11 @@ import Quickshell.Wayland
 /// a blank button. The window in use has a bar under its icon and a running
 /// one a dot; the accessible name says the same in words. Only the capsule
 /// takes input: the transparent margin around it lets clicks through.
+///
+/// That presentation is the light recipe's (`tokens.lightRecipe`). With any
+/// other theme the Dock looks as it did before: 40 px lettered bubbles in a
+/// pill 60 px thick. Only the input region (the visible pill, rounded) and
+/// the accessible names are the same in both.
 Scope {
     id: provider
 
@@ -35,13 +40,15 @@ Scope {
     property bool appsLoaded: false
     property string notice: ""
 
+    /// The light recipe's presentation; false keeps the earlier one.
+    readonly property bool soft: tokens !== null && tokens.lightRecipe === true
     readonly property int iconSize: 42
-    readonly property int tileSize: 52
+    readonly property int tileSize: soft ? 52 : 40
     readonly property int pillPadding: 8
     /// Space between the capsule and the screen edge.
     readonly property int edgeGap: 12
     readonly property int pillThickness: tileSize + pillPadding * 2
-    readonly property int thickness: pillThickness + edgeGap + 4
+    readonly property int thickness: soft ? pillThickness + edgeGap + 4 : 60
 
     function healthy() {
         return ready && client !== null && tokens !== null;
@@ -69,13 +76,15 @@ Scope {
         }) || null;
     }
 
-    /// The indexed application for an id: the same id, or else the same
-    /// last segment (a window's `foot` is the index's `org.codeberg.dnkl.foot`).
+    /// The indexed application for an id: the same id, or else (light
+    /// recipe) the same last segment (a window's `foot` is the index's
+    /// `org.codeberg.dnkl.foot`). The earlier Dock matched the id only.
     function appFor(appId) {
         const wanted = String(appId).toLowerCase();
         const tail = wanted.split(".").pop();
-        return apps.find(item => String(item.app_id).toLowerCase() === wanted)
-            || apps.find(item => String(item.app_id).toLowerCase().split(".").pop() === tail)
+        return apps.find(item => String(item.app_id) === String(appId))
+            || (soft ? apps.find(item => String(item.app_id).toLowerCase() === wanted)
+                || apps.find(item => String(item.app_id).toLowerCase().split(".").pop() === tail) : null)
             || null;
     }
 
@@ -87,6 +96,9 @@ Scope {
     /// The image for an application's icon, or "" when it has none the
     /// icon theme can resolve (the lettered tile is shown instead).
     function iconSource(appId) {
+        if (!soft) {
+            return "";
+        }
         const app = appFor(appId);
         const icon = app && app.icon ? String(app.icon) : "";
         if (icon.length === 0) {
@@ -162,14 +174,20 @@ Scope {
         id: dock
 
         readonly property bool vertical: provider.position === "left"
+        /// The visible pill, which is also the input region.
+        readonly property Item capsule: provider.soft ? pill : legacyPill
 
         visible: provider.shown
         anchors {
             bottom: provider.position === "bottom"
             left: provider.position === "left"
         }
-        implicitWidth: vertical ? provider.thickness : pill.width + provider.edgeGap * 2
-        implicitHeight: vertical ? pill.height + provider.edgeGap * 2 : provider.thickness
+        implicitWidth: provider.soft
+            ? (vertical ? provider.thickness : pill.width + provider.edgeGap * 2)
+            : (vertical ? provider.thickness : Math.max(160, strip.implicitWidth + provider.tokens.spaceSection * 2))
+        implicitHeight: provider.soft
+            ? (vertical ? pill.height + provider.edgeGap * 2 : provider.thickness)
+            : (vertical ? Math.max(160, strip.implicitHeight + provider.tokens.spaceSection * 2) : provider.thickness)
         exclusiveZone: provider.shown ? provider.thickness : 0
         color: "transparent"
         // Mapped without keyboard interactivity, then on demand: a surface
@@ -185,14 +203,32 @@ Scope {
         WlrLayershell.keyboardFocus: mapped ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
         WlrLayershell.namespace: "ditto-dock-pill"
 
-        /// Input only on the capsule; the margin and shadow pass clicks on.
+        /// Input only on the visible pill, with its rounded ends (Quickshell
+        /// 0.3.1 Region: `item` gives the rectangle, `radius` rounds it). The
+        /// margin, the shadow and the corners outside the curve pass clicks on.
         mask: Region {
-            item: pill
+            item: dock.capsule
+            radius: Math.round(dock.capsule.radius)
+        }
+
+        /// The earlier pill (themes other than the light recipe).
+        Rectangle {
+            id: legacyPill
+            objectName: "dockLegacyPill"
+            visible: !provider.soft
+            anchors.fill: parent
+            anchors.margins: provider.tokens.space
+            radius: Math.min(width, height) / 2
+            color: provider.tokens.surface
+            border.color: provider.tokens.border
+            border.width: 1
+            opacity: provider.tokens.surfaceOpacity
         }
 
         Item {
             id: pill
             objectName: "dockCapsule"
+            visible: provider.soft
             width: dock.vertical ? provider.pillThickness : strip.implicitWidth + provider.pillPadding * 2 + provider.tokens.space * 2
             height: dock.vertical ? strip.implicitHeight + provider.pillPadding * 2 + provider.tokens.space * 2 : provider.pillThickness
             anchors.horizontalCenter: dock.vertical ? undefined : parent.horizontalCenter
@@ -206,7 +242,7 @@ Scope {
             /// Soft shadow from stacked translucent shapes (no shader); none
             /// in the low-power style.
             Repeater {
-                model: provider.tokens.shadowEnabled ? [0.30, 0.16, 0.07] : []
+                model: provider.soft && provider.tokens.shadowEnabled ? [0.30, 0.16, 0.07] : []
 
                 Rectangle {
                     required property real modelData
@@ -240,133 +276,179 @@ Scope {
                 border.color: provider.tokens.highlight !== undefined ? provider.tokens.highlight : "transparent"
                 border.width: 1
             }
+        }
 
-            Grid {
-                id: strip
-                anchors.centerIn: parent
-                flow: dock.vertical ? Grid.TopToBottom : Grid.LeftToRight
-                rows: dock.vertical ? Math.max(1, provider.entries.length + 1) : 1
-                columns: dock.vertical ? 1 : Math.max(1, provider.entries.length + 1)
-                spacing: provider.tokens.space
-                verticalItemAlignment: Grid.AlignVCenter
-                horizontalItemAlignment: Grid.AlignHCenter
+        Grid {
+            id: strip
+            anchors.centerIn: provider.soft ? pill : parent
+            flow: dock.vertical ? Grid.TopToBottom : Grid.LeftToRight
+            rows: dock.vertical ? Math.max(1, provider.entries.length + 1) : 1
+            columns: dock.vertical ? 1 : Math.max(1, provider.entries.length + 1)
+            spacing: provider.tokens.space
+            verticalItemAlignment: provider.soft ? Grid.AlignVCenter : Grid.AlignTop
+            horizontalItemAlignment: provider.soft ? Grid.AlignHCenter : Grid.AlignLeft
 
-                Repeater {
-                    model: provider.entries
+            Repeater {
+                model: provider.entries
 
-                    Item {
-                        id: tile
-                        required property var modelData
-                        readonly property bool running: !!modelData.window
-                        readonly property bool current: running && modelData.window.focused === true
-                        objectName: "dockTile_" + modelData.appId
-                        width: provider.tileSize
-                        height: provider.tileSize
-                        activeFocusOnTab: true
-                        Accessible.role: Accessible.Button
-                        Accessible.name: provider.accessibleName(modelData)
-                        Accessible.onPressAction: provider.activate(modelData)
+                Item {
+                    id: tile
+                    required property var modelData
+                    readonly property bool running: !!modelData.window
+                    readonly property bool current: running && modelData.window.focused === true
+                    objectName: "dockTile_" + modelData.appId
+                    width: provider.tileSize
+                    height: provider.tileSize
+                    activeFocusOnTab: true
+                    Accessible.role: Accessible.Button
+                    Accessible.name: provider.accessibleName(modelData)
+                    Accessible.onPressAction: provider.activate(modelData)
 
-                        /// Plate behind the window in use, and under the pointer.
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: provider.tokens.radiusMedium
-                            visible: tile.current || area.containsMouse
-                            color: provider.tokens.surfaceStrong
-                            border.color: provider.tokens.border
-                            border.width: tile.current ? 1 : 0
-                        }
+                    // ---- earlier presentation: a lettered bubble ----------
+                    Rectangle {
+                        objectName: "dockLegacyBubble"
+                        visible: !provider.soft
+                        anchors.fill: parent
+                        radius: 20
+                        color: tile.current ? provider.tokens.accent : provider.tokens.surfaceStrong
+                        border.color: provider.tokens.border
+                        border.width: 1
 
-                        Image {
-                            id: icon
-                            objectName: "dockIcon"
+                        Text {
                             anchors.centerIn: parent
-                            width: provider.iconSize
-                            height: provider.iconSize
-                            source: provider.iconSource(tile.modelData.appId)
-                            sourceSize.width: provider.iconSize * 2
-                            sourceSize.height: provider.iconSize * 2
-                            fillMode: Image.PreserveAspectFit
-                            asynchronous: true
-                            smooth: true
-                            visible: status === Image.Ready
+                            text: provider.appName(tile.modelData.appId).substring(0, 2)
+                            color: tile.current ? provider.tokens.onAccent : provider.tokens.foreground
+                            font.pixelSize: provider.tokens.fontBody
+                            font.bold: true
                         }
+                    }
 
-                        /// Fallback: a lettered tile with the application's name.
-                        Rectangle {
-                            objectName: "dockIconFallback"
+                    /// Running indicator: a dot, and the accessible name says it too.
+                    Rectangle {
+                        visible: !provider.soft && tile.running
+                        width: 6
+                        height: 6
+                        radius: 3
+                        color: provider.tokens.foreground
+                        anchors.horizontalCenter: dock.vertical ? undefined : parent.horizontalCenter
+                        anchors.verticalCenter: dock.vertical ? parent.verticalCenter : undefined
+                        anchors.top: dock.vertical ? undefined : parent.bottom
+                        anchors.left: dock.vertical ? parent.right : undefined
+                        anchors.topMargin: 1
+                        anchors.leftMargin: 1
+                    }
+
+                    Rectangle {
+                        visible: !provider.soft
+                        anchors.fill: parent
+                        anchors.margins: -3
+                        radius: width / 2
+                        color: "transparent"
+                        border.color: provider.tokens.focus
+                        border.width: tile.activeFocus ? 2 : 0
+                    }
+
+                    // ---- light recipe: the application's icon -------------
+                    /// Plate behind the window in use, and under the pointer.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: provider.tokens.radiusMedium
+                        visible: provider.soft && (tile.current || area.containsMouse)
+                        color: provider.tokens.surfaceStrong
+                        border.color: provider.tokens.border
+                        border.width: tile.current ? 1 : 0
+                    }
+
+                    Image {
+                        id: icon
+                        objectName: "dockIcon"
+                        anchors.centerIn: parent
+                        width: provider.iconSize
+                        height: provider.iconSize
+                        source: provider.iconSource(tile.modelData.appId)
+                        sourceSize.width: provider.iconSize * 2
+                        sourceSize.height: provider.iconSize * 2
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                        smooth: true
+                        visible: provider.soft && status === Image.Ready
+                    }
+
+                    /// Fallback: a lettered tile with the application's name.
+                    Rectangle {
+                        objectName: "dockIconFallback"
+                        anchors.centerIn: parent
+                        width: provider.iconSize
+                        height: provider.iconSize
+                        radius: provider.tokens.radiusMedium
+                        visible: provider.soft && icon.status !== Image.Ready
+                        color: provider.tokens.surfaceStrong
+                        border.color: provider.tokens.border
+                        border.width: 1
+
+                        Text {
                             anchors.centerIn: parent
-                            width: provider.iconSize
-                            height: provider.iconSize
-                            radius: provider.tokens.radiusMedium
-                            visible: icon.status !== Image.Ready
-                            color: provider.tokens.surfaceStrong
-                            border.color: provider.tokens.border
-                            border.width: 1
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: provider.appName(tile.modelData.appId).substring(0, 2)
-                                color: provider.tokens.foreground
-                                font.pixelSize: provider.tokens.fontBody
-                                font.bold: true
-                            }
+                            text: provider.appName(tile.modelData.appId).substring(0, 2)
+                            color: provider.tokens.foreground
+                            font.pixelSize: provider.tokens.fontBody
+                            font.bold: true
                         }
+                    }
 
-                        /// Window in use: a bar. Running: a dot. Shape, not only
-                        /// colour, tells them apart.
-                        Rectangle {
-                            objectName: "dockIndicator"
-                            visible: tile.running
-                            readonly property int length: tile.current ? 16 : 5
-                            width: dock.vertical ? 4 : length
-                            height: dock.vertical ? length : 4
-                            radius: 2
-                            color: tile.current ? provider.tokens.focus : provider.tokens.foregroundMuted
-                            anchors.horizontalCenter: dock.vertical ? undefined : parent.horizontalCenter
-                            anchors.bottom: dock.vertical ? undefined : parent.bottom
-                            anchors.bottomMargin: 1
-                            anchors.verticalCenter: dock.vertical ? parent.verticalCenter : undefined
-                            anchors.left: dock.vertical ? parent.left : undefined
-                            anchors.leftMargin: 1
-                        }
+                    /// Window in use: a bar. Running: a dot. Shape, not only
+                    /// colour, tells them apart.
+                    Rectangle {
+                        objectName: "dockIndicator"
+                        visible: provider.soft && tile.running
+                        readonly property int length: tile.current ? 16 : 5
+                        width: dock.vertical ? 4 : length
+                        height: dock.vertical ? length : 4
+                        radius: 2
+                        color: tile.current ? provider.tokens.focus : provider.tokens.foregroundMuted
+                        anchors.horizontalCenter: dock.vertical ? undefined : parent.horizontalCenter
+                        anchors.bottom: dock.vertical ? undefined : parent.bottom
+                        anchors.bottomMargin: 1
+                        anchors.verticalCenter: dock.vertical ? parent.verticalCenter : undefined
+                        anchors.left: dock.vertical ? parent.left : undefined
+                        anchors.leftMargin: 1
+                    }
 
-                        /// Keyboard focus: a ring around the whole tile.
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: -2
-                            radius: provider.tokens.radiusMedium + 2
-                            color: "transparent"
-                            border.color: provider.tokens.focus
-                            border.width: tile.activeFocus ? 2 : 0
-                        }
+                    /// Keyboard focus: a ring around the whole tile.
+                    Rectangle {
+                        visible: provider.soft
+                        anchors.fill: parent
+                        anchors.margins: -2
+                        radius: provider.tokens.radiusMedium + 2
+                        color: "transparent"
+                        border.color: provider.tokens.focus
+                        border.width: tile.activeFocus ? 2 : 0
+                    }
 
-                        Keys.onReturnPressed: provider.activate(modelData)
-                        Keys.onSpacePressed: provider.activate(modelData)
-                        Keys.onMenuPressed: provider.togglePin(modelData)
+                    Keys.onReturnPressed: provider.activate(modelData)
+                    Keys.onSpacePressed: provider.activate(modelData)
+                    Keys.onMenuPressed: provider.togglePin(modelData)
 
-                        MouseArea {
-                            id: area
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onClicked: mouse => {
-                                if (mouse.button === Qt.RightButton) {
-                                    provider.togglePin(tile.modelData);
-                                } else {
-                                    provider.activate(tile.modelData);
-                                }
+                    MouseArea {
+                        id: area
+                        anchors.fill: parent
+                        hoverEnabled: provider.soft
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton) {
+                                provider.togglePin(tile.modelData);
+                            } else {
+                                provider.activate(tile.modelData);
                             }
                         }
                     }
                 }
+            }
 
-                Text {
-                    visible: provider.notice.length > 0
-                    color: provider.tokens.warning
-                    font.pixelSize: provider.tokens.fontSmall
-                    text: provider.notice
-                }
+            Text {
+                visible: provider.notice.length > 0
+                color: provider.tokens.warning
+                font.pixelSize: provider.tokens.fontSmall
+                text: provider.notice
             }
         }
     }

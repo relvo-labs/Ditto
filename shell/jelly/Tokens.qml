@@ -97,8 +97,10 @@ QtObject {
     readonly property color warning: lightRecipe ? colorToken("warning", "#7a4a00") : colorToken("warning", "#ffcf8b")
     readonly property color danger: lightRecipe ? colorToken("danger", "#a8231b") : colorToken("danger", "#ff9b9b")
     readonly property color success: lightRecipe ? colorToken("success", "#17663a") : colorToken("success", "#9be3b4")
+    // Light: a near-white veil, so text drawn straight on it (the launcher
+    // grid's names and hint) stays readable; a dark veil left the hint at 2.2:1.
     readonly property color scrim: lightRecipe
-        ? (reducedTransparency ? background : Qt.rgba(0.16, 0.14, 0.29, 0.42))
+        ? (reducedTransparency ? background : withAlpha(surfaceBase, 0.86))
         : (reducedTransparency ? "#12121a" : "#b312121a")
 
     // Derived values, not overridable on their own: they follow the tokens above.
