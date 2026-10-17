@@ -130,8 +130,63 @@ fn first_login_seeds_three_exportable_compositions_once() {
 }
 
 #[test]
+fn failed_bootstrap_leaves_no_partial_profiles_or_active_pointer() {
+    let root = root("builtin-atomic-bootstrap");
+    let paths = Paths::under(&root.join("store"));
+    {
+        let lock = ditto_store::WriterLock::acquire(&paths.lock()).unwrap();
+        let (mut store, _) = ditto_store::Store::open_writer(&paths, &lock).unwrap();
+        store
+            .write(|tx| {
+                tx.execute_batch(
+                    "CREATE TRIGGER refuse_second_profile BEFORE INSERT ON profiles
+                WHEN NEW.name = '開發' BEGIN SELECT RAISE(ABORT, 'test bootstrap failure'); END;",
+                )?;
+                Ok(())
+            })
+            .unwrap();
+    }
+    let core = start_at(&root, false);
+    let harness = Harness { core, root };
+    let listed = stored_list(&harness.core);
+    assert!(listed["profiles"].as_array().unwrap().is_empty());
+    assert!(listed["active_profile"].is_null());
+    harness
+        .core
+        .coordinate(Duration::from_secs(10), |co| {
+            assert_eq!(
+                co.store_ref()
+                    .connection()
+                    .query_row("SELECT COUNT(*) FROM revisions", [], |r| r.get::<_, u32>(0))
+                    .unwrap(),
+                0
+            );
+            co.store()
+                .write(|tx| {
+                    tx.execute_batch("DROP TRIGGER refuse_second_profile")?;
+                    Ok(())
+                })
+                .unwrap();
+            co.boot(None);
+        })
+        .unwrap();
+    assert_eq!(
+        stored_list(&harness.core)["profiles"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+}
+
+#[test]
 fn upgrade_preserves_legacy_profiles_with_or_without_an_active_id() {
-    for with_active in [true, false] {
+    for (with_active, names) in [
+        (true, vec!["我的桌面"]),
+        (false, vec!["我的桌面"]),
+        (true, vec!["我的桌面", "開發", "簡報"]),
+        (false, vec!["我的桌面", "開發", "簡報"]),
+    ] {
         let root = root("builtin-upgrade");
         let paths = Paths::under(&root.join("store"));
         let mut saved = Vec::new();
@@ -140,7 +195,7 @@ fn upgrade_preserves_legacy_profiles_with_or_without_an_active_id() {
             let (mut store, _) = ditto_store::Store::open_writer(&paths, &lock).unwrap();
             store
                 .write(|tx| {
-                    for name in ["我的桌面", "開發", "簡報"] {
+                    for name in &names {
                         let document = plain_document("#123456");
                         let (profile, revision) = profiles::create(
                             tx,
@@ -323,4 +378,195 @@ fn builtin_documents_never_reference_absent_packages() {
         assert!(document.entries.is_empty());
         assert!(document.slots.is_empty());
     }
+    let foreign = crate::projection::PackageSet::new(
+        packages
+            .rows()
+            .cloned()
+            .map(|mut row| {
+                row.summary.source = "catalog".into();
+                row
+            })
+            .collect(),
+    );
+    for (_, document) in crate::defaults::builtin_documents(&foreign) {
+        assert!(document.entries.is_empty());
+    }
+}
+
+#[test]
+fn builtin_compositions_pass_preflight_with_shipped_config_schemas() {
+    let harness = shipped_harness("builtin-preflight");
+    let paths = Paths::under(&harness.root.join("store"));
+    harness
+        .core
+        .coordinate(Duration::from_secs(10), move |co| {
+            let packages = co.packages();
+            let resolver = crate::projection::Resolver {
+                packages: &packages,
+                paths: &paths,
+                grants: &[],
+            };
+            let origin = ditto_protocol::change::ChangeOrigin::Cli;
+            let context = crate::preflight::Context {
+                head_revision: "head",
+                base_revision: "head",
+                packages: &packages,
+                resolver: &resolver,
+                origin: &origin,
+                session_locked: false,
+                free_bytes: None,
+                node_version: Some("22.23.2"),
+                verify_trees: true,
+            };
+            let documents = crate::defaults::builtin_documents(&packages);
+            for (name, doc) in &documents {
+                assert_eq!(doc.entries.len(), 8);
+                assert_eq!(doc.layout.workspace_grid, [3, 3]);
+                assert!(doc.layout.rules.is_empty());
+                assert!(doc.layout.regions.is_empty());
+                let validation =
+                    crate::preflight::run_target(&documents[0].1, doc.clone(), vec![], &context);
+                assert!(
+                    validation.reasons.is_empty(),
+                    "{name}: {:?}",
+                    validation.reasons
+                );
+                assert_eq!(doc.appearance, documents[0].1.appearance);
+                assert_eq!(doc.shortcuts, documents[0].1.shortcuts);
+            }
+            assert_eq!(
+                documents[1].1.slot_entry("ui.dock").unwrap().config["position"],
+                "left"
+            );
+            assert_eq!(
+                documents[2]
+                    .1
+                    .slot_entry("svc.notification_policy")
+                    .unwrap()
+                    .config["rules"]["focus"]["enabled"],
+                true
+            );
+            assert!(documents[2].1.avatar.hidden);
+            assert!(!documents[2].1.avatar.animations);
+        })
+        .unwrap();
+}
+
+/// Exercise switch/undo through the real coordinator without IPC. Identical
+/// empty compositions need no Shell/hostd participant; the full recipes above
+/// additionally have an IPC integration test for participant readback.
+#[test]
+fn switch_undo_restores_profile_identity_and_refuses_newer_edits_without_ipc() {
+    use crate::coordinator::Proposal;
+    use ditto_protocol::change::{ChangeMode, ChangeOp, ChangeOrigin};
+    let root = root("switch-undo-direct");
+    seed_store(
+        &root,
+        &plain_document("#123456"),
+        &plain_document("#123456"),
+        |_, _, _, _| Ok(()),
+    );
+    let core = start_at(&root, false);
+    let harness = Harness { core, root };
+    harness
+        .core
+        .coordinate(Duration::from_secs(10), |co| {
+            let connection = co.store_ref().connection();
+            let source = profiles::active_profile(connection).unwrap().unwrap();
+            let (_, source_revision, doc) = profiles::head_document(connection, &source).unwrap();
+            let (target, target_revision) = co
+                .store()
+                .write(|tx| {
+                    profiles::create(
+                        tx,
+                        "測試目標",
+                        &doc,
+                        &RevisionOrigin::Create {
+                            from: "empty".into(),
+                        },
+                    )
+                })
+                .unwrap();
+            let propose_switch = |co: &mut crate::coordinator::Coordinator| {
+                co.propose(
+                    Proposal {
+                        profile_id: Some(source.clone()),
+                        base_revision: source_revision.revision_id.clone(),
+                        ops: vec![ChangeOp::SwitchProfile {
+                            to_profile: target.profile_id.clone(),
+                            to_revision: None,
+                        }],
+                        mode: ChangeMode::Apply,
+                        idempotency_key: None,
+                        request_operation_id: None,
+                        origin: ChangeOrigin::Cli,
+                        subject: "cli".into(),
+                        target: None,
+                    },
+                    None,
+                )
+                .unwrap()
+            };
+            let change = propose_switch(co);
+            assert_eq!(change.state, ChangeState::Committed, "{change:?}");
+            assert_eq!(
+                change.committed_revision.as_ref(),
+                Some(&target_revision.revision_id)
+            );
+            let undo = co
+                .undo(&change.change_id, "cli", Some("undo-switch".into()), None)
+                .unwrap();
+            assert_eq!(undo.state, ChangeState::Committed, "{undo:?}");
+            assert_eq!(
+                undo.committed_revision.as_ref(),
+                Some(&source_revision.revision_id)
+            );
+            assert_eq!(
+                profiles::active_profile(co.store_ref().connection()).unwrap(),
+                Some(source.clone())
+            );
+            assert_eq!(
+                co.undo(&change.change_id, "cli", Some("undo-switch".into()), None)
+                    .unwrap()
+                    .change_id,
+                undo.change_id
+            );
+            assert_eq!(
+                profiles::head_document(co.store_ref().connection(), &source)
+                    .unwrap()
+                    .1
+                    .revision_id,
+                source_revision.revision_id
+            );
+            assert_eq!(
+                profiles::head_document(co.store_ref().connection(), &target.profile_id)
+                    .unwrap()
+                    .1
+                    .revision_id,
+                target_revision.revision_id
+            );
+            let change = propose_switch(co);
+            // A subsequent revision must block this undo, even with equal content.
+            co.store()
+                .write(|tx| {
+                    let edit = profiles::insert_revision(
+                        tx,
+                        &target.profile_id,
+                        Some(&target_revision.revision_id),
+                        &doc,
+                        &RevisionOrigin::Create {
+                            from: "empty".into(),
+                        },
+                        None,
+                    )?;
+                    profiles::set_head(tx, &target.profile_id, &edit.revision_id)
+                })
+                .unwrap();
+            assert!(co.undo(&change.change_id, "cli", None, None).is_err());
+            assert_eq!(
+                profiles::active_profile(co.store_ref().connection()).unwrap(),
+                Some(target.profile_id)
+            );
+        })
+        .unwrap();
 }

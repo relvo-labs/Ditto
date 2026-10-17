@@ -383,8 +383,9 @@ impl Coordinator {
                     }
                     let profile_id = first.expect("built-in compositions are nonempty");
                     profiles::set_active_profile(tx, &profile_id)?;
-                    Ok(profile_id)
-                })?
+                    Ok(())
+                })?;
+                return self.publish_head();
             }
         };
         self.store
