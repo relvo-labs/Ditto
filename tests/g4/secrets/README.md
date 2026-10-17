@@ -9,6 +9,10 @@
 ```sh
 cargo build --locked --workspace --bins
 corepack pnpm -r --filter @ditto/host-runtime --filter @ditto/agent-runtime build
+# common.md 的工具鏈若只有 corepack，給既有 build script 一個本地函式入口：
+pnpm() { corepack pnpm "$@"; }
+export -f pnpm
+bash scripts/build-builtin-packages.sh target/ditto-packages
 timeout 120 python3 tests/g4/secrets/run.py --output /tmp/qa04-product-positive
 timeout 120 python3 tests/g4/secrets/run.py --inject-leak --output /tmp/qa04-product-negative
 ```
@@ -17,7 +21,7 @@ timeout 120 python3 tests/g4/secrets/run.py --inject-leak --output /tmp/qa04-pro
 
 `manifest.json` 明列注入值與掃描根目錄；此測試輸入及 `driver.json` 位於 product 之外，不冒充產品輸出。產品產物與原始 log 都保留在 `product/`，`result.json` 列出每個範圍、檔案數、命中數及原始路徑，缺少必要分類或 SQLite 不通過。命中報告不複製秘密值或上下文。
 
-注入流程：三種秘密樣式經正式 `agent.credentials.create` 入口送往**刻意不存在的私有 Secret Service**，檢查失敗封閉且秘密沒有落盤。正式 Agent 使用缺失的 credential reference 執行失敗路徑；會話、設定與 turn 由 Core 保存。generation 呼叫正式 create/get 產生固定模板 bundle；匯出與診斷使用正式能力。沒有將秘密放入使用者對話再要求任意文字自動被辨識為秘密。對話的非秘密私人哨兵另掃日誌、匯出與診斷；產品的會話原始檔則應保留使用者文字。
+注入流程：三種秘密樣式經正式 `agent.credentials.create` 入口送往**刻意不存在的私有 Secret Service**，檢查失敗封閉且秘密沒有落盤。Core 安裝內建套件、啟動 hostd，driver 必須回讀宿主 PID 才繼續；Core／hostd／Agent 的 stderr 都在保留的 log。正式 Agent 使用缺失的 credential reference 執行失敗路徑；會話、設定與 turn 由 Core 保存。generation 呼叫正式 create/get 產生固定模板 bundle；匯出與診斷使用正式能力。沒有將秘密放入使用者對話再要求任意文字自動被辨識為秘密。對話的非秘密私人哨兵另掃日誌、匯出與診斷；產品的會話原始檔則應保留使用者文字。
 
 這條入口不證明成功的 keyring 解析、真模型成功回合、Codex app-server、隔離 native validation／preview、Shell 或實際崩潰捕捉。這些範圍在 `flow.not_run` 明列；需另以 G2 direct／codex 與 G3 integration 流程補驗。runner 關閉自己的 coredump，不改產品 crash 政策。
 

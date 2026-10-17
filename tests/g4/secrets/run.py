@@ -42,6 +42,8 @@ for key in ("DITTO_DEV_TOKEN", "DITTO_LAUNCH_SCOPE_PREFIX", "DITTO_REQUIRE_QUOTA
             "WAYFIRE_SOCKET", "SWAYSOCK", "DITTO_CORE_SOCKET", "DITTO_CORE_TOKEN_FD"):
     env.pop(key, None)
 command = [str(WORKSPACE / "target/debug/ditto-core"), "serve", "--compositor", "fixture",
+           "--builtin-packages", str(WORKSPACE / "target/ditto-packages"),
+           "--hostd", f"hostd 0.2.0 {shutil.which('node')} {WORKSPACE}/packages/host-runtime/dist/ditto-hostd.mjs",
            "--agent", f"agent 0.3.0 {shutil.which('node')} {WORKSPACE}/packages/agent-runtime/dist/ditto-agentd.mjs",
            "--launch", f"dittoctl 0.3.0 {shutil.which('node')} {Path(__file__).with_name('driver.mjs')}"]
 status = {"ok": False, "evidence_class": "development-host", "checks": [],
@@ -50,6 +52,8 @@ status = {"ok": False, "evidence_class": "development-host", "checks": [],
                       "native isolated generation validation / preview (create and readback only)"]}
 child = None
 try:
+    if not list((WORKSPACE / "target/ditto-packages").glob("*.dittopkg")):
+        raise RuntimeError("build built-in packages first: bash scripts/build-builtin-packages.sh target/ditto-packages")
     # Avoid host-level memory dumps of synthetic secrets from this fixture.
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     with (product / "logs/core-agent.log").open("w") as log:

@@ -16,6 +16,8 @@ let core
 try {
   core = await connect()
   await eventually(async () => (await core.call('desktop.profiles.get')).result)
+  await eventually(async () => (await core.must('desktop.plugins.diagnostics', {})).host.process?.pid)
+  verify('real desktop host is running for log coverage', true)
   for (const [label, secret] of Object.entries(sentinels)) {
     const response = await core.call('agent.credentials.create', {provider: 'direct-model', secret, idempotency_key: `qa04-${label}`})
     verify(`${label}: unavailable private keyring refuses credential`, response.error?.name === 'unavailable' && response.error?.message === 'keyring_unavailable')
