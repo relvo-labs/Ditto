@@ -99,6 +99,8 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 | `blur_radius`（0–64）、`surface_opacity`（0.5–1）、`shadow_radius`（0–48） | 數字字串 |
 | `radius_scale`（0–2）、`font_scale`（0.75–2）、`space_scale`（0.5–2）、`font_family` | 數字字串／字型名 |
 
+QML 的 accent 前景色屬性為 `accentForeground`；Profile 覆寫鍵仍為 `appearance.tokens.on_accent`。
+
 替代值：`reduced_transparency`（材質不透明、邊框與次要文字對比提高、模糊 0）、`reduced_motion`（位移時長 0，只留短淡入）、`low_power_style`（無模糊、無陰影）。系統的減少動畫偏好（`gsettings … enable-animations`）在啟動時讀一次；`DITTO_REDUCED_MOTION=1`、`DITTO_REDUCED_TRANSPARENCY=1`、`DITTO_LOW_POWER_STYLE=1` 供量測使用。模糊半徑目前只是 token：Wayfire 0.11 上沒有背景效果協定可用。
 
 ## i18n

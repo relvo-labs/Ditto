@@ -2,12 +2,15 @@ import QtQuick
 import QtTest
 import DittoStub
 import "../../../../shell/jelly" as Jelly
+import "../.staged/base" as Legacy
 
 // Legacy presentation (#65 review I1): a Profile with the `soft-jelly` theme,
-// or with no theme, must look exactly as at the G4 base f582426. The base
+// or with no theme, preserves the G4 base geometry. #72 intentionally fixes
+// accent foregrounds from black to the design value. The base
 // files are exported by ../stage-providers.mjs into .staged/base/ and drawn
-// next to the current ones with the same tokens and the same fixture data;
-// geometry, the initials and the pixels must match. The light recipe
+// next to the current ones with their own Tokens and the same fixture data;
+// geometry and initials must match. Pixels must match when the current
+// foreground is explicitly overridden to the old black. The light recipe
 // (`soft-jelly-light`) must use the new presentation instead.
 TestCase {
     id: testCase
@@ -27,6 +30,8 @@ TestCase {
         id: tokens
         appearance: null
     }
+
+    Legacy.Tokens { id: baseTokens; appearance: tokens.appearance }
 
     QtObject {
         id: client
@@ -77,7 +82,7 @@ TestCase {
         const component = Qt.createComponent(Qt.resolvedUrl(file));
         verify(component.status === Component.Ready, component.errorString());
         const incubator = component.incubateObject(testCase, {
-            client: client, tokens: tokens, entryId: "dock", slotName: "ui.dock", shown: false,
+            client: client, tokens: file.indexOf("/base/") >= 0 ? baseTokens : tokens, entryId: "dock", slotName: "ui.dock", shown: false,
             config: { position: position, pinned: ["org.example.Files", "org.example.Editor"] }
         });
         incubator.forceCompletion();
@@ -169,7 +174,13 @@ TestCase {
                 compare(after.images, 0, label + ": no icon images");
                 compare([after.windowX, after.windowY, after.windowWidth, after.windowHeight],
                         [before.windowX, before.windowY, before.windowWidth, before.windowHeight], label + ": window");
-                verify(after.pixels.equals(before.pixels), label + ": same pixels as f582426");
+                compare(String(baseTokens.onAccent), "#000000", label + ": historical QML bug");
+                compare(String(tokens.accentForeground), "#1a1626", label + ": fixed design value");
+                verify(!after.pixels.equals(before.pixels), label + ": active initials intentionally change");
+                tokens.appearance = Object.assign({}, appearance || {}, { tokens: { on_accent: "#000000" } });
+                const oldForeground = dockState(current);
+                verify(oldForeground.pixels.equals(before.pixels), label + ": only the accent foreground changed");
+                tokens.appearance = appearance;
                 // Theme-neutral fix: input only on the visible rounded capsule.
                 const panel = current.data.find(item => item.mask !== undefined && item.mask !== null);
                 verify(panel !== undefined, label + ": an input region");

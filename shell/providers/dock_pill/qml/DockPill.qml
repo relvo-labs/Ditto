@@ -317,7 +317,7 @@ Scope {
                         Text {
                             anchors.centerIn: parent
                             text: provider.appName(tile.modelData.appId).substring(0, 2)
-                            color: tile.current ? provider.tokens.onAccent : provider.tokens.foreground
+                            color: tile.current ? provider.tokens.accentForeground : provider.tokens.foreground
                             font.pixelSize: provider.tokens.fontBody
                             font.bold: true
                         }

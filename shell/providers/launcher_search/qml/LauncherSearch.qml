@@ -208,7 +208,7 @@ Scope {
                             anchors.left: parent.left
                             anchors.leftMargin: provider.tokens.space
                             text: modelData.name + (modelData.generic_name ? "  ·  " + modelData.generic_name : "")
-                            color: index === provider.selected ? provider.tokens.onAccent : provider.tokens.foreground
+                            color: index === provider.selected ? provider.tokens.accentForeground : provider.tokens.foreground
                             font.pixelSize: provider.tokens.fontBody
                         }
 

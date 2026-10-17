@@ -75,7 +75,8 @@ QtObject {
     // Light values: contrast against the composited surfaces is computed in
     // tests/g4/visual/tst_tokens.qml and listed in component-sheet.md.
     readonly property color accent: lightRecipe ? colorToken("accent", "#9d8cf0") : colorToken("accent", "#b9a4ff")
-    readonly property color onAccent: lightRecipe ? colorToken("on_accent", "#1c1830") : colorToken("on_accent", "#1a1626")
+    // Avoid on + uppercase: QML treats that spelling as a signal handler.
+    readonly property color accentForeground: lightRecipe ? colorToken("on_accent", "#1c1830") : colorToken("on_accent", "#1a1626")
     readonly property color background: lightRecipe ? colorToken("background", "#d3cff9") : colorToken("background", "#12121a")
     readonly property color surfaceBase: lightRecipe ? colorToken("surface", "#fbfaff") : colorToken("surface", "#1d1f2b")
     /// Alpha of the translucent surface colour (before `surfaceOpacity`).

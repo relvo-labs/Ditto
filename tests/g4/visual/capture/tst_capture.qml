@@ -204,10 +204,16 @@ TestCase {
         render("dock-states", light(), windows, Data.pinned[1]);
     }
 
-    /// The earlier look, unchanged for Profiles with the `soft-jelly` theme
+    /// The legacy geometry for Profiles with the `soft-jelly` theme
     /// (or none): lettered Dock bubbles, the earlier material, flat canvas.
     function test_5_legacy_soft_jelly() {
-        render("legacy-soft-jelly", { theme: "soft-jelly", tokens: {}, locale: "zh-TW" }, [], null);
+        render("legacy-soft-jelly", { theme: "soft-jelly", tokens: {}, locale: "zh-TW" },
+               [{ id: "fixture-legacy", app_id: Data.pinned[0], title: "fixture", focused: true }], null);
+    }
+
+    function test_6_no_theme() {
+        render("legacy-no-theme", { tokens: {}, locale: "zh-TW" },
+               [{ id: "fixture-legacy", app_id: Data.pinned[0], title: "fixture", focused: true }], null);
     }
 
     function initTestCase() {

@@ -43,7 +43,7 @@ Item {
                 radius: 7
                 y: 3
                 x: toggle.checked ? parent.width - width - 3 : 3
-                color: toggle.checked ? toggle.tokens.onAccent : toggle.tokens.foregroundMuted
+                color: toggle.checked ? toggle.tokens.accentForeground : toggle.tokens.foregroundMuted
                 Behavior on x { NumberAnimation { duration: toggle.tokens.durationFast } }
             }
         }

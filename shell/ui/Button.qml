@@ -35,7 +35,7 @@ Rectangle {
         id: label
         anchors.centerIn: parent
         text: button.text
-        color: button.kind === "primary" || button.kind === "danger" ? button.tokens.onAccent : button.tokens.foreground
+        color: button.kind === "primary" || button.kind === "danger" ? button.tokens.accentForeground : button.tokens.foreground
         font.pixelSize: button.tokens.fontBody
 
         // The `font_family` token, when the Profile sets one; the system

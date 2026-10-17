@@ -24,7 +24,7 @@ Rectangle {
         id: label
         anchors.centerIn: parent
         text: badge.text
-        color: badge.tone === "neutral" ? badge.tokens.foreground : badge.tokens.onAccent
+        color: badge.tone === "neutral" ? badge.tokens.foreground : badge.tokens.accentForeground
         font.pixelSize: badge.tokens.fontSmall
     }
 }

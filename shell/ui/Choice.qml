@@ -47,7 +47,7 @@ Item {
                     id: optionLabel
                     anchors.centerIn: parent
                     text: modelData.label + (parent.selected ? " ✓" : "")
-                    color: parent.selected ? choice.tokens.onAccent : choice.tokens.foreground
+                    color: parent.selected ? choice.tokens.accentForeground : choice.tokens.foreground
                     font.pixelSize: choice.tokens.fontBody
                 }
 
