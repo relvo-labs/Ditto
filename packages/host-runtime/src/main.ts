@@ -1,7 +1,6 @@
 import { closeSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CoreLink, type HelloResult } from './bridge/core-link.ts'
-import { describe } from './errors.ts'
 import { faultsCompiledIn } from './fault.ts'
 import type { Strategy } from './loader/transaction.ts'
 import { ModulePolicy } from './loader/module-policy.ts'
@@ -18,6 +17,14 @@ import { hostdVersion } from './version.ts'
  * to start another one (host-protocol §3, §10).
  */
 const log = new HostLog(stderrSink, { component: 'ditto-hostd', pid: process.pid })
+
+// Install before plugin startup: Node's default fatal handler prints the raw
+// Error stack. Preserve its failure exit so Core's supervisor can recover.
+process.on('uncaughtException', error => {
+  log.error('uncaught exception', { error })
+  process.exit(1)
+})
+process.on('unhandledRejection', reason => log.error('unhandled rejection', { error: reason }))
 
 function readToken(env: NodeJS.ProcessEnv): string {
   const fd = env['DITTO_CORE_TOKEN_FD']
@@ -55,14 +62,14 @@ async function main(): Promise<void> {
   const trialStrategy = faultsCompiledIn ? env['DITTO_HOST_STRATEGY'] as Strategy | undefined : undefined
   const runtime = new HostRuntime({ core: link, policy: ModulePolicy.fromEnvironment(env), log, reclaim: () => reclaimer.request(), ...(trialStrategy ? { strategy: trialStrategy } : {}) })
   let stopping = false
-  const stop = async (code: number, why: string) => {
+  const stop = async (code: number, why: string, error?: unknown) => {
     if (stopping) return
     stopping = true
-    log.info('stopping', { why })
+    log.info('stopping', { why, ...(error !== undefined ? { error } : {}) })
     // Bounded by each entry's cleanup timeout; a hung disposer cannot keep hostd alive.
     const deadline = setTimeout(() => process.exit(code), 8_000)
     deadline.unref()
-    try { await runtime.stop() } catch (error) { log.error('stop failed', { error: describe(error) }) }
+    try { await runtime.stop() } catch (error) { log.error('stop failed', { error }) }
     reclaimer.stop()
     process.exit(code)
   }
@@ -70,7 +77,7 @@ async function main(): Promise<void> {
   link.attach({
     request: (method, params) => runtime.handleRequest(method, params),
     notification: (method, params) => runtime.handleNotification(method, params),
-    closed: error => { void stop(1, `Core connection closed${error ? `: ${error.message}` : ''}`) },
+    closed: error => { void stop(1, 'Core connection closed', error) },
   })
   await runtime.start()
   const handshake = await link.handshake(token, {
@@ -83,10 +90,9 @@ async function main(): Promise<void> {
 
   process.on('SIGTERM', () => { void stop(0, 'SIGTERM') })
   process.on('SIGINT', () => { void stop(0, 'SIGINT') })
-  process.on('unhandledRejection', reason => log.error('unhandled rejection', { error: describe(reason) }))
 }
 
 main().catch(error => {
-  log.error('hostd failed to start', { error: describe(error) })
+  log.error('hostd failed to start', { error })
   process.exit(1)
 })

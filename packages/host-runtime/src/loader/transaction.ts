@@ -668,7 +668,7 @@ export class TransactionLayer {
         const result = await withTimeout(Promise.resolve().then(() => drain(controller.signal)), this.drainTimeoutMs, () => controller.abort())
         if ('timeout' in result) this.log.warn('drain timed out; cancelling in-flight work', { entry_id: instance.entryId })
       } catch (error) {
-        this.log.warn('drain failed', { entry_id: instance.entryId, error: describe(error) })
+        this.log.warn('drain failed', { entry_id: instance.entryId, error })
       }
     }
     if (!exportState || !exporter) return undefined
@@ -681,7 +681,7 @@ export class TransactionLayer {
       }
       return structuredClone(state)
     } catch (error) {
-      this.log.error('exportState failed', { entry_id: instance.entryId, error: describe(error) })
+      this.log.error('exportState failed', { entry_id: instance.entryId, error })
       return undefined
     }
   }
@@ -692,7 +692,7 @@ export class TransactionLayer {
     const fiber = instance.fiber
     // The first dispose() call returns the settling promise; later calls return nothing.
     const task = (fiber?.uid !== null && fiber ? Promise.resolve(fiber.dispose()) : Promise.resolve())
-      .catch(error => this.log.error('dispose failed', { entry_id: instance.entryId, error: describe(error) }))
+      .catch(error => this.log.error('dispose failed', { entry_id: instance.entryId, error }))
     try { this.loader.remove(instance.loaderId) } catch { /* never created */ }
     const finished = task.then(() => {
       this.instances.delete(instance.loaderId)

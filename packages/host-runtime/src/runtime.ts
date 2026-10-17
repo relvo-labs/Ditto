@@ -4,7 +4,7 @@ import { TimerService } from '@deepseek-ai/cordis-plugin-timer'
 import type { CoreEvent, RevokedGrant } from './api.ts'
 import type { CoreChannel, HelloResult } from './bridge/core-link.ts'
 import { DittoService } from './ditto-service.ts'
-import { DittoError, describe } from './errors.ts'
+import { DittoError } from './errors.ts'
 import { EventBridge } from './events.ts'
 import { faultPoint, presentedLeaseIds, type FaultPoint } from './fault.ts'
 import { LeaseTable } from './leases.ts'
@@ -41,6 +41,11 @@ interface InvokeParams {
 
 /** D-32 proposal default; the other strategy exists only for the trial. */
 export const defaultStrategy: Strategy = 'isolate_rebuild'
+
+function participantMethod(method: string): string {
+  return ['participant.prepare', 'participant.commit', 'participant.abort', 'participant.rollback'].includes(method)
+    ? method : '[redacted]'
+}
 
 /**
  * ditto-hostd's in-process core: the root Context with the loader, the timer
@@ -84,7 +89,10 @@ export class HostRuntime {
   async start(): Promise<void> {
     if (this.started) return
     this.started = true
-    installCordisExporter(this.root, this.options.log.child({ part: 'cordis' }))
+    installCordisExporter(this.root, this.options.log.child({ part: 'cordis' }), 2, ctx => {
+      const instance = this.tx.instanceFor(ctx)
+      return { entry_id: instance.entryId, plugin_id: instance.spec.package }
+    })
     await this.root.plugin(Loader)
     // Module resolution goes only through the policy: Core-pushed paths inside the package store.
     this.root.loader.internal = {
@@ -117,7 +125,7 @@ export class HostRuntime {
   startBackground(hello?: Partial<HelloResult>): void {
     const intervals = this.options.intervals ?? {}
     const every = (ms: number, task: () => Promise<unknown>) => {
-      const timer = setInterval(() => { task().catch(error => this.options.log.warn('background task failed', { error: describe(error) })) }, ms)
+      const timer = setInterval(() => { task().catch(error => this.options.log.warn('background task failed', { error })) }, ms)
       timer.unref()
       this.timers.push(timer)
     }
@@ -143,10 +151,11 @@ export class HostRuntime {
     const changeId = (params as { change_id?: unknown } | undefined)?.change_id
     try {
       const result = await this.dispatch(method, params) as { items?: { key: string; status: string; reason?: string }[] }
-      this.options.log.info(method, { change_id: changeId, items: result?.items ?? [] })
+      this.options.log.info('participant.result', { change_id: changeId,
+        method: participantMethod(method), items: result?.items ?? [] })
       return result
     } catch (error) {
-      this.options.log.error(`${method} refused`, { change_id: changeId, error: describe(error) })
+      this.options.log.error('participant.refused', { change_id: changeId, method: participantMethod(method), error })
       throw error
     }
   }
@@ -213,7 +222,7 @@ export class HostRuntime {
     }
     await Promise.all(handlers.map(async handler => {
       try { await handler(grant) } catch (error) {
-        this.options.log.error('revoke handler failed', { entry_id: grant.entry_id, error: describe(error) })
+        this.options.log.error('revoke handler failed', { entry_id: grant.entry_id, error })
       }
     }))
   }
@@ -222,7 +231,7 @@ export class HostRuntime {
     const subscription = this.subscriptions.get(event.subscription_id)
     if (!subscription) return
     try { subscription.handler(event) } catch (error) {
-      this.options.log.error('event handler failed', { subscription_id: event.subscription_id, error: describe(error) })
+      this.options.log.error('event handler failed', { subscription_id: event.subscription_id, error })
     }
   }
 

@@ -68,7 +68,10 @@ describe('L-01 dependency loss', () => {
     expect(events('disposed', 'c2')).toHaveLength(1)
     expect(h.core.bindingOf('plugin.test.c1.read')).toBeUndefined()
     expect(h.core.bindingOf('plugin.test.c2.read')).toBeUndefined()
-    expect(h.logs.some(log => log.level === 'error' && log['source'] === 'cordis' && /c1 disposer failed/.test(log.msg))).toBe(true)
+    // The disposer remains attributable without retaining plugin error text.
+    expect(h.logs).toContainEqual(expect.objectContaining({ level: 'error', source: 'cordis', msg: 'cordis.error',
+      entry_id: 'ent-c1', plugin_id: 'test.ent-c1', error: expect.objectContaining({ name: 'Error', fingerprint: expect.stringMatching(/^sha256:/) }) }))
+    expect(JSON.stringify(h.logs)).not.toContain('c1 disposer failed')
 
     await h.core.apply(changeId(), entries(h, { consumers }))
     await settled(h)

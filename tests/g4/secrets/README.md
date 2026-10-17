@@ -17,7 +17,7 @@ timeout 120 python3 tests/g4/secrets/run.py --output /tmp/qa04-product-positive
 timeout 120 python3 tests/g4/secrets/run.py --inject-leak --output /tmp/qa04-product-negative
 ```
 
-第一個命令預期 exit 0、`ok=true`、`hit_count=0`；負向控制預期 exit 1、`flow.ok=true` 且 `hits` 指向 `intentional-leak.log`。若 `flow.ok=false`，代表流程根本沒完成，不能當成負向控制成功或外洩掃描通過。輸出目錄必須不存在，避免舊產物污染證據。
+正向 `run.py` 預期 exit 0、`ok=true`、`hit_count=0`；負向控制預期 exit 1、`flow.ok=true` 且 `hits` 指向 `intentional-leak.log`。若 `flow.ok=false`，代表流程根本沒完成，不能當成負向控制成功或外洩掃描通過。輸出目錄必須不存在，避免舊產物污染證據。
 
 `manifest.json` 明列注入值與掃描根目錄；此測試輸入及 `driver.json` 位於 product 之外，不冒充產品輸出。產品產物與原始 log 都保留在 `product/`，`result.json` 列出每個範圍、檔案數、命中數及原始路徑，缺少必要分類或 SQLite 不通過。命中報告不複製秘密值或上下文。
 
@@ -43,7 +43,7 @@ python3 tests/g4/secrets/control.py --inject-leak --output /tmp/qa04-control-neg
 | --- | --- | --- |
 | Quickshell 0.3.1／cpptrace | `packaging/systemd/user/ditto-core.service` 的 `--shell`／`--rescue-ui`／`--lock` 啟動規格；`docs/platform/dependency-inventory.md` 釘選 cpptrace | 本地沒有 Quickshell 執行檔、上游 handler source 或 crash 樣本。**未執行**；不能猜測 dump 實際位置或宣稱未包含記憶體內容。VM 須記錄該釘選版本實際產生的報告位置、內容及同意介面。 |
 | Core panic | `crates/ditto-core/src/main.rs`、`lib.rs` 未安裝自訂 panic hook；一般日誌遮蔽在 `log.rs`，不涵蓋標準 Rust panic hook | 程序 stderr 由工作階段收集；panic payload 的內容安全尚無保證。OS dump 是另一層（本機 core_pattern 為 apport），不能當成 Core 的遮蔽輸出。實際 panic／OS dump **未執行**。 |
-| hostd | `src/main.ts` 的 `describe(error)`、`unhandledRejection`；`src/log.ts` 的 Cordis exporter → HostLog → stderrSink／journald | **已重現缺口**：Error.message 與 stack 未遮蔽私人內容；不是已通過。修正需改 `packages/host-runtime/src/log.ts`，超出本 lane 寫入範圍，交 coordinator 處理。 |
+| hostd | `src/main.ts` 的啟動／停止／斷線／unhandledRejection；`src/log.ts` 的 Cordis exporter → HostLog → stderrSink／journald | `163e782` 已重現 Error.message／stack 外洩。repair1 經擴大寫入授權修正預設日誌；保留類別、閉合錯誤碼、已知交易分類、插件識別及 SHA-256 指紋，丟棄原文。這不是實際 crash／OS dump 已驗證的宣稱。 |
 | Core 診斷回應 | `diagnostics.rs::plugins`／`rescue_status`，沒有獨立「診斷壓縮包」或 opt-in 上傳實作 | 回應含插件、依賴、註冊、狀態；`supervisor_note` 讀 audit `redacted_detail`，欄位名不是通用遮蔽器。現有生產 disable reason 為固定代碼（hosts.rs）；未實證此路徑缺口，因此沒有修改 diagnostics.rs。 |
 | 範圍可見的選擇加入 | 原始日誌／崩潰內容沒有正式範圍選擇與上傳介面 | **未提供／BLOCKED**；手動複製檔案不是選擇加入機制。不得據此宣稱 §16 全項通過。 |
 
@@ -53,7 +53,69 @@ python3 tests/g4/secrets/control.py --inject-leak --output /tmp/qa04-control-neg
 node --experimental-transform-types tests/g4/secrets/crash-audit.mjs /tmp/qa04-crash-audit.json
 ```
 
-目前預期 exit 1，四類私人測試內容命中 4 項。此為 RED 與交接證據；沒有在可寫範圍內找到可完整修補的出口，因此沒有虛構 GREEN。
+目前預期 exit 0，四類私人測試內容命中 0 項，且三筆 Error／格式字串／物件載荷的診斷指紋仍存在。repair1 的原始 RED 在 `163e782` 上命中 4 項、exit 1；原始及擴充後的 GREEN 均保留於 lane evidence/repair1。沒有新增 opt-in、上傳、保留政策、設定開關或持久狀態。
+
+## repair1：driver 契約核對
+
+coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id` 而停止，`flow.ok=false`，不得計入正向／負向證據。driver 現在兩次匯出均使用 `desktop.profiles.get` 回讀的 `profile.profile_id`。本機仍不能開 socket，**修正後端到端流程未執行，交 coordinator 重跑**。
+
+`node tests/g4/secrets/driver.test.mjs` 實際執行同一個 `runFlow`，逐次以 `schema/catalog.json` 的 input_schema 驗證所有 15 個能力，並以 `{}` 重現舊 export 參數被拒。測試僅實作這些 schema 用到的 vocabulary，遇到新關鍵字就失敗；不是通用 schema 驗證器，也不模擬產品成功證據。
+
+| 方法 | 必填參數 | driver 實際提供 |
+| --- | --- | --- |
+| `desktop.profiles.get` | 無 | `{}`，回讀現役 Profile |
+| `desktop.plugins.diagnostics` | 無 | `{}` |
+| `agent.credentials.create` | `provider,secret,idempotency_key` | `direct-model`、三種哨兵各一次、`qa04-<label>` |
+| `agent.sessions.create` | `title,idempotency_key` | `QA04 private conversation`、`qa04` |
+| `agent.settings.describe` | 無 | `{}` |
+| `agent.settings.patch` | `expected_revision,settings` | 回讀 revision 與完整偏好，覆寫啟用／direct-model／缺失憑證引用／HTTPS endpoint；移除 `_meta` |
+| `agent.turns.submit` | `session_id,client_message_id,text` | 建立的 session、`qa04-message`、私人對話哨兵 |
+| `agent.turns.get` | `turn_id` | submit 回傳的 turn ID |
+| `agent.sessions.read` | `session_id` | 建立的 session，另傳 `offset:0,limit:50` |
+| `desktop.plugins.development.create` | `description,request_summary,idempotency_key` | 正式 tasks-summary 範例、`QA04 fixed template`、`qa04-create` |
+| `desktop.plugins.development.get` | `artifact_id` | create 回傳的 artifact ID |
+| `desktop.profiles.export` | `profile_id` | 回讀的 Profile ID，初次匯出與隱私複查皆提供 |
+| `desktop.rescue.status` | 無 | `{}` |
+| `agent.runtime.get` | 無 | `{}` |
+| `agent.runtime.stop` | 無 | `{}` |
+| `core.handshake`（既有 connect helper） | `protocol_version,client,auth` | `0.3.0`、launcher 的 kind/version、繼承 descriptor 取得的 token；核對 `schema/handshake-input.json`，本輪未執行 IPC |
+
+能力參數由共用 client 加入 `_meta.protocol_version=0.3.0,deadline_ms=15000`；這是 Core 剝除的傳輸 metadata，不屬於 input_schema 的領域參數。實際單元請求表可由 `DITTO_QA04_CONTRACT_REPORT=<path>` 保存。
+
+## repair1：hostd 日誌路徑盤點
+
+下表路徑均相對 `packages/host-runtime/src/`；以 `git grep -n -E 'describe\(|stack|message|console\.|stderr|journald' -- packages/host-runtime/src` 及實際 log 呼叫交叉核對。
+
+| 路徑 | 可否帶私人內容／處理 |
+| --- | --- |
+| `log.ts::installCordisExporter` | 可以：Error、格式字串、物件、logger 名稱。改固定 `cordis.error/message` 與指紋，不格式化載荷；插件識別由交易層依 fiber 查回，不信任 logger 名稱。 |
+| `log.ts::HostLog/child/write`、`stderrSink` | 可以：外部直接呼叫、繼承 fields、巢狀 items。共用遮蔽器在進入自訂 sink 前及 stderr 序列化前執行；未知 msg 只留固定 `host.message` 與指紋。沿用 Rust content keys、`[redacted]` 與 HOME→`~/…`，error/reason 保留安全診斷摘要。 |
+| `main.ts::stop` 的 cleanup catch | 可以：runtime.stop Error。傳 Error 本體給共同遮蔽器。 |
+| `main.ts` 的 `closed` callback | 可以：連線 Error.message 原先插進 why。why 改固定 `Core connection closed`，Error 獨立遮蔽。 |
+| `main.ts::unhandledRejection` | 可以：任意 rejection。僅類別／已知碼／指紋。 |
+| Node 預設 fatal handler → `main.ts::uncaughtException` | 可以：原先 Node 直接印 stack。現在插件啟動前安裝遮蔽 handler，記固定事件與安全摘要後仍 exit 1；rejection handler 也提前安裝。 |
+| `main.ts::main().catch` | 可以：啟動 Error 與路徑。僅類別／已知碼／指紋。 |
+| `runtime.ts::startBackground` | 可以：背景 request Error。傳 Error 本體遮蔽。 |
+| `runtime.ts::handleRequest` 成功／拒絕 | 可以：`items[].reason` 與例外、未知 method。items 遞迴遮蔽 reason，保留固定分類、key/status/change_id；method 僅保留已知參與者方法。 |
+| `runtime.ts::permissionRevoked/deliverEvent` | 可以：插件 handler Error。保留 entry/subscription ID，不記 grant/event 載荷。 |
+| `ditto-service.ts::events.emit` candidate drop | event 名稱可能是任意文字；name 遮蔽，保留 entry ID。 |
+| `ditto-service.ts::events.subscribe`、`activate` | 可以：topics、Core／註冊 Error。topics 遮蔽，Error 保留閉合碼與指紋、entry/capability ID。 |
+| `events.ts::pump` | 可以：插件 event 名稱、Core Error；payload 原本未記。name 遮蔽、Error 摘要、entry ID 保留。 |
+| `leases.ts::revoke/renew` | 可以：撤銷／重註冊 Error。保留 lease/capability 關聯與安全摘要。其他固定通知僅列 lease IDs。 |
+| `loader/transaction.ts::drainAndExport/dispose` | 可以：drain、exportState、fiber.dispose Error。傳 Error 本體遮蔽；其他 log 僅固定事件、entry、bytes、timeout。 |
+| `fault-enabled.ts::faultPoint` | 測試環境 action 原先任意直寫 stderr；改走同一 HostLog，只保留已知 action 分類。production bundle 仍剔除 fault 模組。 |
+| `errors.ts::describe/toWireError/DittoError.toWire`、transaction 其餘 describe、`bridge/rpc.ts`、projection fail、runtime invoke/schema issue | 可以帶私人文字，但屬 RPC／狀態資料，不是 stderr/log 出口；本輪不改 wire 契約。進入 participant 日誌時由上述邊界遮蔽。 |
+| `testing/fake-core.ts` | 僅測試 RPC fault，非 production 日誌；同樣不直寫 stderr。 |
+
+既有 disposer 測試原以私人錯誤原文辨識 c1，現改驗證真實 Core-owned entry/plugin ID、Error 類別與指紋，並斷言原文缺席。數量／狀態／關聯欄位仍保留。指紋用於穩定分組，不保存原始內容；未知自訂 Error 類別或錯誤碼不直接信任。
+
+```sh
+corepack pnpm --filter @ditto/host-runtime test
+corepack pnpm --filter @ditto/host-runtime typecheck
+corepack pnpm --filter @ditto/host-runtime build
+node tests/g4/secrets/driver.test.mjs
+node --experimental-transform-types tests/g4/secrets/crash-audit.mjs /tmp/qa04-crash-audit.json
+```
 
 ## AT-17：VM／參考機補跑
 

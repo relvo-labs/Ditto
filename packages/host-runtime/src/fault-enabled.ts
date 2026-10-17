@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs'
 import type { FaultPoint } from './fault.ts'
+import { HostLog, stderrSink } from './log.ts'
+
+const log = new HostLog(stderrSink, { component: 'ditto-hostd', part: 'fault' })
 
 /**
  * `DITTO_HOST_FAULT=<point>:<action>[:<n>][,...]`
@@ -27,7 +30,9 @@ export async function faultPoint(point: FaultPoint): Promise<void> {
     if (rule.point !== point) continue
     if (rule.nth !== undefined && rule.nth !== count) continue
     if (rule.action.startsWith('present=')) continue
-    process.stderr.write(JSON.stringify({ ts: new Date().toISOString(), level: 'warn', msg: 'fault injected', point, action: rule.action, hit: count }) + '\n')
+    const action = ['throw', 'hang', 'exit', 'kill'].includes(rule.action) ? rule.action
+      : rule.action.startsWith('delay=') ? 'delay' : 'unknown'
+    log.warn('host.fault', { point, action, hit: count })
     if (rule.action === 'throw') throw new Error(`fault injected at ${point}`)
     if (rule.action === 'hang') await new Promise(() => {})
     if (rule.action === 'exit') process.exit(70)
