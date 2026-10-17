@@ -38,6 +38,10 @@ export type Observation =
       workspace_grid?: [number, number] | null;
     };
 /**
+ * An explicit rendering choice; absence retains the optional legacy avatar.
+ */
+export type AvatarPresentation = 'assistant';
+/**
  * Where on its output the character sits.
  */
 export type AvatarCorner = 'bottom_right' | 'bottom_left' | 'top_right' | 'top_left';
@@ -81,6 +85,11 @@ export interface AvatarSettings {
    * digest.
    */
   output?: string | null;
+  /**
+   * D-48: absent preserves legacy rendering and its document digest.
+   * Older readers reject this field; see the explicit downgrade policy.
+   */
+  presentation?: AvatarPresentation | null;
   scale: number;
 }
 /**

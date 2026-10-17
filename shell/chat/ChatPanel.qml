@@ -28,6 +28,11 @@ PanelWindow {
     /// The character's corner (`bottom_right`, …) and the space it takes.
     property string corner: "bottom_right"
     property int avatarHeight: 250
+    /// Actual entry rectangle in output-local coordinates; null is the exact
+    /// legacy layout. The output/corner selection remains the Shell's.
+    property var entryRect: null
+    readonly property real entryPanelTop: entryRect ? entryRect.y + entryRect.height + 8 : 0
+    readonly property real entryPanelBottom: entryRect && screen ? screen.height - entryRect.y + 8 : 0
     signal closeRequested()
     signal expandRequested()
     signal settingsRequested()
@@ -40,13 +45,16 @@ PanelWindow {
     }
     // Next to the character, clear of the panel and dock.
     margins {
-        top: 64 + avatarHeight + 8
-        bottom: 64 + avatarHeight + 8
-        left: 32
-        right: 32
+        top: entryRect ? entryPanelTop : 64 + avatarHeight + 8
+        bottom: entryRect && screen ? entryPanelBottom : 64 + avatarHeight + 8
+        left: entryRect ? Math.min(entryRect.x, (screen ? screen.width : 900) - panel.implicitWidth - 8) : 32
+        right: entryRect && screen ? Math.max(8, screen.width - entryRect.x - entryRect.width) : 32
     }
-    implicitWidth: 400
-    implicitHeight: Math.min(520, (screen ? screen.height : 900) - 64 * 2 - avatarHeight - 16)
+    implicitWidth: entryRect && screen ? Math.min(400, screen.width - 16) : 400
+    implicitHeight: entryRect && screen
+        ? Math.max(1, Math.min(520, corner.indexOf("top") === 0
+            ? screen.height - entryPanelTop - 8 : screen.height - entryPanelBottom - 8))
+        : Math.min(520, (screen ? screen.height : 900) - 64 * 2 - avatarHeight - 16)
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     aboveWindows: true
@@ -76,7 +84,7 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         radius: panel.tokens.radiusLarge
-        color: panel.tokens.background
+        color: panel.entryRect ? panel.tokens.surface : panel.tokens.background
         border.color: panel.tokens.border
         border.width: 1
 

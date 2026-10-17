@@ -534,6 +534,44 @@ mod tests {
     }
 
     #[test]
+    fn assistant_readback_requires_the_selected_presentation() {
+        let mut avatar = AvatarSettings::default();
+        let mut target = ShellProjection {
+            appearance: appearance(),
+            avatar: avatar.clone(),
+            slots: vec![],
+            shortcuts: vec![],
+        };
+        let observed = ShellObservation {
+            mounts: vec![],
+            appearance: Some(appearance()),
+            avatar: Some(avatar.clone()),
+            avatar_placement: None,
+            approval_responder: false,
+        };
+        avatar.presentation = Some(ditto_protocol::profile::AvatarPresentation::Assistant);
+        target.avatar = avatar.clone();
+        assert!(
+            !check_shell(&target, &observed, None)
+                .iter()
+                .find(|v| v.key == "avatar")
+                .unwrap()
+                .ok
+        );
+        let observed = ShellObservation {
+            avatar: Some(avatar),
+            ..observed
+        };
+        assert!(
+            check_shell(&target, &observed, None)
+                .iter()
+                .find(|v| v.key == "avatar")
+                .unwrap()
+                .ok
+        );
+    }
+
+    #[test]
     fn generated_upgrade_requires_the_actual_mounted_artifact() {
         let mut generated = binding("ui.generated_panel", "ent-generated");
         generated.qml_url = "ditto-generated:fixed".into();

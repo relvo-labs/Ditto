@@ -50,6 +50,7 @@ QtObject {
     // ---- internals --------------------------------------------------------------------
     property bool wanted: false
     property string subscriptionId: ""
+    property bool reconnecting: false
     property bool reading: false
     property bool readAgain: false
     readonly property int pageSize: 50
@@ -104,17 +105,33 @@ QtObject {
         return Object.keys(open).length > 0;
     }
 
+    readonly property string transportText: reconnecting
+        ? client.t(qsTr("正在重新連線；將查詢實際結果")) : ""
+
+    /// Unknown settings/provider are not readback that AI is disabled/offline.
+    /// `enabled` remains fail-closed for controls while these reads are pending.
+    readonly property string offlineReason: client.online === false
+        ? client.t(qsTr("桌面服務未連線"))
+        : settings && settings.enabled === false
+            ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
+            : settings && settings.enabled === true && provider && !connected
+                ? client.t(qsTr("模型尚未連接；桌面仍可照常操作")) : ""
+
     readonly property string stateText: {
+        const result = turn && ["partial", "unknown", "cancelled"].indexOf(turn.state) >= 0
+            ? failureText(turn) : "";
+        if (taskState === "offline") {
+            // Keep both the known terminal outcome and the current readback.
+            if (result) return result + (offlineReason ? " · " + offlineReason : "");
+            return offlineReason || client.t(qsTr("待命中"));
+        }
+        if (result) return result;
+        if (turn && turn.state === "cancelling") return client.t(qsTr("正在停止"));
         switch (taskState) {
-        case "offline":
-            return !client.online ? client.t(qsTr("桌面服務未連線"))
-                : !enabled ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
-                : client.t(qsTr("模型尚未連接；桌面仍可照常操作"));
         case "starting":
             return client.t(qsTr("正在啟動對話"));
         case "thinking":
-            return turn && turn.state === "cancelling" ? client.t(qsTr("正在停止"))
-                : client.t(qsTr("正在理解需求；可停止"));
+            return client.t(qsTr("正在理解需求；可停止"));
         case "executing":
             return client.t(qsTr("正在套用並確認桌面變更"));
         case "awaiting":
@@ -183,6 +200,8 @@ QtObject {
             state.readNew();
         }, function (result) {
             state.subscriptionId = result.subscription_id;
+            state.reconnecting = false;
+            if (state.turn) state.refreshTurnFrom({ data: { turn_id: state.turn.turn_id } });
             state.readNew();
         }, function (error) {
             state.setError(error);
@@ -629,6 +648,7 @@ QtObject {
     property Connections connection: Connections {
         target: state.client
         function onDisconnected() {
+            state.reconnecting = state.wanted;
             state.subscriptionId = "";
         }
         function onOnlineChanged() {

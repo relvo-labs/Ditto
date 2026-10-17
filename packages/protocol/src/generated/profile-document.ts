@@ -1,5 +1,9 @@
 /* Generated from schema/profile-document.json; do not edit. */
 
+/**
+ * An explicit rendering choice; absence retains the optional legacy avatar.
+ */
+export type AvatarPresentation = 'assistant';
 export type HostKind = 'qml' | 'cordis' | 'core_builtin';
 
 export interface ProfileDocument {
@@ -46,6 +50,11 @@ export interface AvatarSettings {
    * digest.
    */
   output?: string | null;
+  /**
+   * D-48: absent preserves legacy rendering and its document digest.
+   * Older readers reject this field; see the explicit downgrade policy.
+   */
+  presentation?: AvatarPresentation | null;
   scale: number;
 }
 export interface EntrySpec {

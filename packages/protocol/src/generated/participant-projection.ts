@@ -21,6 +21,10 @@ export type Projection =
        */
       strategy?: string | null;
     };
+/**
+ * An explicit rendering choice; absence retains the optional legacy avatar.
+ */
+export type AvatarPresentation = 'assistant';
 export type HotSwapLevel = 'instant' | 'controlled_handoff' | 'host_restart' | 'session_restart';
 
 export interface Appearance {
@@ -53,6 +57,11 @@ export interface AvatarSettings {
    * digest.
    */
   output?: string | null;
+  /**
+   * D-48: absent preserves legacy rendering and its document digest.
+   * Older readers reject this field; see the explicit downgrade policy.
+   */
+  presentation?: AvatarPresentation | null;
   scale: number;
 }
 export interface ShortcutBinding {

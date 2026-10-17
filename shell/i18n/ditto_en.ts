@@ -236,6 +236,21 @@
     </message>
 </context>
 <context>
+    <name>AssistantEntry</name>
+    <message>
+        <source>助理</source>
+        <translation>Assistant</translation>
+    </message>
+    <message>
+        <source>待命中</source>
+        <translation>Idle</translation>
+    </message>
+    <message>
+        <source>開啟助理對話</source>
+        <translation>Open assistant conversation</translation>
+    </message>
+</context>
+<context>
     <name>Avatar</name>
     <message>
         <source>待命中</source>
@@ -1103,6 +1118,10 @@
         <translation>Stopped</translation>
     </message>
     <message>
+        <source>待命中</source>
+        <translation>Idle</translation>
+    </message>
+    <message>
         <source>桌面服務未連線</source>
         <translation>Desktop service not connected</translation>
     </message>
@@ -1137,6 +1156,10 @@
     <message>
         <source>正在理解需求；可停止</source>
         <translation>Working out what you asked; you can stop it</translation>
+    </message>
+    <message>
+        <source>正在重新連線；將查詢實際結果</source>
+        <translation>Reconnecting; checking the actual result</translation>
     </message>
     <message>
         <source>沒有完成；可以再試一次</source>
@@ -1443,6 +1466,10 @@
     <message>
         <source>diff.avatar.output</source>
         <translation>Character screen</translation>
+    </message>
+    <message>
+        <source>diff.avatar.presentation</source>
+        <translation>Assistant presentation</translation>
     </message>
     <message>
         <source>diff.avatar.scale</source>
