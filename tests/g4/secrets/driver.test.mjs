@@ -63,8 +63,10 @@ test('the production driver completes with every actual request schema-checked, 
   const preferences = {revision: 1, enabled: false, provider: 'codex-app-server', max_tool_calls: 20,
     turn_timeout_ms: 120000, retain_conversations: true, approval_mode: 'ask'}
   const responses = {
-    'desktop.profiles.get': {profile: {profile_id: 'profile-active-from-readback'}},
+    'desktop.profiles.get': {profile: {profile_id: 'profile-active-from-readback', head_revision: 'revision-from-readback'}},
     'desktop.plugins.diagnostics': {host: {process: {pid: 123}}},
+    'desktop.changes.propose': {change_id: 'change-test'},
+    'desktop.changes.get': {change_id: 'change-test', idempotency_key: 'QA04_PRIVATE_PROPOSAL_CONTENT'},
     'agent.sessions.create': {session_id: 'session-test'},
     'agent.settings.describe': preferences,
     'agent.turns.submit': {turn_id: 'turn-test'},
@@ -87,19 +89,30 @@ test('the production driver completes with every actual request schema-checked, 
     save: path => saved.push(path),
     eventually: async fn => { const result = await fn(); assert.ok(result); return result },
   })
-  assert.equal(new Set(requests.map(item => item.method)).size, 15)
+  assert.equal(new Set(requests.map(item => item.method)).size, 17)
+  const proposals = requests.filter(item => item.method === 'desktop.changes.propose')
+  assert.equal(proposals.length, 1)
+  assert.deepEqual(proposals[0].params, {
+    profile_id: 'profile-active-from-readback', base_revision: 'revision-from-readback',
+    ops: [], idempotency_key: 'QA04_PRIVATE_PROPOSAL_CONTENT',
+  })
+  assert.deepEqual(requests.find(item => item.method === 'desktop.changes.get').params, {change_id: 'change-test'})
   const exports = requests.filter(item => item.method === 'desktop.profiles.export')
   assert.equal(exports.length, 2)
   for (const request of exports) assert.deepEqual(request.params, {profile_id: 'profile-active-from-readback'})
   assert.ok(saved.includes('exports/profile'))
+  assert.ok(saved.includes('conversations/proposal-readback'))
   if (process.env.DITTO_QA04_CONTRACT_REPORT) writeFileSync(process.env.DITTO_QA04_CONTRACT_REPORT, JSON.stringify(requests, null, 2))
 })
 
 test('the original empty export params and missing params on every required method are rejected', () => {
   assert.throws(() => validate(input('desktop.profiles.export'), {}), /missing profile_id/)
   for (const method of ['agent.credentials.create', 'agent.sessions.create', 'agent.settings.patch',
-    'agent.turns.submit', 'agent.turns.get', 'agent.sessions.read', 'desktop.plugins.development.create', 'desktop.plugins.development.get']) {
+    'agent.turns.submit', 'agent.turns.get', 'agent.sessions.read', 'desktop.plugins.development.create', 'desktop.plugins.development.get',
+    'desktop.changes.propose']) {
     assert.throws(() => validate(input(method), {}), /missing/)
   }
   assert.throws(() => validate(input('desktop.rescue.status'), {profile_id: 'unexpected'}))
+  assert.throws(() => validate(input('desktop.changes.propose'), {base_revision: 'revision-test', ops: [], subject: 'private'}), /unexpected subject/)
+  assert.throws(() => validate(input('desktop.changes.propose'), {base_revision: 'revision-test', ops: {}}), /expected array/)
 })

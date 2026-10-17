@@ -59,12 +59,14 @@ node --experimental-transform-types tests/g4/secrets/crash-audit.mjs /tmp/qa04-c
 
 coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id` 而停止，`flow.ok=false`，不得計入正向／負向證據。driver 現在兩次匯出均使用 `desktop.profiles.get` 回讀的 `profile.profile_id`。本機仍不能開 socket，**修正後端到端流程未執行，交 coordinator 重跑**。
 
-`node tests/g4/secrets/driver.test.mjs` 實際執行同一個 `runFlow`，逐次以 `schema/catalog.json` 的 input_schema 驗證所有 15 個能力，並以 `{}` 重現舊 export 參數被拒。測試僅實作這些 schema 用到的 vocabulary，遇到新關鍵字就失敗；不是通用 schema 驗證器，也不模擬產品成功證據。
+`node tests/g4/secrets/driver.test.mjs` 實際執行同一個 `runFlow`，逐次以 `schema/catalog.json` 的 input_schema 驗證所有 17 個能力，並以 `{}` 重現舊 export 參數被拒。測試僅實作這些 schema 用到的 vocabulary，遇到新關鍵字就失敗；不是通用 schema 驗證器，也不模擬產品成功證據。
 
 | 方法 | 必填參數 | driver 實際提供 |
 | --- | --- | --- |
 | `desktop.profiles.get` | 無 | `{}`，回讀現役 Profile |
 | `desktop.plugins.diagnostics` | 無 | `{}` |
+| `desktop.changes.propose` | `base_revision,ops` | 回讀的 `profile_id`、`head_revision`，空 ops 與私人哨兵冪等鍵 |
+| `desktop.changes.get` | 無（可依 change／operation ID 查詢） | propose 回傳的 `change_id`，確認私人冪等鍵保存 |
 | `agent.credentials.create` | `provider,secret,idempotency_key` | `direct-model`、三種哨兵各一次、`qa04-<label>` |
 | `agent.sessions.create` | `title,idempotency_key` | `QA04 private conversation`、`qa04` |
 | `agent.settings.describe` | 無 | `{}` |
@@ -81,6 +83,8 @@ coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id`
 | `core.handshake`（既有 connect helper） | `protocol_version,client,auth` | `0.3.0`、launcher 的 kind/version、繼承 descriptor 取得的 token；核對 `schema/handshake-input.json`，本輪未執行 IPC |
 
 能力參數由共用 client 加入 `_meta.protocol_version=0.3.0,deadline_ms=15000`；這是 Core 剝除的傳輸 metadata，不屬於 input_schema 的領域參數。實際單元請求表可由 `DITTO_QA04_CONTRACT_REPORT=<path>` 保存。
+
+#73 新增 proposal → ChangeSet 回讀，私人哨兵 `QA04_PRIVATE_PROPOSAL_CONTENT` 只允許保留在明確保存的 readback／store，不得進一般日誌、匯出與診斷。`run.py` 的隱私掃描已加入此哨兵。subject 是 Core 綁定的呼叫身分，不能當 RPC 參數；logger 的任意私人 subject 測試與全部欄位結論見 [Core 日誌盤點](core-log-audit.md)。產品掃描仍交 coordinator 在 sandbox 外重跑，未宣稱通過。
 
 ## repair1：hostd 日誌路徑盤點
 

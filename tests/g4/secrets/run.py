@@ -89,7 +89,8 @@ if args.inject_leak:
     (product / "logs/intentional-leak.log").write_text(sentinels["token"])
 report = scan(manifest["roots"], sentinels)
 privacy = scan({category: manifest["roots"][category] for category in ("logs", "exports", "diagnostics")},
-               {"conversation_content": "QA04_PRIVATE_CONVERSATION_CONTENT"})
+               {"conversation_content": "QA04_PRIVATE_CONVERSATION_CONTENT",
+                "proposal_content": "QA04_PRIVATE_PROPOSAL_CONTENT"})
 report.update({"flow": status, "injection_manifest": str(root / "manifest.json"),
                "negative_control": args.inject_leak, "default_privacy_scan": privacy})
 coverage = all(report["scope"][category]["file_count"] > 0 for category in

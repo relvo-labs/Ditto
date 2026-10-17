@@ -9,6 +9,17 @@ export async function runFlow(core, {sentinels, verify, save, eventually}) {
   const exportParams = {profile_id: profile.profile.profile_id}
   await eventually(async () => (await core.must('desktop.plugins.diagnostics', {})).host.process?.pid)
   verify('real desktop host is running for log coverage', true)
+  // Subject is bound by Core to the caller (cli here), never an input field.
+  // A private idempotency key takes a valid proposal through change.draft.
+  const proposal = await core.must('desktop.changes.propose', {
+    profile_id: profile.profile.profile_id, base_revision: profile.profile.head_revision,
+    ops: [], idempotency_key: 'QA04_PRIVATE_PROPOSAL_CONTENT',
+  })
+  verify('proposal creates a traceable change', !!proposal.change_id)
+  const change = await core.must('desktop.changes.get', {change_id: proposal.change_id})
+  verify('Core retains the private proposal for scanner coverage',
+    change.change_id === proposal.change_id && change.idempotency_key === 'QA04_PRIVATE_PROPOSAL_CONTENT')
+  save('conversations/proposal-readback', change)
   for (const [label, secret] of Object.entries(sentinels)) {
     const response = await core.call('agent.credentials.create', {provider: 'direct-model', secret, idempotency_key: `qa04-${label}`})
     verify(`${label}: unavailable private keyring refuses credential`, response.error?.name === 'unavailable' && response.error?.message === 'keyring_unavailable')

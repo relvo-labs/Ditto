@@ -103,7 +103,10 @@ mod tests {
         let fields = [
             ("reason", "backend rejected QA04_PRIVATE_ERROR_CONTENT"),
             ("error", "worker failed with QA04_PRIVATE_WORKER_CONTENT"),
-            ("spec", "dittoctl 0.3.0 command QA04_PRIVATE_LAUNCH_ARGUMENT"),
+            (
+                "spec",
+                "dittoctl 0.3.0 command QA04_PRIVATE_LAUNCH_ARGUMENT",
+            ),
             ("operation_id", "op-1"),
         ];
         let text = line("failure", &fields);
