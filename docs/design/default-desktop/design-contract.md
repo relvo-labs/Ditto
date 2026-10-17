@@ -9,22 +9,23 @@
 | 圖中區域 | 必須保留的可見關係 | 尚無法從圖確定 |
 | --- | --- | --- |
 | 背景 | 淺薰衣草、右方大型 Ditto、泡泡與反光、左方留給工作視窗 | 乾淨桌布、分層原檔、授權、是否會動 |
+| 左上標題／副標 | `01 — SOFT JELLY` 與 `A softer desktop for brighter days`，灰紫字、拉開字距 | 是 mockup caption、桌布字樣或 Profile／主題名稱 widget 尚未知；交 owner 決定，不能硬編或從圖裁切，也不能默默省略 |
 | 頂部 | 中央小工作區膠囊，右側 Wi-Fi／音量／電池／時間／搜尋；不鋪厚重實底 bar | 圖中 1～4 不代表只允許四個工作區；時間不能寫死 |
 | 左上雙窗 | Files 在後、Notes 在前，近白帶紫的表面、亮邊、淡而寬的柔影 | 真實應用選型、精確字體／半徑、是否首次登入自動開啟 |
 | Files／Notes 內容 | 側欄與正文有層次，淡紫選中底，圖示與間距一致 | 示意檔名不是實際檔案；第三方 app 內部不能任意重繪 |
 | 底部 Dock | 置中浮動膠囊，七個彩色柔亮圖示，有留白與近白半透明底 | hover 放大、彈跳、running 指示及排序行為皆未在圖中觀察到 |
-| 右下入口 | 約 197×54 的小膠囊，兩行短文案與符號，與 Dock 分離 | 右側符號是否獨立按鈕、是否能直接輸入都未知；owner 已指定改為助理 |
+| 右下入口 | 約 197×54 的小膠囊；左側圓形小 Ditto 頭像，中間 `Need a hand?`／`Ask anything…`，右側 sparkle | owner 已要求右下改助理，故這個小 Ditto 頭像要替換；助理用非 Ditto 頭像或中性符號待確認，不再把原圖小 Ditto 當交付選項。是否直接輸入也未知 |
 | 天氣／手寫字樣 | 右側小天氣文字、手寫裝飾 | 是桌布還是 widget；不可硬編即時天氣或假狀態 |
 
 ## 2. 原生實作差距
 
 以下引用都對固定基底，而不是 current deployed Profile：
 
-- [`shell/jelly/Tokens.qml`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/jelly/Tokens.qml#L59-L125)：已有語意色、spacing、motion 與降級 flags，但 fallback 偏深；`defaults.rs` 只改 accent。`soft-jelly` 名稱不等於已還原原圖。
+- [`shell/jelly/Tokens.qml`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/jelly/Tokens.qml#L23-L125)：已有語意色、spacing、motion 與降級 flags，但 fallback 偏深；`defaults.rs` 只改 accent。`soft-jelly` 名稱不等於已還原原圖。
 - [`Material.qml`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/jelly/Material.qml#L16-L35)：矩形底、border、偏移矩形影；blur／shadow token 的存在不證明已渲染柔化效果。
 - [`shell.qml` 背景](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/shell.qml#L321-L334)：只有顏色，未接 wallpaper Image；不可在 Shell 偷存第二份正式配置。
 - [`DockBottom.qml`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/providers/dock_bottom/qml/DockBottom.qml#L74-L110) 是 app ID 文字條，另一 [`DockPill.qml`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/providers/dock_pill/qml/DockPill.qml#L160-L180) 是縮寫圓球，尚非圖中的圖示 Dock。保留供應者可替換契約。
-- [`AvatarSettings`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/crates/ditto-protocol/src/profile.rs#L348-L399) 已有 enabled／hidden／scale／animations／output／corner；沒有自由拖曳座標，也沒有 `outcorner` 欄位。
+- [`AvatarSettings`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/crates/ditto-protocol/src/profile.rs#L348-L399) 已有 enabled／hidden／scale／animations／output／corner；沒有自由拖曳座標，位置由 `output` 與 `corner` 兩個欄位共同定義。
 - [`ConversationState`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/chat/ConversationState.qml#L57-L153) 是新助理必須重用的狀態來源，不能另造假進度。
 
 ## 3. 材質分層提案
@@ -56,7 +57,7 @@
 
 ### 呈現與狀態
 
-- 建議一個有標籤的 button 膠囊，使用中性助理符號；「需要幫忙嗎？」是文案候選，不是確定品牌。右端 sparkle 初始視為裝飾，除非另有明確操作契約。
+- 建議一個有標籤的 button 膠囊。**原圖是左側小 Ditto 頭像、右側 sparkle；owner 明確要求將右下 Ditto 改為助理，這是有需求依據的視覺差異，不是研究漏掉原圖。** 助理可用非 Ditto 小頭像或中性符號，兩者都只是候選，依 owner 決定的符號交付並記入 deviation ledger；不得預設採用中性符號或另造 Ditto 分身。「需要幫忙嗎？」是文案候選，不是確定品牌。右端 sparkle 初始視為裝飾，除非另有明確操作契約。
 - 不把入口畫成假輸入框。點擊、Enter／Space 或既有 `Super+A` 才打開真實 editor；待機與通知不得搶焦點。
 - compact 與完整視窗沿用同一會話、草稿、串流、pending turn 與完整歷史。面板定位改用入口真實幾何，不再依大型角色固定高度。
 - 沿用七態：idle、thinking、executing、awaiting、done、failed、offline；starting 是生命週期提示，cancelling 是 turn 階段，reconnecting 是傳輸提示，不擅自擴充 PRD enum。
@@ -66,6 +67,7 @@
 
 - approval 仍用既有請求與拒絕預設，Escape 保留拒絕；preview 用原 Core 確認／倒數。助理只提示與導向，不自動核准或自動 commit。
 - 收合不停止 turn；停止呼叫既有 cancel 並等真實終態；Undo 僅針對可撤銷的已生效變更。重連先回讀，不能重播副作用。
+- **既有缺口**：[`ChatBody.qml:71`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/chat/ChatBody.qml#L67-L71) 的 Escape 直接觸發 closeRequested；來源中未見明確 preedit／inputMethodComposing guard。這是 R3／#47 要補驗證與修正的輸入法接點，尚未證明實際每種輸入法都會誤觸。[`ApprovalWindow.qml:73`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/chat/ApprovalWindow.qml#L69-L73) 的 Escape 則是拒絕，不能一併改成收合。
 - IME composing 時 Enter／Escape／方向鍵先交輸入法；候選確認不誤送，候選取消不誤收合。沒有 preedit 時 Escape 收合並交還焦點。
 - 螢幕／檔案／剪貼簿上下文仍需清楚範圍、授權與撤銷，不能為了助理順手而常駐偷讀。
 - 保留快捷鍵／Dock 等無角色入口、AT-SPI／Orca、大字與可見 focus；多屏拔插沿用 output／corner fallback，不能硬編整張桌面的右下座標。
@@ -74,6 +76,8 @@
 
 owner 這次要求會取代 PRD §11.1／AVA-03 與研究文件中「預設獨立 Ditto 角色入口」的對應選擇；R3 必須先補決策紀錄與精確 authority delta，再接實作。**本研究文件本身不悄悄改 PRD，也不把所有 AVA 要求取消。**
 
-新預設助理與舊版可選 avatar 模式要有 Core 管理的呈現契約。先評估已註冊 entry config；不足才提 optional typed field／schema 遷移，不在本規劃假設欄位已存在。建議 absent 保留 legacy，明確選新預設才採新模式；測 digest、匯入匯出、切換、undo、重啟，不能全域改 `AvatarSettings::default()` 讓舊文件默默變意義。
+新預設助理與舊版可選 avatar 模式要有 Core 管理的呈現契約。先評估已註冊 entry config；不足才提 optional typed field／schema 遷移，不在本規劃假設欄位已存在。建議 absent 保留 legacy，明確選新預設才採新模式；測 digest、匯入匯出、切換、undo、重啟，不能全域改 `AvatarSettings::default()` 讓舊文件默默變意義。`AvatarSettings` 有 `deny_unknown_fields`：若新增 typed field，舊版程式讀新版文件會拒絕，必須明列前向相容限制、版本協商／遷移與降版政策；「新程式讀舊文件」通過不等於「舊程式可讀新文件」。
+
+PRD §11.1 原先還把右側大型 Ditto 定義為可動角色層。R3 的 authority delta 也要交代桌布 Ditto 是靜態或分層動態（目前未知），以及 AVA-01／02／05／07 與 AT-12 哪些由 optional avatar 承接、哪些互動需求映射到助理。不得只換入口便默默刪掉可及性、遮擋與無角色能力。
 
 既有 [`aboveWindows: true`](https://github.com/relvo-labs/Ditto/blob/39da2977fa1a819033b4a68a3cdf350e2b32f808/shell/shell.qml#L563) 與 AVA-05「應用可覆蓋角色」需實機核對；只看一個屬性不足以宣告 bug。由 #46／#56 接遮擋／喚回測試，若證實不符再追修正。

@@ -8,14 +8,14 @@
 | --- | --- | --- |
 | [Apple HIG Materials](https://developer.apple.com/design/human-interface-guidelines/materials)、[Motion](https://developer.apple.com/design/human-interface-guidelines/motion) | 材質分層、內容辨識、避免動態阻擋下一操作；輔助偏好是設計變體 | 不搬 Liquid Glass shader、Apple 圖示／品牌；原圖仍是視覺權威 |
 | [Microsoft Fluent／WinUI Materials](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/materials)、[Acrylic](https://learn.microsoft.com/en-us/windows/apps/design/style/acrylic) | 區分常駐基底、短暫面板與不透明 fallback；in-app 與桌面背板不同 | WinUI 的系統自動降級不等於 Qt 已有；不把每層都玻璃化 |
-| [GNOME HIG Keyboard](https://developer.gnome.org/hig/guidelines/keyboard.html)、[libadwaita SpringAnimation](https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/class.SpringAnimation.html) | 鍵盤可到達、焦點順序、動畫 skip 的有效終態 | 不引入 GTK widget；應用的 Super 限制不能原樣套給 desktop shell |
+| [GNOME HIG Keyboard](https://developer.gnome.org/hig/guidelines/keyboard.html)、[libadwaita SpringAnimation](https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/class.SpringAnimation.html)／[父類別 AdwAnimation.skip](https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/method.Animation.skip.html) | 鍵盤可到達、焦點順序、動畫 skip 的有效終態 | 不引入 GTK widget；應用的 Super 限制不能原樣套給 desktop shell |
 | [KDE HIG Accessibility](https://develop.kde.org/hig/accessibility)、[Plasma](https://kde.org/plasma-desktop/) | 鍵盤／pointer／reader 分別測；focus 與 selection 不混淆，進階設定與主線分開 | 不複製整個 System Settings 選項量或 widget 生態 |
 | [System76 COSMIC 快捷鍵](https://www.system76.com/support/pop-cosmic-keyboard-shortcuts) | 搜尋應用與已開視窗；模式提示可被發現，先回到工作再另開工作 | 不自動執行模糊命中的命令，不更換 Wayfire |
 | [elementary HIG Undo](https://docs.elementary.io/hig/user-workflow/always-provide-an-undo) | 可逆操作、錯誤保留上下文與下一步 | 不將外部不可逆動作包成假 Undo；不搬 Pantheon |
-| [Qt Quick MultiEffect](https://doc.qt.io/qt-6.10/qml-qtquick-effects-multieffect.html)、[SpringAnimation](https://doc.qt.io/qt-6.10/qml-qtquick-springanimation.html)、[software adaptation](https://doc.qt.io/qt-6/qtquick-visualcanvas-adaptations-software.html) | 原生 effect 範圍／成本、spring／retarget、IME composing、software 降級 | 一般 Qt 6 文件不等於 pinned 版本；MultiEffect 不是跨程序 backdrop blur |
+| [Qt Quick MultiEffect](https://doc.qt.io/qt-6.10/qml-qtquick-effects-multieffect.html)、[SpringAnimation](https://doc.qt.io/qt-6.10/qml-qtquick-springanimation.html)、[TextInput composing](https://doc.qt.io/qt-6.10/qml-qtquick-textinput.html#inputMethodComposing-prop)、[software adaptation](https://doc.qt.io/qt-6/qtquick-visualcanvas-adaptations-software.html) | 原生 effect 範圍／成本、spring／retarget、IME composing、software 降級 | 一般 Qt 6 文件不等於 pinned 版本；MultiEffect 不是跨程序 backdrop blur |
 | [Quickshell](https://quickshell.org)、[固定版 layer-shell focus](https://github.com/quickshell-mirror/quickshell/blob/2b4501a282689792b62e94f3fb30d8f512324fe6/src/wayland/wlr_layershell/wlr_layershell.hpp#L45-L76) | 常駐面板、明確喚出、鍵盤取得與歸還分開；專注於原生 Shell 接點 | Exclusive 不等於安全鎖屏；不照搬社群 showcase 當預設 |
 
-前六項是桌面設計體系，後兩項是工程能力基準，**不是八個完整桌面產品的 usability 排名**。Qt 6.10 的線上頁面目前標 6.10.3，repo 仍釘 6.10.2；任何 API 選型要再核對實際映像，沒有升級授權。文件圖片的版本與素材權利未逐一核實，不能直接納入發行包。
+前六項是桌面規範／產品參考（COSMIC 引用的是官方快捷鍵支援頁，不是 HIG），後兩項是工程能力基準，**不是八個完整桌面產品的 usability 排名**。Qt 6.10 的線上頁面目前標 6.10.3，repo 仍釘 6.10.2；任何 API 選型要再核對實際映像，沒有升級授權。文件圖片的版本與素材權利未逐一核實，不能直接納入發行包。
 
 ## 2. 固定版本的工程參考
 
@@ -30,7 +30,7 @@ SHA 是本輪研究快照，不表示最新 release，也不建議升級目標�
 ### Wayfire — 真背景模糊與整窗變形不是同一效果
 
 - 固定 commit：[`fdf8832e4263db54e2fef2abf30326e16877b8a2`](https://github.com/WayfireWM/wayfire/commit/fdf8832e4263db54e2fef2abf30326e16877b8a2)。
-- [`blur.cpp:112–168`](https://github.com/WayfireWM/wayfire/blob/fdf8832e4263db54e2fef2abf30326e16877b8a2/plugins/blur/blur.cpp#L112-L168) 處理擴張 damage、render target 邊界與像素保存；[`wobbly.cpp:59–110`](https://github.com/WayfireWM/wayfire/blob/fdf8832e4263db54e2fef2abf30326e16877b8a2/plugins/wobbly/wobbly.cpp#L59-L110) 是網格與物理狀態，不是一般 easing。
+- [`blur.cpp:112–168`](https://github.com/WayfireWM/wayfire/blob/fdf8832e4263db54e2fef2abf30326e16877b8a2/plugins/blur/blur.cpp#L112-L168) 處理擴張 damage、render target 邊界與像素保存；[`wobbly.cpp:59–110`](https://github.com/WayfireWM/wayfire/blob/fdf8832e4263db54e2fef2abf30326e16877b8a2/plugins/wobbly/wobbly.cpp#L59-L110) 這段顯示網格三角化與 model 頂點；spring 物理另見同目錄 `wobbly.c`，不是一般 easing。
 - Ditto 提案：分開測 compositor backdrop、局部 QML 材質、整窗變形；不預設開啟全視窗 wobble。根 LICENSE 為 MIT，但 `wobbly.c` 有獨立來源／檔頭署名，採用前逐檔審查。
 
 ### niri — spring 的中斷與終止
