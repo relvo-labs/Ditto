@@ -118,13 +118,13 @@
 | D8 | 次要文字 | `#9695a3` 在 `#faf9ff` 上 = 2.82:1 | `#57536f`（6.68:1） | 原圖的值低於 WCAG AA，可讀性優先 | 刻意偏離 |
 | D9 | 圓角 | 視窗≈14–16 | token `radiusLarge` 20、`radiusMedium` 12；樣本用 16 | 沒有「視窗圓角」token | 待凍結 |
 | D10 | Canvas 方塊紋 | 平滑 | software renderer 的漸層有淡方塊紋 | renderer 產物，不是 recipe | 硬體 capture 重驗 |
-| D11 | 右下 | 小 Ditto 頭像＋文字膠囊 | 空白 | owner 已要求改成助理（R3／#67），不放假入口 | 交 #67 |
+| D11 | 右下 | 小 Ditto 頭像＋文字膠囊 | 有標籤的助理膠囊；中性對話符號與非 Ditto 幾何小頭像兩個候選，暫用中性符號 | owner 已要求改助理；本 lane 指示暫用中性，不另畫 Ditto；右端 sparkle 沒有獨立操作所以不新增按鈕 | 待 owner 決定最終符號 |
 
-## 5. 交接需求（本 PR 不改 `crates/`、`schema/`、`defaults.rs`）
+## 5. 交接需求（#71 原交接，R3 更新 H1／H3）
 
-- **H1 預設主題（#45／Core）**：新的預設要不要用 `soft-jelly-light`，或改寫 `soft-jelly` 本身？`APPEARANCE_TOKENS` 每個 token 只有一個預設值，所以個人化中心與 Agent 看到的仍是深色預設。需要決定：要嘛依主題列出預設值，要嘛換掉預設值並同步更新 `appearance_tokens_match_the_shell` 測試。`defaults.rs` 目前把 accent 覆寫為 `#b9a4ff`，在淺色 recipe 下對比仍達標。
+- **H1 預設主題（#45／Core）**：R3 依 D-48 已把新「預設」文件改為 `soft-jelly-light`；agent 依 #71 交接實作，owner 可反悔，既有 store 不改。「開發」「簡報」仍為 `soft-jelly`。以下保留 token 層的後續問題：`APPEARANCE_TOKENS` 每個 token 只有一個預設值，所以個人化中心與 Agent 看到的仍是深色預設。需要決定：要嘛依主題列出預設值，要嘛換掉預設值並同步更新 `appearance_tokens_match_the_shell` 測試。`defaults.rs` 目前把 accent 覆寫為 `#b9a4ff`，在淺色 recipe 下對比仍達標。
 - **H2 桌布欄位（Core／#45／#51／#49）**：Profile `appearance` 需要一個由 Core 管理的桌布引用（素材 ID 或 Core 資料區內的資產，加 fit 方式，必要時分輸出），並經 ChangeSet 寫入。Shell 端只接 `Backdrop.wallpaperSource`，不讀環境變數或自訂設定檔。多螢幕的 crop／fit 由 #49 決定。素材與授權由 #51 決定。
-- **H3 Dock 綁定（#45）**：預設 Profile 綁的是 `ditto.dock.bottom`（文字視窗列）。要對齊原圖，預設要改綁 `ditto.dock.pill`，並給一份實際存在的釘選清單（manifest 目前的預設是 firefox／foot／kate）。
+- **H3 Dock 綁定（#45）**：R3 依 D-48 已把新「預設」文件改綁已安裝的 `ditto.dock.pill`，缺套件時保留原供應者；agent 依 #71 交接實作，owner 可反悔。釘選清單沿用已註冊供應者設定（不捏造應用）；既有 store 與「簡報」不變。
 - **H4 內建套件版本（#50）**：`ditto.dock.pill` 內容改了，但版本仍是 `1.1.0`。G1／G2 測試與語意任務集逐字引用 `1.1.0`。已有 store 的機器在 seed 時會記 `boot.builtin_refused`（同版本不同內容），保留舊內容，只有新 store 會拿到新 Dock。升版與升級路徑屬內建套件升版工作。
 - **H5 `on_accent` 既有缺陷**：`Tokens.qml` 的 `onAccent` 屬性名稱以 `on`＋大寫開頭，被 QML 當成訊號處理器名稱，綁定沒有生效。實際值一律是 `#000000`，Profile 的 `on_accent` 覆寫也無效；`main` 上同樣如此。黑字在兩種 accent 上都達 AA。修正需要改名或另設 token，會影響所有呼叫端，本 PR 不動。
 - **H6 頂部 slice**：浮動工作區膠囊與狀態圖示屬於 `panel_top` 供應者或新供應者，需要圖示素材，也要決定供應者 ID 與預設綁定（#45）。
@@ -142,9 +142,10 @@
 4. 以 1280×800、scale 1 渲染五張圖：normal、reduced-transparency、low-power、dock-states（淺色），以及 legacy-soft-jelly（舊版主題）。
 5. 產出 side-by-side、50/50 疊圖（標出元件框）與逐元件取樣 `comparison.json`。
 
-標明的測試資料：四個工作區（第一個作用中）、釘選清單、dock-states 圖中的兩筆視窗記錄。時鐘是執行當下的真實時間。不畫桌布、標題、天氣或助理。PNG 只放證據目錄，不進 git。
+標明的測試資料：四個工作區（第一個作用中）、釘選清單、dock-states 圖中的兩筆視窗記錄。時鐘是執行當下的真實時間。#65 的五個既有場景不畫桌布、標題、天氣或助理；#67 的獨立助理場景與限制見下節。PNG 只放證據目錄，不進 git。
 
 Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscreen 也只有 software renderer。因此 capture 用 `tests/g4/visual/stubs/` 的純 QML 替身代替 Quickshell 型別（PanelWindow 依 layer-shell 規則擺放）。這是開發證據：證明 QML 能建出這個畫面，但**不能**證明 Wayfire 上的實際合成、輸入區、焦點或效能。
+
 # D-48 新預設的助理入口
 
 | 欄位 | 內容 |
@@ -185,3 +186,20 @@ Core 持有 optional typed `avatar.presentation`；absent＝legacy 且省略序�
 相容政策：schema version 1 與 RPC 版本不變（新增選用欄位）。新版讀舊文件不遷移，digest 不變。舊版 deny_unknown_fields 會拒絕含 presentation 的文件，**不具前向相容**；匯入先驗證，未知欄位不可忽略後執行。沒有自動降版或靜默刪欄位；降版前由新版明確移除呈現意圖、保存及匯出，以舊 schema 驗證，保留原始匯出／store 備份。禁止舊程式直接開含新文件的 store；Core／Shell 同版配送，混版不支援。測試以基底 schema 證明拒絕與明確降版後可讀。
 
 PRD 只更新 §11.1／AVA-03，其他需求、NFR 與出口不變。此為新決策，未覆寫 milestones 既有待決策項；該清單不在本 lane 寫入範圍。指定 `.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md` 因 runner 唯讀而 BLOCKED；此處暫存完整紀錄，coordinator 可移回。
+
+
+## 7. R3 助理呈現與開發證據（#67）
+
+Core 的 `avatar.presentation = "assistant"` 明確選擇新入口；absent／null 仍是 legacy，與 theme、hidden、enabled 分開。Schema、Rust／TS 與契約向量一起生成；輸出角落、顯示器消失 fallback、隱藏與停用沿用原 Core 投影。`AssistantSymbol.qml` 是可替換候選接點，未形成新角色品牌。
+
+入口為可見膠囊命中區，文字「助理」和真實任務狀態並列，無假 editor、無獨立 sparkle 按鈕。點擊、Enter／Space 或 Super+A 開同一 ConversationState。compact 的位置來自實際入口矩形（output-local），完整視窗與收合保留草稿、串流、歷史與待決 turn。收合只移除表面；停止、撤銷、approval、preview 沿用既有路徑。Escape composing guard 在 ChatBody／ChatInput；非 composing 才收合，Shell 保存先前應用並透過既有 focus 能力回焦。實際 Wayfire 回焦與輸入法尚未執行。
+
+Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 逐字相同；legacy compact 四角像素及幾何相同。共用 IME guard、重連回讀與保留已知 partial／unknown／stopped 結果的修正適用兩種呈現；這些修正不改已保存的 Profile。助理縮放後的命中區使用表面的實際尺寸，圓角外不攔截。
+
+| Slice | 改動／oracle | 開發證據 | 限制 |
+| --- | --- | --- | --- |
+| S1 狀態／同一對話 | `shell/assistant/`、`shell/chat/`、shell 掛載；Core turn／工具事件推導狀態，不重播工具 | `tst_assistant.qml` 15 項；`assistant/tst_assistant_flow.qml` 10 項；12 張 normal／legacy 場景 | fixture，不是真實 Core／模型端到端；IPC 在 sandbox BLOCKED |
+| S2 相容 | protocol optional 欄位、defaults、docops、projection、builtin_profiles；absent digest、全部既有 avatar 欄位、匯出匯入、undo／切換儲存操作、關閉 Store 後 Core 開機回讀 | protocol 29／store 51；Core 新增 assistant 4 項通過；舊 schema 拒絕新版、明確降版後接受；33 個 TS shape vectors | 完整參與者切換／undo 的 IPC gate BLOCKED；無自動降版 |
+| A1 鍵盤／IME | 真實 Enter／Space／Escape、composing policy、approval Escape 拒絕；四角定位、縮放與隱藏 | QtTest、legacy 逐像素／結構比對 | 未注入真正 QInputMethodEvent；實體 IME、回焦、Orca、大字、多屏熱插拔未執行，交 #47／#49 |
+
+執行入口與完整 gate 限制見 `tests/g4/visual/README-assistant.md`。證據目錄為 `/data/hermes/ditto-runs/g4-impl/r3-assistant/evidence/`。沒有 Quickshell／Wayfire／實體座位；PNG 是 Qt 6.10.2 offscreen software 與 layer-shell／FloatingWindow 替身的 **development** 證據。沒有乾淨桌布素材，不宣稱忠實還原或 G4／NFR 通過。
