@@ -5,7 +5,7 @@ import type {
 } from './api.ts'
 import type { CoreChannel } from './bridge/core-link.ts'
 import { PluginDataArea, grantedFile } from './data-area.ts'
-import { DittoError, describe } from './errors.ts'
+import { DittoError } from './errors.ts'
 import type { EventBridge } from './events.ts'
 import type { LeaseTable } from './leases.ts'
 import type { Instance, LifecycleHooks, Registration, Subscription } from './loader/instance.ts'
@@ -89,7 +89,7 @@ export class DittoService extends Service implements DittoApi {
           if (disposed) return
           subscription.subscriptionId = result.subscription_id
           bindings.subscriptions.set(result.subscription_id, subscription)
-        }, error => bindings.log.warn('subscription refused', { entry_id: instance.entryId, topics, error: describe(error) }))
+        }, error => bindings.log.warn('subscription refused', { entry_id: instance.entryId, topics, error }))
         return () => {
           disposed = true
           instance.subscriptions.delete(subscription)
@@ -157,7 +157,7 @@ async function activate(bindings: DittoBindings, registration: Registration): Pr
     await bindings.leases.register(registration)
   } catch (error) {
     bindings.log.error('capability registration refused', {
-      entry_id: registration.instance.entryId, capability_id: registration.definition.id, error: describe(error),
+      entry_id: registration.instance.entryId, capability_id: registration.definition.id, error,
     })
     throw error
   }

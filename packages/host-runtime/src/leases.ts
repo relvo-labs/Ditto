@@ -1,5 +1,4 @@
 import type { CoreChannel } from './bridge/core-link.ts'
-import { describe } from './errors.ts'
 import type { Registration } from './loader/instance.ts'
 import type { HostLog } from './log.ts'
 
@@ -47,7 +46,7 @@ export class LeaseTable {
       await this.core.request('host.capability.revoke', { lease_id: leaseId }, { onBehalfOf: registration.instance.entryId })
     } catch (error) {
       // Core revokes every lease of a lost connection itself; nothing to retry.
-      this.log.warn('lease revoke failed', { lease_id: leaseId, error: describe(error) })
+      this.log.warn('lease revoke failed', { lease_id: leaseId, error })
     }
   }
 
@@ -76,7 +75,7 @@ export class LeaseTable {
       if (registration.revoked || registration.instance.mode !== 'active') continue
       this.log.warn('lease expired; registering again', { lease_id: leaseId, capability_id: registration.definition.id })
       registration.settling = this.register(registration).catch(error => {
-        this.log.error('re-registration failed', { capability_id: registration.definition.id, error: describe(error) })
+        this.log.error('re-registration failed', { capability_id: registration.definition.id, error })
       })
     }
     return result

@@ -1,6 +1,6 @@
 import type { Json } from './api.ts'
 import type { CoreChannel } from './bridge/core-link.ts'
-import { DittoError, describe } from './errors.ts'
+import { DittoError } from './errors.ts'
 import type { HostLog } from './log.ts'
 
 interface Pending { name: string; payload: Json; coalesceKey?: string; resync?: boolean }
@@ -78,7 +78,7 @@ export class EventBridge {
         } catch (error) {
           if (error instanceof DittoError && error.reason === 'host_unavailable') return
           // An undeclared event (invalid_params) is a plugin bug; log and move on.
-          this.log.warn('event rejected by Core', { entry_id: entryId, name: item.name, error: describe(error) })
+          this.log.warn('event rejected by Core', { entry_id: entryId, name: item.name, error })
         }
       }
     } finally {
