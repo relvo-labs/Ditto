@@ -27,9 +27,9 @@ TestCase {
         verify(!findChild(view, "backdropWallpaper").visible);
         verify(findChild(view, "backdropCanvas").visible);
         const image = grabImage(view);
-        // Lighter at the top right than at the bottom left.
-        const topRight = image.pixel(315, 3), bottomLeft = image.pixel(3, 196);
-        verify(topRight.r + topRight.g + topRight.b > bottomLeft.r + bottomLeft.g + bottomLeft.b);
+        // Lighter on the right than on the left.
+        const right = image.pixel(315, 100), left = image.pixel(3, 100);
+        verify(right.r + right.g + right.b > left.r + left.g + left.b);
     }
 
     function test_dark_canvas_stays_flat() {

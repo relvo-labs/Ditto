@@ -112,9 +112,9 @@ TestCase {
     function test_light_normal() {
         const t = make(light());
         verify(t.lightRecipe);
-        compare(String(t.background), "#d9d4f8");
+        compare(String(t.background), "#d3cff9");
         compare(String(t.surfaceBase), "#fbfaff");
-        fuzzyCompare(t.surface.a, 0.84, 0.01);
+        fuzzyCompare(t.surface.a, 0.9, 0.01);
         fuzzyCompare(t.surfaceOpacity, 0.94, 0.001);
         compare(t.blurRadius, 18);
         verify(t.shadowEnabled);
@@ -122,7 +122,7 @@ TestCase {
         verify(t.effectsEnabled);
         fuzzyCompare(t.highlight.a, 0.85, 0.01);
         verify(t.canvasGlow.a > 0);
-        verify(luminance(t.canvasTop) > luminance(t.canvasBottom));
+        verify(luminance(t.canvasBottom) > luminance(t.canvasTop));
     }
 
     function test_light_reduced_transparency() {
@@ -146,13 +146,13 @@ TestCase {
         compare(t.shadowRadius, 0);
         verify(!t.effectsEnabled);
         // Low power drops effects, not translucency: that is the other switch.
-        fuzzyCompare(t.surface.a, 0.84, 0.01);
+        fuzzyCompare(t.surface.a, 0.9, 0.01);
     }
 
     function test_overrides_still_apply_in_the_light_recipe() {
         const t = make(light({ tokens: { accent: "#b9a4ff", background: "not-a-colour", surface_opacity: "0.7" } }));
         compare(String(t.accent), "#b9a4ff");
-        compare(String(t.background), "#d9d4f8");
+        compare(String(t.background), "#d3cff9");
         fuzzyCompare(t.surfaceOpacity, 0.7, 0.001);
     }
 

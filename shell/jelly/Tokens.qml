@@ -76,10 +76,10 @@ QtObject {
     // tests/g4/visual/tst_tokens.qml and listed in component-sheet.md.
     readonly property color accent: lightRecipe ? colorToken("accent", "#9d8cf0") : colorToken("accent", "#b9a4ff")
     readonly property color onAccent: lightRecipe ? colorToken("on_accent", "#1c1830") : colorToken("on_accent", "#1a1626")
-    readonly property color background: lightRecipe ? colorToken("background", "#d9d4f8") : colorToken("background", "#12121a")
+    readonly property color background: lightRecipe ? colorToken("background", "#d3cff9") : colorToken("background", "#12121a")
     readonly property color surfaceBase: lightRecipe ? colorToken("surface", "#fbfaff") : colorToken("surface", "#1d1f2b")
     /// Alpha of the translucent surface colour (before `surfaceOpacity`).
-    readonly property real surfaceAlpha: reducedTransparency ? 1.0 : (lightRecipe ? 0.84 : 0.62)
+    readonly property real surfaceAlpha: reducedTransparency ? 1.0 : (lightRecipe ? 0.9 : 0.62)
     readonly property color surface: reducedTransparency ? surfaceBase : withAlpha(surfaceBase, surfaceAlpha)
     readonly property color surfaceStrong: lightRecipe
         ? colorToken("surface_strong", reducedTransparency ? "#e6e2f8" : "#ece8fb")
@@ -107,9 +107,9 @@ QtObject {
         : (lightRecipe ? Qt.rgba(1, 1, 1, 0.85) : Qt.rgba(1, 1, 1, 0.08))
     /// The desktop canvas behind every surface while no wallpaper is shown:
     /// a soft gradient in the light recipe, the flat background otherwise.
-    readonly property color canvasTop: lightRecipe ? Qt.tint(background, Qt.rgba(1, 1, 1, 0.3)) : background
-    readonly property color canvasBottom: background
-    readonly property color canvasGlow: lightRecipe ? Qt.rgba(1, 1, 1, 0.38) : "transparent"
+    readonly property color canvasTop: background
+    readonly property color canvasBottom: lightRecipe ? Qt.tint(background, Qt.rgba(1, 1, 1, 0.12)) : background
+    readonly property color canvasGlow: lightRecipe ? Qt.rgba(1, 1, 1, 0.42) : "transparent"
 
     // ---- material --------------------------------------------------------------
     /// Blur is requested only where the compositor offers a background effect;
