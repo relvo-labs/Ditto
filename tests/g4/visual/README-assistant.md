@@ -25,4 +25,4 @@ node --experimental-strip-types tests/g4/visual/check-assistant-contracts.mjs /p
 
 本 runner 的 sandbox 禁止 socket，也使 Node `spawnSync` 回 EPERM。原 `run.sh` 的 staging、protocol integration test、完整 Core IPC 與 lrelease 子程序 gate 需在 sandbox 外重跑，不能把替代步驟冒充原 gate 通過。本機替代程序直接跑 Python staging、qmltestrunner、`/usr/bin/python3 capture/compose.py`；TS shape checker 不啟動 Core；lrelease 直接執行並以 cmp 檢查 .qm。完整指令、exit、原始失敗及替代結果見 evidence `REPORT.md`／`gate-results.json`。
 
-D-48 指定決策檔位於唯讀 `.agents/`，BLOCKED；完整紀錄暫存於 [component-sheet](../../../docs/design/default-desktop/component-sheet.md#d-48-新預設的助理入口)，coordinator 可移回指定位置。最終符號待 owner 決定，暫用中性符號；新預設主題與 Dock 是依 #71 的可逆交接選擇。
+決策紀錄見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。最終符號待 owner 決定，暫用中性符號；新預設主題與 Dock 是依 #71 的可逆交接選擇。
