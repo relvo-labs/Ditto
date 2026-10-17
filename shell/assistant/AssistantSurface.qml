@@ -33,7 +33,9 @@ PanelWindow {
     aboveWindows: true
     WlrLayershell.namespace: "ditto-assistant"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-    mask: Region { item: entry; radius: entry.radius }
+    // Define the region in output pixels, including the selected scale.
+    mask: Region { item: inputShape; radius: surface.implicitHeight / 2 }
+    Item { id: inputShape; width: surface.implicitWidth; height: surface.implicitHeight }
     onVisibleChanged: if (!visible && shown) reshow.restart()
     onScreenChanged: if (shown) reshow.restart()
     Timer {

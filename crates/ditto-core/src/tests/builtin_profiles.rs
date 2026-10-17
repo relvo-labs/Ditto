@@ -651,3 +651,45 @@ fn assistant_legacy_export_switch_undo_and_restart_store_roundtrip() {
         })
         .unwrap();
 }
+
+#[test]
+fn assistant_and_legacy_survive_core_boot_from_a_closed_store() {
+    for assistant in [false, true] {
+        let root = root("assistant-restart");
+        let paths = Paths::under(&root.join("store"));
+        let mut document = crate::defaults::empty_document();
+        document.avatar.presentation =
+            assistant.then_some(ditto_protocol::profile::AvatarPresentation::Assistant);
+        document.avatar.output = Some("HDMI-A-2".into());
+        document.avatar.corner = ditto_protocol::profile::AvatarCorner::TopLeft;
+        document.avatar.scale = 1.75;
+        document.avatar.animations = false;
+        let (profile, revision) = {
+            let lock = ditto_store::WriterLock::acquire(&paths.lock()).unwrap();
+            let (mut store, _) = ditto_store::Store::open_writer(&paths, &lock).unwrap();
+            store
+                .write(|tx| {
+                    let result =
+                        profiles::create(tx, "saved-entry", &document, &RevisionOrigin::Import)?;
+                    profiles::set_active_profile(tx, &result.0.profile_id)?;
+                    Ok(result)
+                })
+                .unwrap()
+        };
+        // The writer and its lock have closed. Core opens its own Store and
+        // runs the real boot path, including the no-reseed upgrade rule.
+        let core = start_at(&root, false);
+        let harness = Harness { core, root };
+        let actual = stored_get(&harness.core, &json!(profile.profile_id));
+        assert_eq!(actual["document"], document.to_value());
+        assert_eq!(actual["revision"]["document_sha256"], document.digest());
+        assert_eq!(actual["profile"]["head_revision"], revision.revision_id);
+        assert_eq!(
+            stored_list(&harness.core)["profiles"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+}
