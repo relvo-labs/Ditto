@@ -105,6 +105,9 @@ QtObject {
         : (reducedTransparency ? "#12121a" : "#b312121a")
 
     // Derived values, not overridable on their own: they follow the tokens above.
+    /// Status fills are pale in the dark recipe and dark in the light one.
+    /// This is separate from the Profile-overridable foreground on accent.
+    readonly property color statusForeground: lightRecipe ? "#ffffff" : "#1a1626"
     /// The thin bright edge just inside a surface; none with reduced transparency.
     readonly property color highlight: reducedTransparency ? "transparent"
         : (lightRecipe ? Qt.rgba(1, 1, 1, 0.85) : Qt.rgba(1, 1, 1, 0.08))

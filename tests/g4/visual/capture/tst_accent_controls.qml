@@ -34,12 +34,17 @@ TestCase {
     }
     function test_capture() {
         for (const theme of ["no-theme", "soft-jelly", "soft-jelly-light"]) {
-            sceneTokens.appearance = theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} };
-            for (const tone of ["info", "good", "warn", "bad"]) {
-                verify(findChild(scene, "badge_" + tone).width > 0, tone + " badge rendered");
+            for (const mode of ["normal", "reduced-transparency", "low-power"]) {
+                sceneTokens.appearance = theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} };
+                sceneTokens.appearance = Object.assign({}, sceneTokens.appearance, {
+                    reduced_transparency: mode === "reduced-transparency", low_power_style: mode === "low-power"
+                });
+                for (const tone of ["info", "good", "warn", "bad"]) {
+                    verify(findChild(scene, "badge_" + tone).width > 0, tone + " badge rendered");
+                }
+                waitForRendering(scene, 250);
+                grabImage(scene).save(Qt.resolvedUrl("../.staged/out/accent-controls-" + theme + (mode === "normal" ? "" : "-" + mode) + ".png").toString().replace("file://", ""));
             }
-            waitForRendering(scene);
-            grabImage(scene).save(Qt.resolvedUrl("../.staged/out/accent-controls-" + theme + ".png").toString().replace("file://", ""));
         }
     }
 }

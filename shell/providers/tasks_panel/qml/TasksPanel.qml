@@ -150,7 +150,7 @@ Scope {
                         id: demoLabel
                         anchors.centerIn: parent
                         text: provider.t(qsTr("示範資料"))
-                        color: provider.tokens.accentForeground
+                        color: provider.tokens.statusForeground
                         font.pixelSize: provider.tokens.fontSmall
                     }
                 }

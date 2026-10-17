@@ -189,7 +189,7 @@ TestCase {
         }
     }
 
-    function test_light_text_contrast_meets_aa() {
+    function test_all_recipes_text_contrast_meets_aa() {
         const modes = {
             "normal": light(),
             "reduced-transparency": light({ reduced_transparency: true }),
@@ -197,6 +197,13 @@ TestCase {
             // The default Profile overrides only the accent (defaults.rs).
             "normal+profile-accent": light({ tokens: { accent: "#b9a4ff" } })
         };
+        for (const theme of ["no-theme", "soft-jelly"]) {
+            for (const mode of ["normal", "reduced-transparency", "low-power"]) {
+                const appearance = { tokens: {}, reduced_transparency: mode === "reduced-transparency", low_power_style: mode === "low-power" };
+                if (theme !== "no-theme") appearance.theme = theme;
+                modes[theme + "/" + mode] = appearance;
+            }
+        }
         const failures = [];
         for (const mode in modes) {
             for (const line of report(mode, make(modes[mode]))) {

@@ -38,26 +38,32 @@ TestCase {
         failOnWarning(/./);
         StubDesktop.layer = scene;
         for (const theme of ["no-theme", "soft-jelly", "soft-jelly-light"]) {
-            sceneTokens.appearance = theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} };
-            for (const name of ["LauncherGrid", "LauncherSearch", "TasksPanel", "Centers"]) {
-                const file = name === "Centers" ? "../../../../shell/centers/Centers.qml" : "../.staged/providers/" + name + ".qml";
-                const component = Qt.createComponent(Qt.resolvedUrl(file));
-                verify(component.status === Component.Ready, component.errorString());
-                const object = component.createObject(testCase, { tokens: sceneTokens, client: client });
-                verify(object !== null);
-                if (name !== "Centers") object.shown = true;
-                if (name === "LauncherGrid") {
-                    object.apps = [{ app_id: "fixture", name: "Fixture app", categories: ["Utility"] }];
-                    object.isOpen = true;
-                } else if (name === "LauncherSearch") {
-                    object.isOpen = true;
-                    object.results = [{ app_id: "fixture", name: "Fixture result", description: "Fixture description" }];
+            for (const mode of ["normal", "reduced-transparency", "low-power"]) {
+                sceneTokens.appearance = theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} };
+                sceneTokens.appearance = Object.assign({}, sceneTokens.appearance, {
+                    reduced_transparency: mode === "reduced-transparency", low_power_style: mode === "low-power"
+                });
+                const names = mode === "normal" ? ["LauncherGrid", "LauncherSearch", "TasksPanel", "Centers"] : ["TasksPanel"];
+                for (const name of names) {
+                    const file = name === "Centers" ? "../../../../shell/centers/Centers.qml" : "../.staged/providers/" + name + ".qml";
+                    const component = Qt.createComponent(Qt.resolvedUrl(file));
+                    verify(component.status === Component.Ready, component.errorString());
+                    const object = component.createObject(testCase, { tokens: sceneTokens, client: client });
+                    verify(object !== null);
+                    if (name !== "Centers") object.shown = true;
+                    if (name === "LauncherGrid") {
+                        object.apps = [{ app_id: "fixture", name: "Fixture app", categories: ["Utility"] }];
+                        object.isOpen = true;
+                    } else if (name === "LauncherSearch") {
+                        object.isOpen = true;
+                        object.results = [{ app_id: "fixture", name: "Fixture result", description: "Fixture description" }];
+                    }
+                    waitForRendering(scene, 250);
+                    grabImage(scene).save(Qt.resolvedUrl("../.staged/out/accent-" + name + "-" + theme + (mode === "normal" ? "" : "-" + mode) + ".png").toString().replace("file://", ""));
+                    if (object.release) object.release();
+                    object.destroy();
+                    wait(0);
                 }
-                waitForRendering(scene);
-                grabImage(scene).save(Qt.resolvedUrl("../.staged/out/accent-" + name + "-" + theme + ".png").toString().replace("file://", ""));
-                if (object.release) object.release();
-                object.destroy();
-                wait(0);
             }
         }
     }
