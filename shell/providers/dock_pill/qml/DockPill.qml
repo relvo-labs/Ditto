@@ -184,7 +184,10 @@ Scope {
     onShownChanged: {
         settlePresentation();
         if (shown) loadApps();
-        if (motionEnabled) revealAnimation.start();
+        // motionEnabled also depends on shown; its notification may follow
+        // this handler. Read the new intent directly so show starts (and hide
+        // never starts) the presentation, even on an immediate reverse.
+        if (shown && soft && tokens.motionEnabled) revealAnimation.start();
     }
     Component.onCompleted: ready = true
 

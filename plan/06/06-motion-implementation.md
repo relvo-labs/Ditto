@@ -31,3 +31,7 @@ Qt 離屏或本機測試只證明其執行範圍；實體 Wayfire、移屏／熱
 狀態／過渡與候選參數見 [R2 原生動態候選](../../docs/design/default-desktop/motion-candidate.md)。已接淺色 Dock 圖示、助理符號與 compact 內容；working cue 依同一 ConversationState 投影，在 cancelling／終態／斷線／隱藏立即停止。close 與 compact／full 切換保留立即銷毀，退場動畫延後，不讓 focus／input 租用跟著視覺停留。
 
 首次 checkpoint 的 focused motion QtTest 為 31 passed／0 failed（含各 TestCase setup／cleanup）；既有 Dock 9、assistant unit 27、assistant flow 12 通過。shell i18n 575 字串／181 Core keys／2 語言通過；7 個變動 QML 的 qmllint 無新增診斷，既有 16 個 metadata 警告保留。完整 runner／媒體／獨立審查尚未執行，不能將本 checkpoint 當 Ready 或驗收完成。原始證據在 `/data/hermes/ditto-runs/g4-impl/r2-motion/evidence/checkpoint/`；最終 SHA 由 checkpoint handoff 回報，不在 commit 內自我引用。
+
+## PR #82 後續回合
+
+沿原寫入範圍補 canonical visual／assistant runner、可重跑 live QML 取樣與時間戳錄影。靜態 capture 等實際 reveal／feedback／symbol／opacity settle，不全域停用 production motion。錄影發現的 Dock reveal 啟動順序由新增 regression 先 RED 再修正；候選參數與 instant close 邊界不變。最終個別 exit、case／scenario counts、前後 source hashes、commit blob 綁定與媒體由 `/data/hermes/ditto-runs/g4-impl/r2-motion/evidence/final/manifest.json` 索引。fresh independent review 仍由 parent 在 exact head 執行；不是本 writer 自我核可。

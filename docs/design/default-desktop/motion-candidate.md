@@ -40,4 +40,6 @@ QtTest 使用實際 AssistantEntry、MotionValue、staged DockPill／ChatPanel�
 
 首個 regression 在 production 修正前 RED（press scale 仍為 1）；原始 log 在 repo 外 `…/evidence/checkpoint/motion-red.log`。同目錄保存 focused motion、既有 Dock／assistant unit／assistant flow、i18n 與逐檔 baseline／candidate qmllint。staging 的 avatar 原始碼完整比對改釘實際合併基底 f99b4ea，因其已有 statusForeground 對比修正；25c0b72 的 legacy 呈現 fixture 及 approval 比對保留。
 
-本 checkpoint 刻意在 coherent commit 停止：完整 visual／assistant capture runner、錄影、fresh independent review 留給同一 thread 的後續回合。尚無媒體檔；不得將 Qt offscreen 結果當實體動畫或幀預算證明。實體 Wayfire、NFR-05／資源、熱插拔、IME／Orca、使用者測試與 owner 動態核定均未執行。#81 狀態載入正確性不在本 slice 修改。
+首次 checkpoint `b25d865` 刻意在 coherent commit 停止。後續同一 thread 增加 [可重跑的原生錄影](../../../tests/g4/motion/README.md)、靜態 capture 的實際 settle 與 renderer 回讀；完整執行結果、來源／commit 綁定及可播放媒體由 repo 外 `…/evidence/final/manifest.json` 索引。不得將 Qt offscreen 結果當實體動畫或幀預算證明。實體 Wayfire、NFR-05／資源、熱插拔、IME／Orca、使用者測試與 owner 動態核定均未執行。#81 狀態載入正確性不在本 slice 修改。
+
+後續原生樣本發現 Dock show handler 讀取依賴 shown 的衍生旗標時，其通知順序使 reveal 沒有啟動。以實際 revealAnimation.running 與 settle 後像素穩定的 QtTest 先取得 RED，再將啟動條件改為直接讀取最新 shown 意圖；不新增時長、queue 或 completion。初始失敗和探針保存在 repo 外，不以成功 wrapper 隱藏。靜態 capture 保留正常 production motion，等待真實動畫值 settle；錄影另保留實際過渡。

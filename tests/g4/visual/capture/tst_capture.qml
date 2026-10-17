@@ -151,6 +151,11 @@ TestCase {
         if (focusApp) {
             findChild(layer, "dockTile_" + focusApp).forceActiveFocus();
         }
+        // Static semantics capture: let the real, enabled production motion
+        // settle. Image loading alone does not settle reveal/focus/readback.
+        tryCompare(dock, "reveal", 1);
+        tryVerify(() => dock.entries.every(entry =>
+            !findChild(layer, "dockTile_" + entry.appId).motionRunning));
         waitForRendering(screen);
         const image = grabImage(screen);
         const path = outDir + mode + ".png";
@@ -164,6 +169,7 @@ TestCase {
             mode: mode, file: path, viewport: { width: 1280, height: 800, scale: 1 },
             renderer: screen.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "hardware(" + screen.GraphicsInfo.api + ")",
             appearance: appearance, material_shadow_path: findChild(screen, "materialSample_back").children[0].shadowPath,
+            motion: { enabled: sceneTokens.motionEnabled, settled: true, dock_reveal: dock.reveal },
             fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null },
             geometry: { dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
                         panel_window: rect(layer.children.find(item => item.objectName === "stubPanelWindow" && item.visible

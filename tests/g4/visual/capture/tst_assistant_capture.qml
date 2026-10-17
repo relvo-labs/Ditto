@@ -72,7 +72,9 @@ TestCase {
         const legacy = data.presentation === "legacy";
         const scene = data.scene;
         const preopen = scene === "collapsed";
-        tokens.appearance = { theme: legacy ? "soft-jelly" : "soft-jelly-light", tokens: {}, reduced_motion: true };
+        // Normal fixtures retain production motion and wait for finite
+        // transitions below. Legacy avatar remains a deliberately static sample.
+        tokens.appearance = { theme: legacy ? "soft-jelly" : "soft-jelly-light", tokens: {}, reduced_motion: legacy };
         conversation.wanted = false;
         conversation.subscriptionId = "";
         client.online = scene !== "offline";
@@ -88,6 +90,7 @@ TestCase {
         conversation.sessions = [];
         const output = { name: "fixture-output", width: 1280, height: 800 };
         let entryRect;
+        let entryControl = null;
         if (legacy) {
             mount("shell/avatar/Avatar.qml", { tokens: tokens, animations: false,
                 avatarState: conversation.wanted ? conversation.taskState : "idle", width: 220, height: 220, x: 1028, y: 486 });
@@ -98,6 +101,7 @@ TestCase {
             });
             entryRect = { x: 1280 - 32 - entry.implicitWidth, y: 800 - 32 - entry.implicitHeight,
                 width: entry.implicitWidth, height: entry.implicitHeight };
+            entryControl = entry.contentItem.children.find(item => typeof item.symbolVariant === "string");
         }
         let chat = null;
         if (scene === "full") {
@@ -110,13 +114,16 @@ TestCase {
             mount("shell/chat/ApprovalWindow.qml", { tokens: tokens, client: client, x: 360, y: 240,
                 approval: { request_id: "fixture-request", request: { resource: "desktop.config" } } });
         }
-        wait(100);
+        if (entryControl) tryCompare(entryControl.children[0], "scale", 1);
+        if (chat && scene !== "full") tryCompare(findChild(chat.contentItem, "chatPresentationContent"), "opacity", 1);
         waitForRendering(desktop);
         const path = outDir + "assistant-" + data.tag + ".png";
         grabImage(desktop).save(path);
         console.log("ASSISTANT_CAPTURE " + JSON.stringify({ scene: data.tag, file: path,
             evidence_class: "development", fixture: true, viewport: [1280,800], scale: 1,
-            renderer: "offscreen/software", compositor: "stub", profile: data.presentation,
+            renderer: desktop.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "graphics-api-" + desktop.GraphicsInfo.api,
+            graphics_api: desktop.GraphicsInfo.api, compositor: "stub", profile: data.presentation,
+            motion: { enabled: tokens.motionEnabled, settled: true },
             profile_hash: null, session_id: conversation.sessionId, turn_id: conversation.turn ? conversation.turn.turn_id : null,
             operation_ids: [], task_state: conversation.taskState, state_text: conversation.stateText,
             wanted: conversation.wanted, settings_known: !!conversation.settings,

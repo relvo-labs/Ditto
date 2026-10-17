@@ -104,4 +104,16 @@ TestCase {
         tryCompare(icon(), "scale", 1);
         compare(client.calls.length, 0);
     }
+    function test_static_capture_settles_enabled_motion() {
+        provider.shown = false;
+        provider.shown = true;
+        verify(tokens.motionEnabled);
+        verify(provider.revealAnimation.running);
+        tryCompare(provider, "reveal", 1);
+        tryVerify(() => !tile().motionRunning);
+        const settled = grabImage(layer);
+        wait(100);
+        verify(settled.equals(grabImage(layer)), "settled native pixels are stable with motion enabled");
+        verify(tokens.motionEnabled); // capture never changes production policy
+    }
 }
