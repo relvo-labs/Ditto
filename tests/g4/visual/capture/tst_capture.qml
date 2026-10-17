@@ -164,7 +164,9 @@ TestCase {
             renderer: screen.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "hardware(" + screen.GraphicsInfo.api + ")",
             appearance: appearance, material_shadow_path: findChild(screen, "materialSample_back").children[0].shadowPath,
             fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null },
-            geometry: { dock_capsule: rect(capsule), dock_window: rect(capsule.parent), panel_window: rect(findChild(layer, "stubPanelWindow")),
+            geometry: { dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
+                        panel_window: rect(layer.children.find(item => item.objectName === "stubPanelWindow" && item.visible
+                                                                  && item !== capsule.parent && item.y === 0)),
                         sample_back: rect(findChild(screen, "materialSample_back")), sample_front: rect(findChild(screen, "materialSample_front")) },
             dock_icons: icons, wallpaper_shown: backdrop.wallpaperShown
         }));
