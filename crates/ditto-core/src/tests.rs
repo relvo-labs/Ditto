@@ -3,6 +3,7 @@
 //! protocol 0.2 over socket pairs. What the fakes report is what Core reads
 //! back, so a lying fake is how readback mismatches are tested.
 
+mod builtin_profiles;
 mod generation_transactions;
 
 use super::*;
@@ -2148,18 +2149,18 @@ fn profiles_are_created_duplicated_compared_and_the_active_one_cannot_be_deleted
         .to_string();
     let copy = cli.result(
         catalog::PROFILES_DUPLICATE,
-        json!({"profile_id": active, "name": "簡報", "idempotency_key": "dup-1"}),
+        json!({"profile_id": active, "name": "測試複本", "idempotency_key": "dup-1"}),
     );
     let again = cli.result(
         catalog::PROFILES_DUPLICATE,
-        json!({"profile_id": active, "name": "簡報", "idempotency_key": "dup-1"}),
+        json!({"profile_id": active, "name": "測試複本", "idempotency_key": "dup-1"}),
     );
     assert_eq!(copy["profile_id"], again["profile_id"]);
     let renamed = cli.result(
         catalog::PROFILES_RENAME,
-        json!({"profile_id": copy["profile_id"], "name": "簡報二"}),
+        json!({"profile_id": copy["profile_id"], "name": "測試複本二"}),
     );
-    assert_eq!(renamed["name"], "簡報二");
+    assert_eq!(renamed["name"], "測試複本二");
     let diff = cli.result(
         catalog::PROFILES_DIFF,
         json!({"from": {"profile_id": active}, "to": {"profile_id": copy["profile_id"]}}),

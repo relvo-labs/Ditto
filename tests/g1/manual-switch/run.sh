@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # EX1-01: cross-plugin switching and saving by GUI alone, no model.
 #   ① Dock B replaces Dock A          ② search launcher replaces grid launcher
-#   ③ floating → basic tiling         ④ saved as a new profile 「開發」
-#   ⑤ duplicated as 「簡報」, appearance changed
-#   ⑥ the two compared                ⑦ back to 「開發」
+#   ③ floating → basic tiling         ④ saved as a new profile 「手動測試開發」
+#   ⑤ duplicated as 「手動測試簡報」, appearance changed
+#   ⑥ the two compared                ⑦ back to 「手動測試開發」
 # Throughout: the reference applications are never terminated, Kate's
 # unsaved buffer hash does not change, and afterwards no shortcut or command
 # has two owners.
@@ -175,26 +175,26 @@ duplicate_as() {
     && gui "使用這個組合" --group "$name" && "${GUI[@]}" press
 }
 expected='{"ui.dock":"ditto.dock.pill","ui.launcher":"ditto.launcher.search","layout.strategy":"ditto.layout.simple-tile"}'
-run_step save-dev duplicate_as "$active_name" "開發" \
-  && step save-dev "④ the composition saved as a new profile 「開發」 and in use" saved-as "開發" "$expected"
+run_step save-dev duplicate_as "$active_name" "手動測試開發" \
+  && step save-dev "④ the composition saved as a new profile 「手動測試開發」 and in use" saved-as "手動測試開發" "$expected"
 
-run_step duplicate-presentation duplicate_as "開發" "簡報" \
-  && step duplicate-presentation "⑤ 「開發」 duplicated as 「簡報」 and in use" saved-as "簡報" "$expected"
+run_step duplicate-presentation duplicate_as "手動測試開發" "手動測試簡報" \
+  && step duplicate-presentation "⑤ 「手動測試開發」 duplicated as 「手動測試簡報」 and in use" saved-as "手動測試簡報" "$expected"
 
 open_center personalization.open
 before="$("${READ[@]}" last-change)"
 larger_text() { gui "較大" --group "文字大小" && "${GUI[@]}" press space; }
 run_step presentation-appearance larger_text \
-  && step presentation-appearance "⑤ 「簡報」 appearance changed (larger text)" appearance "$before" "簡報" /appearance/tokens/font_scale 1.15
+  && step presentation-appearance "⑤ 「手動測試簡報」 appearance changed (larger text)" appearance "$before" "手動測試簡報" /appearance/tokens/font_scale 1.15
 
 open_center composition.open
-compare() { gui "與目前使用的比較" --group "開發" && "${GUI[@]}" press; }
+compare() { gui "與目前使用的比較" --group "手動測試開發" && "${GUI[@]}" press; }
 run_step compare compare \
-  && step compare "⑥ 「開發」 and 「簡報」 compared: they differ in appearance only" compared "開發" "簡報" /appearance
+  && step compare "⑥ 「手動測試開發」 and 「手動測試簡報」 compared: they differ in appearance only" compared "手動測試開發" "手動測試簡報" /appearance
 
-switch_back() { gui "使用這個組合" --group "開發" && "${GUI[@]}" press; }
+switch_back() { gui "使用這個組合" --group "手動測試開發" && "${GUI[@]}" press; }
 run_step back-to-dev switch_back \
-  && step back-to-dev "⑦ back to 「開發」: its Dock, launcher and layout are in force" saved-as "開發" "$expected"
+  && step back-to-dev "⑦ back to 「手動測試開發」: its Dock, launcher and layout are in force" saved-as "手動測試開發" "$expected"
 
 owners="$("${READ[@]}" owners)"
 if [[ "$(jq -r .ok <<<"$owners")" == true ]]; then
