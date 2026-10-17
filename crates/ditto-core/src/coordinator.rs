@@ -365,19 +365,27 @@ impl Coordinator {
                 return Ok(());
             }
         }
-        let packages = self.packages();
-        let document = defaults::default_document(&packages);
         let existing = profiles::list(self.store.connection())?;
         let profile_id = match existing.first() {
             Some(profile) => profile.profile_id.clone(),
             None => {
+                // Bootstrap only an empty profile store. Never backfill or
+                // overwrite user compositions on upgrade, even with no active id.
+                let documents = defaults::builtin_documents(&self.packages());
                 let origin = RevisionOrigin::Create {
                     from: "default".into(),
                 };
-                let (profile, _) = self.store.write(|tx| {
-                    profiles::create(tx, defaults::DEFAULT_PROFILE_NAME, &document, &origin)
+                self.store.write(|tx| {
+                    let mut first = None;
+                    for (name, document) in &documents {
+                        let (profile, _) = profiles::create(tx, name, document, &origin)?;
+                        first.get_or_insert(profile.profile_id);
+                    }
+                    let profile_id = first.expect("built-in compositions are nonempty");
+                    profiles::set_active_profile(tx, &profile_id)?;
+                    Ok(())
                 })?;
-                profile.profile_id
+                return self.publish_head();
             }
         };
         self.store
@@ -1813,6 +1821,38 @@ impl Coordinator {
         let origin = ChangeOrigin::Undo {
             undoes: change_id.into(),
         };
+        if let [ChangeOp::SwitchProfile { to_profile, .. }] = stored.record.ops.as_slice() {
+            let (active, current, _) = self.active_head()?;
+            let source = profiles::get(self.store.connection(), &stored.record.profile_id)?;
+            // A switch never edits either document. Undo it by switching back,
+            // only while both ends still have the revisions we switched between.
+            if active.profile_id != *to_profile
+                || stored.record.committed_revision.as_deref() != Some(&current.revision_id)
+                || source.head_revision != stored.record.base_revision
+            {
+                return Err(CoreError::conflict(
+                    ConflictReason::UndoBlockedByNewerChange,
+                    "the active composition or either revision changed; undo the newer change first",
+                ));
+            }
+            return self.propose(
+                Proposal {
+                    profile_id: Some(active.profile_id),
+                    base_revision: current.revision_id,
+                    ops: vec![ChangeOp::SwitchProfile {
+                        to_profile: source.profile_id,
+                        to_revision: Some(stored.record.base_revision.clone()),
+                    }],
+                    mode: ChangeMode::Apply,
+                    idempotency_key,
+                    request_operation_id,
+                    origin,
+                    subject: subject.into(),
+                    target: None,
+                },
+                None,
+            );
+        }
         let latest = changes::latest_committed(self.store.connection(), &stored.record.profile_id)?;
         let (_, head, head_document) =
             profiles::head_document(self.store.connection(), &stored.record.profile_id)?;

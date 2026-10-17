@@ -1,4 +1,4 @@
-//! The built-in default Profile ("soft-jelly"). Only packages that are
+//! The built-in Profiles ("soft-jelly"). Only packages that are
 //! actually installed appear in it: a document that pins a missing package
 //! would fail every later preflight.
 
@@ -58,6 +58,7 @@ fn newest_version(packages: &PackageSet, package: &str) -> Option<String> {
     packages
         .rows()
         .filter(|row| row.summary.package_id == package)
+        .filter(|row| row.summary.source == "builtin")
         .filter_map(|row| semver::Version::parse(&row.summary.version).ok())
         .max()
         .map(|version| version.to_string())
@@ -103,6 +104,70 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
             },
         ],
         avatar: AvatarSettings::default(),
+    }
+}
+
+/// First-login compositions, in activation order. Purpose-specific choices
+/// are agent proposals pending owner confirmation (PRD §20.1); names are
+/// display data, never inputs to routing or intent interpretation.
+pub fn builtin_documents(packages: &PackageSet) -> [(&'static str, ProfileDocument); 3] {
+    let default = default_document(packages);
+    let mut development = default.clone();
+    replace_slot(&mut development, packages, "ui.dock", "ditto.dock.pill");
+    replace_slot(
+        &mut development,
+        packages,
+        "ui.launcher",
+        "ditto.launcher.search",
+    );
+    replace_slot(
+        &mut development,
+        packages,
+        "layout.strategy",
+        "ditto.layout.simple-tile",
+    );
+    if let Some(entry) = development
+        .slots
+        .get("ui.dock")
+        .cloned()
+        .and_then(|id| development.entry_mut(&id))
+    {
+        if entry.package == "ditto.dock.pill" {
+            entry.config = json!({"position": "left"});
+        }
+    }
+    let mut presentation = default.clone();
+    if let Some(entry) = presentation
+        .slots
+        .get("svc.notification_policy")
+        .cloned()
+        .and_then(|id| presentation.entry_mut(&id))
+    {
+        // The installed service still lets critical notifications through.
+        entry.config = json!({"rules": {"focus": {"enabled": true, "allow": []}}});
+    }
+    presentation.avatar.hidden = true;
+    presentation.avatar.animations = false;
+    [
+        (DEFAULT_PROFILE_NAME, default),
+        ("開發", development),
+        ("簡報", presentation),
+    ]
+}
+
+/// Retain the installed default when a purpose-specific alternative is absent.
+/// Preserve the entry id and every unrelated field, as a normal slot edit does.
+fn replace_slot(document: &mut ProfileDocument, packages: &PackageSet, slot: &str, package: &str) {
+    let Some(version) = newest_version(packages, package) else {
+        return;
+    };
+    let Some(id) = document.slots.get(slot).cloned() else {
+        return;
+    };
+    if let Some(entry) = document.entry_mut(&id) {
+        entry.package = package.into();
+        entry.version = version;
+        entry.config = json!({});
     }
 }
 
