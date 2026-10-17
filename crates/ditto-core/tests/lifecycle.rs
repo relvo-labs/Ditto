@@ -691,7 +691,7 @@ fn l06_hostd_killed_during_handoff_lists_items_and_replays_nothing() {
 
     let drains = |hit: u64| {
         fixture.log_lines().into_iter().any(|line| {
-            line["msg"] == "fault injected"
+            line["msg"] == "host.fault"
                 && line["point"] == "commit.after_drain"
                 && line["hit"] == hit
         })
