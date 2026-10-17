@@ -77,14 +77,7 @@ fn first_login_seeds_three_exportable_compositions_once() {
     for name in ["預設", "開發", "簡報"] {
         let summary = profiles.iter().find(|p| p["name"] == name).unwrap();
         let saved = stored_get(&harness.core, &summary["profile_id"]);
-        assert_eq!(
-            saved["document"]["appearance"]["theme"],
-            if name == "預設" {
-                "soft-jelly-light"
-            } else {
-                "soft-jelly"
-            }
-        );
+        assert_eq!(saved["document"]["appearance"]["theme"], "soft-jelly-light");
         assert_eq!(saved["history"].as_array().unwrap().len(), 1);
         let doc: ProfileDocument = serde_json::from_value(saved["document"].clone()).unwrap();
         let export_doc = doc.clone();
@@ -104,6 +97,16 @@ fn first_login_seeds_three_exportable_compositions_once() {
             })
             .unwrap();
         assert_eq!(doc.digest(), saved["revision"]["document_sha256"]);
+        // D-48 shares appearance across compositions, but assistant rendering
+        // is deliberately default-only; purpose-specific avatars stay legacy.
+        assert_eq!(
+            doc.avatar.presentation,
+            if name == "預設" {
+                Some(ditto_protocol::profile::AvatarPresentation::Assistant)
+            } else {
+                None
+            }
+        );
         if name == "預設" {
             assert_eq!(summary["profile_id"], listed["active_profile"]);
             assert_eq!(
@@ -441,14 +444,7 @@ fn builtin_compositions_pass_preflight_with_shipped_config_schemas() {
                     "{name}: {:?}",
                     validation.reasons
                 );
-                assert_eq!(
-                    doc.appearance.theme,
-                    if *name == "預設" {
-                        "soft-jelly-light"
-                    } else {
-                        "soft-jelly"
-                    }
-                );
+                assert_eq!(doc.appearance, documents[0].1.appearance);
                 assert_eq!(doc.shortcuts, documents[0].1.shortcuts);
             }
             assert_eq!(

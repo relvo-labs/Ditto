@@ -122,6 +122,7 @@ pub fn default_document(packages: &PackageSet) -> ProfileDocument {
 pub fn builtin_documents(packages: &PackageSet) -> [(&'static str, ProfileDocument); 3] {
     let default = default_document(packages);
     let mut development = legacy_document(packages);
+    development.appearance = default.appearance.clone();
     replace_slot(&mut development, packages, "ui.dock", "ditto.dock.pill");
     replace_slot(
         &mut development,
@@ -146,6 +147,7 @@ pub fn builtin_documents(packages: &PackageSet) -> [(&'static str, ProfileDocume
         }
     }
     let mut presentation = legacy_document(packages);
+    presentation.appearance = default.appearance.clone();
     if let Some(entry) = presentation
         .slots
         .get("svc.notification_policy")
