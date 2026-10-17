@@ -1,8 +1,8 @@
 //! Structured log lines on stderr for journald (REC-06): one JSON object per
-//! line with `session_id`, `change_id`, `operation_id` and `subject` when the
+//! line with `session_id`, `change_id` and `operation_id` when the
 //! event has them. Redaction happens here, before anything is written: window
-//! titles, notification text, clipboard content and paths under the home
-//! directory never reach the log.
+//! titles, notification text, clipboard content, proposal subjects, error text,
+//! launch arguments and paths under the home directory never reach the log.
 
 use std::{io::Write, sync::OnceLock};
 
@@ -17,6 +17,10 @@ const CONTENT_KEYS: &[&str] = &[
     "text",
     "content",
     "window_title",
+    "subject",
+    "reason",
+    "error",
+    "spec",
 ];
 
 static SESSION: OnceLock<String> = OnceLock::new();
@@ -79,6 +83,37 @@ pub fn event(name: &str, fields: &[(&str, &str)]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn draft_subject_is_redacted_while_change_id_remains_traceable() {
+        let subject = "QA04_PRIVATE_PROPOSAL_SUBJECT 私人提案";
+        let text = line(
+            "change.draft",
+            &[("change_id", "chg-private-subject"), ("subject", subject)],
+        );
+        assert!(!text.contains(subject), "{text}");
+        let logged: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(logged["event"], "change.draft");
+        assert_eq!(logged["subject"], "[redacted]");
+        assert_eq!(logged["change_id"], "chg-private-subject");
+    }
+
+    #[test]
+    fn free_text_errors_and_launch_arguments_never_reach_the_log() {
+        let fields = [
+            ("reason", "backend rejected QA04_PRIVATE_ERROR_CONTENT"),
+            ("error", "worker failed with QA04_PRIVATE_WORKER_CONTENT"),
+            ("spec", "dittoctl 0.3.0 command QA04_PRIVATE_LAUNCH_ARGUMENT"),
+            ("operation_id", "op-1"),
+        ];
+        let text = line("failure", &fields);
+        let logged: Value = serde_json::from_str(&text).unwrap();
+        for (key, value) in &fields[..3] {
+            assert!(!text.contains(value), "{text}");
+            assert_eq!(logged[*key], "[redacted]");
+        }
+        assert_eq!(logged["operation_id"], "op-1");
+    }
 
     #[test]
     fn content_and_home_paths_never_reach_the_log() {
