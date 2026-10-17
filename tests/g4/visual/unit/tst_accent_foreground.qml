@@ -35,6 +35,8 @@ TestCase {
         compare(String(tokens.accentForeground), "#ff0000", "initial Profile override");
         tokens.appearance = Object.assign({}, row.appearance, { tokens: { on_accent: "#00ff00" } });
         compare(String(tokens.accentForeground), "#00ff00", "live Profile override");
+        tokens.appearance = row.appearance;
+        compare(String(tokens.accentForeground), row.expected, "removing override restores recipe");
     }
 
     function test_before_projection() {

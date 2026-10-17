@@ -19,10 +19,14 @@ mkdirSync(out, { recursive: true });
 const providers = [
   'shell/providers/dock_pill/qml/DockPill.qml',
   'shell/providers/panel_top/qml/PanelTop.qml',
+  'shell/providers/launcher_grid/qml/LauncherGrid.qml',
+  'shell/providers/launcher_search/qml/LauncherSearch.qml',
+  'shell/providers/tasks_panel/qml/TasksPanel.qml',
 ];
 // The legacy reference: the same files at the G4 base, before #65. The
 // legacy-presentation tests render them next to the current files with the
-// `soft-jelly` theme and require the same pixels and geometry.
+// `soft-jelly` theme and require the same geometry. #72 permits the fixed
+// accent foreground; pixels must match with an explicit black override.
 const LEGACY_BASE = 'f58242612d43506984cdfde8f303b73045a57617';
 const legacy = [
   { path: 'shell/providers/dock_pill/qml/DockPill.qml', stage: true },

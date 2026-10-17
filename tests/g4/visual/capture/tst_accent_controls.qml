@@ -11,30 +11,33 @@ TestCase {
     height: 240
     visible: true
     when: windowShown
-    Jelly.Tokens { id: tokens }
+    Jelly.Tokens { id: sceneTokens }
     Rectangle {
         id: scene
         width: 800; height: 240
-        color: tokens.background
+        color: sceneTokens.background
         Column {
             x: 24; y: 24; spacing: 16
-            Text { text: "Fixture: primary / danger / badges / selected choice / checked toggle"; color: tokens.foreground }
+            Text { text: "Fixture: primary / danger / badges / selected choice / checked toggle"; color: sceneTokens.foreground }
             Row {
                 spacing: 16
-                Ui.Button { tokens: tokens; text: "Primary"; kind: "primary" }
-                Ui.Button { tokens: tokens; text: "Danger"; kind: "danger" }
+                Ui.Button { tokens: sceneTokens; text: "Primary"; kind: "primary" }
+                Ui.Button { tokens: sceneTokens; text: "Danger"; kind: "danger" }
                 Repeater {
                     model: ["info", "good", "warn", "bad"]
-                    Ui.Badge { required property string modelData; tokens: tokens; text: modelData; tone: modelData }
+                    Ui.Badge { required property string modelData; objectName: "badge_" + modelData; tokens: sceneTokens; text: modelData; tone: modelData }
                 }
             }
-            Ui.Choice { tokens: tokens; options: [{value: "selected", label: "Selected"}]; value: "selected" }
-            Ui.Toggle { tokens: tokens; checked: true; text: "Enabled" }
+            Ui.Choice { tokens: sceneTokens; options: [{value: "selected", label: "Selected"}]; value: "selected" }
+            Ui.Toggle { tokens: sceneTokens; checked: true; text: "Enabled" }
         }
     }
     function test_capture() {
         for (const theme of ["no-theme", "soft-jelly", "soft-jelly-light"]) {
-            tokens.appearance = theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} };
+            sceneTokens.appearance = theme === "no-theme" ? { tokens: {} } : { theme: theme, tokens: {} };
+            for (const tone of ["info", "good", "warn", "bad"]) {
+                verify(findChild(scene, "badge_" + tone).width > 0, tone + " badge rendered");
+            }
             waitForRendering(scene);
             grabImage(scene).save(Qt.resolvedUrl("../.staged/out/accent-controls-" + theme + ".png").toString().replace("file://", ""));
         }

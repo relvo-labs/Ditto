@@ -9,3 +9,5 @@ PopupAnchor 1.0 PopupAnchor.qml
 PopupRect 1.0 PopupRect.qml
 SystemClock 1.0 SystemClock.qml
 Region 1.0 Region.qml
+FloatingWindow 1.0 FloatingWindow.qml
+ExclusionMode 1.0 ExclusionMode.qml
