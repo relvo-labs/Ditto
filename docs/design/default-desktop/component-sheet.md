@@ -122,7 +122,7 @@
 
 ## 5. 交接需求（#71 原交接，R3 更新 H1／H3）
 
-- **H1 預設主題（#45／Core）**：R3 依 D-48 已把新「預設」文件改為 `soft-jelly-light`；agent 依 #71 交接實作，owner 可反悔，既有已儲存的文件不改寫；日後在既有 store 透過 `desktop.profiles.create {from: default}` 建立的新 Profile 也使用這份預設模板。依 #69 的共用 appearance 契約，新 store 的「開發」「簡報」也共用「預設」完整 appearance（含 `soft-jelly-light` 與 tokens）；助理呈現仍僅「預設」選用，兩份用途組合維持 legacy avatar。以下保留 token 層的後續問題：`APPEARANCE_TOKENS` 每個 token 只有一個預設值，所以個人化中心與 Agent 看到的仍是深色預設。需要決定：要嘛依主題列出預設值，要嘛換掉預設值並同步更新 `appearance_tokens_match_the_shell` 測試。`defaults.rs` 目前把 accent 覆寫為 `#b9a4ff`，在淺色 recipe 下對比仍達標。
+- **H1 預設主題（#45／Core）**：R3 依 D-48 已把新「預設」文件改為 `soft-jelly-light`；agent 依 #71 交接實作，owner 可反悔，既有已儲存的文件不改寫；日後在既有 store 透過 `desktop.profiles.create {from: default}` 建立的新 Profile 也使用這份預設模板。依 #69 的共用 appearance 契約，新 store 的「開發」「簡報」也共用「預設」完整 appearance（含 `soft-jelly-light` 與 tokens）；三份內建組合中，助理呈現僅「預設」選用，兩份用途組合維持 legacy avatar。以下保留 token 層的後續問題：`APPEARANCE_TOKENS` 每個 token 只有一個預設值，所以個人化中心與 Agent 看到的仍是深色預設。需要決定：要嘛依主題列出預設值，要嘛換掉預設值並同步更新 `appearance_tokens_match_the_shell` 測試。`defaults.rs` 目前把 accent 覆寫為 `#b9a4ff`，在淺色 recipe 下對比仍達標。
 - **H2 桌布欄位（Core／#45／#51／#49）**：Profile `appearance` 需要一個由 Core 管理的桌布引用（素材 ID 或 Core 資料區內的資產，加 fit 方式，必要時分輸出），並經 ChangeSet 寫入。Shell 端只接 `Backdrop.wallpaperSource`，不讀環境變數或自訂設定檔。多螢幕的 crop／fit 由 #49 決定。素材與授權由 #51 決定。
 - **H3 Dock 綁定（#45）**：R3 依 D-48 已把新「預設」文件改綁已安裝的 `ditto.dock.pill`，缺套件時保留原供應者；agent 依 #71 交接實作，owner 可反悔。釘選清單沿用已註冊供應者設定（不捏造應用）；既有 store 與「簡報」不變。
 - **H4 內建套件版本（#50）**：`ditto.dock.pill` 內容改了，但版本仍是 `1.1.0`。G1／G2 測試與語意任務集逐字引用 `1.1.0`。已有 store 的機器在 seed 時會記 `boot.builtin_refused`（同版本不同內容），保留舊內容，只有新 store 會拿到新 Dock。升版與升級路徑屬內建套件升版工作。
