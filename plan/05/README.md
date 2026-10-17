@@ -4,13 +4,15 @@
 | --- | --- |
 | 文件編號 | DITTO-PLAN-005 |
 | 日期 | 2026-10-13 |
-| 狀態 | 功能整合實作與開發驗證中；出口未評審 |
+| 狀態 | G3 出口依 D-47 於 2026-10-17 通過；未涵蓋項轉 G4 |
 | 上位權威 | [PRD v0.4.0](../../docs/product/Ditto-PRD-v0.4.0.md) §9、12.1、14～17、19、21；[milestones/01 G3](../../milestones/01/03-phases.md#g3受限生成與移植) |
 | 追蹤 | [#34](https://github.com/relvo-labs/Ditto/issues/34)，子 issue #15～#33（2026-10-13 已逐項閱讀，均無補充留言） |
 | 分支／基底 | `codex/g3-restricted-generation`；開工基底為 `codex/g2-agent-foundation@a88bce89b8976d546497345777c642d9f2b7de59`。PR #13 已合併，PR #40 現以 `main` 為基底 |
 | 前置 | G1 依 D-38 已完成；G2 功能由 owner 依 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受；原量測缺口繼續追蹤 |
 
 目標是透過對話產出兩種原先未安裝、可運作且可繼續修改的新插件，失敗時桌面維持可用。這份計畫不宣告 G2 或 G3 出口，不更改資源門檻。
+
+> 2026-10-17：[D-47](../../.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md) 接受開發 VM 證據，G3 出口通過，PR #40 已合併。以下保留實作時的歷史描述；目前交接與執行計畫見 [plan/06](../06/README.md)。D-17 選型已於 2026-10-14 決定（[紀錄](../../.agents/notes/decisions/2026-10-14-d17-g3-generated-plugin-selection.md)）。
 
 ## 導讀
 

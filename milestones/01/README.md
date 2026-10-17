@@ -13,7 +13,7 @@
 
 PRD 是需求的唯一權威；本計畫是實作順序的權威。兩者衝突時以 PRD 為準，並在本目錄留下決策紀錄。
 
-**目前進度（2026-10-07）**：owner 依實際使用接受 G0、G1 完成（[D-38](../../.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)），下一開發階段為 G2。逐項證據與剩餘工作見 [G0 評審](../../.agents/notes/gate-reviews/G0-exit.md)、[G1 評審](../../.agents/notes/gate-reviews/G1-exit.md)；下列工期仍是原計畫估算。
+**目前進度（2026-10-17）**：G0／G1 依 D-38、G2 功能依 D-46、G3 出口依 [D-47](../../.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md) 接受。PR #40 已合併；G4 執行計畫見 [plan/06](../../plan/06/README.md)。既有證據與未涵蓋項依原紀錄保留，工期仍是未核定估算。
 
 ## 文件
 
@@ -31,6 +31,8 @@ PRD 是需求的唯一權威；本計畫是實作順序的權威。兩者衝突�
 G2 的可實作細分見 [plan/04](../../plan/04/README.md)：沿用已完成的 G0／G1 底座，依 D-09a 加入 Codex 個人訂閱＋app-server，保留原28包，增補到44包與十九項出口；契約選型、125人週估算、D-44程序架構與加嚴項為提案，沒有改動下列上位階段門檻與估算。
 
 G3 的可實作細分見 [plan/05](../../plan/05/README.md)：完整對應 issue #15～#34、十九項 G2 待評審交接與原五項出口。依 D-45 開始獨立基礎設施，後續 [D-46](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受 G2 功能完成並授權完整 G3 接線；原量測缺口仍追蹤，64 人週維持提案。
+
+G4 的可實作細分見 [plan/06](../../plan/06/README.md)：完整對應 #42～#61、G3 交接、D-38／D-46 後續與六項出口。
 
 ## 階段總覽
 
