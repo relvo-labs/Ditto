@@ -239,7 +239,7 @@ fn handshake(
                 ("kind", &input.client.kind),
                 ("pid", &peer.pid.to_string()),
                 (
-                    "reason",
+                    "reason_code",
                     if accepted {
                         "unknown_kind"
                     } else {

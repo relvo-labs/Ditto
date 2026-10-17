@@ -273,7 +273,13 @@ impl HostManager {
                 true
             }
             Err(error) => {
-                crate::log::event("host.start_refused", &[("reason", &error.to_string())]);
+                crate::log::event(
+                    "host.start_refused",
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", &format!("{:?}", error.kind())),
+                    ],
+                );
                 inner.run = RunState::Backoff {
                     until: Instant::now() + Duration::from_secs(RESTART_BACKOFF[0]),
                 };

@@ -190,7 +190,10 @@ fn follow_compositor(
                 }
                 Err(error) => ditto_core::log::event(
                     "compositor.unreachable",
-                    &[("reason", &error.to_string())],
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", &format!("{:?}", error.kind())),
+                    ],
                 ),
             }
         }
@@ -348,7 +351,13 @@ fn main() -> io::Result<()> {
             // The store failed its check or its migration: nothing is
             // repaired automatically. systemd's OnFailure starts rescue,
             // which reads the database offline under the same lock.
-            ditto_core::log::event("core.store_refused", &[("reason", &error.to_string())]);
+            ditto_core::log::event(
+                "core.store_refused",
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", ditto_core::log::store_error_code(&error)),
+                ],
+            );
             std::process::exit(3);
         }
     };
@@ -395,7 +404,11 @@ fn main() -> io::Result<()> {
                 {
                     ditto_core::log::event(
                         "shortcut.command_failed",
-                        &[("command", command_id), ("reason", &error.message)],
+                        &[
+                            ("command", command_id),
+                            ("reason", &error.message),
+                            ("reason_code", &format!("{:?}", error.name)),
+                        ],
                     );
                 }
             }
@@ -426,7 +439,11 @@ fn main() -> io::Result<()> {
             Err(error) => {
                 ditto_core::log::event(
                     "launch.failed",
-                    &[("spec", specification), ("reason", &error.to_string())],
+                    &[
+                        ("spec", specification),
+                        ("reason", &error.to_string()),
+                        ("reason_code", &format!("{:?}", error.kind())),
+                    ],
                 );
             }
         }
@@ -451,7 +468,13 @@ fn main() -> io::Result<()> {
                 None => ditto_core::serve_bound_connection(stream, core, &registry),
             };
             if let Err(error) = served {
-                ditto_core::log::event("connection.ended", &[("reason", &error.to_string())]);
+                ditto_core::log::event(
+                    "connection.ended",
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", &format!("{:?}", error.kind())),
+                    ],
+                );
             }
         });
     }

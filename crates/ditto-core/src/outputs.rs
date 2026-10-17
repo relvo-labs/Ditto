@@ -265,6 +265,7 @@ pub fn handle(core: &Core, vanished: &[String], before: &[Window]) -> Option<Res
                 &[
                     ("outputs", &vanished.join(",")),
                     ("reason", &format!("{error:?}")),
+                    ("reason_code", error_kind(&error)),
                 ],
             );
             return None;
@@ -289,7 +290,7 @@ pub fn handle(core: &Core, vanished: &[String], before: &[Window]) -> Option<Res
             &[
                 ("window_id", &window.window_id.0),
                 ("app_id", &window.app_id),
-                ("reason", &window.reason),
+                ("reason_code", &window.reason),
             ],
         );
     }
@@ -301,7 +302,18 @@ pub fn handle(core: &Core, vanished: &[String], before: &[Window]) -> Option<Res
         {
             crate::log::event(
                 "outputs.notice_failed",
-                &[("reason", &format!("{error:?}"))],
+                &[
+                    ("reason", &format!("{error:?}")),
+                    (
+                        "reason_code",
+                        match &error {
+                            ditto_system::SystemError::Unavailable(_) => "unavailable",
+                            ditto_system::SystemError::NotFound(_) => "not_found",
+                            ditto_system::SystemError::Invalid(_) => "invalid",
+                            ditto_system::SystemError::Failed(_) => "failed",
+                        },
+                    ),
+                ],
             );
         }
     }
