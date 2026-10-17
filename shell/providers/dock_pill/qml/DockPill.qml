@@ -53,9 +53,49 @@ Scope {
         revealAnimation.stop();
         reveal = 1;
     }
-    onMotionEnabledChanged: if (!motionEnabled) settlePresentation()
-    onPositionChanged: settlePresentation()
-    onScreenChanged: settlePresentation()
+    // Focus confirmation belongs to the provider's observation lifetime, not
+    // the array-model delegates (which rebuild on any window upsert).
+    readonly property string focusedWindowId: {
+        const window = client ? client.windows.find(item => item.focused === true) : null;
+        return window ? window.id : "";
+    }
+    property bool focusObserved: false
+    property string observedFocusId: ""
+    property string confirmationWindowId: ""
+    property real focusScale: 1
+    readonly property int confirmationIndex: entries.findIndex(entry =>
+        entry.window && entry.window.id === confirmationWindowId)
+    property NumberAnimation confirmationAnimation: NumberAnimation {
+        target: provider; property: "focusScale"; from: 0.94; to: 1
+        duration: provider.tokens ? provider.tokens.motionPresent : 0
+        easing.type: Easing.OutBack
+        easing.overshoot: 0
+    }
+    function settleConfirmation() {
+        confirmationAnimation.stop();
+        focusScale = 1;
+        confirmationWindowId = "";
+    }
+    function observeFocus() {
+        if (!ready) return;
+        const next = focusedWindowId;
+        if (!focusObserved) {
+            focusObserved = true;
+            observedFocusId = next;
+            return; // Initial readback is a baseline, not a focus transition.
+        }
+        if (next === observedFocusId) return;
+        observedFocusId = next; // Observe even while hidden / motion disabled.
+        settleConfirmation();
+        if (next && shown && soft && tokens.motionEnabled) {
+            confirmationWindowId = next;
+            confirmationAnimation.start();
+        }
+    }
+    onFocusedWindowIdChanged: observeFocus()
+    onMotionEnabledChanged: if (!motionEnabled) { settlePresentation(); settleConfirmation(); }
+    onPositionChanged: { settlePresentation(); settleConfirmation(); }
+    onScreenChanged: { settlePresentation(); settleConfirmation(); }
     readonly property int iconSize: 42
     readonly property int tileSize: soft ? 52 : 40
     readonly property int pillPadding: 8
@@ -183,13 +223,14 @@ Scope {
 
     onShownChanged: {
         settlePresentation();
+        if (!shown) settleConfirmation();
         if (shown) loadApps();
         // motionEnabled also depends on shown; its notification may follow
         // this handler. Read the new intent directly so show starts (and hide
         // never starts) the presentation, even on an immediate reverse.
         if (shown && soft && tokens.motionEnabled) revealAnimation.start();
     }
-    Component.onCompleted: ready = true
+    Component.onCompleted: { ready = true; observeFocus(); }
 
     PanelWindow {
         id: dock
@@ -315,51 +356,41 @@ Scope {
                 Item {
                     id: tile
                     required property var modelData
+                    required property int index
                     readonly property bool running: !!modelData.window
                     readonly property bool current: running && modelData.window.focused === true
                     readonly property bool motionActive: provider.motionEnabled && visible
                     readonly property real feedbackTarget: !visible || !provider.shown ? 1
                         : area.pressed ? 0.90 : area.containsMouse || activeFocus ? 0.96 : 1
                     property real feedbackScale: 1
-                    property real confirmedScale: 1
-                    readonly property bool motionRunning: feedbackAnimation.running || confirmationAnimation.running
+                    readonly property bool confirming: current && modelData.window.id === provider.confirmationWindowId
+                        && index === provider.confirmationIndex
+                    readonly property real confirmedScale: confirming ? provider.focusScale : 1
+                    readonly property bool motionRunning: feedbackAnimation.running
+                        || (confirming && provider.confirmationAnimation.running)
                     // Providers are standalone packages: use the same one-value
                     // stop/retarget policy locally, without importing Shell paths.
                     function retargetFeedback() {
                         feedbackAnimation.stop();
-                        if (!motionActive) { feedbackScale = feedbackTarget; return; }
+                        if (!motionActive || feedbackScale === feedbackTarget) {
+                            feedbackScale = feedbackTarget;
+                            return;
+                        }
                         feedbackAnimation.from = feedbackScale;
                         feedbackAnimation.to = feedbackTarget;
                         feedbackAnimation.start();
                     }
                     function settleMotion() {
                         feedbackAnimation.stop();
-                        confirmationAnimation.stop();
                         feedbackScale = feedbackTarget;
-                        confirmedScale = 1;
                     }
                     onFeedbackTargetChanged: retargetFeedback()
                     onMotionActiveChanged: if (!motionActive) settleMotion()
-                    onCurrentChanged: {
-                        confirmationAnimation.stop();
-                        confirmedScale = 1;
-                        // Actual window readback only: accepting a launch click
-                        // is not evidence that an application has started.
-                        if (current && motionActive) confirmationAnimation.start();
-                    }
                     NumberAnimation {
                         id: feedbackAnimation
                         target: tile; property: "feedbackScale"
                         duration: provider.tokens.motionFeedback
                         easing.type: Easing.OutCubic
-                    }
-                    NumberAnimation {
-                        id: confirmationAnimation
-                        target: tile; property: "confirmedScale"; from: 0.94; to: 1
-                        duration: provider.tokens.motionPresent
-                        easing.type: Easing.OutBack
-                        // A small return without exceeding the original icon size.
-                        easing.overshoot: 0
                     }
                     Connections {
                         target: provider

@@ -11,7 +11,7 @@
 | 首次呈現 | 淺色 Dock 圖示 0.98→1；助理符號 0.96→1；compact 內容透明度 0.92→1 | 固定背板、幾何與 hit target；沒有開場操作鎖。頂部、桌布、launcher 及 full window 開場未新增動態 |
 | hover／鍵盤 focus | Dock 圖示／助理符號縮至 0.96，原有底板／焦點框與標籤保留 | 120 ms；移開／失焦轉向新目標；不重排相鄰按鈕，不縮放 hit target |
 | pointer press／release | 同一局部圖示縮至 0.90，再回當下 hover／focus／expanded 目標 | 120 ms；連點不排隊。Enter／Space／Accessible action 立即沿原路操作，以 focus 框提供等價鍵盤提示 |
-| Dock launch／focus | 點擊直接發原命令；真實視窗回讀 `focused` 才一次 0.94→1；running 點與 current 長條立即反映真狀態 | 180 ms，沒有樂觀成功或無限彈跳。新視窗未聚焦時只有原 running 點；失敗沿原 notice。`dock_bottom` 與 launcher 維持原樣 |
+| Dock launch／focus | 點擊直接發原命令；首次觀測建立基線；其後 focused window ID 真正改變才一次 0.94→1；running 點與 current 長條立即反映真狀態 | 180 ms，沒有樂觀成功或無限彈跳。新視窗未聚焦時只有原 running 點；失敗沿原 notice。`dock_bottom` 與 launcher 維持原樣 |
 | 助理 open／close | 入口的 expanded 目標為 0.98；compact 新建時內容短淡入，focus 立即進 editor | compact close／compact↔full／full close 仍立即銷毀舊表面；**退場動畫延後**，不延長焦點或輸入租用。重開建立新表面，舊 completion 不會藏起或重開它 |
 | thinking／executing | 僅既有投影 `turn.state=running`、Core online、provider connected、非 reconnecting 且 taskState 為 thinking／executing 時，符號透明度 1↔0.65 | 每段 650 ms，純 QML；不是百分比。queued／starting 目前維持原文字，無活動 pulse；沒有待命彈跳 |
 | cancelling／awaiting | 原文字「正在停止」／「需要你的確認」；working cue 同步停止並回 1 | 不改 cancel／approval／preview。收合不是取消，不新增自動操作 |
@@ -43,3 +43,30 @@ QtTest 使用實際 AssistantEntry、MotionValue、staged DockPill／ChatPanel�
 首次 checkpoint `b25d865` 刻意在 coherent commit 停止。後續同一 thread 增加 [可重跑的原生錄影](../../../tests/g4/motion/README.md)、靜態 capture 的實際 settle 與 renderer 回讀；完整執行結果、來源／commit 綁定及可播放媒體由 repo 外 `…/evidence/final/manifest.json` 索引。不得將 Qt offscreen 結果當實體動畫或幀預算證明。實體 Wayfire、NFR-05／資源、熱插拔、IME／Orca、使用者測試與 owner 動態核定均未執行。#81 狀態載入正確性不在本 slice 修改。
 
 後續原生樣本發現 Dock show handler 讀取依賴 shown 的衍生旗標時，其通知順序使 reveal 沒有啟動。以實際 revealAnimation.running 與 settle 後像素穩定的 QtTest 先取得 RED，再將啟動條件改為直接讀取最新 shown 意圖；不新增時長、queue 或 completion。初始失敗和探針保存在 repo 外，不以成功 wrapper 隱藏。靜態 capture 保留正常 production motion，等待真實動畫值 settle；錄影另保留實際過渡。
+
+## F1 焦點身分過渡修正（PR #82 repair 1）
+
+確認回饋只編碼**供應者觀測到的 focused window ID 過渡**，不編碼 delegate 建立／重建。首次快照（包含已聚焦視窗）只建立基線；其後 ID 改變且 shown／淺色／motion enabled 時啟動一次。供應者保有一個有限插值，只有代表目標視窗的第一個 tile 讀取它；同身分的重建延續當下值，不重新起跳。觀測基線在隱藏或降低動畫期間仍更新，恢復可見／動畫不重播。這是 Shell 暫態，沒有新的焦點權威、RPC、retry、持久化或排程。
+
+下列測試均在 `tests/g4/motion/tst_dock_focus_identity.qml`；raw reviewer reproducer 僅改 import／staging 路徑後另存 `tst_dock_readback_repro.qml`，原始檔與失敗 log 不修改。
+
+| Row | 觀測／意圖 | 行為 | QtTest 對應（省略 `test_`） |
+| --- | --- | --- | --- |
+| T01 | 初始空／已聚焦快照 | 建基線，0 次確認 | `T01_initial_observation` |
+| T02 | 真正 ID A→B／none→B | 符合偏好時恰一次，只有 B tile 接收 | `T02_T03_real_transition_loss_and_regain` |
+| T03 | 失焦／全未聚焦→再聚焦 | 立即停止／settle；再聚焦可一次 | 同上 |
+| T04 | 同 ID，title upsert | 0 次新啟動；既有插值不重啟 | `T04_T07_identity_preserving_rebuild(title)`、`T04_T07_rebuild_during_confirmation_continues_without_restart` |
+| T05 | 同 ID，x／y／geometry／size 串流 | 0 次新啟動，不持續回彈 | `T04_T07_identity_preserving_rebuild(geometry-size)`；raw reproducer 的 20 次 stream |
+| T06 | 無關視窗 open／close | 0 次新啟動 | `T04_T07_identity_preserving_rebuild(unrelated-open/unrelated-close)` |
+| T07 | apps reload／reorder、pinned reorder | 0 次新啟動；運行中重建不重啟 | `T04_T07_identity_preserving_rebuild(apps-reload/apps-reorder/pinned-reorder)`、運行中重建測試 |
+| T08 | 同 ID hide→show | hide 停止；show 不重播確認（通用 reveal 分開） | `T08_T09_same_id_restore(hidden)` |
+| T09 | 運行中 reduced-motion／low-power→恢復 | 停止／settle，不排隊或重播 | `T08_T09_same_id_restore(reduced-motion/low-power)` |
+| T10 | hidden 期間 ID 改變→show | 更新基線，0 次啟動；show 不重播 | `T08_T11_T14_eligibility(hidden)` |
+| T11 | reduced-motion／low-power 期間 ID 改變→恢復 | 同上 | `T08_T11_T14_eligibility(reduced-motion/low-power)` |
+| T12 | 同 app 兩視窗切換；多 alias tile 同窗 | 以 window ID 判斷；每次只有一個目標 tile | `T12_same_app_two_window_identity`、`T12_one_target_when_alias_tiles_share_a_window` |
+| T13 | 快速 A→B→A、重複同 ID、再到 C | 每個真正觀測過渡至多一次；只留最新插值，沒有舊 completion 重播 | `T13_rapid_burst_latest_id_only` |
+| T14 | legacy 主題，初始／後續回讀 | 不新增確認動態，原靜態指示沿用 | `T01_initial_observation(legacy-focused)`、`T08_T11_T14_eligibility(legacy)` |
+
+盤點：DockPill 的 `Repeater(entries)` 曾在 delegate 的 `onCurrentChanged` 啟動確認，因此是新增 F1。DockBottom 的 `Repeater(client.windows)` 同樣會重建互動暫態，但只有靜態 focused 色／字，沒有確認動畫；屬 legacy F3。PanelTop 讀 focused title、Shell 保存 lastFocusedApplication、ChatFocusReturn 以 ID 防止錯誤回焦，均不啟動 tile 確認。TasksPanel 和 launcher 依 task／app model 顯示，不是焦點確認消費者。本修正保留原 array model，**F3 的 hover／press／鍵盤焦點重設留待另案**。
+
+**F2 未驗證**：真實 Quickshell window 隱藏是否同步傳到 child Item.visible，沿用既有 Avatar 慣例；offscreen stub 不證明這件事，交 #47／#68 實體驗證。原 native video 保留為歷史；修正後另錄同一原生樣本，補同 ID 的 title／geometry／無關視窗更新與實際確認啟動次數，放 repo 外 `…/evidence/repair1/media/`。完整 RED→GREEN、gate／來源／blob 綁定由 `…/evidence/repair1/manifest.json` 索引。參數與 instant close 邊界不變，不代表 #66 全部通過。

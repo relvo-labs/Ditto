@@ -20,3 +20,5 @@ python3 tests/g4/motion/record-native.py /data/hermes/ditto-runs/g4-impl/r2-moti
 約 16 秒的固定 fixture 順序：首次呈現；Dock hover／press／反向連點及 focused-window 回讀；助理 press 與 repeat open／instant close；running→cancelling→succeeded／partial／unknown；活動中 hide；運行中 reduced-motion；low-power；恢復 normal；reduced-transparency；再次 hide／unknown。每個關卡以真實 QML 物件值檢查，不捏造百分比或自動重播操作。確切事件與取樣時間以 manifest 為準。
 
 canonical `tests/g4/visual/run.sh` 與 `run-assistant.sh` 仍須各自完整執行。靜態 capture 保留正常模式的 production motion，等實際 Dock reveal／feedback、助理符號與 compact opacity settle 後才抓圖；不全域關閉動畫換取通過。正常 capture、fallback 與動態錄影有不同目的。
+
+F1 repair 1 加入 focused window ID 過渡矩陣與僅作路徑適配的 reviewer reproducer。確認動畫屬 provider 生命週期，不屬被重建的 tile；測試用實際 Animation.started 次數與各 tile 的 confirmedScale 區分真正 ID 過渡和 title／geometry／apps reload 等同身分事件。錄影另包含同 ID upsert 不重播的關卡；舊錄影不覆寫。F2 真實 window 隱藏傳遞未驗證；F3 legacy array 重建的 hover／press／keyboard focus 仍是獨立 follow-up。

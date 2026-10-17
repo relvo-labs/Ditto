@@ -22,6 +22,7 @@ TestCase {
     property var chat: null
     property int activations: 0
     property int nextFrame: 0
+    SignalSpy { id: focusConfirmations; target: sample.dock ? sample.dock.confirmationAnimation : null; signalName: "started" }
     FrameAnimation { id: frameClock; running: true }
     Item {
         id: desktop
@@ -102,6 +103,8 @@ TestCase {
             symbol_scale: entry.children[0].scale, symbol_opacity: entry.children[0].opacity,
             feedback_running: entry.feedbackRunning, working_cue_running: entry.workingCueRunning,
             dock_reveal: dock.reveal, dock_icon_scale: findChild(tile(), "dockIconFallback").scale,
+            focused_window_id: dock.focusedWindowId, focus_confirmation_starts: focusConfirmations.count,
+            focus_confirmation_running: dock.confirmationAnimation.running,
             chat_opacity: content() ? content().opacity : null,
             turn: conversation.turn ? conversation.turn.state : null,
             state_text: entry.statusText, draft: conversation.draft, activations: activations };
@@ -135,6 +138,15 @@ TestCase {
             { at: 1170, label: "Press during return", run: () => mousePress(tile(), 26, 26) },
             { at: 1290, label: "Release; no optimistic success", run: () => { mouseRelease(tile(), 26, 26); compare(tile().confirmedScale, 1); compare(client.calls.length, 2); } },
             { at: 1700, label: "Fixture focused-window readback", run: () => { client.windows = [{ id: "fixture-window", app_id: "fixture-files", focused: true }]; } },
+            { at: 1850, label: "Same focused ID: title upsert does not restart", run: () => {
+                client.windows = [{ id: "fixture-window", app_id: "fixture-files", focused: true, title: "fixture title changed" }];
+                compare(focusConfirmations.count, 1);
+            } },
+            { at: 1950, label: "Geometry / unrelated upsert: no focus replay", run: () => {
+                client.windows = [{ id: "fixture-window", app_id: "fixture-files", focused: true, x: 40, width: 800 },
+                    { id: "fixture-other", app_id: "fixture-editor", focused: false }];
+                compare(focusConfirmations.count, 1); compare(dock.focusScale, 1);
+            } },
             { at: 2100, label: "Assistant hover", run: () => mouseMove(entry, 30, 27) },
             { at: 2400, label: "Assistant press", run: () => mousePress(entry, 30, 27) },
             { at: 2520, label: "Open compact; focus is immediate", run: () => { mouseRelease(entry, 30, 27); verify(!!chat); } },
