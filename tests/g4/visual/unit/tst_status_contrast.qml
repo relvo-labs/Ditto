@@ -44,8 +44,7 @@ TestCase {
         return null;
     }
 
-    // Avatar remains an ordinary assertion: this lane forbids writes to
-    // shell/avatar/**, so a failure there must stay visible until repaired.
+    // Include the avatar warning fill alongside the shared status controls.
     function test_fill_pairs_data() {
         const rows = [];
         for (const theme of ["no-theme", "soft-jelly", "soft-jelly-light"]) {

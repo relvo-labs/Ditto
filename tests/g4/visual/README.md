@@ -8,7 +8,7 @@
 
 `unit/tst_status_contrast.qml` 直接讀取 Button、Badge、TasksPanel 與 Avatar 的實際文字／背景配對，涵蓋三種主題的一般、降低透明度與低耗電模式。狀態填色用衍生 `statusForeground`（light 白色、dark `#1a1626`），accent 填色仍用可覆寫的 `accentForeground`；並驗證 accent 覆寫不會影響狀態前景色。中性 Badge／secondary Button 的 surfaceStrong 配對也有元件斷言。
 
-Repair round 1 尚有範圍阻擋：原 lane 禁止修改 `shell/avatar/**`，因此 Avatar awaiting 問號仍以 `#2b2440` 畫在 light warning 上，對比 1.96。測試保留普通的失敗斷言，沒有 skip 或放寬門檻；完整 visual runner 會在這三個失敗後結束。須由獲授權的後續變更將該前景改成 `statusForeground`，才能宣稱全部狀態配對通過。
+Repair round 1b 已獲協調者授權，只修改 Avatar awaiting 問號的前景色為 `statusForeground`。light warning 上的對比從 1.96 提高到 7.48；三主題三模式均由一般對比斷言檢查，沒有 skip 或放寬門檻。
 
 `unit/tst_legacy.qml` 仍比較舊版 Dock 的尺寸、文字、窗口位置與命中區。#72 修復後，啟用中項目的前景色從黑色變成設計值，所以正常畫面應有像素差異；再將目前版本的 `on_accent` 明確覆寫為黑色時，必須逐像素與舊版一致。基準 Dock 與 Tokens 均取自已固定的 `f582426`，不讓基準誤用目前 Tokens。
 
