@@ -58,6 +58,9 @@ pub struct Call<'a> {
     pub operation_id: Option<String>,
     pub deadline: Duration,
     pub started: Instant,
+    /// Core-only proof that this exact invocation consumed a bound one-shot
+    /// approval. Never parsed from request parameters or caller metadata.
+    pub(crate) approved_once: bool,
 }
 
 impl Call<'_> {
@@ -85,8 +88,30 @@ fn verified<T: serde::Serialize>(value: T) -> Handled {
 // ---- authorization and availability --------------------------------------
 
 /// `files:` scopes need the grant the call is about.
-fn resource_for(contract: &CapabilityContract, params: &Map<String, Value>) -> Option<String> {
-    let _ = contract;
+fn resource_for(
+    core: &Core,
+    contract: &CapabilityContract,
+    params: &Map<String, Value>,
+) -> Option<String> {
+    if contract
+        .capability_id
+        .starts_with("desktop.plugins.development.")
+    {
+        if let Some(id) = params
+            .get("description")
+            .and_then(|v| v.get("plugin_id"))
+            .and_then(Value::as_str)
+        {
+            return Some(id.into());
+        }
+        if let Some(id) = params.get("artifact_id").and_then(Value::as_str) {
+            return Some(
+                core.read(|c| ditto_store::generated::get(c, id))
+                    .map(|a| a.description.plugin_id)
+                    .unwrap_or_else(|_| format!("artifact:{id}")),
+            );
+        }
+    }
     params
         .get("grant_id")
         .and_then(Value::as_str)
@@ -110,7 +135,7 @@ pub fn authorize(
     let outcome = authz::authorize(
         &caller.subject,
         contract.scopes,
-        resource_for(contract, params).as_deref(),
+        resource_for(core, contract, params).as_deref(),
         &usable,
     );
     let decision = if outcome.allowed() {
@@ -137,7 +162,21 @@ pub fn authorize(
 
 pub fn resolve(core: &Core, contract: &CapabilityContract) -> Resolved {
     let id = contract.capability_id;
-    if id == catalog::JOBS_SUBMIT && !core.jobs.available {
+    if matches!(
+        id,
+        catalog::DEVELOPMENT_VALIDATE | catalog::DEVELOPMENT_PREVIEW
+    ) {
+        let available = crate::generation::available(core, id == catalog::DEVELOPMENT_PREVIEW);
+        return Resolved {
+            provider_label: Some("isolated-generation".into()),
+            availability: Availability::DependsOnSystem {
+                component: "generation-host".into(),
+                available,
+                reason: (!available).then_some(UnavailableReason::SystemUnavailable),
+            },
+        };
+    }
+    if id == catalog::JOBS_SUBMIT && !core.jobs.ready() {
         return Resolved {
             provider_label: None,
             availability: Availability::DependsOnSystem {
@@ -302,7 +341,7 @@ pub struct CapabilitiesView(pub catalog::CapabilitiesListOutput);
 
 // ---- dispatch -------------------------------------------------------------
 
-pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
+pub fn dispatch(core: &Arc<Core>, caller: &Caller, mut call: Call<'_>) -> Handled {
     // The G1 stand-in remains a test caller. Every tool of the production
     // controller must be correlated before its first side effect.
     if caller.subject.as_str() == Subject::AGENT
@@ -363,7 +402,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
         }
         // Refused calls may request an approval and retry that same intent.
         // Only an authorized dispatch consumes the execution reservation.
-        authorize_call(core, caller, &call)?;
+        call.approved_once = authorize_call(core, caller, &call)?;
         let id = intent_id.clone();
         coordinate(core, &call, move |c| {
             ditto_store::turns::begin_execution(c.store(), &id, &owner, &cap, &args)
@@ -388,11 +427,11 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
         crate::agent_routes::announce_turn(core, &turn.turn_id);
         return outcome;
     }
-    authorize_call(core, caller, &call)?;
+    call.approved_once = authorize_call(core, caller, &call)?;
     dispatch_authorized(core, caller, call)
 }
 
-fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<(), CoreError> {
+fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<bool, CoreError> {
     let result = authorize(core, caller, call.contract, &call.params);
     if result.as_ref().is_err_and(|e| {
         e.data
@@ -421,11 +460,11 @@ fn authorize_call(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Result<
             if coordinate(core, call, move |c| {
                 ditto_store::approvals::consume(c.store(), &owner, &turn.turn_id, cap, &hash)
             })?? {
-                return Ok(());
+                return Ok(true);
             }
         }
     }
-    result
+    result.map(|_| false)
 }
 
 fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Handled {
@@ -439,6 +478,13 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
         ));
     }
     check_available(core, call.contract)?;
+    if call
+        .contract
+        .capability_id
+        .starts_with("desktop.plugins.development.")
+    {
+        return crate::generation::dispatch(core, caller, &call);
+    }
     if call.contract.provider == Provider::Compositor {
         return crate::desktop::execute(&core.session, &call);
     }
@@ -931,7 +977,13 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
             }
             let job_id = input.job_id.clone();
             let job = coordinate(core, &call, move |c| {
-                c.store().write(|tx| jobs::request_cancel(tx, &job_id))
+                c.store().write(|tx| {
+                    let job = jobs::request_cancel(tx, &job_id)?;
+                    if job.state == JobState::Cancelled {
+                        crate::generation::finish_job(tx, &job)?;
+                    }
+                    Ok::<_, ditto_store::StoreError>(job)
+                })
             })??;
             core.jobs.wake();
             core.publish(DesktopEventPayload::JobsUpdated { job: job.clone() });
@@ -945,7 +997,7 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
                     "background jobs need a systemd user manager to enforce their limits",
                 ));
             }
-            if !core.jobs.accepts(&input.kind) {
+            if input.kind.starts_with("generation.") || !core.jobs.accepts(&input.kind) {
                 return Err(CoreError::invalid("unknown job kind"));
             }
             // Fixture kinds take bounded numbers; real kinds take nothing.
@@ -1079,7 +1131,7 @@ fn change_outcome(record: ChangeRecord) -> Handled {
     Ok((json!(record), verified))
 }
 
-fn origin_for(
+pub(crate) fn origin_for(
     core: &Core,
     caller: &Caller,
     call: &Call<'_>,
@@ -1118,10 +1170,28 @@ fn origin_for(
 /// known), then for the outcome within the caller's deadline. Running over the
 /// deadline returns the record as it is now; the change continues and the
 /// caller follows it with `changes.get`, never by resending.
-fn run_proposal(core: &Arc<Core>, caller: &Caller, proposal: Proposal, call: &Call<'_>) -> Handled {
+pub(crate) fn run_proposal(
+    core: &Arc<Core>,
+    caller: &Caller,
+    proposal: Proposal,
+    call: &Call<'_>,
+) -> Handled {
     let (accepted, change_id) = mpsc::channel();
     let (reply, outcome) = mpsc::channel();
     let gone = Arc::clone(&caller.gone);
+    let generation_auth = call
+        .contract
+        .capability_id
+        .starts_with("desktop.plugins.development.")
+        .then(|| {
+            (
+                Arc::clone(core),
+                caller.clone(),
+                call.contract.clone(),
+                call.params.clone(),
+                call.approved_once,
+            )
+        });
     core.submit(move |coordinator| {
         // Acceptance is the draft being written. A caller that disappeared
         // while the proposal waited in the queue never learns a change id,
@@ -1139,6 +1209,18 @@ fn run_proposal(core: &Arc<Core>, caller: &Caller, proposal: Proposal, call: &Ca
                 ],
             );
             return;
+        }
+        if let Some((core, caller, contract, params, approved_once)) = generation_auth {
+            if let Err(error) = crate::generation::recheck_authorization(
+                &core,
+                &caller,
+                &contract,
+                &params,
+                approved_once,
+            ) {
+                let _ = reply.send(Err(error));
+                return;
+            }
         }
         let _ = reply.send(coordinator.propose(proposal, Some(accepted)));
     });
@@ -1575,7 +1657,7 @@ fn changes_list(core: &Core, input: ChangesListInput) -> Handled {
 
 // ---- appearance, panels, layout, shortcuts, commands -------------------------
 
-fn active_document(
+pub(crate) fn active_document(
     core: &Core,
 ) -> Result<(ProfileSummary, RevisionSummary, ProfileDocument), CoreError> {
     Ok(core.read(|connection| {
@@ -1957,7 +2039,20 @@ fn plugins_list(core: &Core) -> Handled {
                     }
                     HostKind::Qml => {
                         match mounts.iter().find(|mount| mount.entry_id == entry.entry_id) {
-                            Some(mount) if mount.mounted => EntryRuntimeState::Active,
+                            Some(mount) if mount.mounted => {
+                                let expected = packages
+                                    .get(&entry.package, &entry.version)
+                                    .and_then(|row| row.generated.as_ref());
+                                if expected.is_some_and(|a| {
+                                    mount.artifact_id.as_deref() != Some(&a.artifact_id)
+                                }) {
+                                    EntryRuntimeState::Failed {
+                                        reason: "generated_artifact_mismatch".into(),
+                                    }
+                                } else {
+                                    EntryRuntimeState::Active
+                                }
+                            }
                             Some(_) => EntryRuntimeState::Loading,
                             None if slot.is_some() => EntryRuntimeState::NotReported,
                             None => EntryRuntimeState::Disabled,
@@ -1976,10 +2071,17 @@ fn plugins_list(core: &Core) -> Handled {
                 disabled: entry.disabled,
                 state,
                 started_reason: "profile".into(),
-                trust_note_key: match entry.host {
-                    HostKind::Cordis => "trust.same_host_no_isolation.cordis".into(),
-                    HostKind::Qml => "trust.same_host_no_isolation.qml".into(),
-                    HostKind::CoreBuiltin => "trust.core_builtin".into(),
+                trust_note_key: if packages
+                    .get(&entry.package, &entry.version)
+                    .is_some_and(|row| row.generated.is_some())
+                {
+                    "trust.generated_fixed_template".into()
+                } else {
+                    match entry.host {
+                        HostKind::Cordis => "trust.same_host_no_isolation.cordis".into(),
+                        HostKind::Qml => "trust.same_host_no_isolation.qml".into(),
+                        HostKind::CoreBuiltin => "trust.core_builtin".into(),
+                    }
                 },
             }
         })

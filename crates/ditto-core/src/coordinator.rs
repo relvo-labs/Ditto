@@ -258,8 +258,20 @@ impl Coordinator {
                 &partial.display().to_string(),
             );
         }
+        match crate::jobs_pool::reap_interrupted(self.store.connection()) {
+            Ok(()) => self
+                .core
+                .jobs
+                .recovery_clean
+                .store(true, std::sync::atomic::Ordering::SeqCst),
+            Err(error) => crate::log::event(
+                "jobs.recovery_cleanup_failed",
+                &[("reason", &error.to_string())],
+            ),
+        }
         let _ = self.store.write(|tx| {
             jobs::fail_interrupted(tx)?;
+            crate::generation::reconcile(tx)?;
             ditto_store::bindings::expire_generation(tx, None)?;
             Ok(())
         });
@@ -659,7 +671,7 @@ impl Coordinator {
             &proposal.origin,
             node.as_deref(),
         );
-        let validation = match &proposal.target {
+        let mut validation = match &proposal.target {
             Some(target) => preflight::run_target(
                 &head_document,
                 target.document.clone(),
@@ -668,6 +680,38 @@ impl Coordinator {
             ),
             None => preflight::run(&head_document, &proposal.ops, &context),
         };
+        if let Err(error) =
+            ditto_store::generated::check_document(self.store.connection(), &validation.target)
+        {
+            validation.reasons.push(docops::reason(
+                PreflightCode::PreconditionFailed,
+                None,
+                json!({"why":"generated_data_policy","detail":error.to_string()}),
+            ));
+        }
+        // A generic config grant must not silently migrate plugin data. Agent
+        // activation carries a durable, authorized development intent instead.
+        if proposal.subject == "agent" || proposal.subject.starts_with("agent.") {
+            let changed_schema = validation.target.entries.iter().filter(|e| !e.disabled).any(|entry| {
+                let next=ditto_store::generated::by_package(self.store.connection(), &entry.package, &entry.version).ok().flatten();
+                let old_id=self.store.connection().query_row("SELECT artifact_id FROM generated_plugin_data WHERE plugin_id=?1",[&entry.package],|r|r.get::<_,String>(0)).ok();
+                let previous=old_id.and_then(|id|ditto_store::generated::get(self.store.connection(),&id).ok());
+                matches!((previous,next),(Some(a),Some(b)) if a.description.data != b.description.data)
+            });
+            let authorized = match &proposal.origin {
+                ChangeOrigin::Agent{turn_id,tool_call_id,..} => self.store.connection().query_row(
+                    "SELECT EXISTS(SELECT 1 FROM agent_tool_intents WHERE turn_id=?1 AND call_id=?2 AND capability_id=?3)",
+                    rusqlite::params![turn_id,tool_call_id,ditto_protocol::catalog::DEVELOPMENT_ACTIVATE], |r|r.get::<_,bool>(0)).unwrap_or(false),
+                _ => false,
+            };
+            if changed_schema && !authorized {
+                validation.reasons.push(docops::reason(
+                    PreflightCode::PermissionRequired,
+                    None,
+                    json!({"why":"generated_data_requires_development_activation"}),
+                ));
+            }
+        }
         let stored = self.store.write(|tx| {
             changes::insert(
                 tx,
@@ -738,7 +782,19 @@ impl Coordinator {
         Ok(changes::get(self.store.connection(), change_id)?.record)
     }
 
-    fn announce(&self, record: &ChangeRecord) {
+    fn announce(&mut self, record: &ChangeRecord) {
+        if let Err(error) = self
+            .store
+            .write(|tx| ditto_store::generated::record_activation(tx, record))
+        {
+            crate::log::event(
+                "generation.journal_failed",
+                &[
+                    ("change_id", &record.change_id),
+                    ("reason", &error.to_string()),
+                ],
+            );
+        }
         self.core.publish(DesktopEventPayload::ChangeUpdated {
             change: Box::new(record.summary()),
         });
@@ -1399,6 +1455,7 @@ impl Coordinator {
         let window = self.core.config.confirmation_window;
         fault::before_commit_revision();
         let written = self.store.write(|tx| {
+            ditto_store::generated::apply_document(tx, &validation.target, change_id)?;
             let revision_id = match &switch_to {
                 Some((profile, revision)) => {
                     profiles::set_active_profile(tx, profile)?;
@@ -1440,6 +1497,7 @@ impl Coordinator {
                 ChangeState::Committed,
             )?;
             changes::settle_committed_result(tx, change_id)?;
+            ditto_store::generated::record_activation(tx, &changes::get(tx, change_id)?.record)?;
             Ok(revision_id)
         });
         let revision_id = match written {

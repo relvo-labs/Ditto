@@ -1,0 +1,7 @@
+{
+  "kind": "shape",
+  "description": "Generated mount reports the artifact identity of its actual instance",
+  "type": "shell-report-input",
+  "valid": true,
+  "value": {"mounts": [{"slot": "ui.generated_panel", "entry_id": "ent-generated", "mounted": true, "visible": true, "artifact_id": "art-current"}], "appearance": null, "avatar": null}
+}

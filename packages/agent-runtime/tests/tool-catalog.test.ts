@@ -1,12 +1,16 @@
 import {describe,it,expect} from 'vitest'
 import {readFileSync} from 'node:fs'
 import {TOOL_GUIDE,BASE_INSTRUCTIONS} from '../src/tool-catalog.ts'
+import {check} from '../../protocol/src/schema-check.ts'
 import {recentChangesText} from '../src/runtime.ts'
 
-const catalog=JSON.parse(readFileSync(new URL('../../../schema/catalog.json',import.meta.url),'utf8')) as {capabilities:Array<{capability_id:string;resource_scope:string[]}>}
+const catalog=JSON.parse(readFileSync(new URL('../../../schema/catalog.json',import.meta.url),'utf8')) as {capabilities:Array<{capability_id:string;resource_scope:string[];input_schema:Record<string,unknown>}>}
 const byId=new Map(catalog.capabilities.map(c=>[c.capability_id,c]))
 
 describe('Agent tool allow-list',()=>{
+  it('supports the complete schema of every offered tool in strict mode',()=>{
+    for(const id of Object.keys(TOOL_GUIDE))expect(()=>check(byId.get(id)!.input_schema,{},{strict:true}),id).not.toThrow()
+  })
   it('names only capabilities Core really has',()=>{
     for(const id of Object.keys(TOOL_GUIDE))expect(byId.has(id),id).toBe(true)
   })

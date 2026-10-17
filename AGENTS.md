@@ -12,6 +12,8 @@
 | [plan/02/](plan/02/README.md)、[plan/03/](plan/03/README.md)、[plan/04/](plan/04/README.md) | G0／G1／G2 執行計畫：範圍、出口、工作包、依賴與決策；G2 含 Codex 訂閱＋app-server，44 包／十九項出口，選型與估算待核定 | 該階段動手之前 |
 | [.agents/skills/](.agents/skills/README.md) | 把上述原則轉成可觸發判斷程序的 skill 集合 | 見下方觸發速查 |
 
+G3 計畫與獨立基礎設施見 [plan/05](plan/05/README.md)，主追蹤為 issue #34。依 [D-45](.agents/notes/decisions/2026-10-13-d45-g3-independent-foundation.md)，在 `codex/g3-restricted-generation` 疊在 G2 的 `a88bce8` 上開始；起始接線等待條件已由 D-46 取代，G2 PR #13 已合併；G2／G3 證據不得混用。
+
 ## 五條不可違反原則
 
 出處：[milestones/01/README.md](milestones/01/README.md)。違反任一條的變更不予合併。
@@ -37,7 +39,9 @@
 
 ## 專案現況
 
-**G0、G1 已完成（2026-10-07 owner 實際使用裁定 [D-38](.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)），G2 實作中。** 原生 Core、交易與儲存、Cordis hostd、可替換 QML 供應者、管理中心、救援與鎖定均已落地。G2 在分支 `codex/g2-agent-foundation`：Agent 與 `ditto-confine` 內的 Codex app-server、對話、approval、context、工作池、區域布局與語意任務集已有開發證據；真實訂閱、語意分數與參考機量測尚未執行，逐項見 [G2 評審紀錄](.agents/notes/gate-reviews/G2-exit.md)。
+**G0、G1 已完成（2026-10-07 owner 實際使用裁定 [D-38](.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)），G2 功能由 owner 依 [D-46](.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受，G3 整合實作已提交 PR #40 審查。** 原生 Core、交易與儲存、Cordis hostd、可替換 QML 供應者、管理中心、救援與鎖定均已落地。G2 在分支 `codex/g2-agent-foundation`：Agent 與 `ditto-confine` 內的 Codex app-server、對話、approval、context、工作池、區域布局與語意任務集已有開發證據；真實訂閱、語意集及參考機冷登入量測已有證據，D-44 後端先採 1G 寬鬆上限；剩餘項目由 #35～#39 追蹤，逐項見 [G2 評審紀錄](.agents/notes/gate-reviews/G2-exit.md)。
+
+G3 分支 `codex/g3-restricted-generation` 已接正式生成能力、隔離原生驗證／預覽、固定模板 Shell 解譯、啟用與資料回退；實體座位的真模型、鍵盤取消、資料回退、逐關故障、OS 超限存活及三態信任矩陣已有證據，並修正逾時關卡遺失與失敗文案。見 [實體驗收](.agents/notes/gate-reviews/G3-reference-seat-2026-10-14.md) 與 [G3 評審紀錄](.agents/notes/gate-reviews/G3-exit.md)；出口仍待 owner 裁定。
 
 主要開發機同時是主要[參考機](docs/platform/support-matrix.md) `ditto-ref-ws-rtx4060-01`；其他機器仍可開發，效能數字不可跨機混算。**合成器是 Wayfire（D-02 已於 2026-09-22 決定方向），Sway 支援已遺棄**——`sway.rs` 與開發容器保留為決策對照。參考機 runner、原生應用回讀、Shell 重啟存活、身分負例與三次冷登入資源量測已有紀錄。
 

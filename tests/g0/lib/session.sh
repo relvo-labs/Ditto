@@ -62,7 +62,7 @@ start_compositor() {
       return 1
     }
   else
-    RUNTIME_DIR="$(mktemp -d /tmp/ditto-g0.XXXXXX)"
+    RUNTIME_DIR="$(mktemp -d "${DITTO_FIXTURE_RUNTIME_PARENT:-/tmp}/ditto-g0.XXXXXX")"
     chmod 700 "$RUNTIME_DIR"
   fi
   export XDG_RUNTIME_DIR="$RUNTIME_DIR"

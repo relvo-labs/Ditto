@@ -8,7 +8,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::error::{StoreError, StoreResult};
 
-pub const CURRENT_VERSION: u32 = 3;
+pub const CURRENT_VERSION: u32 = 5;
 
 const V1: &str = r#"
 CREATE TABLE core_meta (
@@ -349,6 +349,31 @@ fn apply(transaction: &Transaction<'_>, version: u32) -> StoreResult<()> {
             ALTER TABLE jobs_v3 RENAME TO jobs;
             CREATE INDEX jobs_by_state ON jobs(state, created_at);
         "#)?,
+        4 => transaction.execute_batch(r#"
+            ALTER TABLE generated_artifacts RENAME TO generated_artifacts_legacy;
+            CREATE TABLE generated_artifacts (
+                artifact_id TEXT PRIMARY KEY, plugin_id TEXT NOT NULL, version TEXT NOT NULL,
+                parent_id TEXT REFERENCES generated_artifacts(artifact_id), bundle_sha256 TEXT NOT NULL,
+                create_key TEXT NOT NULL UNIQUE, create_hash TEXT NOT NULL, artifact_json TEXT NOT NULL,
+                UNIQUE(plugin_id,version)
+            );
+            CREATE TABLE generated_plugin_data (
+                plugin_id TEXT PRIMARY KEY, artifact_id TEXT NOT NULL REFERENCES generated_artifacts(artifact_id),
+                schema_version INTEGER NOT NULL CHECK(schema_version>0), revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9007199254740991), payload_json TEXT NOT NULL
+            );
+            CREATE TABLE generated_data_snapshots (
+                change_id TEXT NOT NULL, plugin_id TEXT NOT NULL, from_artifact_id TEXT NOT NULL,
+                to_artifact_id TEXT NOT NULL, schema_version INTEGER NOT NULL, payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, PRIMARY KEY(change_id,plugin_id)
+            );
+            CREATE INDEX generated_snapshots_by_artifact ON generated_data_snapshots(plugin_id,from_artifact_id,created_at);
+        "#)?,
+        // Endpoint/schema plausibility cannot prove a pre-fix v4 lineage.
+        // Keep every legacy byte, but only future atomic ownership commits
+        // explicitly set this flag. There is no retroactive proof backfill.
+        5 => transaction.execute_batch(
+            "ALTER TABLE generated_data_snapshots ADD COLUMN lineage_proven INTEGER NOT NULL DEFAULT 0 CHECK(lineage_proven IN (0,1));",
+        )?,
         other => return Err(StoreError::Invalid(format!("no migration to {other}"))),
     }
     transaction.pragma_update(None, "user_version", version)?;
@@ -372,8 +397,142 @@ pub fn migrate(connection: &mut Connection) -> StoreResult<u32> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    // Historical schema fixture; never uses the current migration to invent
+    // proof for legacy snapshots.
+    pub(crate) fn v4_fixture(db: &mut Connection) {
+        configure(db).unwrap();
+        for version in 1..=4 {
+            let tx = db.transaction().unwrap();
+            apply(&tx, version).unwrap();
+            tx.commit().unwrap();
+        }
+    }
+    #[test]
+    fn fresh_store_and_newer_schema_refusal() {
+        let temp = crate::testing::open("fresh-v5");
+        let c = temp.store.connection();
+        assert_eq!(user_version(c).unwrap(), 5);
+        assert!(c
+            .prepare("SELECT lineage_proven FROM generated_data_snapshots")
+            .is_ok());
+        c.pragma_update(None, "user_version", CURRENT_VERSION + 1)
+            .unwrap();
+        assert!(crate::Store::open_reader(temp.store.paths()).is_err());
+        let paths = temp.store.paths().clone();
+        // open_writer requires the same held writer lock; use an in-memory
+        // migration check here and the open/backup tests below for file stores.
+        let mut newer = Connection::open_in_memory().unwrap();
+        newer
+            .pragma_update(None, "user_version", CURRENT_VERSION + 1)
+            .unwrap();
+        assert!(matches!(migrate(&mut newer), Err(StoreError::Invalid(_))));
+        assert_eq!(user_version(&newer).unwrap(), CURRENT_VERSION + 1);
+        assert_eq!(std::fs::read_dir(paths.backups()).unwrap().count(), 0);
+    }
+    #[test]
+    fn v4_lineage_migration_preserves_bytes_and_backup() {
+        let root = crate::testing::temp_root("v4-lineage-migration");
+        let paths = crate::Paths::under(&root);
+        paths.create().unwrap();
+        let lock = crate::WriterLock::acquire(&paths.lock()).unwrap();
+        let mut db = Connection::open(paths.database()).unwrap();
+        v4_fixture(&mut db);
+        let snapshot = "{ \"note\" : \"historical bytes\" }";
+        let current = "{ \"note\" : \"current bytes\" }";
+        db.execute("INSERT INTO generated_artifacts VALUES('art-v4','local.generated.v4','1.0.0',NULL,'hash','key','create-hash','{}')", []).unwrap();
+        db.execute(
+            "INSERT INTO generated_plugin_data VALUES('local.generated.v4','art-v4',1,9,?1)",
+            [current],
+        )
+        .unwrap();
+        db.execute("INSERT INTO generated_data_snapshots VALUES('old','local.generated.v4','art-a','art-v4',1,?1,'old-time')", [snapshot]).unwrap();
+        let tx = db.transaction().unwrap();
+        let (profile, revision) = crate::profiles::create(
+            &tx,
+            "v4",
+            &crate::profiles::tests::document(),
+            &ditto_protocol::profile::RevisionOrigin::Create { from: "v4".into() },
+        )
+        .unwrap();
+        crate::profiles::set_active_profile(&tx, &profile.profile_id).unwrap();
+        tx.commit().unwrap();
+        assert!(crate::Store::open_reader(&paths).is_err());
+        drop(db);
+        let (store, report) = crate::Store::open_writer(&paths, &lock).unwrap();
+        assert_eq!(report.migrated_from, Some(4));
+        assert_eq!(user_version(store.connection()).unwrap(), 5);
+        let backup = Connection::open(report.backup.unwrap()).unwrap();
+        assert_eq!(user_version(&backup).unwrap(), 4);
+        assert!(backup
+            .prepare("SELECT lineage_proven FROM generated_data_snapshots")
+            .is_err());
+        for c in [store.connection(), &backup] {
+            assert_eq!(
+                c.query_row(
+                    "SELECT payload_json FROM generated_data_snapshots",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+                snapshot
+            );
+            assert_eq!(
+                c.query_row("SELECT payload_json FROM generated_plugin_data", [], |r| {
+                    r.get::<_, String>(0)
+                })
+                .unwrap(),
+                current
+            );
+            assert_eq!(
+                c.query_row("SELECT revision FROM generated_plugin_data", [], |r| r
+                    .get::<_, i64>(0))
+                    .unwrap(),
+                9
+            );
+            assert_eq!(
+                crate::profiles::get(c, &profile.profile_id)
+                    .unwrap()
+                    .head_revision,
+                revision.revision_id
+            );
+        }
+        assert_eq!(
+            store
+                .connection()
+                .query_row(
+                    "SELECT lineage_proven FROM generated_data_snapshots",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        assert!(crate::Store::open_reader(&paths).is_ok());
+        drop(store);
+        drop(backup);
+        drop(lock);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn v5_lineage_migration_rolls_back_on_conflict() {
+        let mut db = Connection::open_in_memory().unwrap();
+        v4_fixture(&mut db);
+        db.execute("INSERT INTO generated_data_snapshots VALUES('old','plugin','from','to',1,'{ \"keep\" : true }','t')", []).unwrap();
+        db.execute("ALTER TABLE generated_data_snapshots ADD COLUMN lineage_proven INTEGER NOT NULL DEFAULT 0", []).unwrap();
+        assert!(migrate(&mut db).is_err());
+        assert_eq!(user_version(&db).unwrap(), 4);
+        assert_eq!(
+            db.query_row(
+                "SELECT payload_json FROM generated_data_snapshots",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "{ \"keep\" : true }"
+        );
+    }
     #[test]
     fn v1_migration_preserves_profiles_and_creates_a_readable_v1_backup() {
         let root = crate::testing::temp_root("v1-migration");
@@ -435,6 +594,44 @@ mod tests {
         drop(backup);
         drop(lock);
         std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn generation_migration_keeps_legacy_rows_and_rolls_back_on_conflict() {
+        let mut db = Connection::open_in_memory().unwrap();
+        for version in 1..=3 {
+            let tx = db.transaction().unwrap();
+            apply(&tx, version).unwrap();
+            tx.commit().unwrap();
+        }
+        db.execute(
+            "INSERT INTO generated_artifacts VALUES ('legacy','t','{\"keep\":true}')",
+            [],
+        )
+        .unwrap();
+        db.execute("CREATE TABLE generated_plugin_data (conflict TEXT)", [])
+            .unwrap();
+        assert!(migrate(&mut db).is_err());
+        assert_eq!(user_version(&db).unwrap(), 3);
+        assert_eq!(
+            db.query_row(
+                "SELECT meta_json FROM generated_artifacts WHERE artifact_id='legacy'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "{\"keep\":true}"
+        );
+        db.execute("DROP TABLE generated_plugin_data", []).unwrap();
+        migrate(&mut db).unwrap();
+        assert_eq!(
+            db.query_row(
+                "SELECT meta_json FROM generated_artifacts_legacy WHERE artifact_id='legacy'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "{\"keep\":true}"
+        );
     }
     #[test]
     fn a_failed_v2_migration_rolls_back_all_new_tables() {

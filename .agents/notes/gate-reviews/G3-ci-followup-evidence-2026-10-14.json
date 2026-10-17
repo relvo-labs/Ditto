@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-14",
+  "parent_commit": "9686390df620594c3cacaec28c2a4babbc2c6a3d",
+  "dirty": true,
+  "implementation_sha256": {
+    "crates/ditto-test-host/src/main.rs": "636464e516cd65c3870c58652836ab5a4c1ae131ab3a5f1da1d5a920f3d3142a",
+    "shell/centers/GeneratedArtifacts.qml": "8fc50b82315f745b0c6085d2dea6abbc0646292c39df00b3c25fdc0a92973268",
+    "tests/g3/host/rejection.py": "dd9f3196e281ed231e6fa728982d3b8aa122bda9b97b74d7818b9870ae3c0cb1",
+    "tests/g3/management/tst_management.qml": "c8dee45c9acbd904a0460d8c0c89d4d787cabd8532c90f0cf11af945f58b7533"
+  },
+  "ci_failure": {
+    "head": "9686390df620594c3cacaec28c2a4babbc2c6a3d",
+    "run": 38524724843,
+    "reason": "long checkout Unix socket path -> early error returned abbreviated JSON, missing completion; Core integration 37 and lint passed before refusal check"
+  },
+  "targeted_verification": {
+    "test_host_tests": "pass; 4 total including 1 new binary test",
+    "test_host_clippy": "pass",
+    "early_filesystem_error": "unavailable; completion null; cleanup not claimed",
+    "long_checkout_network": "full; actual outside socket reached only as a denied target, completion exit 0 and cleanup verified",
+    "qt_management_passed": 7,
+    "qml_lint": "pass",
+    "i18n_strings": 569,
+    "fmt": "pass"
+  },
+  "reports": {
+    "artifacts/g3/rejection-3821735/long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-/report.json": {
+      "format_version": 1,
+      "probe": "network",
+      "unit": "ditto-generated-test-a2c1a6e152bf6722e4aad888",
+      "boundary": {
+        "policy": "diagnostic-v1",
+        "enforcement": "full",
+        "landlock_abi": 7,
+        "files": true,
+        "network": true,
+        "processes": true,
+        "time": true,
+        "resources": {
+          "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generated-test-a2c1a6e152bf6722e4aad888.service",
+          "memory_max": "536870912",
+          "memory_swap_max": "0",
+          "cpu_max": "100000 100000",
+          "pids_max": "64"
+        },
+        "reasons": []
+      },
+      "outcome": "succeeded",
+      "service_result": "success",
+      "completion": {
+        "exit_code": 0,
+        "output": "network: TCP/UDP/IPv6/netlink/Unix datagram and ungranted Unix endpoint denied\n"
+      },
+      "cleanup_complete": true,
+      "diagnostics": "",
+      "elapsed_ms": 130,
+      "candidate_activation_available": false
+    },
+    "artifacts/g3/rejection-3821735/early/report.json": {
+      "format_version": 1,
+      "probe": "files",
+      "unit": "",
+      "boundary": {
+        "policy": "diagnostic-v1",
+        "enforcement": "unavailable",
+        "landlock_abi": 7,
+        "files": false,
+        "network": false,
+        "processes": false,
+        "time": false,
+        "resources": null,
+        "reasons": [
+          "Not a directory (os error 20)"
+        ]
+      },
+      "outcome": "unavailable",
+      "service_result": "not_observed",
+      "completion": null,
+      "cleanup_complete": false,
+      "diagnostics": "Not a directory (os error 20)",
+      "elapsed_ms": 0,
+      "candidate_activation_available": false
+    }
+  },
+  "raw_sha256": {
+    "artifacts/g3/ci-followup-20261014/path-build.log": "f6af4983c1a4e788b9901fd9d19477d7b337ca66c90d5243cc5d27363e1735a0",
+    "artifacts/g3/ci-followup-20261014/host-clippy.log": "b1c948494e8966e41d3ea69b720e731f3e6c6b3e4fa91c900d2e05d0be4d95e6",
+    "artifacts/g3/ci-followup-20261014/host-test.log": "143daabb8fc6fc1fa9e8006758281abed82f5706c13502229d0c459789c60c14",
+    "artifacts/g3/ci-followup-20261014/remote-g3-full.log": "6802c6f52006f04e1098aa2879aec16a85da2b615f7a8de20ff2a5b7598829a9",
+    "artifacts/g3/ci-followup-20261014/management.log": "a3c9044c7295e67e7f885823ed50548f74989609c0c2718d1de272a4ee5abece",
+    "artifacts/g3/ci-followup-20261014/remote-g3-failure.log": "39175a26e7bc0d87bd846531c0ef696fe329ec6ab52e2c97b5c84b75d3b1dc3b",
+    "artifacts/g3/ci-followup-20261014/path-rejection.log": "96b1f5b9965a885d3bacef4f71d681e68d84d8698a26ca1eb609cbe1b7407d44",
+    "artifacts/g3/ci-followup-20261014/i18n.log": "408bc7c109b2ff97581d208135cc79e476152db878d658d07b7a369760f3d755",
+    "artifacts/g3/ci-followup-20261014/management-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/rejection-3821735/long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-long-checkout-/report.json": "b012515a8403dc89e9087827346274b04686ba5499e7816d27d5476ff6f7011e",
+    "artifacts/g3/rejection-3821735/early/report.json": "c4646d8e1d128cabb03f94189cb1ee8b8667ac957691995d522f14ec39fdb742"
+  },
+  "remote_after_fix": "not yet asserted; query current PR #40 checks",
+  "physical_seat": "not run; authorization pending"
+}

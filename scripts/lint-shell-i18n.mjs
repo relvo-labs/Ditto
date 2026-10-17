@@ -69,7 +69,7 @@ const REQUIRED_KEYS = [
   // install jobs
   'install.integrity_mismatch', 'install.invalid_package', 'install.storage_full', 'install.failed', 'job.interrupted',
   // trust notes, diagnostics, layout strategies, commands
-  'trust.core_builtin', 'trust.same_host_no_isolation.cordis', 'trust.same_host_no_isolation.qml',
+  'trust.core_builtin', 'trust.same_host_no_isolation.cordis', 'trust.same_host_no_isolation.qml', 'trust.generated_fixed_template',
   'diagnostics.shared_host_no_per_plugin_memory',
   'layout.strategy.floating', 'layout.strategy.simple-tile',
   'command.composition.open', 'command.history.open', 'command.launcher.toggle', 'command.personalization.open',
@@ -77,7 +77,7 @@ const REQUIRED_KEYS = [
   'shortcut.command_failed',
   // slot names (Tr.slotName)
   ...['ui.panel_top', 'ui.dock', 'ui.launcher', 'ui.tasks_panel', 'ui.notifications', 'layout.strategy', 'svc.tasks',
-    'svc.notification_policy', 'ui.status_item'].map((slot) => `slot.${slot}`),
+    'svc.notification_policy', 'ui.status_item', 'ui.generated_panel'].map((slot) => `slot.${slot}`),
   // error names and reasons (DittoClient.errorText)
   ...['unsupported', 'invalid_params', 'not_found', 'permission_denied', 'timeout', 'cancelled', 'conflict', 'unavailable',
     'protocol_version_unsupported', 'identity_rejected', 'preflight_rejected', 'internal'].map((name) => `error.${name}`),

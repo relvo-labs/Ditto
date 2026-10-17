@@ -1,6 +1,6 @@
 # ditto-store：資料表、不變量與故障語意
 
-狀態：實作中（schema 版本 1）。權威是 `crates/ditto-store/src/schema.rs`；本文件描述語意與不變量，欄位不一致時以程式碼為準修正本文件。
+狀態：實作中（schema 版本 5）。權威是 `crates/ditto-store/src/schema.rs`；本文件描述語意與不變量，欄位不一致時以程式碼為準修正本文件。
 
 ## 1. 位置與寫入者
 
@@ -36,7 +36,7 @@
 | `permission_grants` | 授予 | 不能刪；只能撤銷一次，其他欄位不能改 |
 | `audit_log` | 稽核紀錄（已遮蔽的細節） | 只增不改不刪 |
 | `jobs` | 長工作（安裝等） | 狀態受 CHECK 限制；`idempotency_key` 唯一 |
-| `sessions`、`messages`、`tasks`、`generated_artifacts` | 為 G2／G3 預留，G1 不寫入 | 之後加列，不加表 |
+| `sessions`、`messages`、`tasks` | 為 G2／G3 預留，G1 不寫入 | 舊預留表不作 G2／G3 權威；正式表由前向 migration 建立 |
 
 `changesets.request_operation_id` 保存呼叫者自己的 `_meta.operation_id`，斷線後可用 `desktop.changes.get {operation_id}` 找回自己送出的變更（CHG-07）。
 
@@ -58,3 +58,17 @@
 ## 6. 故障注入點（只在 `fault-injection` build）
 
 `store.commit_revision:full|ioerr`、`store.unpack:ioerr`，以及 Core 側的 `coordinator.after_state=<state>:abort_process`、`coordinator.readback=mismatch`。環境變數 `DITTO_FAULT=<point>:<action>[:n]`。release 二進位不得含這些字串（`scripts/check-release-fault-points.sh`，`rust.yml` 另以 fault-injection build 做正向對照）。
+
+## 7. G3 schema 4
+
+原空殼 generated_artifacts 完整改名為 generated_artifacts_legacy，保留舊列；新 generated_artifacts 以 plugin_id/version 唯一、parent 外鍵與 create idempotency key 保存正式產物。generated_plugin_data 是每個插件的唯一資料權威，generated_data_snapshots 保存回退快照。遷移失敗不改 schema version 或舊表；資料升版、快照與 Profile revision 同筆交易。詳見 [生產模板邊界](../platform/generated-template-boundary.md)。
+
+## 8. G3 schema 5：資料鏈證明
+
+Neil 依第二輪修正授權採用保守遷移：`generated_data_snapshots.lineage_proven INTEGER NOT NULL DEFAULT 0 CHECK(lineage_proven IN (0,1))`。v4 的所有快照保留原欄位／payload bytes，但一律未證明；不從 parent、端點、schema 或 rowid 推測並補上 proof。現役插件資料、artifact 與 Profile revision 不被遷移改寫。
+
+新所有者切換（含相同 schema）在資料／Profile 提交的同一 SQLite 交易明確寫入 `lineage_proven=1`。回退逐跳要求最新對應邊有 proof，不能略過未證明的新邊而使用更舊快照；任何未知或無效邊都以既有 Conflict 拒絕，保留目前資料與 head。新兩快照回第一版仍依原政策執行；跨越 v4 未知歷史的回退不再承諾可用。遷移及回退不刪除未證明的歷史列。
+
+`Store::open_writer` 沿用遷移前整庫備份；備份維持 v4，遷移失敗停留在原版本，重新開啟不能取得半份 proof。`open_reader` 只接受目前版本，不執行遷移；v4 build 不能開啟 v5，無降版工具或 retroactive proof backfill。本輪不提供整庫復原的新救援語意（#41）；原備份不包含升版後寫入，不能當作無資料損失的回退。
+
+生成預算使用既有 `jobs` 歷史，不新增表。每筆 validate 的私有 `params_json.generation_turn_id` 保存 Core 綁定的 turn，worker 只轉送原有 artifact／work_root 給 native host。舊 job 只透過 artifact 解析 turn 歸屬，不藉其目前狀態推測工作結果。每筆 queued／running／cancelling／失敗／取消／中斷／未知或缺少合格報告的工作各占額度；只有該筆 succeeded 且 hash 相符、完整 full 驗證報告才釋放自身額度，前次失敗不因後次成功消失。同 key 回讀與 preview 不新增驗證額度。

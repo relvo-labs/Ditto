@@ -1,0 +1,1350 @@
+{
+  "date": "2026-10-14",
+  "base_commit": "830281c23324b3e5564e11a39552b3b525855feb",
+  "dirty": true,
+  "implementation_sha256": {
+    ".github/workflows/g3-foundation.yml": "fd323bff5e21979a117bae21a850db12a3548d99029b623f737c1adeb46c5be0",
+    ".github/workflows/vm-regression.yml": "f9714e11e6988f267067cbfe65f8810dc7e4ea6aa429f44ce5b02c8ae46c369b",
+    "crates/ditto-core/src/tests.rs": "855ba327429f20c08ecfb7fe7215647d3db936bdc67ee9548858948026b858fe",
+    "crates/ditto-store/src/generated.rs": "b1acfe075c2c19522d2fe44af9c250b3472339405a92a5ad22683e3cb6d05286",
+    "crates/ditto-test-host/src/bin/generation.rs": "df80d6b5b34d1c074f95e3b9f8fe5b54dc24b52c6cff2ecd4f3d5e3fe32b22e9",
+    "packages/agent-runtime/src/tool-catalog.ts": "aac387a9a190391b091a7ff548f94c268f769739844616a14d235ae613d67787",
+    "tests/contract-vectors/0.3/shape-generation-validation-full.json": "afeaf1d851911f5230a5d88a32e37932b4b0078d409481c1bfaf0d996b67e8b4",
+    "tests/contract-vectors/0.3/shape-generation-validation-partial.json": "e08db4ba4faece149c2e428c097009e3aae49a9dbf6ccab1c39da74f38b29e38",
+    "tests/contract-vectors/0.3/shape-generation-validation-unavailable.json": "3df76597ca1fafcaf54f8ac2e7907727e195654fa9b74358a02e2e5ceea3eaa9",
+    "tests/contract-vectors/0.3/shape-generation-validation-unknown.json": "ca135833cdcba649a3c1095649b913b9b836e854df52a41272b2835dd0b01547",
+    "tests/g3/agent/description-checks.mjs": "49092b5933bb6c086551eecb2079d0d2cfe644e98bfe953ef0ac0e53c45adda2",
+    "tests/g3/agent/real-driver.mjs": "e01759b3c28f9a110d899510dbdac16b2d69d5cf72a05d22bb1f8dcc55b6d362",
+    "tests/g3/integration/driver.mjs": "d9fd2d828a12d24ab7b909457d4e8d80a8c261d213a66b59cc687d3d0709cc6a",
+    "tests/g3/integration/run.mjs": "d28f811312edf4617f7ecc21e000b798c85cc42db7211d5bc076c907c51ea479",
+    "tests/g3/run.sh": "121d82f124e1b4e4de4385446bec9b6efa6cb98d10c7a0f278ff9245825fae02",
+    "tools/dev-vm/lib.sh": "ae11866028f4256a82239d35f92427923d98d6cd278a283f27c070fe955c5223",
+    "tools/dev-vm/run-g1.sh": "46e67e7715caddd6bb56e3613c18995316b16f805b37c94eeafde1d91e44cbf6",
+    "tools/dev-vm/run-g2-measure.sh": "3f439dda7fcefbfbfa5897014b20bf88beb7e0912528ba1827672e2bd9a6964f",
+    "tools/dev-vm/run-g2.sh": "d6b2ccd4c7f9332e64f0b8ae5f14eb0c65daa249f0a5d9c9cfd7bb8634e6a701",
+    "tools/dev-vm/run-g3.sh": "20087d1137cc654ce4328f895126ee9e0702b283cb4e2cbf13a13664cc3826f6",
+    "tools/dev-vm/run.sh": "c9354cc5313c95f1deea81d899b087b758df5d10e2fa318ede654c2383ebb155",
+    "tools/dev-vm/test-artifact-collection.sh": "687d7fd7de7361526a54d864af1e4a376e82768e6bd9dd404bd859b38bc9f248",
+    "tools/generation-host/runner.cpp": "1563794096d9e6f8d1395f5f0723f0dab13f404ceffc0dd7600f90d8fcd8e04e"
+  },
+  "local": {
+    "rust_passed": 248,
+    "node_passed": 184,
+    "node_skipped_existing": 2,
+    "qt_passed": 5,
+    "native_integration_passed": 27,
+    "fault_injection_passed": 3,
+    "clippy": "pass",
+    "fault_clippy": "pass",
+    "fmt": "pass",
+    "schema_and_ts_freshness": "pass",
+    "templates": "pass",
+    "upstream_hashes": 9,
+    "vendor_source_changes": 0,
+    "i18n_strings": 553,
+    "skills_errors": 0,
+    "skills_existing_warnings": 1,
+    "release_no_fault_points": "pass",
+    "native_integration_before_timing_passed": 25,
+    "timing_host_clippy_and_tests": "pass; 3 boundary tests"
+  },
+  "vm": [
+    {
+      "path": "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c",
+      "evidence_class": "development-vm",
+      "exit_code": 0,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "reports": [
+        "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/agent-20261014T052118Z.json",
+        "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/desktop-20261014T052109Z.json",
+        "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/host-2026-10-14T05-20-49Z-7022/summary.json",
+        "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/restart-g76YxE/result.json",
+        "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/integration-1aITrl/result.json"
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c",
+      "evidence_class": "development-vm",
+      "exit_code": 2,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production-partial",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "candidate-execution",
+          "status": "not_run",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "reports": [
+        "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/suite-records/integration-wiMOlZ/result.json"
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c",
+      "evidence_class": "development-vm",
+      "exit_code": 0,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "reports": [
+        "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/agent-20261014T054122Z.json",
+        "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/desktop-20261014T054113Z.json",
+        "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/host-2026-10-14T05-40-53Z-7028/summary.json",
+        "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/restart-vMuxxm/result.json",
+        "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/integration-yhnIqX/result.json"
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c",
+      "evidence_class": "development-vm",
+      "exit_code": 2,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production-partial",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "candidate-execution",
+          "status": "not_run",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "reports": [
+        "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/suite-records/integration-vnyUJA/result.json"
+      ]
+    }
+  ],
+  "real_model": [
+    {
+      "path": "artifacts/g3/real-model-20261014T052524Z.json",
+      "evidence_class": "development-headless-real-subscription",
+      "checks": [
+        "existing test subscription authenticated",
+        "tasks-create real model turn succeeded",
+        "workspaces-create real model turn succeeded",
+        "two real generated plugins validated and activated",
+        "tasks-modify real model turn succeeded",
+        "workspaces-modify real model turn succeeded",
+        "both plugin kinds support real conversational version changes",
+        "真實生成待辦 1791955526277 had a real preview",
+        "真實生成工作區 1791955526277 had a real preview"
+      ],
+      "source": {
+        "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+        "dirty": true,
+        "source_tree_sha256": "6e3f2f19f72b3310f5149b4727e3bdb99306118524e491a5430481317410fbb5",
+        "kernel": "6.17.0-40-generic",
+        "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+      },
+      "session_id": "ses-01M4WDYTN973FG1EMHJ3PKMANR",
+      "models": [
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1037,
+          "turn_id": "turn-01M4WDYTNHEG7A9493GE0VM844"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1037,
+          "turn_id": "turn-01M4WE00DX0B4Y8JE3PSD49J9D"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1037,
+          "turn_id": "turn-01M4WE1DH39Z06CKR0XCZSN3JT"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1037,
+          "turn_id": "turn-01M4WE2Q6VGMDP5PRM6HF0VPCW"
+        }
+      ],
+      "turns": [
+        {
+          "label": "tasks-create",
+          "turn_id": "turn-01M4WDYTNHEG7A9493GE0VM844",
+          "state": "succeeded",
+          "tool_calls": 10,
+          "seconds": 38.63
+        },
+        {
+          "label": "workspaces-create",
+          "turn_id": "turn-01M4WE00DX0B4Y8JE3PSD49J9D",
+          "state": "succeeded",
+          "tool_calls": 12,
+          "seconds": 46.154
+        },
+        {
+          "label": "tasks-modify",
+          "turn_id": "turn-01M4WE1DH39Z06CKR0XCZSN3JT",
+          "state": "succeeded",
+          "tool_calls": 8,
+          "seconds": 42.649
+        },
+        {
+          "label": "workspaces-modify",
+          "turn_id": "turn-01M4WE2Q6VGMDP5PRM6HF0VPCW",
+          "state": "succeeded",
+          "tool_calls": 8,
+          "seconds": 39.142
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "art-01M4WDZ50HSND4NM629Q9K4NK8",
+          "plugin_id": "local.generated.tasks1791955526277",
+          "version": "1.0.0",
+          "bundle_sha256": "sha256:94243db92cbd5fd2bbc161aff1ccb9b136e3f2c17a059707c8f8ed8d6d9a4ce1",
+          "parent_id": null,
+          "description": {
+            "accent": "#9333EA",
+            "content": {
+              "max_items": 4,
+              "order": "source",
+              "show_completed": false,
+              "template": "tasks_summary_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.tasks1791955526277",
+            "title": "真實生成待辦 1791955526277",
+            "version": "1.0.0",
+            "width": 320
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4wdz83tc205e8xew56ea75x.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2418930,
+              "unit": "ditto-generation-01m4wdz83tc205e8xew56ea75x.service"
+            },
+            "bundle_sha256": "sha256:94243db92cbd5fd2bbc161aff1ccb9b136e3f2c17a059707c8f8ed8d6d9a4ce1",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        },
+        {
+          "artifact_id": "art-01M4WE0JERDMKCF6C6SNWJ14Z3",
+          "plugin_id": "local.generated.workspaces1791955526277",
+          "version": "1.0.0",
+          "bundle_sha256": "sha256:b76375e114f568bfdee212c9a211fdcd83a2e85e9abdf52dad79fee933dfe38a",
+          "parent_id": null,
+          "description": {
+            "accent": "#b9a4ff",
+            "content": {
+              "actions": [
+                {
+                  "label": "工作",
+                  "workspace_id": "wayfire-ws-1-0-0"
+                },
+                {
+                  "label": "整理",
+                  "workspace_id": "wayfire-ws-1-1-0"
+                }
+              ],
+              "template": "workspace_actions_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.workspaces1791955526277",
+            "title": "真實生成工作區 1791955526277",
+            "version": "1.0.0",
+            "width": 280
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4we0nfn1q70cdhz4ekkmf5y.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2429829,
+              "unit": "ditto-generation-01m4we0nfn1q70cdhz4ekkmf5y.service"
+            },
+            "bundle_sha256": "sha256:b76375e114f568bfdee212c9a211fdcd83a2e85e9abdf52dad79fee933dfe38a",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        },
+        {
+          "artifact_id": "art-01M4WE1X5JJ2HXXS5FQKNZNNB4",
+          "plugin_id": "local.generated.tasks1791955526277",
+          "version": "1.0.1",
+          "bundle_sha256": "sha256:26413c2f390c3ef8eeeb31b8583c0ba8cb892a8b932f360d06dd1cce212ad507",
+          "parent_id": "art-01M4WDZ50HSND4NM629Q9K4NK8",
+          "description": {
+            "accent": "#9333EA",
+            "content": {
+              "max_items": 2,
+              "order": "source",
+              "show_completed": false,
+              "template": "tasks_summary_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.tasks1791955526277",
+            "title": "真實生成待辦 1791955526277",
+            "version": "1.0.1",
+            "width": 380
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4we212294hx299m8wxzwf96.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2440413,
+              "unit": "ditto-generation-01m4we212294hx299m8wxzwf96.service"
+            },
+            "bundle_sha256": "sha256:26413c2f390c3ef8eeeb31b8583c0ba8cb892a8b932f360d06dd1cce212ad507",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        },
+        {
+          "artifact_id": "art-01M4WE36757Q3080E0VV9D1FKT",
+          "plugin_id": "local.generated.workspaces1791955526277",
+          "version": "1.0.1",
+          "bundle_sha256": "sha256:fe2973266f00164e5f8be2d21d5176c030fdda49bcd392c20544a4ea4757fcc7",
+          "parent_id": "art-01M4WE0JERDMKCF6C6SNWJ14Z3",
+          "description": {
+            "accent": "#b9a4ff",
+            "content": {
+              "actions": [
+                {
+                  "label": "工作",
+                  "workspace_id": "wayfire-ws-1-0-0"
+                },
+                {
+                  "label": "閱讀",
+                  "workspace_id": "wayfire-ws-1-1-0"
+                }
+              ],
+              "template": "workspace_actions_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.workspaces1791955526277",
+            "title": "真實生成工作區 1791955526277",
+            "version": "1.0.1",
+            "width": 340
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4we393vk3yznnj6n5jkyrar.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2450116,
+              "unit": "ditto-generation-01m4we393vk3yznnj6n5jkyrar.service"
+            },
+            "bundle_sha256": "sha256:fe2973266f00164e5f8be2d21d5176c030fdda49bcd392c20544a4ea4757fcc7",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        }
+      ],
+      "rendered": null,
+      "workspace_action": null,
+      "restore_errors": [],
+      "token_usage": null,
+      "monetary_cost": null
+    },
+    {
+      "path": "artifacts/g3/real-model-20261014T052944Z.json",
+      "evidence_class": "development-headless-real-subscription",
+      "checks": [
+        "existing test subscription authenticated",
+        "tasks-create real model turn succeeded",
+        "workspaces-create real model turn succeeded",
+        "two real generated plugins validated and activated",
+        "tasks-modify real model turn succeeded",
+        "workspaces-modify real model turn succeeded",
+        "both plugin kinds support real conversational version changes",
+        "real generated tasks panel reads the live service",
+        "real generated workspace buttons are usable",
+        "real generated button activates its requested workspace",
+        "真實生成待辦 1791955785635 had a real preview",
+        "真實生成工作區 1791955785635 had a real preview",
+        "original composition restored by readback",
+        "original settings restored by readback",
+        "all test grants revoked by readback"
+      ],
+      "source": {
+        "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+        "dirty": true,
+        "source_tree_sha256": "5d0790e3419e3b6332b33e7425278b5dad3ef1ef306793b32af57e1aeb93522b",
+        "kernel": "6.17.0-40-generic",
+        "native_runner_sha256": "94383915eb281347fb414ad58d942e7c7e1daa486e7fa6abbaaa58e67018bdd4"
+      },
+      "session_id": "ses-01M4WE6RG2TW5G3A9W85EQNQKJ",
+      "models": [
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1039,
+          "turn_id": "turn-01M4WE6RGCV5FWHB9BDMZ892P4"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1039,
+          "turn_id": "turn-01M4WE8637XQD8YRDPSX8T7SF2"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1039,
+          "turn_id": "turn-01M4WE9JPNHM80F8AHCH96WHBA"
+        },
+        {
+          "model": "gpt-6.1-sol",
+          "provider": "codex-app-server",
+          "settings_revision": 1039,
+          "turn_id": "turn-01M4WEAQF710JM91RV93PN04YM"
+        }
+      ],
+      "turns": [
+        {
+          "label": "tasks-create",
+          "turn_id": "turn-01M4WE6RGCV5FWHB9BDMZ892P4",
+          "state": "succeeded",
+          "tool_calls": 11,
+          "seconds": 46.656
+        },
+        {
+          "label": "workspaces-create",
+          "turn_id": "turn-01M4WE8637XQD8YRDPSX8T7SF2",
+          "state": "succeeded",
+          "tool_calls": 12,
+          "seconds": 45.644
+        },
+        {
+          "label": "tasks-modify",
+          "turn_id": "turn-01M4WE9JPNHM80F8AHCH96WHBA",
+          "state": "succeeded",
+          "tool_calls": 8,
+          "seconds": 37.629
+        },
+        {
+          "label": "workspaces-modify",
+          "turn_id": "turn-01M4WEAQF710JM91RV93PN04YM",
+          "state": "succeeded",
+          "tool_calls": 8,
+          "seconds": 38.137
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact_id": "art-01M4WE761G5PKVKA20V3P9E17K",
+          "plugin_id": "local.generated.tasks1791955785635",
+          "version": "1.0.0",
+          "bundle_sha256": "sha256:a6b0c28c97a9d993a2a30e73c271eba6b6b575ff9b274972691372476fe11bb0",
+          "parent_id": null,
+          "description": {
+            "accent": "#b9a4ff",
+            "content": {
+              "max_items": 4,
+              "order": "source",
+              "show_completed": false,
+              "template": "tasks_summary_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.tasks1791955785635",
+            "title": "真實生成待辦 1791955785635",
+            "version": "1.0.0",
+            "width": 320
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4we78rc3bc8cac43z9dq60m.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2480881,
+              "unit": "ditto-generation-01m4we78rc3bc8cac43z9dq60m.service"
+            },
+            "bundle_sha256": "sha256:a6b0c28c97a9d993a2a30e73c271eba6b6b575ff9b274972691372476fe11bb0",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        },
+        {
+          "artifact_id": "art-01M4WE8NHM9ZGBSBCV3H8GC9AB",
+          "plugin_id": "local.generated.workspaces1791955785635",
+          "version": "1.0.0",
+          "bundle_sha256": "sha256:380d071c03ba26272cb204767306899a26dc2f79eb6dda348fbae55aeba2a77c",
+          "parent_id": null,
+          "description": {
+            "accent": "#b9a4ff",
+            "content": {
+              "actions": [
+                {
+                  "label": "工作",
+                  "workspace_id": "wayfire-ws-1-0-0"
+                },
+                {
+                  "label": "整理",
+                  "workspace_id": "wayfire-ws-1-1-0"
+                }
+              ],
+              "template": "workspace_actions_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.workspaces1791955785635",
+            "title": "真實生成工作區 1791955785635",
+            "version": "1.0.0",
+            "width": 280
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4we8t574dmwcgphc9xx0nva.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2492659,
+              "unit": "ditto-generation-01m4we8t574dmwcgphc9xx0nva.service"
+            },
+            "bundle_sha256": "sha256:380d071c03ba26272cb204767306899a26dc2f79eb6dda348fbae55aeba2a77c",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        },
+        {
+          "artifact_id": "art-01M4WEA1AGTFN2C5ABGSBDC7J6",
+          "plugin_id": "local.generated.tasks1791955785635",
+          "version": "1.0.1",
+          "bundle_sha256": "sha256:16b69c58bf370098c8bb4b7dc21aa6660e811739ebb35413bcb6d9f7f674aa13",
+          "parent_id": "art-01M4WE761G5PKVKA20V3P9E17K",
+          "description": {
+            "accent": "#b9a4ff",
+            "content": {
+              "max_items": 2,
+              "order": "source",
+              "show_completed": false,
+              "template": "tasks_summary_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.tasks1791955785635",
+            "title": "真實生成待辦 1791955785635",
+            "version": "1.0.1",
+            "width": 380
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4wea467tewezk1heyp1dhb6.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2502685,
+              "unit": "ditto-generation-01m4wea467tewezk1heyp1dhb6.service"
+            },
+            "bundle_sha256": "sha256:16b69c58bf370098c8bb4b7dc21aa6660e811739ebb35413bcb6d9f7f674aa13",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        },
+        {
+          "artifact_id": "art-01M4WEB7HFWTYRDMRNRC8NMHQ7",
+          "plugin_id": "local.generated.workspaces1791955785635",
+          "version": "1.0.1",
+          "bundle_sha256": "sha256:85b52c910a50dacb0c247d5eafcd79674b9c353af86dc97958f51509438282e6",
+          "parent_id": "art-01M4WE8NHM9ZGBSBCV3H8GC9AB",
+          "description": {
+            "accent": "#b9a4ff",
+            "content": {
+              "actions": [
+                {
+                  "label": "工作",
+                  "workspace_id": "wayfire-ws-1-0-0"
+                },
+                {
+                  "label": "閱讀",
+                  "workspace_id": "wayfire-ws-1-1-0"
+                }
+              ],
+              "template": "workspace_actions_v1"
+            },
+            "data": {
+              "fields": {},
+              "schema_version": 1
+            },
+            "format_version": 1,
+            "plugin_id": "local.generated.workspaces1791955785635",
+            "title": "真實生成工作區 1791955785635",
+            "version": "1.0.1",
+            "width": 340
+          },
+          "validation": {
+            "boundary": {
+              "cgroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-generation-01m4webab0gx8ptvhjwj4f79kv.service",
+              "cleanup_complete": true,
+              "cpu_max": "100000 100000",
+              "deadline_ms": 15000,
+              "enforcement": "full",
+              "files": true,
+              "landlock_abi": 7,
+              "memory_max": 536870912,
+              "network": true,
+              "pids_max": 64,
+              "policy": "generated-templates-v1",
+              "process_exec_blocked": true,
+              "reasons": [],
+              "runner_pid": 2511827,
+              "unit": "ditto-generation-01m4webab0gx8ptvhjwj4f79kv.service"
+            },
+            "bundle_sha256": "sha256:85b52c910a50dacb0c247d5eafcd79674b9c353af86dc97958f51509438282e6",
+            "diagnostics": [],
+            "preview_opened": false,
+            "stages": [
+              {
+                "diagnostic": "fixed_template_compilation",
+                "result": "passed",
+                "stage": "syntax"
+              },
+              {
+                "diagnostic": "fixed_template_contract",
+                "result": "passed",
+                "stage": "contract"
+              },
+              {
+                "diagnostic": "provider_health",
+                "result": "passed",
+                "stage": "load"
+              },
+              {
+                "diagnostic": "keyboard_focus",
+                "result": "passed",
+                "stage": "focus"
+              },
+              {
+                "diagnostic": "fixture_data_and_keyboard_action",
+                "result": "passed",
+                "stage": "interaction"
+              }
+            ],
+            "test_data": true
+          }
+        }
+      ],
+      "rendered": [
+        {
+          "artifact_id": "art-01M4WEA1AGTFN2C5ABGSBDC7J6",
+          "shown": true,
+          "ready": true,
+          "title": "真實生成待辦 1791955785635",
+          "width": 380,
+          "data_available": true,
+          "tasks": [],
+          "template": "tasks_summary_v1",
+          "buttons": [],
+          "notice": "",
+          "last_requested_workspace": ""
+        },
+        {
+          "artifact_id": "art-01M4WEB7HFWTYRDMRNRC8NMHQ7",
+          "shown": true,
+          "ready": true,
+          "title": "真實生成工作區 1791955785635",
+          "width": 340,
+          "data_available": false,
+          "tasks": [],
+          "template": "workspace_actions_v1",
+          "buttons": [
+            {
+              "workspace_id": "wayfire-ws-1-0-0",
+              "enabled": true,
+              "x": 1346,
+              "y": 127
+            },
+            {
+              "workspace_id": "wayfire-ws-1-1-0",
+              "enabled": true,
+              "x": 1346,
+              "y": 161
+            }
+          ],
+          "notice": "",
+          "last_requested_workspace": ""
+        }
+      ],
+      "workspace_action": {
+        "button": {
+          "workspace_id": "wayfire-ws-1-1-0",
+          "enabled": true,
+          "x": 1346,
+          "y": 161
+        },
+        "workspaces": {
+          "_meta": {
+            "handled_us": 321,
+            "observed_seq": 259,
+            "profile_revision": "rev-01M4WEBSGP5M4KA1CHGT6AVHKD",
+            "readback_verified": false
+          },
+          "workspaces": [
+            {
+              "active": false,
+              "id": "wayfire-ws-1-0-0",
+              "name": "1"
+            },
+            {
+              "active": true,
+              "id": "wayfire-ws-1-1-0",
+              "name": "2"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-2-0",
+              "name": "3"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-0-1",
+              "name": "4"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-1-1",
+              "name": "5"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-2-1",
+              "name": "6"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-0-2",
+              "name": "7"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-1-2",
+              "name": "8"
+            },
+            {
+              "active": false,
+              "id": "wayfire-ws-1-2-2",
+              "name": "9"
+            }
+          ]
+        }
+      },
+      "restore_errors": [],
+      "token_usage": null,
+      "monetary_cost": null
+    }
+  ],
+  "model_settings": {
+    "provider": "codex-app-server",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "low",
+    "max_tool_calls": 24,
+    "turn_timeout_ms": 120000
+  },
+  "authorization": "User explicitly authorized the existing login, subscription usage and external model test prompts/tool results in this session. No credential was copied or printed.",
+  "ci": {
+    "failure_url": "https://github.com/relvo-labs/Ditto/actions/runs/38442749237/job/115453228700",
+    "failure_stage": "checkout",
+    "cause": "Copied immutable 0500 package directories blocked removal of prior VM evidence.",
+    "existing_runner_repair": "Owner write access restored on 40 directories in the exact failing copied G3 run; no content changed.",
+    "remote_patch_checks": "not_run; local patch not pushed"
+  },
+  "unexecuted": [
+    "physical reference-seat AT-06/07/22/26/29 matrix",
+    "G3 resource/frame-time measurements",
+    "owner gate review"
+  ],
+  "raw_sha256": {
+    "artifacts/g3/followup-20261014/ci-checkout-failure.log": "2383430a50193f279ba47019f7c4699fda5a9028836080a28e4b799fdcce559a",
+    "artifacts/g3/followup-20261014/clippy.log": "fcaff8e841b9f4e621c254dac706f48af7a790cb34d6ee17b3ef85a07b41d3c3",
+    "artifacts/g3/followup-20261014/fault-clippy.log": "ffcff400829013a02d6a0ae2dc1c55376f0168ec5d643df5875d47911bb26ae6",
+    "artifacts/g3/followup-20261014/fault-test.log": "d2f9e4b034457fb432cd615e9a2dabea9b31249ec3605f46ac64cdeaefc671bc",
+    "artifacts/g3/followup-20261014/native-integration.json": "917b3454c0186328b1c55c76b03f54c782ad8bd50afb6da47259005cece6bb17",
+    "artifacts/g3/followup-20261014/node-test.log": "3d390b29c24edda1f6de54eb9b149b32ffa65d766f0be420d7f0b3ee566bb1e7",
+    "artifacts/g3/followup-20261014/real-model-settings.json": "d18094df5c4ac8c6d07b320098742f56bf4896a43f66f0567ac128b855be0252",
+    "artifacts/g3/followup-20261014/release-build.log": "d063f73bdca102dcd9f283a571560c941dc0c51b85c24acffb1fb1be25938a50",
+    "artifacts/g3/followup-20261014/rust-test.log": "a2b5a3dbafafa818a4dfafedf104e7604bac474db586a50d5e9ea092f0d9e669",
+    "artifacts/g3/followup-20261014/typecheck.log": "91335f04c9a2598d2b91f2a2b6351577e7e58a1abba98f8439ad89f610ce03be",
+    "artifacts/g3/real-model-20261014T052524Z.core.log": "9701f34684126ca1045a199ead2abed931fb2d6e6d77aecee4433884ed0fef66",
+    "artifacts/g3/real-model-20261014T052524Z.json": "c040de1235bf897ddbd9891abd5e98c8a4a0516939d956b5a6a71949c25f4061",
+    "artifacts/g3/real-model-20261014T052944Z.core.log": "cba53016071dd5cdbf6e3048968ed1a74d6d51a70ba03ae00ba1f50ae96d9f13",
+    "artifacts/g3/real-model-20261014T052944Z.json": "9b70b730458f1b16dde114d1e24e495cecabb023ac41e6c3f25fef9be83ac7fc",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/agent.log": "37552af04d9f4b356e4e498a48f93a0eb47acfe45745fc3085fb45dd1e70de1c",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/build.log": "8aef392dd40a34ac3ad25761fcc85c3cf5248803ec4ffeb8f56b7f4f7136d636",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/dependencies.log": "0e3e735f94a514a7d3b5a3098faadee456192d6619abb03ea1fd549117317a38",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/desktop.log": "7a8720c1123de801f48b6a62fd354f405e1be3fd3bfb5d61d097215deadc2e25",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/foundation.log": "9b7c21e0a9950d5cd535e71f602fb765d14083e606950c1a2b955e8fde92055f",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/host.log": "7ac394a783f90b68162c43048c74a1ace28d5439d2723ab7e1e63987aeb5a262",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/production.log": "bfc7cf8ec15741b5b4afb3241ea25fec998569dba5b2b96419cb6db717449392",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/restart.log": "e659ab845549fece37fa398f8acfd319ff4eb4af16a42102ec3a7e6dadce01e4",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/agent-20261014T052118Z.json": "7877b4f8f00ff4febf53ccec95f5465661858da392e5d98f151037ca6f5de312",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/desktop-20261014T052109Z.json": "962e6b6473ca868102cb724f29f6761abec47ea7ebb84d8c4fec8951f69f6e00",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/host-2026-10-14T05-20-49Z-7022/summary.json": "0516253815d04fb33a5a274060dc8c66d19be6853579382abbe0bf660c87c93f",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/integration-1aITrl/result.json": "a19b9ed9f231cfef7b62edda7f3a83d18fec54f8dd979575ce46ea9311ee72e3",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/suite-records/restart-g76YxE/result.json": "bb5f4f7543f9b93508e1e0fa93ebfab291fd2dd85c0791fc520e2bfa9fb93110",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/summary.jsonl": "345dd812d3ab31a92b0a599ca6b4d2785fa4aa5b2fcbdedff4e84f85435d7183",
+    "artifacts/g3-vm/2026-10-14T05-19-58Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/build.log": "0e84b254dd91b4c78a8188a10f43d03b74b05ec8e693d41bae19c47af26ba876",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/foundation.log": "3fdd3ac1515c157d2ecdc561454202c4e90c9e1ae7f7f5e87addff86810b4308",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/production-partial.log": "1cac60d68d2cd0f16b19a1dc14cad22bdfa749eb7655bce9672ca183eaaebe98",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/rejection.log": "852a1443abc63fa83f8750067c030c432de8bb2f5497de12e03f12bf4c430c9d",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/restore.log": "1ec68a507d7ec97ff17fd8e12fc7bea2652b86d783fe9d9dbe11a313c2c4c8e1",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/suite-records/integration-wiMOlZ/result.json": "fab8ed028f3d584592fa4bd59df55aa97a4b6434e62ba1881b3c49c46c608ea4",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/summary.jsonl": "ea7958fa9e867f22d029afc8586b38c7caba2b0fc248e9ee452b047781653c7e",
+    "artifacts/g3-vm/2026-10-14T05-22-18Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/build.log": "e4f14913a02d70f873a397e46cbecbb9eb568160bd0dcf5d80e21cc4131ebe10",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/host.log": "b36d2844e7d7772a49a4762c9ce0d6c580b86780f2a8caf345263eb959988490",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/dependencies.log": "a612af96baf0d19b3225d9bb60221acfe9c8af1047af8b0d41d52e352ea55d2c",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/foundation.log": "e3b8042c7cbac9aa58c1f1639f59a29d672298b7077b928806b88eeeeada8458",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/production.log": "a502b90ce583cd976d306ddb57a0ed0e1c0da256580457449ce581bf1b8fd0f6",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/restart.log": "b0e64622123513e7fb3ac54e5f58591dfdaae1466511475afa03ece317f553a6",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/agent.log": "7d6d1481ec39653b2b4037b77b91245094576661ddef8d964b9caf874e7d69bf",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/desktop.log": "a6fb360458c0c7eba8f2c7db6bbff2d496b511529f604f9074a5645d1a668899",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/summary.jsonl": "345dd812d3ab31a92b0a599ca6b4d2785fa4aa5b2fcbdedff4e84f85435d7183",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/agent-20261014T054122Z.json": "8e1502a4fddba391f4e7a0eb5a6d660be8bab7f95a6873c330f13a51806e769c",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/desktop-20261014T054113Z.json": "4413bbbfcf83d573b6f1820a0d2117122e1184a087d95171016cd5fdb233e737",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/host-2026-10-14T05-40-53Z-7028/summary.json": "4bd29fc3d7384e819ba35ff992d10afd6e4b6f5165827f2f09bd31c7da919686",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/restart-vMuxxm/result.json": "c734cae6ae5e176b8e160b0e52f4af15c42b6da2913fb7a0a3980b6aeae007c4",
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c/suite-records/integration-yhnIqX/result.json": "158a8b0ee42bc02f190c109c5b2feda3b9addd690f955045fbdf7d0d26c12768",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/restore.log": "1ec68a507d7ec97ff17fd8e12fc7bea2652b86d783fe9d9dbe11a313c2c4c8e1",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/build.log": "36f61859ed17ead143b4049299edf43a77970d1ee2cae45bfefe8d892d63f3a1",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/foundation.log": "3296a291655be4d3e2c470eb120b3ab45a57c835755f16e6802590b825409d5b",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/rejection.log": "24252948c3965866ebc2ee99a54b7950a5a4391ae311eea9d1e7a15d8a2846e5",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/production-partial.log": "78fe273b56d6afcf2fe2644024cd0e9f8da8f6f9b548794e669e7b5d42058d97",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/summary.jsonl": "ea7958fa9e867f22d029afc8586b38c7caba2b0fc248e9ee452b047781653c7e",
+    "artifacts/g3-vm/2026-10-14T05-41-35Z-830281c/suite-records/integration-vnyUJA/result.json": "4099368156f21e61e8ae70f1a7d9b403d283d3e74d8872105389d4c4c24085de",
+    "artifacts/g3/followup-20261014/native-integration-timings.json": "5ed92fd105ac0f9dd5def7a13bd9ae30c4eebfd947c299dc50948f9bf11eb7af",
+    "artifacts/g3/followup-20261014/real-model-preservation.json": "3f034873eb4d906e19313cfa876969a415096bdfea43cb69940633cc7302097f"
+  },
+  "vm_sources": {
+    "artifacts/g3-vm/2026-10-14T05-39-50Z-830281c": {
+      "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+      "dirty": true,
+      "source_tree_sha256": "cf274bc146f47d94aab29aaa4517b60b67fded2c838e17e9d4058b879327fd63",
+      "kernel": "7.0.0-38-generic",
+      "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+    }
+  },
+  "real_description_preservation": {
+    "ok": true,
+    "source": "Core-read artifacts from retained real subscription runs; no new model calls",
+    "results": [
+      {
+        "path": "artifacts/g3/real-model-20261014T052524Z.json",
+        "checks": {
+          "initial task description matches requested bounds": true,
+          "initial workspace description matches requested bounds": true,
+          "task modification preserves every unrequested field": true,
+          "workspace modification preserves every unrequested field": true
+        }
+      },
+      {
+        "path": "artifacts/g3/real-model-20261014T052944Z.json",
+        "checks": {
+          "initial task description matches requested bounds": true,
+          "initial workspace description matches requested bounds": true,
+          "task modification preserves every unrequested field": true,
+          "workspace modification preserves every unrequested field": true
+        }
+      }
+    ]
+  },
+  "stage_timing": {
+    "schema_unchanged": true,
+    "diagnostics_prefix": "stage_timing:",
+    "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c",
+    "source": {
+      "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+      "dirty": true,
+      "source_tree_sha256": "cf274bc146f47d94aab29aaa4517b60b67fded2c838e17e9d4058b879327fd63",
+      "kernel": "6.17.0-40-generic",
+      "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+    },
+    "checks": 27,
+    "example": [
+      "stage_timing:{\"elapsed_ms\":317,\"finished_at\":\"2026-10-14T05:38:48.458Z\",\"format_version\":1,\"stage\":\"syntax\",\"started_at\":\"2026-10-14T05:38:48.141Z\"}",
+      "stage_timing:{\"elapsed_ms\":0,\"finished_at\":\"2026-10-14T05:38:48.458Z\",\"format_version\":1,\"stage\":\"contract\",\"started_at\":\"2026-10-14T05:38:48.458Z\"}",
+      "stage_timing:{\"elapsed_ms\":0,\"finished_at\":\"2026-10-14T05:38:48.458Z\",\"format_version\":1,\"stage\":\"load\",\"started_at\":\"2026-10-14T05:38:48.458Z\"}",
+      "stage_timing:{\"elapsed_ms\":80,\"finished_at\":\"2026-10-14T05:38:48.539Z\",\"format_version\":1,\"stage\":\"focus\",\"started_at\":\"2026-10-14T05:38:48.458Z\"}",
+      "stage_timing:{\"elapsed_ms\":0,\"finished_at\":\"2026-10-14T05:38:48.539Z\",\"format_version\":1,\"stage\":\"interaction\",\"started_at\":\"2026-10-14T05:38:48.539Z\"}"
+    ]
+  }
+}

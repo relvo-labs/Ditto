@@ -100,13 +100,22 @@ pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjec
         let manifest = resolver.packages.manifest(entry)?;
         let directory = resolver.package_dir(entry)?;
         let qml_entry = manifest.qml_entry.as_ref()?;
+        let row = resolver.packages.get(&entry.package, &entry.version)?;
+        let generated = row.generated.as_ref();
+        if row.summary.source == "generated"
+            && !generated.is_some_and(|a| {
+                ditto_store::generated::approved(a) && ditto_store::generated::integrity(a)
+            })
+        {
+            return None;
+        }
         Some(ShellSlotBinding {
             slot: slot.into(),
             entry_id: entry.entry_id.clone(),
             package: entry.package.clone(),
             version: entry.version.clone(),
-            qml_url: format!("file://{}", directory.join(qml_entry).display()),
-            config: entry.config.clone(),
+            qml_url: if generated.is_some(){"ditto-generated:fixed".into()}else{format!("file://{}", directory.join(qml_entry).display())},
+            config: generated.map(|a|serde_json::json!({"artifact_id":a.artifact_id,"description":a.description})).unwrap_or_else(||entry.config.clone()),
         })
     };
     let mut slots = Vec::new();
@@ -306,16 +315,25 @@ pub fn check_shell(
         }
     };
     for binding in &target.slots {
-        let mounted = observed.mounts.iter().any(|mount| {
-            mount.slot == binding.slot
-                && mount.entry_id == binding.entry_id
-                && mount.mounted
-                && mount.visible
-        });
+        let mount = observed
+            .mounts
+            .iter()
+            .find(|mount| mount.slot == binding.slot && mount.entry_id == binding.entry_id);
+        let mounted = mount.is_some_and(|mount| mount.mounted && mount.visible);
+        let correct_artifact = binding.qml_url != "ditto-generated:fixed"
+            || binding.config["artifact_id"]
+                .as_str()
+                .is_some_and(|wanted| {
+                    mount.and_then(|mount| mount.artifact_id.as_deref()) == Some(wanted)
+                });
         verdicts.push(verdict(
             &key(&binding.slot, &binding.entry_id),
-            mounted,
-            "the provider is not mounted and visible",
+            mounted && correct_artifact,
+            if mounted && !correct_artifact {
+                "the mounted generated artifact differs from the requested version"
+            } else {
+                "the provider is not mounted and visible"
+            },
         ));
     }
     for mount in &observed.mounts {
@@ -500,6 +518,7 @@ mod tests {
             entry_id: entry_id.into(),
             mounted: true,
             visible,
+            artifact_id: None,
         }
     }
 
@@ -512,6 +531,34 @@ mod tests {
             low_power_style: false,
             locale: "zh-TW".into(),
         }
+    }
+
+    #[test]
+    fn generated_upgrade_requires_the_actual_mounted_artifact() {
+        let mut generated = binding("ui.generated_panel", "ent-generated");
+        generated.qml_url = "ditto-generated:fixed".into();
+        generated.config = serde_json::json!({"artifact_id":"art-new"});
+        let target = ShellProjection {
+            appearance: appearance(),
+            avatar: AvatarSettings::default(),
+            slots: vec![generated],
+            shortcuts: vec![],
+        };
+        let mut observed = ShellObservation {
+            mounts: vec![mount("ui.generated_panel", "ent-generated", true)],
+            appearance: Some(appearance()),
+            avatar: Some(AvatarSettings::default()),
+            avatar_placement: None,
+            approval_responder: false,
+        };
+        assert!(
+            !check_shell(&target, &observed, None)[0].ok,
+            "the entry id alone must not prove that a generated upgrade loaded"
+        );
+        observed.mounts[0].artifact_id = Some("art-old".into());
+        assert!(!check_shell(&target, &observed, None)[0].ok);
+        observed.mounts[0].artifact_id = Some("art-new".into());
+        assert!(check_shell(&target, &observed, None)[0].ok);
     }
 
     #[test]

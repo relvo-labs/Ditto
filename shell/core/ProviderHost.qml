@@ -47,7 +47,7 @@ QtObject {
     /// unit name (slot, or `<area>#<entry_id>`) → SlotHost
     property var slots: ({})
     /// Multi-entry areas; every other `ui.*` name is a single-provider slot.
-    readonly property var areas: ["ui.status_item"]
+    readonly property var areas: ["ui.status_item", "ui.generated_panel"]
     /// area → unit names of its committed members, in Profile order.
     property var areaOrder: ({})
     /// change id → { phase, slots: [names], appearance: previous, avatar: previous, target }
@@ -116,6 +116,9 @@ QtObject {
     /// set (development only, never in the release login session) the same
     /// `qml_entry` is loaded from the source tree instead.
     function resolveUrl(binding) {
+        if (binding.qml_url === "ditto-generated:fixed") {
+            return Qt.resolvedUrl("../generated/GeneratedPanel.qml");
+        }
         if (devProviders.length === 0) {
             return binding.qml_url;
         }
@@ -148,7 +151,37 @@ QtObject {
 
     /// An area member's readback: shown, and placed where the area is on screen.
     function isPlaced(object) {
+        if (object && object.slotName === "ui.generated_panel") return object.shown === true && object.surfaceVisible === true;
         return statusArea.placed(object);
+    }
+
+    onScreenChanged: layoutGenerated()
+
+    property Connections generatedScreenChanges: Connections {
+        target: host.screen
+        function onWidthChanged() {host.layoutGenerated();}
+        function onHeightChanged() {host.layoutGenerated();}
+    }
+    function layoutGenerated() {
+        const rows=[[]];let x=0;
+        for (const name of (areaOrder["ui.generated_panel"] || [])) {
+            const unit=slots[name];
+            const object=unit && unit.active ? unit.active.object : null;
+            if (!object) continue;
+            if (screen && x+object.panelWidth>screen.width-24 && rows[rows.length-1].length>0) {rows.push([]);x=0;}
+            rows[rows.length-1].push({object:object,x:x});x+=object.panelWidth+12;
+        }
+        const cap=screen ? Math.max(48,Math.floor((screen.height-152-(rows.length-1)*12)/rows.length)) : 600;
+        let y=72;
+        for (const row of rows) {
+            let height=0;
+            for (const member of row) {
+                member.object.maximumPanelHeight=cap;
+                member.object.placementX=member.x;member.object.placementY=y;
+                height=Math.max(height,Math.min(cap,member.object.panelHeight));
+            }
+            y+=height+12;
+        }
     }
 
     function observation() {
@@ -365,6 +398,7 @@ QtObject {
         const previousOrder = areaOrder;
         areaOrder = record.areaOrder;
         statusArea.layout();
+        layoutGenerated();
         const previousAppearance = appearance;
         const previousAvatar = avatar;
         if (record.appearanceChanged) {
@@ -418,6 +452,7 @@ QtObject {
             areaOrder = record.areaOrder;
         }
         statusArea.layout();
+        layoutGenerated();
         if (record.appearanceChanged) {
             appearance = record.appearance;
             items.push({ key: "appearance", status: "restored" });

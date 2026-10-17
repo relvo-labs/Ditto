@@ -1,0 +1,2596 @@
+{
+  "date": "2026-10-14",
+  "base_commit": "830281c23324b3e5564e11a39552b3b525855feb",
+  "implementation_commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+  "implementation_sha256": {
+    ".agents/skills/ditto-generation-safety/SKILL.md": "21a7eb74e1f07306c9b7c3a8901f9b58fb28612daf9f3615394f7746e0292740",
+    ".github/workflows/g3-foundation.yml": "87a2b4836d274b52b3b4cc4ad455302c67356df613b523ec84d87eabed91c592",
+    ".github/workflows/vm-regression.yml": "f9714e11e6988f267067cbfe65f8810dc7e4ea6aa429f44ce5b02c8ae46c369b",
+    "crates/ditto-core/src/generation.rs": "ef69cb0dcf4395a535c5fe29cc9e965a307b65743f3b0572f468ec2b4bdc0ddb",
+    "crates/ditto-core/src/lib.rs": "f893510137baae908e84ccbf7b8e346f3873bfca36ebe515f1e89a7cb8789f33",
+    "crates/ditto-core/src/projection.rs": "4503036493f5b46bb3fe739129d524ecf5f12cbdd03462892b63ef3db28126ff",
+    "crates/ditto-core/src/router.rs": "f4fd0e7ea6c42359b424a388a0037a990a027aa10e672a480495c66c417e4117",
+    "crates/ditto-core/src/tests.rs": "68e686ab6cc58b302ee64b0380bd2f62dca9e6cd6e83ddbe1441720b8bda5156",
+    "crates/ditto-core/src/tests/generation_transactions.rs": "d8e879b17dd48c901435196953ad9533797d2f7697eb384f035cb6a193f8eec1",
+    "crates/ditto-protocol/src/participant.rs": "6dfffd40651bd3f2f2333047d5602279212f3923b01bc55367d92ce3d6ff583b",
+    "crates/ditto-store/src/generated.rs": "b1acfe075c2c19522d2fe44af9c250b3472339405a92a5ad22683e3cb6d05286",
+    "crates/ditto-test-host/src/bin/generation.rs": "df80d6b5b34d1c074f95e3b9f8fe5b54dc24b52c6cff2ecd4f3d5e3fe32b22e9",
+    "docs/contracts/agent-0.3.md": "c91077c15f488413b544a6d3205c263a717033a8bba7f370b8f085f2d102e366",
+    "docs/platform/generated-template-boundary.md": "bfc1bc9c57690e0a3d55458debfacd1425aacde21e732d17cb23e62a4396cd5f",
+    "packages/agent-runtime/src/tool-catalog.ts": "aac387a9a190391b091a7ff548f94c268f769739844616a14d235ae613d67787",
+    "packages/protocol/src/generated/participant-observation.ts": "4db1ce8ec63980c44d524d3a75987b47f708ccefefd4bc9925c407b99438b1ca",
+    "packages/protocol/src/generated/participant-state-output.ts": "e10f4f6dce1a68fa1e0995af3f80e41b2ce40be235a63dcc1b1bf78eff72011b",
+    "packages/protocol/src/generated/shell-report-input.ts": "1851450042ca5132410a08a2f4a04e413fd7a1bd1821d36366e8db604409b70f",
+    "schema/participant-observation.json": "2b4f3f66740d65203ecd9848f7c5c2c1fb52c0ac8986aee4c13ca166da6f3514",
+    "schema/participant-state-output.json": "0604b8cac92f9933b9fdf26f0939f622c3c37437408e86aed8aad7db6174aaca",
+    "schema/shell-report-input.json": "c3b63471c105746ed5acc0cd7bf95918f9e4d7581ebbfd9cb846ea7f2bb2589c",
+    "shell/centers/GeneratedArtifacts.qml": "5e399ab33d2dda213a748eddb5b4b4952f2fbea40a1ffd45a82ab247e8ea8221",
+    "shell/core/SlotHost.qml": "8bf88c2341153af2bdf4eb207375d2f10ff084dc2fffe5fa2face6bfc609c0ac",
+    "shell/i18n/ditto_en.json": "13e2cc4e6c6c89e7a38b7bd51c93e5adaef228ddb4536127bb7af08fd3273166",
+    "shell/i18n/ditto_en.qm": "1ce634ab013869fff300c785fbfaa6f84ce990bea785d8a8f209212daa03eacb",
+    "shell/i18n/ditto_en.ts": "7b447dc1893af49d6912a22c3ec8bd49ee624171b4d8be51f8d73994371996bc",
+    "shell/i18n/ditto_zh_TW.qm": "3328286a13679092c62144186da7043bd839cb6f9f76918a3edd9ecffde26cae",
+    "shell/i18n/ditto_zh_TW.ts": "9d826acd2be9b23442926fc2346117bccf7cc05cfd02f3fcf5222f4e730f84ec",
+    "tests/contract-vectors/0.3/shape-generation-validation-full.json": "afeaf1d851911f5230a5d88a32e37932b4b0078d409481c1bfaf0d996b67e8b4",
+    "tests/contract-vectors/0.3/shape-generation-validation-partial.json": "e08db4ba4faece149c2e428c097009e3aae49a9dbf6ccab1c39da74f38b29e38",
+    "tests/contract-vectors/0.3/shape-generation-validation-unavailable.json": "3df76597ca1fafcaf54f8ac2e7907727e195654fa9b74358a02e2e5ceea3eaa9",
+    "tests/contract-vectors/0.3/shape-generation-validation-unknown.json": "ca135833cdcba649a3c1095649b913b9b836e854df52a41272b2835dd0b01547",
+    "tests/contract-vectors/0.3/shape-shell-generated-artifact.json": "fcda29e6a64ff2e47e16a011e4e91192b2d5b57526ee17d7ad243153f25171bd",
+    "tests/contract-vectors/0.3/shape-shell-invalid-artifact.json": "504336b6501d0c2e0435683fe108793b14f79ca60bc0b7cbec1e793064b737e2",
+    "tests/contract-vectors/0.3/shape-shell-legacy-mount.json": "03b1fd6c6abcd7a20fb9e6a94fe7998bffb81a9db5be1453e18bcde7da4bbfc7",
+    "tests/g3/README.md": "b310fa68a19f909360564c78f3f43e412241dbcb27ee09fa9948182b6fbf8e78",
+    "tests/g3/agent/description-checks.mjs": "49092b5933bb6c086551eecb2079d0d2cfe644e98bfe953ef0ac0e53c45adda2",
+    "tests/g3/agent/driver.mjs": "4e0e1b250bf28e6eca620b3f9b22f9b68d54628a2b62e1506f6be97c7eae879f",
+    "tests/g3/agent/real-driver.mjs": "e01759b3c28f9a110d899510dbdac16b2d69d5cf72a05d22bb1f8dcc55b6d362",
+    "tests/g3/desktop/driver.mjs": "a26b7a5fd2af2e6ffedb6acb43b9e195985320deaa63605f02f53d4a0e330087",
+    "tests/g3/integration/driver.mjs": "5cc62145edb583be01ab4b257025cfe390e3b1799eb3113769679b4949faf44d",
+    "tests/g3/integration/run.mjs": "c73b342c8114ba89b54b4fe4d5217a07ec88405dc3a3971660b29ec388f89ddd",
+    "tests/g3/integration/trust-matrix.mjs": "0ba53cf9700311773a8f5863fb78d98a23483d03afae70a6082fc64dd2879e50",
+    "tests/g3/management/tst_management.qml": "a51740c53460d0e871291571c373ae658bf8f296351fe79675955fd0f406c888",
+    "tests/g3/native-failures/driver.py": "b499a0d002d8784c1fba8307ce0d8e952d16f85bd5573498864c6eec4560e78d",
+    "tests/g3/run.sh": "e9b80772cead8ce4d53a14aa419909164444e65cc394d91bd3fad6f3015b8bbb",
+    "tools/dev-vm/lib.sh": "ae11866028f4256a82239d35f92427923d98d6cd278a283f27c070fe955c5223",
+    "tools/dev-vm/run-g1.sh": "46e67e7715caddd6bb56e3613c18995316b16f805b37c94eeafde1d91e44cbf6",
+    "tools/dev-vm/run-g2-measure.sh": "3f439dda7fcefbfbfa5897014b20bf88beb7e0912528ba1827672e2bd9a6964f",
+    "tools/dev-vm/run-g2.sh": "d6b2ccd4c7f9332e64f0b8ae5f14eb0c65daa249f0a5d9c9cfd7bb8634e6a701",
+    "tools/dev-vm/run-g3.sh": "b97cea4202aeb0699341f4e4da838a9d9448f9ac23702ae7d5ff05ce26151f79",
+    "tools/dev-vm/run.sh": "c9354cc5313c95f1deea81d899b087b758df5d10e2fa318ede654c2383ebb155",
+    "tools/dev-vm/test-artifact-collection.sh": "687d7fd7de7361526a54d864af1e4a376e82768e6bd9dd404bd859b38bc9f248",
+    "tools/generation-host/runner.cpp": "1563794096d9e6f8d1395f5f0723f0dab13f404ceffc0dd7600f90d8fcd8e04e"
+  },
+  "local": {
+    "rust_passed": 254,
+    "node_passed": 184,
+    "node_skipped_existing": 2,
+    "qt_template_passed": 5,
+    "qt_management_passed": 6,
+    "fault_injection_passed": 3,
+    "release_no_fault_points": "pass",
+    "fault_positive_control": "rejected as required",
+    "fmt": "pass",
+    "clippy": "pass",
+    "fault_clippy": "pass",
+    "typecheck": "pass",
+    "schema_ts_templates_freshness": "pass",
+    "upstream_hashes": 9,
+    "vendor_source_changes": 0,
+    "i18n_strings": 569,
+    "i18n_keys": 181,
+    "skills_errors": 0,
+    "skills_existing_warnings": 1,
+    "g2_shared_path_regressions": {
+      "codex": 40,
+      "races": 7,
+      "injection": 18,
+      "desktop": 19
+    }
+  },
+  "vm": [
+    {
+      "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c",
+      "exit_code": 1,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "native-failures",
+          "status": "fail",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "evidence_class": "development-vm",
+      "reports": [
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/production.log",
+          "ok": true,
+          "checks": 27,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "fcb0e803cd4d8d49ce4a4efb27d2843205c6ddbbd25a3d4ba55afce20ddc5af6",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/desktop-20261014T060602Z.json",
+          "ok": true,
+          "checks": [
+            "local.generated.daily_summary 0.1.0 five isolated stages",
+            "tasks-activate committed",
+            "Core reads back mounted generated tasks panel",
+            "mounted panel reads actual tasks service",
+            "real confined Wayland preview opens",
+            "third generation job stays queued",
+            "global pool admits only two jobs",
+            "queued cancellation reconciles artifact",
+            "preview job-01M4WG94ANYW20YS8ZXSHC6M9Z cancellation finishes",
+            "preview job-01M4WG94QQ34FWGMFEZE8Y9M7Y cancellation finishes",
+            "cancelled preview retains opening evidence",
+            "local.generated.daily_summary 0.2.0 five isolated stages",
+            "tasks-upgrade committed",
+            "data migrated with profile revision",
+            "modified panel is rendered",
+            "undo committed",
+            "old data snapshot restored",
+            "old panel restored",
+            "local.generated.workspace_actions 0.1.0 five isolated stages",
+            "workspaces-activate committed",
+            "both generated panels coexist",
+            "workspace action is enabled",
+            "actual button click activates the requested workspace",
+            "activation journal includes commit and preserved immutable source",
+            "native application survives generation and rollback"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "fcb0e803cd4d8d49ce4a4efb27d2843205c6ddbbd25a3d4ba55afce20ddc5af6",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/agent-20261014T060610Z.json",
+          "ok": true,
+          "checks": [
+            "g3-denied turn outcome follows Core",
+            "denied generation reaches the shared Core authorization path",
+            "ungranted generation is refused before artifact creation",
+            "g3-tasks turn outcome follows Core",
+            "Agent source is bound to actual turn",
+            "Agent-generated tasks passed real native validation and activation",
+            "g3-workspaces turn outcome follows Core",
+            "g3-modify turn outcome follows Core",
+            "g3-workspaces-modify turn outcome follows Core",
+            "follow-up creates validated new version",
+            "workspace follow-up creates a new validated version",
+            "original version remains immutable",
+            "both generated kinds are enabled in actual Profile",
+            "conversation deletion redacts durable generation source",
+            "desktop remains after Agent exits"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "fcb0e803cd4d8d49ce4a4efb27d2843205c6ddbbd25a3d4ba55afce20ddc5af6",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/restart-pZay0I/result.json",
+          "ok": true,
+          "checks": [
+            "both previews have separate native cgroups",
+            "interrupted preview job-01M4WG98XXNZH7VRE7SZTQ7QVG is not replayed",
+            "interrupted preview job-01M4WG99B6TPPA4HK4X8QST01S is not replayed",
+            "old worker and candidate cgroups are empty before replacement admission",
+            "preview opening history survives restart",
+            "a new preview can use the recovered pool",
+            "profile revision survives the Core crash",
+            "compositor survives candidate and Core restart"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "fcb0e803cd4d8d49ce4a4efb27d2843205c6ddbbd25a3d4ba55afce20ddc5af6",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "control",
+              "status": "pass",
+              "failure_stage": null,
+              "cleanup_complete": true
+            },
+            {
+              "check": "syntax",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            },
+            {
+              "check": "contract",
+              "status": "pass",
+              "failure_stage": "contract",
+              "cleanup_complete": true
+            },
+            {
+              "check": "assertion",
+              "status": "fail",
+              "error": "{'cgroup': '/user.slice/user-1000.slice/user@1000.service/app.slice/ditto-g3-native-7016-load.service', 'limits': {'memory.max': '536870912', 'memory.swap.max': '0', 'cpu.max': '100000 100000', 'pids.max': '64'}, 'confine_status': {'confined': True, 'pid': 7059, 'landlock_abi': 8, 'seccomp': 'connect-broker', 'session_bus_proxy': False}, 'native': {'exec_blocked': True, 'preview_opened': False, 'stages': [{'diagnostic': 'fixed_template_compilation', 'result': 'failed', 'stage': 'syntax'}, {'diagnostic': 'previous_stage_failed', 'result': 'not_run', 'stage': 'contract'}, {'diagnostic': 'previous_stage_failed', 'result': 'not_run', 'stage': 'load'}, {'diagnostic': 'previous_stage_failed', 'result': 'not_run', 'stage': 'focus'}, {'diagnostic': 'previous_stage_failed', 'result': 'not_run', 'stage': 'interaction'}], 'test_data': True}, 'timings': [{'elapsed_ms': 2, 'finished_at': '2026-10-14T06:05:41.728Z', 'format_version': 1, 'stage': 'syntax', 'started_at': '2026-10-14T06:05:41.725Z'}], 'exit_code': 0, 'stderr': \"file:///home/neil/funlab/Ditto/artifacts/g3/native-failures-20261014T060540Z-7016/load/Panel.qml:2:242: Unexpected token `;' \\n     Item { width:320; height:120; property var config: ({}); property var tasks: []; property bool testData:false; property bool dataAvailable:false; property bool ready:false; property var displayedTasks: []; function healthy() { return ready };  } \\n                                                                                                                                                                                                                                                      ^\\n\"}"
+            }
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "fcb0e803cd4d8d49ce4a4efb27d2843205c6ddbbd25a3d4ba55afce20ddc5af6",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/integration-oQVB7w/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "tasks-summary source bundle complete",
+            "tasks-summary create idempotent",
+            "tasks-summary unvalidated publish denied",
+            "tasks-summary real isolated worker completed",
+            "tasks-summary five stages passed under full production policy",
+            "tasks-summary all native stages have measured start/end and duration",
+            "tasks-summary published after validation",
+            "tasks-summary package readback is untrusted fixed description",
+            "tasks-summary missing Shell aborts safely",
+            "tasks-summary aborted activation retry returns same record",
+            "tasks-summary activation key cannot change target",
+            "tasks-summary desktop head unchanged",
+            "workspace-actions source bundle complete",
+            "workspace-actions create idempotent",
+            "workspace-actions unvalidated publish denied",
+            "workspace-actions real isolated worker completed",
+            "workspace-actions five stages passed under full production policy",
+            "workspace-actions all native stages have measured start/end and duration",
+            "workspace-actions published after validation",
+            "workspace-actions package readback is untrusted fixed description",
+            "workspace-actions missing Shell aborts safely",
+            "workspace-actions aborted activation retry returns same record",
+            "workspace-actions activation key cannot change target",
+            "workspace-actions desktop head unchanged",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        }
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c",
+      "exit_code": 0,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "native-failures",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "evidence_class": "development-vm",
+      "reports": [
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/production.log",
+          "ok": true,
+          "checks": 27,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "97eef99e889f7bdbe271f749d474563d5cf338ac9ef2a5eb743c4d09f0332f39",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/desktop-20261014T062309Z.json",
+          "ok": true,
+          "checks": [
+            "local.generated.daily_summary 0.1.0 five isolated stages",
+            "tasks-activate committed",
+            "Core reads back mounted generated tasks panel",
+            "mounted panel reads actual tasks service",
+            "real confined Wayland preview opens",
+            "third generation job stays queued",
+            "global pool admits only two jobs",
+            "queued cancellation reconciles artifact",
+            "preview job-01M4WH8F30B538CKFJSH63YEG7 cancellation finishes",
+            "preview job-01M4WH8FHNQ6DKXAPCQR265HDR cancellation finishes",
+            "cancelled preview retains opening evidence",
+            "local.generated.daily_summary 0.2.0 five isolated stages",
+            "tasks-upgrade committed",
+            "data migrated with profile revision",
+            "modified panel is rendered",
+            "undo committed",
+            "old data snapshot restored",
+            "old panel restored",
+            "tasks-upgrade-again committed",
+            "local.generated.daily_summary 0.3.0 five isolated stages",
+            "tasks-second-upgrade committed",
+            "second data migration is read from the actual owner",
+            "second modified version is actually mounted",
+            "local.generated.daily_summary 0.4.0 five isolated stages",
+            "tasks-compatible-upgrade committed",
+            "tasks-compatible-rollback committed",
+            "compatible rollback preserves newer readable values",
+            "tasks-return-to-first committed",
+            "two modifications can return to the first data snapshot",
+            "first version appearance returns after two modifications",
+            "local.generated.workspace_actions 0.1.0 five isolated stages",
+            "workspaces-activate committed",
+            "both generated panels coexist",
+            "workspace action is enabled",
+            "actual button click activates the requested workspace",
+            "irreversible-base-b committed",
+            "irreversible-base-c committed",
+            "irreversible-base-d committed",
+            "local.generated.daily_summary 0.5.0 five isolated stages",
+            "tasks-irreversible-upgrade committed",
+            "irreversible rollback is refused without moving the revision",
+            "old version cannot read incompatible data",
+            "generated plugin can be removed without deleting its data",
+            "activation journal includes commit and preserved immutable source",
+            "native application survives generation and rollback"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "97eef99e889f7bdbe271f749d474563d5cf338ac9ef2a5eb743c4d09f0332f39",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/agent-20261014T062319Z.json",
+          "ok": true,
+          "checks": [
+            "g3-denied turn outcome follows Core",
+            "denied generation reaches the shared Core authorization path",
+            "ungranted generation is refused before artifact creation",
+            "g3-tasks turn outcome follows Core",
+            "activation consumes a genuine one-shot approval",
+            "one-shot approval does not create a permanent data grant",
+            "Agent source is bound to actual turn",
+            "Agent-generated tasks passed real native validation and activation",
+            "g3-workspaces turn outcome follows Core",
+            "g3-modify turn outcome follows Core",
+            "g3-workspaces-modify turn outcome follows Core",
+            "follow-up creates validated new version",
+            "workspace follow-up creates a new validated version",
+            "original version remains immutable",
+            "both generated kinds are enabled in actual Profile",
+            "conversation deletion redacts durable generation source",
+            "desktop remains after Agent exits"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "97eef99e889f7bdbe271f749d474563d5cf338ac9ef2a5eb743c4d09f0332f39",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/restart-T9wdEv/result.json",
+          "ok": true,
+          "checks": [
+            "both previews have separate native cgroups",
+            "interrupted preview job-01M4WH8NJSNZ4NTN53GJ357CTE is not replayed",
+            "interrupted preview job-01M4WH8P040N31A9T5B3RTD96Z is not replayed",
+            "old worker and candidate cgroups are empty before replacement admission",
+            "preview opening history survives restart",
+            "a new preview can use the recovered pool",
+            "profile revision survives the Core crash",
+            "compositor survives candidate and Core restart"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "97eef99e889f7bdbe271f749d474563d5cf338ac9ef2a5eb743c4d09f0332f39",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "control",
+              "status": "pass",
+              "failure_stage": null,
+              "cleanup_complete": true
+            },
+            {
+              "check": "syntax",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            },
+            {
+              "check": "contract",
+              "status": "pass",
+              "failure_stage": "contract",
+              "cleanup_complete": true
+            },
+            {
+              "check": "load",
+              "status": "pass",
+              "failure_stage": "load",
+              "cleanup_complete": true
+            },
+            {
+              "check": "focus",
+              "status": "pass",
+              "failure_stage": "focus",
+              "cleanup_complete": true
+            },
+            {
+              "check": "interaction",
+              "status": "pass",
+              "failure_stage": "interaction",
+              "cleanup_complete": true
+            },
+            {
+              "check": "illegal-import",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            }
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "97eef99e889f7bdbe271f749d474563d5cf338ac9ef2a5eb743c4d09f0332f39",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/integration-rGEIL8/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "tasks-summary source bundle complete",
+            "tasks-summary create idempotent",
+            "tasks-summary unvalidated publish denied",
+            "tasks-summary real isolated worker completed",
+            "tasks-summary five stages passed under full production policy",
+            "tasks-summary all native stages have measured start/end and duration",
+            "tasks-summary published after validation",
+            "tasks-summary package readback is untrusted fixed description",
+            "tasks-summary missing Shell aborts safely",
+            "tasks-summary aborted activation retry returns same record",
+            "tasks-summary activation key cannot change target",
+            "tasks-summary desktop head unchanged",
+            "workspace-actions source bundle complete",
+            "workspace-actions create idempotent",
+            "workspace-actions unvalidated publish denied",
+            "workspace-actions real isolated worker completed",
+            "workspace-actions five stages passed under full production policy",
+            "workspace-actions all native stages have measured start/end and duration",
+            "workspace-actions published after validation",
+            "workspace-actions package readback is untrusted fixed description",
+            "workspace-actions missing Shell aborts safely",
+            "workspace-actions aborted activation retry returns same record",
+            "workspace-actions activation key cannot change target",
+            "workspace-actions desktop head unchanged",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        }
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c",
+      "exit_code": 0,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "unavailable-trust",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "native-failures",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "evidence_class": "development-vm",
+      "reports": [
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/production.log",
+          "ok": true,
+          "checks": 37,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/unavailable-trust.log",
+          "ok": true,
+          "checks": 14,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/desktop-20261014T062802Z.json",
+          "ok": true,
+          "checks": [
+            "local.generated.daily_summary 0.1.0 five isolated stages",
+            "tasks-activate committed",
+            "Core reads back mounted generated tasks panel",
+            "mounted panel reads actual tasks service",
+            "real confined Wayland preview opens",
+            "third generation job stays queued",
+            "global pool admits only two jobs",
+            "queued cancellation reconciles artifact",
+            "preview job-01M4WHHD7TX4KG080151TPSMPB cancellation finishes",
+            "preview job-01M4WHHDPHY086AP2JVDX7NBYX cancellation finishes",
+            "cancelled preview retains opening evidence",
+            "local.generated.daily_summary 0.2.0 five isolated stages",
+            "tasks-upgrade committed",
+            "data migrated with profile revision",
+            "modified panel is rendered",
+            "undo committed",
+            "old data snapshot restored",
+            "old panel restored",
+            "tasks-upgrade-again committed",
+            "local.generated.daily_summary 0.3.0 five isolated stages",
+            "tasks-second-upgrade committed",
+            "second data migration is read from the actual owner",
+            "second modified version is actually mounted",
+            "local.generated.daily_summary 0.4.0 five isolated stages",
+            "tasks-compatible-upgrade committed",
+            "tasks-compatible-rollback committed",
+            "compatible rollback preserves newer readable values",
+            "tasks-return-to-first committed",
+            "two modifications can return to the first data snapshot",
+            "first version appearance returns after two modifications",
+            "local.generated.workspace_actions 0.1.0 five isolated stages",
+            "workspaces-activate committed",
+            "both generated panels coexist",
+            "workspace action is enabled",
+            "actual button click activates the requested workspace",
+            "irreversible-base-b committed",
+            "irreversible-base-c committed",
+            "irreversible-base-d committed",
+            "local.generated.daily_summary 0.5.0 five isolated stages",
+            "tasks-irreversible-upgrade committed",
+            "irreversible rollback is refused without moving the revision",
+            "old version cannot read incompatible data",
+            "generated plugin can be removed without deleting its data",
+            "activation journal includes commit and preserved immutable source",
+            "native application survives generation and rollback"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/agent-20261014T062812Z.json",
+          "ok": true,
+          "checks": [
+            "g3-denied turn outcome follows Core",
+            "denied generation reaches the shared Core authorization path",
+            "ungranted generation is refused before artifact creation",
+            "g3-tasks turn outcome follows Core",
+            "activation consumes a genuine one-shot approval",
+            "one-shot approval does not create a permanent data grant",
+            "Agent source is bound to actual turn",
+            "Agent-generated tasks passed real native validation and activation",
+            "g3-workspaces turn outcome follows Core",
+            "g3-modify turn outcome follows Core",
+            "g3-workspaces-modify turn outcome follows Core",
+            "follow-up creates validated new version",
+            "workspace follow-up creates a new validated version",
+            "original version remains immutable",
+            "both generated kinds are enabled in actual Profile",
+            "conversation deletion redacts durable generation source",
+            "desktop remains after Agent exits"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/restart-m4qUSn/result.json",
+          "ok": true,
+          "checks": [
+            "both previews have separate native cgroups",
+            "interrupted preview job-01M4WHHKZ80ZCQFNZ5JH9J10FK is not replayed",
+            "interrupted preview job-01M4WHHMCMZZM5TEWGNJ3M1CK2 is not replayed",
+            "old worker and candidate cgroups are empty before replacement admission",
+            "preview opening history survives restart",
+            "a new preview can use the recovered pool",
+            "profile revision survives the Core crash",
+            "compositor survives candidate and Core restart"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "control",
+              "status": "pass",
+              "failure_stage": null,
+              "cleanup_complete": true
+            },
+            {
+              "check": "syntax",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            },
+            {
+              "check": "contract",
+              "status": "pass",
+              "failure_stage": "contract",
+              "cleanup_complete": true
+            },
+            {
+              "check": "load",
+              "status": "pass",
+              "failure_stage": "load",
+              "cleanup_complete": true
+            },
+            {
+              "check": "focus",
+              "status": "pass",
+              "failure_stage": "focus",
+              "cleanup_complete": true
+            },
+            {
+              "check": "interaction",
+              "status": "pass",
+              "failure_stage": "interaction",
+              "cleanup_complete": true
+            },
+            {
+              "check": "illegal-import",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            }
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/integration-N0uoiV/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "trust matrix ran with actually unavailable isolation",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/integration-jwO51N/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "tasks-summary source bundle complete",
+            "tasks-summary create idempotent",
+            "tasks-summary unvalidated publish denied",
+            "tasks-summary real isolated worker completed",
+            "tasks-summary five stages passed under full production policy",
+            "tasks-summary all native stages have measured start/end and duration",
+            "tasks-summary published after validation",
+            "tasks-summary package readback is untrusted fixed description",
+            "tasks-summary missing Shell aborts safely",
+            "tasks-summary aborted activation retry returns same record",
+            "tasks-summary activation key cannot change target",
+            "tasks-summary desktop head unchanged",
+            "workspace-actions source bundle complete",
+            "workspace-actions create idempotent",
+            "workspace-actions unvalidated publish denied",
+            "workspace-actions real isolated worker completed",
+            "workspace-actions five stages passed under full production policy",
+            "workspace-actions all native stages have measured start/end and duration",
+            "workspace-actions published after validation",
+            "workspace-actions package readback is untrusted fixed description",
+            "workspace-actions missing Shell aborts safely",
+            "workspace-actions aborted activation retry returns same record",
+            "workspace-actions activation key cannot change target",
+            "workspace-actions desktop head unchanged",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        }
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c",
+      "exit_code": 2,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "unavailable-trust",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production-partial",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "candidate-execution",
+          "status": "not_run",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "evidence_class": "development-vm",
+      "reports": [
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/production-partial.log",
+          "ok": true,
+          "checks": 25,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "6.8.0-139-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/unavailable-trust.log",
+          "ok": true,
+          "checks": 14,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+            "kernel": "6.8.0-139-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/suite-records/integration-JyXniE/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "tasks-summary source bundle complete",
+            "tasks-summary create idempotent",
+            "tasks-summary unvalidated publish denied",
+            "tasks-summary real isolated worker completed",
+            "tasks-summary old kernel is inspection only",
+            "tasks-summary partial isolation cannot publish",
+            "workspace-actions source bundle complete",
+            "workspace-actions create idempotent",
+            "workspace-actions unvalidated publish denied",
+            "workspace-actions real isolated worker completed",
+            "workspace-actions old kernel is inspection only",
+            "workspace-actions partial isolation cannot publish",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/suite-records/integration-3nb1bi/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "trust matrix ran with actually unavailable isolation",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        }
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c",
+      "exit_code": 0,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "unavailable-trust",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "native-failures",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "evidence_class": "development-vm",
+      "reports": [
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/production.log",
+          "ok": true,
+          "checks": 37,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "2b8f334080508871c6a1fae620e01d11b6b9c5c4db76f14049d4384e1939beb9",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/unavailable-trust.log",
+          "ok": true,
+          "checks": 14,
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "2b8f334080508871c6a1fae620e01d11b6b9c5c4db76f14049d4384e1939beb9",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/desktop-20261014T063901Z.json",
+          "ok": true,
+          "checks": [
+            "local.generated.daily_summary 0.1.0 five isolated stages",
+            "tasks-activate committed",
+            "Core reads back mounted generated tasks panel",
+            "mounted panel reads actual tasks service",
+            "real confined Wayland preview opens",
+            "third generation job stays queued",
+            "global pool admits only two jobs",
+            "queued cancellation reconciles artifact",
+            "preview job-01M4WJ5GVD28PD39JEE9MRD7G9 cancellation finishes",
+            "preview job-01M4WJ5HA1KMXW3VSGXFAM0687 cancellation finishes",
+            "cancelled preview retains opening evidence",
+            "local.generated.daily_summary 0.2.0 five isolated stages",
+            "tasks-upgrade committed",
+            "data migrated with profile revision",
+            "modified panel is rendered",
+            "undo committed",
+            "old data snapshot restored",
+            "old panel restored",
+            "tasks-upgrade-again committed",
+            "local.generated.daily_summary 0.3.0 five isolated stages",
+            "tasks-second-upgrade committed",
+            "second data migration is read from the actual owner",
+            "second modified version is actually mounted",
+            "local.generated.daily_summary 0.4.0 five isolated stages",
+            "tasks-compatible-upgrade committed",
+            "tasks-compatible-rollback committed",
+            "compatible rollback preserves newer readable values",
+            "tasks-return-to-first committed",
+            "two modifications can return to the first data snapshot",
+            "first version appearance returns after two modifications",
+            "local.generated.workspace_actions 0.1.0 five isolated stages",
+            "workspaces-activate committed",
+            "both generated panels coexist",
+            "workspace action is enabled",
+            "actual button click activates the requested workspace",
+            "irreversible-base-b committed",
+            "irreversible-base-c committed",
+            "irreversible-base-d committed",
+            "local.generated.daily_summary 0.5.0 five isolated stages",
+            "tasks-irreversible-upgrade committed",
+            "irreversible rollback is refused without moving the revision",
+            "old version cannot read incompatible data",
+            "generated plugin can be removed without deleting its data",
+            "activation journal includes commit and preserved immutable source",
+            "native application survives generation and rollback"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "2b8f334080508871c6a1fae620e01d11b6b9c5c4db76f14049d4384e1939beb9",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/agent-20261014T063911Z.json",
+          "ok": true,
+          "checks": [
+            "g3-denied turn outcome follows Core",
+            "denied generation reaches the shared Core authorization path",
+            "ungranted generation is refused before artifact creation",
+            "g3-tasks turn outcome follows Core",
+            "activation consumes a genuine one-shot approval",
+            "one-shot approval does not create a permanent data grant",
+            "Agent source is bound to actual turn",
+            "Agent-generated tasks passed real native validation and activation",
+            "g3-workspaces turn outcome follows Core",
+            "g3-modify turn outcome follows Core",
+            "g3-workspaces-modify turn outcome follows Core",
+            "follow-up creates validated new version",
+            "workspace follow-up creates a new validated version",
+            "original version remains immutable",
+            "both generated kinds are enabled in actual Profile",
+            "conversation deletion redacts durable generation source",
+            "desktop remains after Agent exits"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "2b8f334080508871c6a1fae620e01d11b6b9c5c4db76f14049d4384e1939beb9",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/restart-pK4MNK/result.json",
+          "ok": true,
+          "checks": [
+            "both previews have separate native cgroups",
+            "interrupted preview job-01M4WJ5QE9ZTY7BVA3TSC3330E is not replayed",
+            "interrupted preview job-01M4WJ5QVPANTEQ6N1HP4V7RWS is not replayed",
+            "old worker and candidate cgroups are empty before replacement admission",
+            "preview opening history survives restart",
+            "a new preview can use the recovered pool",
+            "profile revision survives the Core crash",
+            "compositor survives candidate and Core restart"
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "2b8f334080508871c6a1fae620e01d11b6b9c5c4db76f14049d4384e1939beb9",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "control",
+              "status": "pass",
+              "failure_stage": null,
+              "cleanup_complete": true
+            },
+            {
+              "check": "syntax",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            },
+            {
+              "check": "contract",
+              "status": "pass",
+              "failure_stage": "contract",
+              "cleanup_complete": true
+            },
+            {
+              "check": "load",
+              "status": "pass",
+              "failure_stage": "load",
+              "cleanup_complete": true
+            },
+            {
+              "check": "focus",
+              "status": "pass",
+              "failure_stage": "focus",
+              "cleanup_complete": true
+            },
+            {
+              "check": "interaction",
+              "status": "pass",
+              "failure_stage": "interaction",
+              "cleanup_complete": true
+            },
+            {
+              "check": "illegal-import",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            }
+          ],
+          "source": {
+            "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+            "dirty": true,
+            "source_tree_sha256": "2b8f334080508871c6a1fae620e01d11b6b9c5c4db76f14049d4384e1939beb9",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/integration-1FL1mt/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "tasks-summary source bundle complete",
+            "tasks-summary create idempotent",
+            "tasks-summary unvalidated publish denied",
+            "tasks-summary real isolated worker completed",
+            "tasks-summary five stages passed under full production policy",
+            "tasks-summary all native stages have measured start/end and duration",
+            "tasks-summary published after validation",
+            "tasks-summary package readback is untrusted fixed description",
+            "tasks-summary missing Shell aborts safely",
+            "tasks-summary aborted activation retry returns same record",
+            "tasks-summary activation key cannot change target",
+            "tasks-summary desktop head unchanged",
+            "workspace-actions source bundle complete",
+            "workspace-actions create idempotent",
+            "workspace-actions unvalidated publish denied",
+            "workspace-actions real isolated worker completed",
+            "workspace-actions five stages passed under full production policy",
+            "workspace-actions all native stages have measured start/end and duration",
+            "workspace-actions published after validation",
+            "workspace-actions package readback is untrusted fixed description",
+            "workspace-actions missing Shell aborts safely",
+            "workspace-actions aborted activation retry returns same record",
+            "workspace-actions activation key cannot change target",
+            "workspace-actions desktop head unchanged",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/integration-HyYf47/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "trust matrix ran with actually unavailable isolation",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        }
+      ]
+    },
+    {
+      "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d",
+      "exit_code": 0,
+      "checks": [
+        {
+          "check": "restore",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "sync",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "build",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "foundation",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "unavailable-trust",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "rejection",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "native-failures",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "host",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "production",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "dependencies",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "packages",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "desktop",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "restart",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        },
+        {
+          "check": "agent",
+          "status": "pass",
+          "evidence_class": "development-vm"
+        }
+      ],
+      "evidence_class": "development-vm",
+      "reports": [
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/production.log",
+          "ok": true,
+          "checks": 37,
+          "source": {
+            "commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+            "dirty": true,
+            "source_tree_sha256": "50dc9421750fffa7f9dfd909d5ca30040c5efb6d3a3b7421d83eb2deed8d2f9e",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/unavailable-trust.log",
+          "ok": true,
+          "checks": 14,
+          "source": {
+            "commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+            "dirty": true,
+            "source_tree_sha256": "50dc9421750fffa7f9dfd909d5ca30040c5efb6d3a3b7421d83eb2deed8d2f9e",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/desktop-20261014T064732Z.json",
+          "ok": true,
+          "checks": [
+            "local.generated.daily_summary 0.1.0 five isolated stages",
+            "tasks-activate committed",
+            "Core reads back mounted generated tasks panel",
+            "mounted panel reads actual tasks service",
+            "real confined Wayland preview opens",
+            "third generation job stays queued",
+            "global pool admits only two jobs",
+            "queued cancellation reconciles artifact",
+            "preview job-01M4WJN3HQBS3Z81PQ671WXEC4 cancellation finishes",
+            "preview job-01M4WJN40D1HED4V7594ZSSS3Q cancellation finishes",
+            "cancelled preview retains opening evidence",
+            "local.generated.daily_summary 0.2.0 five isolated stages",
+            "tasks-upgrade committed",
+            "data migrated with profile revision",
+            "modified panel is rendered",
+            "undo committed",
+            "old data snapshot restored",
+            "old panel restored",
+            "tasks-upgrade-again committed",
+            "local.generated.daily_summary 0.3.0 five isolated stages",
+            "tasks-second-upgrade committed",
+            "second data migration is read from the actual owner",
+            "second modified version is actually mounted",
+            "local.generated.daily_summary 0.4.0 five isolated stages",
+            "tasks-compatible-upgrade committed",
+            "tasks-compatible-rollback committed",
+            "compatible rollback preserves newer readable values",
+            "tasks-return-to-first committed",
+            "two modifications can return to the first data snapshot",
+            "first version appearance returns after two modifications",
+            "local.generated.workspace_actions 0.1.0 five isolated stages",
+            "workspaces-activate committed",
+            "both generated panels coexist",
+            "workspace action is enabled",
+            "actual button click activates the requested workspace",
+            "irreversible-base-b committed",
+            "irreversible-base-c committed",
+            "irreversible-base-d committed",
+            "local.generated.daily_summary 0.5.0 five isolated stages",
+            "tasks-irreversible-upgrade committed",
+            "irreversible rollback is refused without moving the revision",
+            "old version cannot read incompatible data",
+            "generated plugin can be removed without deleting its data",
+            "activation journal includes commit and preserved immutable source",
+            "native application survives generation and rollback"
+          ],
+          "source": {
+            "commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+            "dirty": true,
+            "source_tree_sha256": "50dc9421750fffa7f9dfd909d5ca30040c5efb6d3a3b7421d83eb2deed8d2f9e",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/agent-20261014T064742Z.json",
+          "ok": true,
+          "checks": [
+            "g3-denied turn outcome follows Core",
+            "denied generation reaches the shared Core authorization path",
+            "ungranted generation is refused before artifact creation",
+            "g3-tasks turn outcome follows Core",
+            "activation consumes a genuine one-shot approval",
+            "one-shot approval does not create a permanent data grant",
+            "Agent source is bound to actual turn",
+            "Agent-generated tasks passed real native validation and activation",
+            "g3-workspaces turn outcome follows Core",
+            "g3-modify turn outcome follows Core",
+            "g3-workspaces-modify turn outcome follows Core",
+            "follow-up creates validated new version",
+            "workspace follow-up creates a new validated version",
+            "original version remains immutable",
+            "both generated kinds are enabled in actual Profile",
+            "conversation deletion redacts durable generation source",
+            "desktop remains after Agent exits"
+          ],
+          "source": {
+            "commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+            "dirty": true,
+            "source_tree_sha256": "50dc9421750fffa7f9dfd909d5ca30040c5efb6d3a3b7421d83eb2deed8d2f9e",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/restart-sTKReC/result.json",
+          "ok": true,
+          "checks": [
+            "both previews have separate native cgroups",
+            "interrupted preview job-01M4WJNA8C3BZWEX9HG4HGF04S is not replayed",
+            "interrupted preview job-01M4WJNANP9HGEFY1NMKYTW9Y4 is not replayed",
+            "old worker and candidate cgroups are empty before replacement admission",
+            "preview opening history survives restart",
+            "a new preview can use the recovered pool",
+            "profile revision survives the Core crash",
+            "compositor survives candidate and Core restart"
+          ],
+          "source": {
+            "commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+            "dirty": true,
+            "source_tree_sha256": "50dc9421750fffa7f9dfd909d5ca30040c5efb6d3a3b7421d83eb2deed8d2f9e",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "files",
+              "status": "pass"
+            },
+            {
+              "check": "network",
+              "status": "pass"
+            },
+            {
+              "check": "signals",
+              "status": "pass"
+            },
+            {
+              "check": "spawn",
+              "status": "pass"
+            },
+            {
+              "check": "spoof",
+              "status": "pass"
+            },
+            {
+              "check": "memory",
+              "status": "pass"
+            },
+            {
+              "check": "busy",
+              "status": "pass"
+            },
+            {
+              "check": "timeout",
+              "status": "pass"
+            },
+            {
+              "check": "orphan",
+              "status": "pass"
+            },
+            {
+              "check": "cancel",
+              "status": "pass"
+            }
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/summary.json",
+          "ok": null,
+          "checks": [
+            {
+              "check": "control",
+              "status": "pass",
+              "failure_stage": null,
+              "cleanup_complete": true
+            },
+            {
+              "check": "syntax",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            },
+            {
+              "check": "contract",
+              "status": "pass",
+              "failure_stage": "contract",
+              "cleanup_complete": true
+            },
+            {
+              "check": "load",
+              "status": "pass",
+              "failure_stage": "load",
+              "cleanup_complete": true
+            },
+            {
+              "check": "focus",
+              "status": "pass",
+              "failure_stage": "focus",
+              "cleanup_complete": true
+            },
+            {
+              "check": "interaction",
+              "status": "pass",
+              "failure_stage": "interaction",
+              "cleanup_complete": true
+            },
+            {
+              "check": "illegal-import",
+              "status": "pass",
+              "failure_stage": "syntax",
+              "cleanup_complete": true
+            }
+          ],
+          "source": {
+            "commit": "9e6e37d9fb007d811121e15a9b8da3653bace4c9",
+            "dirty": true,
+            "source_tree_sha256": "50dc9421750fffa7f9dfd909d5ca30040c5efb6d3a3b7421d83eb2deed8d2f9e",
+            "kernel": "7.0.0-38-generic",
+            "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+          }
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/integration-yRN9fz/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "tasks-summary source bundle complete",
+            "tasks-summary create idempotent",
+            "tasks-summary unvalidated publish denied",
+            "tasks-summary real isolated worker completed",
+            "tasks-summary five stages passed under full production policy",
+            "tasks-summary all native stages have measured start/end and duration",
+            "tasks-summary published after validation",
+            "tasks-summary package readback is untrusted fixed description",
+            "tasks-summary missing Shell aborts safely",
+            "tasks-summary aborted activation retry returns same record",
+            "tasks-summary activation key cannot change target",
+            "tasks-summary desktop head unchanged",
+            "workspace-actions source bundle complete",
+            "workspace-actions create idempotent",
+            "workspace-actions unvalidated publish denied",
+            "workspace-actions real isolated worker completed",
+            "workspace-actions five stages passed under full production policy",
+            "workspace-actions all native stages have measured start/end and duration",
+            "workspace-actions published after validation",
+            "workspace-actions package readback is untrusted fixed description",
+            "workspace-actions missing Shell aborts safely",
+            "workspace-actions aborted activation retry returns same record",
+            "workspace-actions activation key cannot change target",
+            "workspace-actions desktop head unchanged",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        },
+        {
+          "path": "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/integration-sKfJly/result.json",
+          "ok": true,
+          "checks": [
+            "official development capabilities are discoverable",
+            "untrusted qml archive installs without executing",
+            "untrusted qml never enters a desktop host",
+            "untrusted qml rejection has authoritative trust-policy evidence",
+            "untrusted qml leaves revision and execution witness unchanged",
+            "untrusted node archive installs without executing",
+            "untrusted node never enters a desktop host",
+            "untrusted node rejection has authoritative trust-policy evidence",
+            "untrusted node leaves revision and execution witness unchanged",
+            "untrusted native ELF is refused during installation",
+            "untrusted native leaves revision and execution witness unchanged",
+            "trust matrix ran with actually unavailable isolation",
+            "arbitrary QML rejected by formal contract",
+            "generation jobs cannot bypass development authorization"
+          ],
+          "source": null
+        }
+      ]
+    }
+  ],
+  "real_model": {
+    "path": "artifacts/g3/real-model-20261014T062738Z.json",
+    "ok": true,
+    "evidence_class": "development-headless-real-subscription",
+    "checks": [
+      "existing test subscription authenticated",
+      "tasks-create real model turn succeeded",
+      "workspaces-create real model turn succeeded",
+      "two real generated plugins validated and activated",
+      "tasks-modify real model turn succeeded",
+      "workspaces-modify real model turn succeeded",
+      "both plugin kinds support real conversational version changes",
+      "initial task description matches requested bounds",
+      "initial workspace description matches requested bounds",
+      "task modification preserves every unrequested field",
+      "workspace modification preserves every unrequested field",
+      "real generated tasks panel reads the live service",
+      "real generated workspace buttons are usable",
+      "real generated button activates its requested workspace",
+      "真實生成待辦 1791959259272 had a real preview",
+      "真實生成工作區 1791959259272 had a real preview",
+      "original composition restored by readback",
+      "original settings restored by readback",
+      "all test grants revoked by readback"
+    ],
+    "source": {
+      "commit": "830281c23324b3e5564e11a39552b3b525855feb",
+      "dirty": true,
+      "source_tree_sha256": "d1aea05a287985f8126e42e56008a2b085690753d43beaf1d5d5e65082fdf157",
+      "kernel": "6.17.0-40-generic",
+      "native_runner_sha256": "8896ba87d173aea182f5aaaa1833c45f4e4c2d04bb8b9a83888773b3d993930c"
+    },
+    "restore_errors": [],
+    "model_selection": [
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1041,
+        "turn_id": "turn-01M4WHGRPP6N7WCDQSMR5WAAC3"
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1041,
+        "turn_id": "turn-01M4WHJJHQWEV5DE65NWNFQTQX"
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1041,
+        "turn_id": "turn-01M4WHNB8993AKQ3Q63FAM7793"
+      },
+      {
+        "model": "gpt-6.1-sol",
+        "provider": "codex-app-server",
+        "settings_revision": 1041,
+        "turn_id": "turn-01M4WHPTSXJZTQSYQR4T8JRYDR"
+      }
+    ],
+    "turns": {
+      "tasks-create": {
+        "turn_id": "turn-01M4WHGRPP6N7WCDQSMR5WAAC3",
+        "state": "succeeded",
+        "seconds": 59.193,
+        "tool_calls": 11
+      },
+      "workspaces-create": {
+        "turn_id": "turn-01M4WHJJHQWEV5DE65NWNFQTQX",
+        "state": "succeeded",
+        "seconds": 90.79,
+        "tool_calls": 12
+      },
+      "tasks-modify": {
+        "turn_id": "turn-01M4WHNB8993AKQ3Q63FAM7793",
+        "state": "succeeded",
+        "seconds": 48.661,
+        "tool_calls": 8
+      },
+      "workspaces-modify": {
+        "turn_id": "turn-01M4WHPTSXJZTQSYQR4T8JRYDR",
+        "state": "succeeded",
+        "seconds": 39.641,
+        "tool_calls": 8
+      }
+    }
+  },
+  "known_failed_runs": {
+    "2026-10-14T06-04-31Z-830281c": "New trusted negative fixture had a QML function separator syntax error, so the intended load failure stopped at syntax. Fixture corrected; production gate did fail closed. Retained in full.",
+    "g2-desktop.log": "First extra G2 desktop run lacked the Wayfire LD_LIBRARY_PATH and stopped before Core/test assertions. Correct environment rerun passed 19 checks.",
+    "i18n-update.log": "Expected temporary 18 unfinished English translations; all completed and final lint passed.",
+    "management.log": "Initial passing tests exposed null-parent teardown warnings; fixed and final 6-check run has no warnings."
+  },
+  "remaining": {
+    "physical_reference_seat": "not_run; plan/05/04 requires distinct physical evidence for AT-06/07/22/26/29 and keyboard/visible failure/survival",
+    "owner_exit_review": "not_decided; AT-18, D-17 and five G3 exit conditions",
+    "issues": "#15 through #34 remained OPEN when queried; no automatic closing",
+    "resource_performance": "not_measured by this followup; preserve original thresholds and D-38/D-46 followups"
+  },
+  "remote_ci": {
+    "before_push_head": "830281c23324b3e5564e11a39552b3b525855feb",
+    "before_push": "11 failed checks (checkout failures documented separately), VM success",
+    "current_head_checks": "Read current PR #40 checks on GitHub; this index records pre-push local/VM evidence and does not assert CI passed."
+  },
+  "raw_sha256": {
+    "artifacts/g2/g2-m1-desktop-2026-10-14T06:36:06Z-8302.json": "5cc6d4936dad4601bbe10c4820c904353c19878b9adcf9abbc6096a8deb8f803",
+    "artifacts/g3/functional-20261014/build.log": "09dc10bcd5afdc1b74a72af7f2388f3214b426ca38b1527d68865cf309c54552",
+    "artifacts/g3/functional-20261014/clippy-final.log": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc",
+    "artifacts/g3/functional-20261014/clippy.log": "a8483491cb75da3a867b04e1767a6e8bd4b57d0766c22003d6d526a754ce9a0d",
+    "artifacts/g3/functional-20261014/commit-vm.log": "eace5cc82a41e19469fa078c936d5c5cbd8b8dc616872315675e326c4613c321",
+    "artifacts/g3/functional-20261014/core.log": "003d8f71435dd3690b9789d34da64f111a72862d0bbc7ff4cdb00b15cb804ec4",
+    "artifacts/g3/functional-20261014/fault-build.log": "02db5a66fa0c60ca8618bd08aac556eac4f3ec863e8630a0d353dba6a0f6e126",
+    "artifacts/g3/functional-20261014/fault-clippy.log": "eb04d56f1fff0b3a5c0177ba4e6028d699d5b5b9edacca1886b7d883e11b8030",
+    "artifacts/g3/functional-20261014/fault-positive.log": "0be2a213e6e643716ed2713c43799c243791efdd6a6982cfde8d39c1e10829c6",
+    "artifacts/g3/functional-20261014/fault-test.log": "137f491cefa851ba0a8bbb7fdfdeb83d433517a9b61783791470e7ac013e2a15",
+    "artifacts/g3/functional-20261014/final-vm.log": "245a4ae97f7d24170db67b7305fcdd486721faeb579466b052e2b2d2c2f2fda1",
+    "artifacts/g3/functional-20261014/g2-codex.log": "f4f5b5423baf35b20cef4d10f1b43fdddefae1d6bd095b2c8071bc26d33b59ef",
+    "artifacts/g3/functional-20261014/g2-desktop-final.log": "280c182d12fd9d2c801f8538c4030005d7af31e7e848f20243320d51e367eb36",
+    "artifacts/g3/functional-20261014/g2-desktop.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/functional-20261014/g2-injection.log": "6f42caebcd14d6c6c9690bb5180c959b5535d7117e1d6e0a1b5921280633061a",
+    "artifacts/g3/functional-20261014/g2-races.log": "8f4ecbc14f7203534238f40aa4903c25063c0c37ff9457428e3ef376394bc0ea",
+    "artifacts/g3/functional-20261014/i18n-final.log": "408bc7c109b2ff97581d208135cc79e476152db878d658d07b7a369760f3d755",
+    "artifacts/g3/functional-20261014/i18n-update.log": "b3c532fb28787774d8cd8d4f943dc1c4ac1a6b6ec77790658c806913ccc36de9",
+    "artifacts/g3/functional-20261014/management-final.log": "865b1d7f0d71333874988e8900a2c77c1d1fa1ba2774fbb08afa030b33dae708",
+    "artifacts/g3/functional-20261014/management-lint-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/functional-20261014/management-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/functional-20261014/management.log": "ac5dfad9e4eb35005e8d937ded87a443786ddc3272cedab7d1c43cc326bbecbd",
+    "artifacts/g3/functional-20261014/matrix-vm.log": "d14e88c0ea07d2d9d0b2bbcc7c925a590ce1dc0c511a1ed804c15adee7e56fee",
+    "artifacts/g3/functional-20261014/node.log": "f461422fdffdcfe17917b75e1c801e33e4889ac66b661e125c0fb0f271482c92",
+    "artifacts/g3/functional-20261014/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3/functional-20261014/partial-vm.log": "bd5bce3ff0da8753f9f3273d81444f81d90b5ff9efc72eed99a47d85f1130e5d",
+    "artifacts/g3/functional-20261014/real.log": "1ad786f2315074947e5a685b947f68e10c29b73d770f670ac0921370199eb2bc",
+    "artifacts/g3/functional-20261014/release-guard.log": "aaf1f339df9589b487bb22a63008ccbe53c9b758b17df0eeac9e5a6633a1af2d",
+    "artifacts/g3/functional-20261014/release.log": "03a6e2c76fb6b762d7ca2df20f13c0e730a6a747ae01db8cd8eb626a7849fd77",
+    "artifacts/g3/functional-20261014/remote-issues.json": "d9ca93b6203b97208cca71679ebce0c66a746a44f6ba6cb2050153780aad95cf",
+    "artifacts/g3/functional-20261014/remote-pr-before-push.json": "ac1423fdcb156cc2a16fd8febb2b929cb50c9f63e4c3821b570a37b65a613f8d",
+    "artifacts/g3/functional-20261014/rust.log": "ebcc52dd88fed627181fd1a8201f15f8a23f7c6755ffe97559ae6d9d1798e58c",
+    "artifacts/g3/functional-20261014/shell-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/functional-20261014/skills-final.log": "5bd935dcfd2f13bce4f5fd2c952e6b061cf75c9e19d5944bc1ad4e44fa3c7e32",
+    "artifacts/g3/functional-20261014/transactions.log": "32cff9339aa5008fff02c9ec437ada5588cece6f915dbf9ce803684fa1cbf152",
+    "artifacts/g3/functional-20261014/typecheck.log": "91335f04c9a2598d2b91f2a2b6351577e7e58a1abba98f8439ad89f610ce03be",
+    "artifacts/g3/functional-20261014/unavailable.json": "2706f4c51bb3432ecc423bef2bf0047ffd81e21947c47a16ab901cb0249e9041",
+    "artifacts/g3/functional-20261014/unavailable.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3/functional-20261014/vm.log": "28cabbb354b4a534fc02aa6ad590c43b68aaeff81e3918e4dc3f503af4064e55",
+    "artifacts/g3/real-model-20261014T062738Z.core.log": "88c9f7d5dbb090d8cb108f35bf0404987b9e77e7fe921e7ea555740520759127",
+    "artifacts/g3/real-model-20261014T062738Z.json": "04211c3e82ae63e5ee053f08a66c750c47304c38765f64b4747814b035f86cdb",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/agent.log": "be6c8d94411d2e1ffc5dd6e37188d6fa40cb8d91eb8b31ab610a84830e2916e1",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/build.log": "bc830015389efb5c78d8799cc7ccc6cd8b9870558879464b87573d32e79f2bac",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/dependencies.log": "fc3640a64aecad396a6849c317e36e71d4c325a00e194cf66aa295ea71d894c6",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/desktop.log": "ad577a90ffda710784f5c314452745fe87dc877906218a1f43f116d2147b2d64",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/foundation.log": "d85d2011b7299bec3dc425a3214f6de38a5161d306df85226a408efb7c97b333",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/host.log": "eb694c2a33deb33f82e5e64281a2eeb58a8275461a8c78a4d37d57695a4e041d",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/native-failures.log": "5e0d1fcaf9c9c3996bbaa09f56cb5a782a638bb52ec0bf1d9ed5640c3f40c062",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/production.log": "b02509340316558e1f89c85a3487afce054f1ece88066de057f4ea3b0cd5d6bb",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/restart.log": "ed1a325bb1c088b2845da2b3821a8ef43a5352299308e4e4e2cea2eb3028873b",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/agent-20261014T060610Z.json": "e428d4a4eb72df4d7cbc3f053f437ebc6852f4e12e20e83699e4431f53e49a42",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/desktop-20261014T060602Z.json": "e8bda3abdd6b80b549ba92150e6a0729cd5f48afce698a269b66a43f1d8ea895",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/busy.json": "6b62d3ec5b3cc92d3517bb53991ace89a4d14493319769b796751410487fa540",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/cancel.json": "0b8fb43accc85e09eb88b7adf68dffc8c530f60eb5dc811e59e238260ece1329",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/files.json": "58e011a186609d3a2e84200cd9c35ec8069d48ce051aeaf6a6420b4e3de7e8f5",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/memory.json": "fa0fd997c1bc9de76336c0c69196e42483aac83755538f6d4b7cb69083274c50",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/network.json": "8bb34898c9872b8e2c4e82dc31a693d4329c58124b7da6fdbd28b9ad03353898",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/orphan.json": "4235e47f6ed568d28fa598035d5a7bdc1f49df9b463b52eaa6c8a10bd595b529",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/signals.json": "291b0fda2036a0c0a36960d4b8be7196ace30ca69f3ea431ac022401ae1ba7eb",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/spawn.json": "a9b38d5835e0dc19470797bda8e3f686ba329616230da027c9ef07b03136e638",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/spoof.json": "b1f68ad562ec5bea482c359074ffd4d43692d307e94ef4cfdf17775521a5d881",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/summary.json": "227adb0a568eb92456206b66a7cea9e65872d21d0f591cd192a39a0f2bca3480",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/host-2026-10-14T06-05-42Z-7124/timeout.json": "d63054ccceea85f154e0dd1a75ce5dc9f0fdab365e88153e074a00f74d6d65e8",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/integration-oQVB7w/result.json": "c0239f17ec28c052fd43dfa9e5500e11704bd6e7c6ae3a55aaba3d112b0973fd",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/contract/stdout.json": "83fd67e0656c822722205582f40a6b27d8b337d4c3568b0e48636cec162d1fb3",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/control/stdout.json": "fb3cdb560d908d619d2878fa5d98400cf5f4e198324f1fd3f8e5d6267fae6d2a",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/load/stdout.json": "1bf1ecdea9f545c6724ae6f757386951d41ac1d8fbd9fc56e8d3c68024cd38f9",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/summary.json": "f279045e2abf870616faafb7eeed84976fe388fe7d236e78c96080f6b9c7c978",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/native-failures-20261014T060540Z-7016/syntax/stdout.json": "3c43d4a0d783026782d4845607c0ba57b1ae14a08c839b5512b9b5201143befd",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/suite-records/restart-pZay0I/result.json": "e81412ce5c94cd340b27dda23833636110809e32f3f26a04c6eab07e135800a3",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/summary.jsonl": "7e711ce6a497e32759be8b1d02fb82efd2464d1976208578aa3ea1f0f617daef",
+    "artifacts/g3-vm/2026-10-14T06-04-31Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/agent.log": "7508e895f7c19be800017cb6d74ac14979144a7aab59ee050aefeb74d3d81918",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/build.log": "75c24d9438d3227b489d6e49728689303e5c1f4b3d47407dc91d9cc71929792c",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/dependencies.log": "fc3640a64aecad396a6849c317e36e71d4c325a00e194cf66aa295ea71d894c6",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/desktop.log": "52900c2d7386584234e519308e3b2f20466149fc0aecd1e0f38f2efe419d3745",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/foundation.log": "8b0227de0952b12f23d6339cd3dae9dd807899416a3c96f611e701590e912b4c",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/host.log": "661db926844f5f4b1a936a6760606f470109053a355015793c2f7fec5eafff96",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/native-failures.log": "c30422ea1716fbb0004f8764d690cdb7fbee7856943cb1dc69c9754aa8c33973",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/production.log": "3dd6314464abbfaafcd503a18e26d7dd269b639bf1b5bec8172c86177ea5437a",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/restart.log": "39045d43de53e60c0cbb79e08911ccb1d3eb0ff0907a509d54703e47734d87dd",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/agent-20261014T062319Z.json": "c912090a329def6f2e3f2aacf3fbf929f30570a37426d7ac5afcc182053cadc1",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/desktop-20261014T062309Z.json": "a4855ab0f94bf5446fe425a17cde07209204456754b194dea427915d4c53ca13",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/busy.json": "ee615ba0f46f8dbfad58e9955c4c4ed8570a7e3d236e32818e2c3d6b8ea011be",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/cancel.json": "60585c9f0961542c9836287ebd98c41caeaf099306a969e53fc3354ebe356841",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/files.json": "25dee00604aecd2abdf38c3db1d345787fc27979157a3240511cb7e24b133b2e",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/memory.json": "a097a9c5ae54c3092830ca2d1a83ec295c473a783005a870458062056571eaa3",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/network.json": "1b0c78cf48139f32ac25ef3a2e2ae9aba0dbb4242558283810e39fd22548f476",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/orphan.json": "085b892dbcab45d672cf277de15532cec5e02c9c40f0727d92e994144ee66236",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/signals.json": "ff36abf03468c5f58f2a510facdb111d99e34d76bb35edc4eba3c7ed3c60fa92",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/spawn.json": "919c8d1efabef8546e152320c4185ebafea3e413282567c9ae104bc339cacee9",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/spoof.json": "df6439b23ca6e0234c31de22a6d33c13f13e88954bbe220ec7cb9187043c6d32",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/summary.json": "be38f19e308104b72c0ec1c7554454dd0e9b1fab862d693544fa68387681e653",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/host-2026-10-14T06-22-49Z-7193/timeout.json": "602a519e0bd64f7875dfc3432c81c51afb38f9f91552e51034352e2fbbb2f3a4",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/integration-rGEIL8/result.json": "fa49a7155a33d16bec5f18b5bcf4c24ad73d2ad71f2afcd8bcc64dcb242d42b4",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/contract/stdout.json": "677ed0a91da2604ecc14ec522c0862c63087d19de2b7a12ebb3df336bcd9d6a4",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/control/stdout.json": "8d65282d6540bd73d82263be64e549486c03a994fced0af9ced81ae45f3b17c3",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/focus/stdout.json": "1b48f4cc1f2666fdf8faa7e93f8a99df9109d9db6450ac657ee96021e75a5e1e",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/illegal-import/stdout.json": "4667ffe75d956ddca6f5f6a3c6e99d19db7d48c7c8416f477fd384f00b20425f",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/interaction/stdout.json": "38d9a0ed95c5d1cafcf3f8a67e804e8edf20d2df91126eba21d280774879a13a",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/load/stdout.json": "4636f9305b2dd8ffeff2051b839c64f1016718023a8d2372a155af5d4712bb0b",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/summary.json": "9abbe4c7569deef0a56c33a34ddaf2d6221e3221bddd24f4bb503a117397ecf7",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/native-failures-20261014T062246Z-7054/syntax/stdout.json": "69d61323793d6974cd23a274fa4a980963c6f6e9b7a0a1743413592dbc5e5d15",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/suite-records/restart-T9wdEv/result.json": "11f9b0aa4b430045dbbceeed5d95eaecb470b641c6620673a8b27305aa760849",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/summary.jsonl": "c33106371bb1cc15af03cfccd10aa93d6dcbba8b8c68b61609b80a37ac422d58",
+    "artifacts/g3-vm/2026-10-14T06-21-59Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/agent.log": "04f90d96c89c71263165f3a2dba2145936038f7093947b83b61397638bd00465",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/build.log": "42260630727dcec0e0f2e7e7a0cf1b5565a6d35f6695ea59749964874d01ec07",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/dependencies.log": "59fb4d6a28caaacdd22bea4ca65ad2b8f8a76230de047f028a66f728289fb7d9",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/desktop.log": "5c33e8451b6a8851c5002b2cbb6e3dc0f195772ec3fdaa6ad13da3b87a91e4f7",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/foundation.log": "21fc1530d29b19a598946076c9d63d6348306d826894e40d66d3eab3a7ae0526",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/host.log": "fc69bb9a20b0374059f1afbcfa69dcacff865db4669addda9908a845a097427a",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/native-failures.log": "1080133a73d4b1f314bb060de1ff97a7d0ffef85b2a2aaf12f673803ca3e78bc",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/production.log": "030a3668915bda22a3e9a13fa37f4647b6c9a66b8d34d24c36ebe88c19b48878",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/restart.log": "d49c3dda949114a19679a40d2ae4619c2d176d3a24c7125e82a4b655b878287a",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/agent-20261014T062812Z.json": "9f960e75eeb12fa1bc822aada9647b09523a21859286bf61fc43afa28935fa30",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/desktop-20261014T062802Z.json": "4673b2597384623803cfee209941f244e20df68046bd78d8d939f920a587d575",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/busy.json": "43d5aa4061c47ac23766d0148cbaa77cd4e77a6af1825ffe48d677b426a55b42",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/cancel.json": "927c5f905ab34a1a6627f093fde2f47a8ce75186773dc7fa34d11fce24a02251",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/files.json": "254f595b7528095c36eabf09f9af3b306bb4705ed89971db382e96c2dde8667e",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/memory.json": "00267eb480e642cd7401628c5f1ef6c798dea2896ef73d122dc9850281dda737",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/network.json": "ea28bd1ff234979962430e6ec9050bb6e548919bf6a2691de56fa8fd56a98f0d",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/orphan.json": "d3a40ec8be810a4d10cbc85efa3a2c760465f6d458a70b3e21ec6c13157f3273",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/signals.json": "efbf94f79bf02dc3bbd089223bed5188cd6782d04fd47ef370d03bb5b9e1f091",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/spawn.json": "ad049b70d4568b64125128e5247a4f33e0236eb32462c4717c60d8ec41fc845a",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/spoof.json": "8022ffb718f46a1bc2ab98d67668331fa9d921e6f6c5e137d7be8556e4e247e2",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/summary.json": "ca98e7965d2b778cfbf38220dd473c3fd6fc0c398ec969b9a73d4d546124e585",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/host-2026-10-14T06-27-42Z-7281/timeout.json": "c38964c155e58fe7e015a0af269da9296ef32200840797cca7656c6dafae3f2e",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/integration-N0uoiV/result.json": "1f4a3b1aa246808fb44cd5a710fb884eb8b8c967fd71952c8094ac46eba4afb4",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/integration-jwO51N/result.json": "3121006002443400baca4e73ca7a2e6b5d8edd58942717b0092bd93d2be3c056",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/contract/stdout.json": "0ad80172c0538c87f8eb6144d02ce9021a2641fcdfbe02da52bfbc1b8be8b4df",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/control/stdout.json": "a7a6cf50eefdfceab58d1e0b199224011b228096a45c1d4e9e2527c48be0ea9e",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/focus/stdout.json": "4533d2275a6c9559f9b665fcbd9da8e7744e9fef01d270893d609cbfa9fff1da",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/illegal-import/stdout.json": "a43bacef70c7f5f9f186c063c2303d6f2efe18b4e10d48837952f42965fc349a",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/interaction/stdout.json": "5811901c956b4546527cbeca15c5797a4c91f9b02ae821923ab1256723c42e23",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/load/stdout.json": "2368d248cba31ce364db7e76c5b177ca652a938727cddcd95864f0e788b39e19",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/summary.json": "401f5abaa25cdcb812ab44a03db8878dd95726d52083b5db60c099f90008207a",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/native-failures-20261014T062739Z-7143/syntax/stdout.json": "8bbc9003733b234e5a0fea5d9ce21ec72c87a1425395574b7ae60a6e90afc3b1",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/suite-records/restart-m4qUSn/result.json": "4aa5cc94388f6f17c3fa1a77a9e7c7147317e88aa86941b652d03a279b4ab7fe",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/summary.jsonl": "0d2bba344a1ff9d0fdcbcac63240d0cd13c9150b4dd4f6e34a0e986daba1e827",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-26-51Z-830281c/unavailable-trust.log": "60887a5343f5874e785c84719dd0082cfc4b4925bcf6370e201b741460e72885",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/build.log": "c8a2dcfe1571d74f073ad47c59aa22ebe3aaa48c7d2ed5ada6a3395c0d36b6c9",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/foundation.log": "0a2f5b29b5d781c09445323eac60646a60c2c5c54e4082ac630dba3a282b833f",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/production-partial.log": "f1f04cb86c7c9b56133b853bfa8e66f7df4fbd82302c2addfcb16086c260e043",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/rejection.log": "e32789bd344ef2fc31879d6220ae6dfb8c7bbff060f0a6e4a80638eef85265a8",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/restore.log": "1ec68a507d7ec97ff17fd8e12fc7bea2652b86d783fe9d9dbe11a313c2c4c8e1",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/suite-records/integration-3nb1bi/result.json": "ccd9f969f5cf52c711d53e9feefc9fb47998c75107ef15489b9de8aee555afab",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/suite-records/integration-JyXniE/result.json": "fda1df9a6d32787140109b9e61e5267051fa86c852c565734d820296e00a5a8f",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/summary.jsonl": "8ae8b5f9ef18eb17c443be486e60b301676af2f2c65442e0cc6f95449ee5af33",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-29-03Z-830281c/unavailable-trust.log": "3ae8309cd54a34729e5c75c857adea55ba531322320f1589d45d23df743578f1",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/agent.log": "be617d0633466cb4e94f3fa25e719501a5113d1b751d4ca615ecf2903d458f63",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/build.log": "ed68af5d6a23f6dc2e791664a936503a99cf3c953aeab1fe73dedb32cfcf48b1",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/dependencies.log": "9af2bbea3c650436796f2d79eed91895947202c5085070f5709aae1b30be5a17",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/desktop.log": "a87373530d8240fcbbb2f452167e930c1a0f6c5d09fd10b898527078060023f8",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/foundation.log": "f3d748bce05b8edaf159cae87abb29f290870e50a90f56a137acea0854a5295d",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/host.log": "1d71bdbcaaf9772caa616195ec6230ea6787617b62e9f984373154a2fbb97f3a",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/native-failures.log": "7693cd1e4864464d395b02df3df52aca101c69c41fd4ed7429e3a011fa268d8d",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/production.log": "b8ca2fb163b77e18ad8f1260098dabf055c37f6139c65856617e09cc7a7ac8f2",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/restart.log": "b744efbcddffee9c6bd477b517a6bee1ddd64f8e9baa6b85a11a41a1c47a3dc3",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/agent-20261014T063911Z.json": "3874a290d224abd6dfe3a235e7854f248f8c961bdf8d566c5e55b97086d1d133",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/desktop-20261014T063901Z.json": "496770601ca2927f08c152eb404601defae700a4dbf8f4a32333477e63da10e0",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/busy.json": "1635ae858ac19823f3ba9c8945d5666b190fc75922b995be1061452ab867fd36",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/cancel.json": "91452f27d6af6724935295849c4c829958d82fc6dbaf363b8391270ee6647b15",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/files.json": "d61eb7fcc82b9ccdc1b8b0e3f45933e95eee2a93402b1a9260d097bededf4be1",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/memory.json": "578e0096b5b1c23017701ae14a56231146be3ddef5a50576bac74ce63069cadb",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/network.json": "040ceb792f51685e79eec6c71441f0eb415358bdfd0d8162d2b4967f3d0ba920",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/orphan.json": "1e1817be18c65e4bd0fb9195f1078e25a24816ada133b1693f5f24cc788112ea",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/signals.json": "537590a24e6c8e6b6141cfd14fb29a9315b95c8ec50129bf01b53fd68188ef23",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/spawn.json": "b476c548de612034d3351fc96bca0fd586407b179cff67164087ab8131d09e41",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/spoof.json": "bfe6191cc9ec2d617a4423dca3dbf1103b76b0191735127bb25fb2645b87a205",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/summary.json": "15b8c50a07aa0f9dcdd6cc9b66dc35f982c6a31ec62987dcc4cd01a618336593",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/host-2026-10-14T06-38-40Z-7300/timeout.json": "9b4a82858cba8cc070be84386cd201d483b35b075f790f9cb0b096932790e048",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/integration-1FL1mt/result.json": "7df638e1ad018b9a7b558e96607e0aef120825136377ae9f6b67c9c0bb097231",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/integration-HyYf47/result.json": "2f96e3dfa82a62b83fe9e5582d105867e098ea4110f18ae65ee418aeb36cd86e",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/contract/stdout.json": "efef2b8e36ea9330e6f3a4832eb0e42bac0fede8c42927123eb3cfadf27eb46a",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/control/stdout.json": "9ddf68c85d40fd99edc7289d0c6d5341dd687dd931523ba252e6ecf946a47d7f",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/focus/stdout.json": "4b9e44b65663f313d062a9be6981272c2fdf23fc1d67753a6f435bcac01d8056",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/illegal-import/stdout.json": "4740588d71d9def98829d0ec15d612ff66e1ac1302da3b8df5d05d3848f82e86",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/interaction/stdout.json": "43f6cb77fb42310cccfd8285d9f2e66133389a455dac295eb684755a250f4836",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/load/stdout.json": "8f8520cd7954078378a3948dddc761edf267b2d9a03f2fec2cdc737601b4796e",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/summary.json": "4e2da5707abe762dbe88425ae7721aed992a5e7ae21e896871d866a1fdbd5723",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/native-failures-20261014T063837Z-7162/syntax/stdout.json": "8bcd44315ecdace9b75c36f2ecee07524477f0de8089bbdc91e943c5f07da41e",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/suite-records/restart-pK4MNK/result.json": "e6195e61db34a31167f69d82dbf42ce732912b51b728439655fe8782f6ee99ac",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/summary.jsonl": "0d2bba344a1ff9d0fdcbcac63240d0cd13c9150b4dd4f6e34a0e986daba1e827",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-37-47Z-830281c/unavailable-trust.log": "74f342cb805f99476053709d0d7cd5302001d2c0f6d3df4528968266409be18d",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/agent.log": "aad11e00f62de7cb3ce1b70ff94286537052266d7ad2edd52d5b49ad9c296db8",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/build.log": "ef7abcab73ab4e6d641430bbc3ac6ee7cd6ae106c61f5426e6790de5a35384d7",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/codex-copy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/collect.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/dependencies.log": "59fb4d6a28caaacdd22bea4ca65ad2b8f8a76230de047f028a66f728289fb7d9",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/desktop.log": "a90418d719b4f080da417d1e0699d1f49dea85b3b69b0124a2a48f9986fef676",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/foundation.log": "38ff26aebbc2f452546e34db8ae9c8e888ecf1f8848eae9e94f44242ce1f3265",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/host.log": "58bbb81ed0826d223edde83747f82ec3a12550cdd05e7c8b21f41a83419e8d51",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/native-failures.log": "1e6dbdc495ec026e2f0b0ebce993a071706c5cbb3e006e15dd5ef8367d5d17ba",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/packages.log": "6fff381b40c3408422257c06c4814b6c136296b5ee5484f046c69fc2676ad2e1",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/production.log": "76eab3c405e2dabb40b2bcba53b2fb8076896aeaf63b744f8dc02d6ff449494f",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/rejection.log": "5c80cc5806a8d034a1881833724cdf0758c0087fc46276da601c6b44fc5fde22",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/restart.log": "692930a7e4ce8e8ec595f7590148c69cae0e4d391e8e52777f8476b221e59dca",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/restore.log": "58f9656bcb9f7a3a538a8531e58a7d50ee6c083a374fad45c9c847ff0678d8b2",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/agent-20261014T064742Z.json": "7c18428df5938be11b9aeb722bb1125f7ba8a11c5577a660506fd1760ed10ef1",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/desktop-20261014T064732Z.json": "6c576d9e8b0af4171ed2babb3d954b46583fccceb9a8406d0ea230987e0a75f9",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/busy.json": "3f83938d9ca5d99a9956d89cf0d9398a6c3f949d235554864e755f8ee89dcf79",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/cancel.json": "d9f206a2a1a08a3d79251decc0b734ba8229615e6603187b638ca43b820be0f9",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/files.json": "b61543aeaa0330cf59777d79bc351bf91f322abfa0566f8d8e4879f8b18bd0c4",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/memory.json": "cce0adf72f580abcce4f8f587590942291794f969123a5bb3c8751a222012347",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/network.json": "5856899ddf2ac81f34d41ef6e79905ae4e4bb7a07e0c829b31c44b670aaefb7a",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/orphan.json": "3480cd5c2202074530337d232d0886593c89d1239ff0e17a3ddc57aaf1d68417",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/signals.json": "40cbd4bca07999e2aae80a439f4eb0f5943d227cf0709da629cf4b4d1f491e7b",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/spawn.json": "b39f0ade07b6681f993854fb48f3695d749b6c56f1f928dc3ecbcf85f5a6be0a",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/spoof.json": "86aaa89272aa80eeb1c58f3f41a99c023bf96e5ffa2fc282a4c2b85232888ddb",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/summary.json": "7fc528253d76da2d77a59ba499befa63c69ce5044d8c5d4a3e17c13216d99d79",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/host-2026-10-14T06-47-12Z-7282/timeout.json": "1e4373e3256da64c0cbdf449d1207ae2bfb8a148640a3903894201ae7b794fa1",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/integration-sKfJly/result.json": "cb48cf0a5a19052e18505b26358854c5ceee660406aa44a9fd23a6a772171fc2",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/integration-yRN9fz/result.json": "5fcbe8721a9bd04d21599b76dab66ed145a4b7cbeef389eb51d0dd66a024b1cf",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/contract/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/contract/stdout.json": "b99000a53fb5658fd20d8790fb88e8c8f8bda46c7be0cf3c0a59ae14fc237f22",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/control/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/control/stdout.json": "07275dfdcb77117e64a9302179869f15e502b47d439cdd9c27fea8b34da783e9",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/focus/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/focus/stdout.json": "e214ec2da14b8a8815d431da28e0b67b48f976d5a9772dbbcf87b3ff308be2aa",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/illegal-import/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/illegal-import/stdout.json": "62c331bb916645beb70cea2200c086ddac414fe59fd5f0eeb3504eb3885c71f5",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/interaction/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/interaction/stdout.json": "88eac68c6c3d31a01fb6aaae5a39ec510cea0faa75c913088d3f26d7e9687782",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/load/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/load/stdout.json": "0ae57ff3849940af2ce23d52383d09d78182ba195200004d3f2024248fc6b26f",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/summary.json": "f129ae5f3ae9105072fbdb91571f9740a4c2858c361a66cd1e9ca1cef29fab3e",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/syntax/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/native-failures-20261014T064709Z-7144/syntax/stdout.json": "9a54f1f4ac4019008a92a2c865a7ca753c2178205fae0b5a5ef81d6731a54af2",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/suite-records/restart-sTKReC/result.json": "81ad1338db8eb55d0c4f20504c48830241f43ebd7d3cc58f1ed743ca6ee955af",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/summary.jsonl": "0d2bba344a1ff9d0fdcbcac63240d0cd13c9150b4dd4f6e34a0e986daba1e827",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/sync.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/g3-vm/2026-10-14T06-46-20Z-9e6e37d/unavailable-trust.log": "ca0262810687a8794db7f1ffd5e32625d21ff3964f2f3efdd8118434b425944f"
+  }
+}

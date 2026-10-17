@@ -10,7 +10,7 @@ description: >-
 metadata:
   type: skill
   category: agent
-  status: draft
+  status: stable
   language: zh-Hant
   related:
     - ditto-agent-changeset
@@ -21,7 +21,7 @@ metadata:
 
 > 受限生成與隔離執行：模板優先、限制能力、隔離驗證、預算與回復。
 
-> **status: draft** — 隔離測試宿主與強制執行回報的實際形狀在 G3-HOST-01／02 才確定，屆時須回頭核對第 4 步的能力限制清單並改為 stable。
+> **status: stable** — G3 的正式形狀已核對：Rust `Description`、五關固定 Qt runner、`generated-templates-v1` 分項 attestation、Core 發布／啟用與資料回退；見 [生產邊界](../../../docs/platform/generated-template-boundary.md)。這不是 G3 出口或任意 QML／Node 隔離通過宣告。
 
 ## Overview
 
@@ -82,6 +82,8 @@ metadata:
 - 網路預設關閉。
 - 不得產生或載入原生動態庫；MVP 不開放 Agent 生成並直接載入任意原生庫。
 
+目前 MVP 沒有任意 imports／程式碼欄位；原始碼是固定模板封裝。試載與預覽在獨立宿主，啟用後由主 Shell 自己的固定模板解讀描述，不載入套件 QML。受控 runner 的系統／Qt 依賴唯讀白名單另列於生產邊界；不是候選的檔案授權。
+
 限制要由**程序與能力代理**落實。`node:vm`、Worker、QML import 限制與 Cordis 的依賴注入**都不是 OS 安全沙箱**——這條在架構上已經定案，不要在生成路徑上重新爭論。
 
 ### 5. 產出完整的生成物
@@ -110,7 +112,7 @@ metadata:
 
 自動修復最多三輪。超出後**保留結果並說明問題**，不繼續燒預算。
 
-判準：每一輪都要有可觀察的進展（錯誤變了、通過的關卡多了）。同一個錯誤重複出現兩次就停，那是模型在原地打轉。
+判準：依 plan/05 的管線規則，每一輪修復都須通過更多連續、有序的驗證關卡；只改變診斷文字或缺少報告不算關卡進展。沒有進展、退步，或同一個錯誤重複出現兩次就停。Core 比較持久父版本報告，同回合不得改接舊父版本或換插件 ID 繞過停止；只有明確的新使用者回合可另啟預算。
 
 ### 8. 啟用失敗要回復
 

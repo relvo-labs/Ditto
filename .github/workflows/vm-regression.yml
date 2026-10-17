@@ -12,6 +12,7 @@ on:
       - 'tests/g0/**'
       - 'tests/g1/**'
       - 'tests/g2/**'
+      - 'tests/g3/**'
       - 'packages/**'
       - 'schema/**'
       - 'tools/**'
@@ -76,4 +77,17 @@ jobs:
         with:
           name: g2-vm-${{ github.run_id }}
           path: g2-vm-artifacts.tar.gz
+          retention-days: 30
+
+      - name: G3 VM generation and isolation regression
+        if: success() || failure()
+        run: bash tools/dev-vm/run-g3.sh
+      - name: Pack G3 VM artifacts
+        if: always()
+        run: tar -czf g3-vm-artifacts.tar.gz --ignore-failed-read artifacts/g3-vm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: g3-vm-${{ github.run_id }}
+          path: g3-vm-artifacts.tar.gz
           retention-days: 30

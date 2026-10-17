@@ -22796,7 +22796,5612 @@
         "max_ms": 5000
       },
       "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.create",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "key-based",
+      "input_schema": {
+        "$defs": {
+          "Content": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "max_items": {
+                    "format": "uint8",
+                    "maximum": 20,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "order": {
+                    "$ref": "#/$defs/TaskOrder"
+                  },
+                  "show_completed": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "const": "tasks_summary_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "max_items",
+                  "show_completed",
+                  "order"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "actions": {
+                    "items": {
+                      "$ref": "#/$defs/WorkspaceAction"
+                    },
+                    "maxItems": 16,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "template": {
+                    "const": "workspace_actions_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "actions"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "DataMigration": {
+            "additionalProperties": false,
+            "properties": {
+              "defaults": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "from_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "remove": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "rename": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "rollback": {
+                "$ref": "#/$defs/RollbackPolicy"
+              }
+            },
+            "required": [
+              "from_version",
+              "rollback"
+            ],
+            "type": "object"
+          },
+          "DataPlan": {
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/DataType"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "migration": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DataMigration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "DataType": {
+            "enum": [
+              "text",
+              "integer",
+              "boolean",
+              "text_list"
+            ],
+            "type": "string"
+          },
+          "Description": {
+            "additionalProperties": false,
+            "properties": {
+              "accent": {
+                "type": "string"
+              },
+              "content": {
+                "$ref": "#/$defs/Content"
+              },
+              "data": {
+                "$ref": "#/$defs/DataPlan",
+                "default": {
+                  "fields": {},
+                  "schema_version": 1
+                }
+              },
+              "format_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "plugin_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint16",
+                "maximum": 640,
+                "minimum": 160,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format_version",
+              "plugin_id",
+              "version",
+              "title",
+              "width",
+              "accent",
+              "content"
+            ],
+            "type": "object"
+          },
+          "RollbackPolicy": {
+            "enum": [
+              "snapshot",
+              "compatible",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "TaskOrder": {
+            "enum": [
+              "source",
+              "title"
+            ],
+            "type": "string"
+          },
+          "WorkspaceAction": {
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id",
+              "label"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "$ref": "#/$defs/Description"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "parent_id": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request_summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "request_summary",
+          "idempotency_key"
+        ],
+        "title": "GenerateInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ActivationRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "change_id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "change_id",
+              "state",
+              "at"
+            ],
+            "type": "object"
+          },
+          "ArtifactState": {
+            "enum": [
+              "candidate",
+              "validating",
+              "inspect_only",
+              "validated",
+              "published",
+              "active",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "Coalesce": {
+            "enum": [
+              "none",
+              "latest"
+            ],
+            "type": "string"
+          },
+          "CommandDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title_key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title_key"
+            ],
+            "type": "object"
+          },
+          "Content": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "max_items": {
+                    "format": "uint8",
+                    "maximum": 20,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "order": {
+                    "$ref": "#/$defs/TaskOrder"
+                  },
+                  "show_completed": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "const": "tasks_summary_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "max_items",
+                  "show_completed",
+                  "order"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "actions": {
+                    "items": {
+                      "$ref": "#/$defs/WorkspaceAction"
+                    },
+                    "maxItems": 16,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "template": {
+                    "const": "workspace_actions_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "actions"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "DataMigration": {
+            "additionalProperties": false,
+            "properties": {
+              "defaults": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "from_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "remove": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "rename": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "rollback": {
+                "$ref": "#/$defs/RollbackPolicy"
+              }
+            },
+            "required": [
+              "from_version",
+              "rollback"
+            ],
+            "type": "object"
+          },
+          "DataPlan": {
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/DataType"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "migration": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DataMigration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "DataType": {
+            "enum": [
+              "text",
+              "integer",
+              "boolean",
+              "text_list"
+            ],
+            "type": "string"
+          },
+          "Description": {
+            "additionalProperties": false,
+            "properties": {
+              "accent": {
+                "type": "string"
+              },
+              "content": {
+                "$ref": "#/$defs/Content"
+              },
+              "data": {
+                "$ref": "#/$defs/DataPlan",
+                "default": {
+                  "fields": {},
+                  "schema_version": 1
+                }
+              },
+              "format_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "plugin_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint16",
+                "maximum": 640,
+                "minimum": 160,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format_version",
+              "plugin_id",
+              "version",
+              "title",
+              "width",
+              "accent",
+              "content"
+            ],
+            "type": "object"
+          },
+          "Enforcement": {
+            "enum": [
+              "full",
+              "partial",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "EventDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "coalesce": {
+                "$ref": "#/$defs/Coalesce"
+              },
+              "name": {
+                "type": "string"
+              },
+              "schema": true
+            },
+            "required": [
+              "name",
+              "schema",
+              "coalesce"
+            ],
+            "type": "object"
+          },
+          "GenerationBoundary": {
+            "additionalProperties": false,
+            "properties": {
+              "cgroup": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cleanup_complete": {
+                "type": "boolean"
+              },
+              "cpu_max": {
+                "type": "string"
+              },
+              "deadline_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "enforcement": {
+                "$ref": "#/$defs/Enforcement"
+              },
+              "files": {
+                "type": "boolean"
+              },
+              "landlock_abi": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "memory_max": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "network": {
+                "type": "boolean"
+              },
+              "pids_max": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "policy": {
+                "type": "string"
+              },
+              "process_exec_blocked": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "runner_pid": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "enforcement",
+              "policy",
+              "landlock_abi",
+              "files",
+              "network",
+              "process_exec_blocked",
+              "memory_max",
+              "cpu_max",
+              "pids_max",
+              "deadline_ms",
+              "cleanup_complete",
+              "reasons"
+            ],
+            "type": "object"
+          },
+          "GenerationOrigin": {
+            "additionalProperties": false,
+            "properties": {
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_summary": {
+                "type": "string"
+              },
+              "turn_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "request_summary"
+            ],
+            "type": "object"
+          },
+          "GenerationValidation": {
+            "additionalProperties": false,
+            "properties": {
+              "boundary": {
+                "$ref": "#/$defs/GenerationBoundary"
+              },
+              "bundle_sha256": {
+                "type": "string"
+              },
+              "diagnostics": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "preview_opened": {
+                "type": "boolean"
+              },
+              "stages": {
+                "items": {
+                  "$ref": "#/$defs/StageEvidence"
+                },
+                "type": "array"
+              },
+              "test_data": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "bundle_sha256",
+              "boundary",
+              "stages",
+              "test_data",
+              "preview_opened"
+            ],
+            "type": "object"
+          },
+          "HostKind": {
+            "enum": [
+              "qml",
+              "cordis",
+              "core_builtin"
+            ],
+            "type": "string"
+          },
+          "HotSwapLevel": {
+            "enum": [
+              "instant",
+              "controlled_handoff",
+              "host_restart",
+              "session_restart"
+            ],
+            "type": "string"
+          },
+          "IdlePolicy": {
+            "enum": [
+              "resident",
+              "on_demand"
+            ],
+            "type": "string"
+          },
+          "Item": {
+            "additionalProperties": false,
+            "description": "What a package provides or depends on. Exactly one field is set.",
+            "properties": {
+              "capability": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "package": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "service": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "description": "semver range, for `package` dependencies.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "Manifest": {
+            "additionalProperties": false,
+            "properties": {
+              "activation_events": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "author": {
+                "type": "string"
+              },
+              "cleanup": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "commands": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/CommandDecl"
+                },
+                "type": "array"
+              },
+              "config_schema": {
+                "default": {
+                  "type": "object"
+                }
+              },
+              "conflicts": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "data_schema": true,
+              "description": true,
+              "entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "events": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/EventDecl"
+                },
+                "type": "array"
+              },
+              "health": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "host_kind": {
+                "$ref": "#/$defs/HostKind"
+              },
+              "hot_swap": {
+                "$ref": "#/$defs/HotSwapLevel"
+              },
+              "id": {
+                "type": "string"
+              },
+              "idle_policy": {
+                "$ref": "#/$defs/IdlePolicy"
+              },
+              "license": {
+                "type": "string"
+              },
+              "manifest_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "migrations": {
+                "default": [],
+                "items": true,
+                "type": "array"
+              },
+              "name": {
+                "description": "A string, or a `{ locale: text }` object."
+              },
+              "optional": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "permissions": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "platform": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "plugin_kind": {
+                "$ref": "#/$defs/PluginKind"
+              },
+              "provides": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "qml_entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "required_protocol_version": {
+                "type": "string"
+              },
+              "requires": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "rescue": {
+                "$ref": "#/$defs/RescueDecl",
+                "default": {
+                  "disable_safe": false
+                }
+              },
+              "resource_budget": {
+                "$ref": "#/$defs/ResourceBudget",
+                "default": {}
+              },
+              "runtime": {
+                "$ref": "#/$defs/RuntimeRequirement",
+                "default": {}
+              },
+              "shortcuts": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/ShortcutDecl"
+                },
+                "type": "array"
+              },
+              "slots": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "source": {
+                "type": "string"
+              },
+              "trust_level": {
+                "$ref": "#/$defs/TrustLevel"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_version",
+              "id",
+              "version",
+              "name",
+              "author",
+              "license",
+              "source",
+              "plugin_kind",
+              "host_kind",
+              "trust_level",
+              "required_protocol_version",
+              "hot_swap",
+              "health",
+              "cleanup",
+              "idle_policy"
+            ],
+            "type": "object"
+          },
+          "PluginKind": {
+            "enum": [
+              "service",
+              "qml_provider",
+              "declarative_bundle"
+            ],
+            "type": "string"
+          },
+          "PreviewRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "opened": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "job_id",
+              "state",
+              "opened",
+              "at"
+            ],
+            "type": "object"
+          },
+          "RepairBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "failure_fingerprints": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "stopped": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "attempts",
+              "stopped",
+              "failure_fingerprints"
+            ],
+            "type": "object"
+          },
+          "RescueDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "disable_safe": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "ResourceBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "cpu_percent": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "memory_mib": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "RollbackPolicy": {
+            "enum": [
+              "snapshot",
+              "compatible",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "RuntimeRequirement": {
+            "additionalProperties": false,
+            "properties": {
+              "node": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "qt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "ShortcutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "chord": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "chord",
+              "command"
+            ],
+            "type": "object"
+          },
+          "StageEvidence": {
+            "additionalProperties": false,
+            "properties": {
+              "diagnostic": {
+                "type": "string"
+              },
+              "result": {
+                "$ref": "#/$defs/StageResult"
+              },
+              "stage": {
+                "$ref": "#/$defs/ValidationStage"
+              }
+            },
+            "required": [
+              "stage",
+              "result",
+              "diagnostic"
+            ],
+            "type": "object"
+          },
+          "StageResult": {
+            "enum": [
+              "passed",
+              "failed",
+              "not_run"
+            ],
+            "type": "string"
+          },
+          "TaskOrder": {
+            "enum": [
+              "source",
+              "title"
+            ],
+            "type": "string"
+          },
+          "TimeoutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "timeout_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "timeout_ms"
+            ],
+            "type": "object"
+          },
+          "TrustLevel": {
+            "enum": [
+              "trusted",
+              "community",
+              "untrusted"
+            ],
+            "type": "string"
+          },
+          "ValidationStage": {
+            "enum": [
+              "syntax",
+              "contract",
+              "load",
+              "focus",
+              "interaction"
+            ],
+            "type": "string"
+          },
+          "WorkspaceAction": {
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id",
+              "label"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "activations": {
+            "items": {
+              "$ref": "#/$defs/ActivationRecord"
+            },
+            "type": "array"
+          },
+          "artifact_id": {
+            "type": "string"
+          },
+          "bundle_sha256": {
+            "type": "string"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "config_schema": true,
+          "created_at": {
+            "type": "string"
+          },
+          "dependencies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "description": {
+            "$ref": "#/$defs/Description"
+          },
+          "manifest": {
+            "$ref": "#/$defs/Manifest"
+          },
+          "origin": {
+            "$ref": "#/$defs/GenerationOrigin"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previews": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/PreviewRecord"
+            },
+            "type": "array"
+          },
+          "repair": {
+            "$ref": "#/$defs/RepairBudget"
+          },
+          "source_files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "state": {
+            "$ref": "#/$defs/ArtifactState"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/GenerationValidation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validation_job_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "artifact_id",
+          "description",
+          "manifest",
+          "dependencies",
+          "source_files",
+          "config_schema",
+          "origin",
+          "bundle_sha256",
+          "created_at",
+          "state",
+          "repair",
+          "activations",
+          "changed_fields"
+        ],
+        "title": "GeneratedArtifact",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.plugins.development.get",
+      "resource_scope": [
+        "plugins.develop"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.get",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "title": "ArtifactInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ActivationRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "change_id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "change_id",
+              "state",
+              "at"
+            ],
+            "type": "object"
+          },
+          "ArtifactState": {
+            "enum": [
+              "candidate",
+              "validating",
+              "inspect_only",
+              "validated",
+              "published",
+              "active",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "Coalesce": {
+            "enum": [
+              "none",
+              "latest"
+            ],
+            "type": "string"
+          },
+          "CommandDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title_key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title_key"
+            ],
+            "type": "object"
+          },
+          "Content": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "max_items": {
+                    "format": "uint8",
+                    "maximum": 20,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "order": {
+                    "$ref": "#/$defs/TaskOrder"
+                  },
+                  "show_completed": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "const": "tasks_summary_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "max_items",
+                  "show_completed",
+                  "order"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "actions": {
+                    "items": {
+                      "$ref": "#/$defs/WorkspaceAction"
+                    },
+                    "maxItems": 16,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "template": {
+                    "const": "workspace_actions_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "actions"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "DataMigration": {
+            "additionalProperties": false,
+            "properties": {
+              "defaults": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "from_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "remove": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "rename": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "rollback": {
+                "$ref": "#/$defs/RollbackPolicy"
+              }
+            },
+            "required": [
+              "from_version",
+              "rollback"
+            ],
+            "type": "object"
+          },
+          "DataPlan": {
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/DataType"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "migration": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DataMigration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "DataType": {
+            "enum": [
+              "text",
+              "integer",
+              "boolean",
+              "text_list"
+            ],
+            "type": "string"
+          },
+          "Description": {
+            "additionalProperties": false,
+            "properties": {
+              "accent": {
+                "type": "string"
+              },
+              "content": {
+                "$ref": "#/$defs/Content"
+              },
+              "data": {
+                "$ref": "#/$defs/DataPlan",
+                "default": {
+                  "fields": {},
+                  "schema_version": 1
+                }
+              },
+              "format_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "plugin_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint16",
+                "maximum": 640,
+                "minimum": 160,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format_version",
+              "plugin_id",
+              "version",
+              "title",
+              "width",
+              "accent",
+              "content"
+            ],
+            "type": "object"
+          },
+          "Enforcement": {
+            "enum": [
+              "full",
+              "partial",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "EventDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "coalesce": {
+                "$ref": "#/$defs/Coalesce"
+              },
+              "name": {
+                "type": "string"
+              },
+              "schema": true
+            },
+            "required": [
+              "name",
+              "schema",
+              "coalesce"
+            ],
+            "type": "object"
+          },
+          "GenerationBoundary": {
+            "additionalProperties": false,
+            "properties": {
+              "cgroup": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cleanup_complete": {
+                "type": "boolean"
+              },
+              "cpu_max": {
+                "type": "string"
+              },
+              "deadline_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "enforcement": {
+                "$ref": "#/$defs/Enforcement"
+              },
+              "files": {
+                "type": "boolean"
+              },
+              "landlock_abi": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "memory_max": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "network": {
+                "type": "boolean"
+              },
+              "pids_max": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "policy": {
+                "type": "string"
+              },
+              "process_exec_blocked": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "runner_pid": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "enforcement",
+              "policy",
+              "landlock_abi",
+              "files",
+              "network",
+              "process_exec_blocked",
+              "memory_max",
+              "cpu_max",
+              "pids_max",
+              "deadline_ms",
+              "cleanup_complete",
+              "reasons"
+            ],
+            "type": "object"
+          },
+          "GenerationOrigin": {
+            "additionalProperties": false,
+            "properties": {
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_summary": {
+                "type": "string"
+              },
+              "turn_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "request_summary"
+            ],
+            "type": "object"
+          },
+          "GenerationValidation": {
+            "additionalProperties": false,
+            "properties": {
+              "boundary": {
+                "$ref": "#/$defs/GenerationBoundary"
+              },
+              "bundle_sha256": {
+                "type": "string"
+              },
+              "diagnostics": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "preview_opened": {
+                "type": "boolean"
+              },
+              "stages": {
+                "items": {
+                  "$ref": "#/$defs/StageEvidence"
+                },
+                "type": "array"
+              },
+              "test_data": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "bundle_sha256",
+              "boundary",
+              "stages",
+              "test_data",
+              "preview_opened"
+            ],
+            "type": "object"
+          },
+          "HostKind": {
+            "enum": [
+              "qml",
+              "cordis",
+              "core_builtin"
+            ],
+            "type": "string"
+          },
+          "HotSwapLevel": {
+            "enum": [
+              "instant",
+              "controlled_handoff",
+              "host_restart",
+              "session_restart"
+            ],
+            "type": "string"
+          },
+          "IdlePolicy": {
+            "enum": [
+              "resident",
+              "on_demand"
+            ],
+            "type": "string"
+          },
+          "Item": {
+            "additionalProperties": false,
+            "description": "What a package provides or depends on. Exactly one field is set.",
+            "properties": {
+              "capability": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "package": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "service": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "description": "semver range, for `package` dependencies.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "Manifest": {
+            "additionalProperties": false,
+            "properties": {
+              "activation_events": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "author": {
+                "type": "string"
+              },
+              "cleanup": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "commands": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/CommandDecl"
+                },
+                "type": "array"
+              },
+              "config_schema": {
+                "default": {
+                  "type": "object"
+                }
+              },
+              "conflicts": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "data_schema": true,
+              "description": true,
+              "entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "events": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/EventDecl"
+                },
+                "type": "array"
+              },
+              "health": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "host_kind": {
+                "$ref": "#/$defs/HostKind"
+              },
+              "hot_swap": {
+                "$ref": "#/$defs/HotSwapLevel"
+              },
+              "id": {
+                "type": "string"
+              },
+              "idle_policy": {
+                "$ref": "#/$defs/IdlePolicy"
+              },
+              "license": {
+                "type": "string"
+              },
+              "manifest_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "migrations": {
+                "default": [],
+                "items": true,
+                "type": "array"
+              },
+              "name": {
+                "description": "A string, or a `{ locale: text }` object."
+              },
+              "optional": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "permissions": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "platform": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "plugin_kind": {
+                "$ref": "#/$defs/PluginKind"
+              },
+              "provides": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "qml_entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "required_protocol_version": {
+                "type": "string"
+              },
+              "requires": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "rescue": {
+                "$ref": "#/$defs/RescueDecl",
+                "default": {
+                  "disable_safe": false
+                }
+              },
+              "resource_budget": {
+                "$ref": "#/$defs/ResourceBudget",
+                "default": {}
+              },
+              "runtime": {
+                "$ref": "#/$defs/RuntimeRequirement",
+                "default": {}
+              },
+              "shortcuts": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/ShortcutDecl"
+                },
+                "type": "array"
+              },
+              "slots": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "source": {
+                "type": "string"
+              },
+              "trust_level": {
+                "$ref": "#/$defs/TrustLevel"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_version",
+              "id",
+              "version",
+              "name",
+              "author",
+              "license",
+              "source",
+              "plugin_kind",
+              "host_kind",
+              "trust_level",
+              "required_protocol_version",
+              "hot_swap",
+              "health",
+              "cleanup",
+              "idle_policy"
+            ],
+            "type": "object"
+          },
+          "PluginKind": {
+            "enum": [
+              "service",
+              "qml_provider",
+              "declarative_bundle"
+            ],
+            "type": "string"
+          },
+          "PreviewRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "opened": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "job_id",
+              "state",
+              "opened",
+              "at"
+            ],
+            "type": "object"
+          },
+          "RepairBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "failure_fingerprints": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "stopped": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "attempts",
+              "stopped",
+              "failure_fingerprints"
+            ],
+            "type": "object"
+          },
+          "RescueDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "disable_safe": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "ResourceBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "cpu_percent": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "memory_mib": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "RollbackPolicy": {
+            "enum": [
+              "snapshot",
+              "compatible",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "RuntimeRequirement": {
+            "additionalProperties": false,
+            "properties": {
+              "node": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "qt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "ShortcutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "chord": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "chord",
+              "command"
+            ],
+            "type": "object"
+          },
+          "StageEvidence": {
+            "additionalProperties": false,
+            "properties": {
+              "diagnostic": {
+                "type": "string"
+              },
+              "result": {
+                "$ref": "#/$defs/StageResult"
+              },
+              "stage": {
+                "$ref": "#/$defs/ValidationStage"
+              }
+            },
+            "required": [
+              "stage",
+              "result",
+              "diagnostic"
+            ],
+            "type": "object"
+          },
+          "StageResult": {
+            "enum": [
+              "passed",
+              "failed",
+              "not_run"
+            ],
+            "type": "string"
+          },
+          "TaskOrder": {
+            "enum": [
+              "source",
+              "title"
+            ],
+            "type": "string"
+          },
+          "TimeoutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "timeout_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "timeout_ms"
+            ],
+            "type": "object"
+          },
+          "TrustLevel": {
+            "enum": [
+              "trusted",
+              "community",
+              "untrusted"
+            ],
+            "type": "string"
+          },
+          "ValidationStage": {
+            "enum": [
+              "syntax",
+              "contract",
+              "load",
+              "focus",
+              "interaction"
+            ],
+            "type": "string"
+          },
+          "WorkspaceAction": {
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id",
+              "label"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "activations": {
+            "items": {
+              "$ref": "#/$defs/ActivationRecord"
+            },
+            "type": "array"
+          },
+          "artifact_id": {
+            "type": "string"
+          },
+          "bundle_sha256": {
+            "type": "string"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "config_schema": true,
+          "created_at": {
+            "type": "string"
+          },
+          "dependencies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "description": {
+            "$ref": "#/$defs/Description"
+          },
+          "manifest": {
+            "$ref": "#/$defs/Manifest"
+          },
+          "origin": {
+            "$ref": "#/$defs/GenerationOrigin"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previews": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/PreviewRecord"
+            },
+            "type": "array"
+          },
+          "repair": {
+            "$ref": "#/$defs/RepairBudget"
+          },
+          "source_files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "state": {
+            "$ref": "#/$defs/ArtifactState"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/GenerationValidation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validation_job_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "artifact_id",
+          "description",
+          "manifest",
+          "dependencies",
+          "source_files",
+          "config_schema",
+          "origin",
+          "bundle_sha256",
+          "created_at",
+          "state",
+          "repair",
+          "activations",
+          "changed_fields"
+        ],
+        "title": "GeneratedArtifact",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "desktop.read"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.list",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "title": "Empty",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ActivationRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "change_id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "change_id",
+              "state",
+              "at"
+            ],
+            "type": "object"
+          },
+          "ArtifactState": {
+            "enum": [
+              "candidate",
+              "validating",
+              "inspect_only",
+              "validated",
+              "published",
+              "active",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "Coalesce": {
+            "enum": [
+              "none",
+              "latest"
+            ],
+            "type": "string"
+          },
+          "CommandDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title_key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title_key"
+            ],
+            "type": "object"
+          },
+          "Content": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "max_items": {
+                    "format": "uint8",
+                    "maximum": 20,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "order": {
+                    "$ref": "#/$defs/TaskOrder"
+                  },
+                  "show_completed": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "const": "tasks_summary_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "max_items",
+                  "show_completed",
+                  "order"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "actions": {
+                    "items": {
+                      "$ref": "#/$defs/WorkspaceAction"
+                    },
+                    "maxItems": 16,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "template": {
+                    "const": "workspace_actions_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "actions"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "DataMigration": {
+            "additionalProperties": false,
+            "properties": {
+              "defaults": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "from_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "remove": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "rename": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "rollback": {
+                "$ref": "#/$defs/RollbackPolicy"
+              }
+            },
+            "required": [
+              "from_version",
+              "rollback"
+            ],
+            "type": "object"
+          },
+          "DataPlan": {
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/DataType"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "migration": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DataMigration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "DataType": {
+            "enum": [
+              "text",
+              "integer",
+              "boolean",
+              "text_list"
+            ],
+            "type": "string"
+          },
+          "Description": {
+            "additionalProperties": false,
+            "properties": {
+              "accent": {
+                "type": "string"
+              },
+              "content": {
+                "$ref": "#/$defs/Content"
+              },
+              "data": {
+                "$ref": "#/$defs/DataPlan",
+                "default": {
+                  "fields": {},
+                  "schema_version": 1
+                }
+              },
+              "format_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "plugin_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint16",
+                "maximum": 640,
+                "minimum": 160,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format_version",
+              "plugin_id",
+              "version",
+              "title",
+              "width",
+              "accent",
+              "content"
+            ],
+            "type": "object"
+          },
+          "Enforcement": {
+            "enum": [
+              "full",
+              "partial",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "EventDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "coalesce": {
+                "$ref": "#/$defs/Coalesce"
+              },
+              "name": {
+                "type": "string"
+              },
+              "schema": true
+            },
+            "required": [
+              "name",
+              "schema",
+              "coalesce"
+            ],
+            "type": "object"
+          },
+          "GeneratedArtifact": {
+            "additionalProperties": false,
+            "properties": {
+              "activations": {
+                "items": {
+                  "$ref": "#/$defs/ActivationRecord"
+                },
+                "type": "array"
+              },
+              "artifact_id": {
+                "type": "string"
+              },
+              "bundle_sha256": {
+                "type": "string"
+              },
+              "changed_fields": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "config_schema": true,
+              "created_at": {
+                "type": "string"
+              },
+              "dependencies": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "description": {
+                "$ref": "#/$defs/Description"
+              },
+              "manifest": {
+                "$ref": "#/$defs/Manifest"
+              },
+              "origin": {
+                "$ref": "#/$defs/GenerationOrigin"
+              },
+              "parent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "previews": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/PreviewRecord"
+                },
+                "type": "array"
+              },
+              "repair": {
+                "$ref": "#/$defs/RepairBudget"
+              },
+              "source_files": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "state": {
+                "$ref": "#/$defs/ArtifactState"
+              },
+              "validation": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/GenerationValidation"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "validation_job_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "artifact_id",
+              "description",
+              "manifest",
+              "dependencies",
+              "source_files",
+              "config_schema",
+              "origin",
+              "bundle_sha256",
+              "created_at",
+              "state",
+              "repair",
+              "activations",
+              "changed_fields"
+            ],
+            "type": "object"
+          },
+          "GenerationBoundary": {
+            "additionalProperties": false,
+            "properties": {
+              "cgroup": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cleanup_complete": {
+                "type": "boolean"
+              },
+              "cpu_max": {
+                "type": "string"
+              },
+              "deadline_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "enforcement": {
+                "$ref": "#/$defs/Enforcement"
+              },
+              "files": {
+                "type": "boolean"
+              },
+              "landlock_abi": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "memory_max": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "network": {
+                "type": "boolean"
+              },
+              "pids_max": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "policy": {
+                "type": "string"
+              },
+              "process_exec_blocked": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "runner_pid": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "enforcement",
+              "policy",
+              "landlock_abi",
+              "files",
+              "network",
+              "process_exec_blocked",
+              "memory_max",
+              "cpu_max",
+              "pids_max",
+              "deadline_ms",
+              "cleanup_complete",
+              "reasons"
+            ],
+            "type": "object"
+          },
+          "GenerationOrigin": {
+            "additionalProperties": false,
+            "properties": {
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_summary": {
+                "type": "string"
+              },
+              "turn_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "request_summary"
+            ],
+            "type": "object"
+          },
+          "GenerationValidation": {
+            "additionalProperties": false,
+            "properties": {
+              "boundary": {
+                "$ref": "#/$defs/GenerationBoundary"
+              },
+              "bundle_sha256": {
+                "type": "string"
+              },
+              "diagnostics": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "preview_opened": {
+                "type": "boolean"
+              },
+              "stages": {
+                "items": {
+                  "$ref": "#/$defs/StageEvidence"
+                },
+                "type": "array"
+              },
+              "test_data": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "bundle_sha256",
+              "boundary",
+              "stages",
+              "test_data",
+              "preview_opened"
+            ],
+            "type": "object"
+          },
+          "HostKind": {
+            "enum": [
+              "qml",
+              "cordis",
+              "core_builtin"
+            ],
+            "type": "string"
+          },
+          "HotSwapLevel": {
+            "enum": [
+              "instant",
+              "controlled_handoff",
+              "host_restart",
+              "session_restart"
+            ],
+            "type": "string"
+          },
+          "IdlePolicy": {
+            "enum": [
+              "resident",
+              "on_demand"
+            ],
+            "type": "string"
+          },
+          "Item": {
+            "additionalProperties": false,
+            "description": "What a package provides or depends on. Exactly one field is set.",
+            "properties": {
+              "capability": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "package": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "service": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "description": "semver range, for `package` dependencies.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "Manifest": {
+            "additionalProperties": false,
+            "properties": {
+              "activation_events": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "author": {
+                "type": "string"
+              },
+              "cleanup": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "commands": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/CommandDecl"
+                },
+                "type": "array"
+              },
+              "config_schema": {
+                "default": {
+                  "type": "object"
+                }
+              },
+              "conflicts": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "data_schema": true,
+              "description": true,
+              "entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "events": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/EventDecl"
+                },
+                "type": "array"
+              },
+              "health": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "host_kind": {
+                "$ref": "#/$defs/HostKind"
+              },
+              "hot_swap": {
+                "$ref": "#/$defs/HotSwapLevel"
+              },
+              "id": {
+                "type": "string"
+              },
+              "idle_policy": {
+                "$ref": "#/$defs/IdlePolicy"
+              },
+              "license": {
+                "type": "string"
+              },
+              "manifest_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "migrations": {
+                "default": [],
+                "items": true,
+                "type": "array"
+              },
+              "name": {
+                "description": "A string, or a `{ locale: text }` object."
+              },
+              "optional": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "permissions": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "platform": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "plugin_kind": {
+                "$ref": "#/$defs/PluginKind"
+              },
+              "provides": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "qml_entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "required_protocol_version": {
+                "type": "string"
+              },
+              "requires": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "rescue": {
+                "$ref": "#/$defs/RescueDecl",
+                "default": {
+                  "disable_safe": false
+                }
+              },
+              "resource_budget": {
+                "$ref": "#/$defs/ResourceBudget",
+                "default": {}
+              },
+              "runtime": {
+                "$ref": "#/$defs/RuntimeRequirement",
+                "default": {}
+              },
+              "shortcuts": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/ShortcutDecl"
+                },
+                "type": "array"
+              },
+              "slots": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "source": {
+                "type": "string"
+              },
+              "trust_level": {
+                "$ref": "#/$defs/TrustLevel"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_version",
+              "id",
+              "version",
+              "name",
+              "author",
+              "license",
+              "source",
+              "plugin_kind",
+              "host_kind",
+              "trust_level",
+              "required_protocol_version",
+              "hot_swap",
+              "health",
+              "cleanup",
+              "idle_policy"
+            ],
+            "type": "object"
+          },
+          "PluginKind": {
+            "enum": [
+              "service",
+              "qml_provider",
+              "declarative_bundle"
+            ],
+            "type": "string"
+          },
+          "PreviewRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "opened": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "job_id",
+              "state",
+              "opened",
+              "at"
+            ],
+            "type": "object"
+          },
+          "RepairBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "failure_fingerprints": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "stopped": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "attempts",
+              "stopped",
+              "failure_fingerprints"
+            ],
+            "type": "object"
+          },
+          "RescueDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "disable_safe": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "ResourceBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "cpu_percent": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "memory_mib": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "RollbackPolicy": {
+            "enum": [
+              "snapshot",
+              "compatible",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "RuntimeRequirement": {
+            "additionalProperties": false,
+            "properties": {
+              "node": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "qt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "ShortcutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "chord": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "chord",
+              "command"
+            ],
+            "type": "object"
+          },
+          "StageEvidence": {
+            "additionalProperties": false,
+            "properties": {
+              "diagnostic": {
+                "type": "string"
+              },
+              "result": {
+                "$ref": "#/$defs/StageResult"
+              },
+              "stage": {
+                "$ref": "#/$defs/ValidationStage"
+              }
+            },
+            "required": [
+              "stage",
+              "result",
+              "diagnostic"
+            ],
+            "type": "object"
+          },
+          "StageResult": {
+            "enum": [
+              "passed",
+              "failed",
+              "not_run"
+            ],
+            "type": "string"
+          },
+          "TaskOrder": {
+            "enum": [
+              "source",
+              "title"
+            ],
+            "type": "string"
+          },
+          "TimeoutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "timeout_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "timeout_ms"
+            ],
+            "type": "object"
+          },
+          "TrustLevel": {
+            "enum": [
+              "trusted",
+              "community",
+              "untrusted"
+            ],
+            "type": "string"
+          },
+          "ValidationStage": {
+            "enum": [
+              "syntax",
+              "contract",
+              "load",
+              "focus",
+              "interaction"
+            ],
+            "type": "string"
+          },
+          "WorkspaceAction": {
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id",
+              "label"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/$defs/GeneratedArtifact"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "artifacts"
+        ],
+        "title": "ArtifactsOutput",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "desktop.read"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.validate",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "key-based",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "idempotency_key"
+        ],
+        "title": "GenerationJobInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "JobState": {
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cancellable": {
+            "default": false,
+            "description": "Whether `desktop.jobs.cancel` can stop it now.",
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "error_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "owner": {
+            "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "result": true,
+          "state": {
+            "$ref": "#/$defs/JobState"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "kind",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.jobs.get",
+      "resource_scope": [
+        "plugins.develop"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.preview",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "key-based",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "idempotency_key"
+        ],
+        "title": "GenerationJobInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "JobState": {
+            "oneOf": [
+              {
+                "enum": [
+                  "queued",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "cancelling",
+                "description": "Cancel was asked of a running job; it ends `cancelled` once its\nworker is gone (or with its real outcome if that came first).",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cancellable": {
+            "default": false,
+            "description": "Whether `desktop.jobs.cancel` can stop it now.",
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "error_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "owner": {
+            "description": "The subject that submitted it (`agent`, `shell`, `cli`); Core owns\nthe job from then on, whoever leaves.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phase": {
+            "description": "What the worker reports it is doing (`hashing 3/12`, …).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "progress": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "result": true,
+          "state": {
+            "$ref": "#/$defs/JobState"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "kind",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.jobs.get",
+      "resource_scope": [
+        "plugins.develop"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.publish",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "title": "ArtifactInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ActivationRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "change_id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "change_id",
+              "state",
+              "at"
+            ],
+            "type": "object"
+          },
+          "ArtifactState": {
+            "enum": [
+              "candidate",
+              "validating",
+              "inspect_only",
+              "validated",
+              "published",
+              "active",
+              "failed"
+            ],
+            "type": "string"
+          },
+          "Coalesce": {
+            "enum": [
+              "none",
+              "latest"
+            ],
+            "type": "string"
+          },
+          "CommandDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title_key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title_key"
+            ],
+            "type": "object"
+          },
+          "Content": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "max_items": {
+                    "format": "uint8",
+                    "maximum": 20,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "order": {
+                    "$ref": "#/$defs/TaskOrder"
+                  },
+                  "show_completed": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "const": "tasks_summary_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "max_items",
+                  "show_completed",
+                  "order"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "actions": {
+                    "items": {
+                      "$ref": "#/$defs/WorkspaceAction"
+                    },
+                    "maxItems": 16,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "template": {
+                    "const": "workspace_actions_v1",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "template",
+                  "actions"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "DataMigration": {
+            "additionalProperties": false,
+            "properties": {
+              "defaults": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "from_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "remove": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "rename": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "rollback": {
+                "$ref": "#/$defs/RollbackPolicy"
+              }
+            },
+            "required": [
+              "from_version",
+              "rollback"
+            ],
+            "type": "object"
+          },
+          "DataPlan": {
+            "additionalProperties": false,
+            "properties": {
+              "fields": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/DataType"
+                },
+                "default": {},
+                "type": "object"
+              },
+              "migration": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/DataMigration"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "schema_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "schema_version"
+            ],
+            "type": "object"
+          },
+          "DataType": {
+            "enum": [
+              "text",
+              "integer",
+              "boolean",
+              "text_list"
+            ],
+            "type": "string"
+          },
+          "Description": {
+            "additionalProperties": false,
+            "properties": {
+              "accent": {
+                "type": "string"
+              },
+              "content": {
+                "$ref": "#/$defs/Content"
+              },
+              "data": {
+                "$ref": "#/$defs/DataPlan",
+                "default": {
+                  "fields": {},
+                  "schema_version": 1
+                }
+              },
+              "format_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "plugin_id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "width": {
+                "format": "uint16",
+                "maximum": 640,
+                "minimum": 160,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "format_version",
+              "plugin_id",
+              "version",
+              "title",
+              "width",
+              "accent",
+              "content"
+            ],
+            "type": "object"
+          },
+          "Enforcement": {
+            "enum": [
+              "full",
+              "partial",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "EventDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "coalesce": {
+                "$ref": "#/$defs/Coalesce"
+              },
+              "name": {
+                "type": "string"
+              },
+              "schema": true
+            },
+            "required": [
+              "name",
+              "schema",
+              "coalesce"
+            ],
+            "type": "object"
+          },
+          "GenerationBoundary": {
+            "additionalProperties": false,
+            "properties": {
+              "cgroup": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cleanup_complete": {
+                "type": "boolean"
+              },
+              "cpu_max": {
+                "type": "string"
+              },
+              "deadline_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "enforcement": {
+                "$ref": "#/$defs/Enforcement"
+              },
+              "files": {
+                "type": "boolean"
+              },
+              "landlock_abi": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "memory_max": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "network": {
+                "type": "boolean"
+              },
+              "pids_max": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "policy": {
+                "type": "string"
+              },
+              "process_exec_blocked": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "runner_pid": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "enforcement",
+              "policy",
+              "landlock_abi",
+              "files",
+              "network",
+              "process_exec_blocked",
+              "memory_max",
+              "cpu_max",
+              "pids_max",
+              "deadline_ms",
+              "cleanup_complete",
+              "reasons"
+            ],
+            "type": "object"
+          },
+          "GenerationOrigin": {
+            "additionalProperties": false,
+            "properties": {
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_summary": {
+                "type": "string"
+              },
+              "turn_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "request_summary"
+            ],
+            "type": "object"
+          },
+          "GenerationValidation": {
+            "additionalProperties": false,
+            "properties": {
+              "boundary": {
+                "$ref": "#/$defs/GenerationBoundary"
+              },
+              "bundle_sha256": {
+                "type": "string"
+              },
+              "diagnostics": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "preview_opened": {
+                "type": "boolean"
+              },
+              "stages": {
+                "items": {
+                  "$ref": "#/$defs/StageEvidence"
+                },
+                "type": "array"
+              },
+              "test_data": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "bundle_sha256",
+              "boundary",
+              "stages",
+              "test_data",
+              "preview_opened"
+            ],
+            "type": "object"
+          },
+          "HostKind": {
+            "enum": [
+              "qml",
+              "cordis",
+              "core_builtin"
+            ],
+            "type": "string"
+          },
+          "HotSwapLevel": {
+            "enum": [
+              "instant",
+              "controlled_handoff",
+              "host_restart",
+              "session_restart"
+            ],
+            "type": "string"
+          },
+          "IdlePolicy": {
+            "enum": [
+              "resident",
+              "on_demand"
+            ],
+            "type": "string"
+          },
+          "Item": {
+            "additionalProperties": false,
+            "description": "What a package provides or depends on. Exactly one field is set.",
+            "properties": {
+              "capability": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "package": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "service": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "description": "semver range, for `package` dependencies.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "Manifest": {
+            "additionalProperties": false,
+            "properties": {
+              "activation_events": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "author": {
+                "type": "string"
+              },
+              "cleanup": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "commands": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/CommandDecl"
+                },
+                "type": "array"
+              },
+              "config_schema": {
+                "default": {
+                  "type": "object"
+                }
+              },
+              "conflicts": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "data_schema": true,
+              "description": true,
+              "entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "events": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/EventDecl"
+                },
+                "type": "array"
+              },
+              "health": {
+                "$ref": "#/$defs/TimeoutDecl"
+              },
+              "host_kind": {
+                "$ref": "#/$defs/HostKind"
+              },
+              "hot_swap": {
+                "$ref": "#/$defs/HotSwapLevel"
+              },
+              "id": {
+                "type": "string"
+              },
+              "idle_policy": {
+                "$ref": "#/$defs/IdlePolicy"
+              },
+              "license": {
+                "type": "string"
+              },
+              "manifest_version": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "migrations": {
+                "default": [],
+                "items": true,
+                "type": "array"
+              },
+              "name": {
+                "description": "A string, or a `{ locale: text }` object."
+              },
+              "optional": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "permissions": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "platform": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "plugin_kind": {
+                "$ref": "#/$defs/PluginKind"
+              },
+              "provides": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "qml_entry": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "required_protocol_version": {
+                "type": "string"
+              },
+              "requires": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/Item"
+                },
+                "type": "array"
+              },
+              "rescue": {
+                "$ref": "#/$defs/RescueDecl",
+                "default": {
+                  "disable_safe": false
+                }
+              },
+              "resource_budget": {
+                "$ref": "#/$defs/ResourceBudget",
+                "default": {}
+              },
+              "runtime": {
+                "$ref": "#/$defs/RuntimeRequirement",
+                "default": {}
+              },
+              "shortcuts": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/ShortcutDecl"
+                },
+                "type": "array"
+              },
+              "slots": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "source": {
+                "type": "string"
+              },
+              "trust_level": {
+                "$ref": "#/$defs/TrustLevel"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "manifest_version",
+              "id",
+              "version",
+              "name",
+              "author",
+              "license",
+              "source",
+              "plugin_kind",
+              "host_kind",
+              "trust_level",
+              "required_protocol_version",
+              "hot_swap",
+              "health",
+              "cleanup",
+              "idle_policy"
+            ],
+            "type": "object"
+          },
+          "PluginKind": {
+            "enum": [
+              "service",
+              "qml_provider",
+              "declarative_bundle"
+            ],
+            "type": "string"
+          },
+          "PreviewRecord": {
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "job_id": {
+                "type": "string"
+              },
+              "opened": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "job_id",
+              "state",
+              "opened",
+              "at"
+            ],
+            "type": "object"
+          },
+          "RepairBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "failure_fingerprints": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "stopped": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "attempts",
+              "stopped",
+              "failure_fingerprints"
+            ],
+            "type": "object"
+          },
+          "RescueDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "disable_safe": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "ResourceBudget": {
+            "additionalProperties": false,
+            "properties": {
+              "cpu_percent": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "memory_mib": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "RollbackPolicy": {
+            "enum": [
+              "snapshot",
+              "compatible",
+              "unavailable"
+            ],
+            "type": "string"
+          },
+          "RuntimeRequirement": {
+            "additionalProperties": false,
+            "properties": {
+              "node": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "qt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "ShortcutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "chord": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "chord",
+              "command"
+            ],
+            "type": "object"
+          },
+          "StageEvidence": {
+            "additionalProperties": false,
+            "properties": {
+              "diagnostic": {
+                "type": "string"
+              },
+              "result": {
+                "$ref": "#/$defs/StageResult"
+              },
+              "stage": {
+                "$ref": "#/$defs/ValidationStage"
+              }
+            },
+            "required": [
+              "stage",
+              "result",
+              "diagnostic"
+            ],
+            "type": "object"
+          },
+          "StageResult": {
+            "enum": [
+              "passed",
+              "failed",
+              "not_run"
+            ],
+            "type": "string"
+          },
+          "TaskOrder": {
+            "enum": [
+              "source",
+              "title"
+            ],
+            "type": "string"
+          },
+          "TimeoutDecl": {
+            "additionalProperties": false,
+            "properties": {
+              "timeout_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "timeout_ms"
+            ],
+            "type": "object"
+          },
+          "TrustLevel": {
+            "enum": [
+              "trusted",
+              "community",
+              "untrusted"
+            ],
+            "type": "string"
+          },
+          "ValidationStage": {
+            "enum": [
+              "syntax",
+              "contract",
+              "load",
+              "focus",
+              "interaction"
+            ],
+            "type": "string"
+          },
+          "WorkspaceAction": {
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "workspace_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "workspace_id",
+              "label"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "activations": {
+            "items": {
+              "$ref": "#/$defs/ActivationRecord"
+            },
+            "type": "array"
+          },
+          "artifact_id": {
+            "type": "string"
+          },
+          "bundle_sha256": {
+            "type": "string"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "config_schema": true,
+          "created_at": {
+            "type": "string"
+          },
+          "dependencies": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "description": {
+            "$ref": "#/$defs/Description"
+          },
+          "manifest": {
+            "$ref": "#/$defs/Manifest"
+          },
+          "origin": {
+            "$ref": "#/$defs/GenerationOrigin"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previews": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/PreviewRecord"
+            },
+            "type": "array"
+          },
+          "repair": {
+            "$ref": "#/$defs/RepairBudget"
+          },
+          "source_files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "state": {
+            "$ref": "#/$defs/ArtifactState"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/GenerationValidation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validation_job_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "artifact_id",
+          "description",
+          "manifest",
+          "dependencies",
+          "source_files",
+          "config_schema",
+          "origin",
+          "bundle_sha256",
+          "created_at",
+          "state",
+          "repair",
+          "activations",
+          "changed_fields"
+        ],
+        "title": "GeneratedArtifact",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.plugins.development.get",
+      "resource_scope": [
+        "plugins.develop"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.activate",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "preflight_rejected",
+        "internal"
+      ],
+      "idempotency": "key-based",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "base_revision": {
+            "type": "string"
+          },
+          "entry_id": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "base_revision",
+          "idempotency_key"
+        ],
+        "title": "GenerationActivateInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ChangeCard": {
+            "additionalProperties": false,
+            "description": "The change card: prototype contract (kind, title, items, footnote), with\ntranslation keys instead of text.",
+            "properties": {
+              "footnote_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "items": {
+                "items": {
+                  "$ref": "#/$defs/DiffItem"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "title_args": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "title_key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "title_key",
+              "items"
+            ],
+            "type": "object"
+          },
+          "ChangeOp": {
+            "description": "`before` fields are intent: Core refills them from the base revision and\nrefuses the change when a caller-supplied value disagrees, because the\ncaller planned against a state that no longer exists.",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "after": true,
+                  "before": true,
+                  "op": {
+                    "const": "set_value",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "JSON pointer into the document, limited to `/appearance`, `/avatar`,\n`/layout` and `/shortcuts`.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "path",
+                  "after"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "entry": {
+                    "$ref": "#/$defs/NewEntry"
+                  },
+                  "op": {
+                    "const": "add_entry",
+                    "type": "string"
+                  },
+                  "slot": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "entry"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "entry_id": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "const": "remove_entry",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "entry_id"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "after": {
+                    "additionalProperties": true,
+                    "description": "The whole new config. Preflight accepts only an object, and the\nschema says so, so a model is not left to guess (a JSON-encoded\nstring is rejected, never parsed).",
+                    "type": "object"
+                  },
+                  "before": true,
+                  "entry_id": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "const": "set_entry_config",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "entry_id",
+                  "after"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "disabled": {
+                    "type": "boolean"
+                  },
+                  "entry_id": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "const": "set_entry_disabled",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "entry_id",
+                  "disabled"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "entry_id": {
+                    "type": "string"
+                  },
+                  "from_version": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "const": "upgrade_entry",
+                    "type": "string"
+                  },
+                  "to_version": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "entry_id",
+                  "from_version",
+                  "to_version"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "from": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "op": {
+                    "const": "bind_slot",
+                    "type": "string"
+                  },
+                  "slot": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "slot",
+                  "to"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "op": {
+                    "const": "switch_profile",
+                    "type": "string"
+                  },
+                  "to_profile": {
+                    "type": "string"
+                  },
+                  "to_revision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "to_profile"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "ChangeOrigin": {
+            "oneOf": [
+              {
+                "properties": {
+                  "kind": {
+                    "const": "gui",
+                    "type": "string"
+                  },
+                  "surface": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "cli",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "agent_standin",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "agent",
+                    "type": "string"
+                  },
+                  "session_id": {
+                    "type": "string"
+                  },
+                  "tool_call_id": {
+                    "type": "string"
+                  },
+                  "turn_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "session_id",
+                  "turn_id",
+                  "tool_call_id"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "rescue",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "supervisor",
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "reason"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "timed_revert",
+                    "type": "string"
+                  },
+                  "reverts": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "reverts"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "undo",
+                    "type": "string"
+                  },
+                  "undoes": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "undoes"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "import",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "ChangeState": {
+            "enum": [
+              "draft",
+              "validated",
+              "rejected",
+              "prepared",
+              "aborted",
+              "applying",
+              "verifying",
+              "committed",
+              "rolling_back",
+              "rolled_back",
+              "partially_applied",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "Confirmation": {
+            "oneOf": [
+              {
+                "properties": {
+                  "state": {
+                    "const": "not_required",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "deadline": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "const": "pending",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "deadline"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "const": "confirmed",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "by_change": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "const": "reverted",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "by_change"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "DiffItem": {
+            "additionalProperties": false,
+            "description": "One line of a change card. The label is a translation key so Core never\nemits locale-specific text; the Shell renders it in the Profile's language.",
+            "properties": {
+              "after": true,
+              "before": true,
+              "kind": {
+                "$ref": "#/$defs/DiffKind"
+              },
+              "label_args": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "label_key": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "label_key"
+            ],
+            "type": "object"
+          },
+          "DiffKind": {
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ],
+            "type": "string"
+          },
+          "HostKind": {
+            "enum": [
+              "qml",
+              "cordis",
+              "core_builtin"
+            ],
+            "type": "string"
+          },
+          "HotSwapLevel": {
+            "enum": [
+              "instant",
+              "controlled_handoff",
+              "host_restart",
+              "session_restart"
+            ],
+            "type": "string"
+          },
+          "NewEntry": {
+            "additionalProperties": false,
+            "properties": {
+              "config": {
+                "default": {}
+              },
+              "disabled": {
+                "default": false,
+                "type": "boolean"
+              },
+              "host": {
+                "$ref": "#/$defs/HostKind"
+              },
+              "package": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "package",
+              "version",
+              "host"
+            ],
+            "type": "object"
+          },
+          "OperationSummary": {
+            "additionalProperties": false,
+            "properties": {
+              "ended_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "operation_id": {
+                "type": "string"
+              },
+              "participant": {
+                "type": "string"
+              },
+              "seq": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "started_at": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "step": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation_id",
+              "seq",
+              "participant",
+              "step",
+              "state",
+              "started_at"
+            ],
+            "type": "object"
+          },
+          "OutcomeItem": {
+            "additionalProperties": false,
+            "description": "What happened to one op, as read back. A partial result lists every item.",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "op_index": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "participant": {
+                "type": "string"
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "$ref": "#/$defs/OutcomeStatus"
+              }
+            },
+            "required": [
+              "op_index",
+              "participant",
+              "key",
+              "status"
+            ],
+            "type": "object"
+          },
+          "OutcomeStatus": {
+            "oneOf": [
+              {
+                "enum": [
+                  "applied",
+                  "failed",
+                  "restored",
+                  "not_restored",
+                  "pending"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "scheduled",
+                "description": "Session-restart level: recorded, applied at the next login.",
+                "type": "string"
+              }
+            ]
+          },
+          "PreflightCode": {
+            "enum": [
+              "base_revision_stale",
+              "schema_invalid",
+              "stale_intent",
+              "package_missing",
+              "integrity_mismatch",
+              "protocol_incompatible",
+              "dependency_missing",
+              "dependency_cycle",
+              "version_conflict",
+              "declared_conflict",
+              "single_provider_violation",
+              "shortcut_conflict",
+              "command_conflict",
+              "permission_required",
+              "precondition_failed",
+              "budget_exceeded"
+            ],
+            "type": "string"
+          },
+          "PreflightReason": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "$ref": "#/$defs/PreflightCode"
+              },
+              "detail": {
+                "additionalProperties": true,
+                "default": {},
+                "type": "object"
+              },
+              "detail_key": {
+                "type": "string"
+              },
+              "op_index": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "code",
+              "detail_key"
+            ],
+            "type": "object"
+          },
+          "ResultKind": {
+            "oneOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "failed",
+                  "partial",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "scheduled",
+                "description": "Committed as a revision, but nothing took effect yet: every item is\n`scheduled` (session-restart level: at the next login; in rescue mode:\nwhen the normal mode returns). Never presented as \"applied\".",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "base_revision": {
+            "type": "string"
+          },
+          "card": {
+            "$ref": "#/$defs/ChangeCard"
+          },
+          "change_id": {
+            "type": "string"
+          },
+          "committed_revision": {
+            "description": "The revision this change produced, once committed.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confirmation": {
+            "$ref": "#/$defs/Confirmation"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "failure_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hot_swap_level": {
+            "$ref": "#/$defs/HotSwapLevel"
+          },
+          "idempotency_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "default": [],
+            "description": "Per-op outcomes as read back.",
+            "items": {
+              "$ref": "#/$defs/OutcomeItem"
+            },
+            "type": "array"
+          },
+          "operations": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/OperationSummary"
+            },
+            "type": "array"
+          },
+          "ops": {
+            "items": {
+              "$ref": "#/$defs/ChangeOp"
+            },
+            "type": "array"
+          },
+          "origin": {
+            "$ref": "#/$defs/ChangeOrigin"
+          },
+          "profile_id": {
+            "type": "string"
+          },
+          "reasons": {
+            "default": [],
+            "description": "Every preflight failure, when rejected.",
+            "items": {
+              "$ref": "#/$defs/PreflightReason"
+            },
+            "type": "array"
+          },
+          "recovered_at": {
+            "description": "Set when boot recovery decided this change's outcome.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ResultKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/$defs/ChangeState"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_id",
+          "profile_id",
+          "base_revision",
+          "state",
+          "hot_swap_level",
+          "origin",
+          "ops",
+          "card",
+          "confirmation",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ChangeRecord",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.changes.get",
+      "resource_scope": [
+        "plugins.develop",
+        "desktop.config",
+        "plugins.data"
+      ],
+      "timeout_ms": {
+        "default_ms": 15000,
+        "max_ms": 30000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.data_get",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "title": "ArtifactInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "payload": true,
+          "plugin_id": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schema_version": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "schema_version",
+          "revision",
+          "payload"
+        ],
+        "title": "GeneratedData",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "plugins.data"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "always"
+      },
+      "cancellable": false,
+      "capability_id": "desktop.plugins.development.data_write",
+      "claimable": true,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "conflict",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "natural",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "expected_revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "payload": true
+        },
+        "required": [
+          "artifact_id",
+          "payload",
+          "expected_revision"
+        ],
+        "title": "GeneratedDataInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "payload": true,
+          "plugin_id": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schema_version": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "schema_version",
+          "revision",
+          "payload"
+        ],
+        "title": "GeneratedData",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": "desktop.plugins.development.data_get",
+      "resource_scope": [
+        "plugins.data"
+      ],
+      "timeout_ms": {
+        "default_ms": 2000,
+        "max_ms": 5000
+      },
+      "version": "1.0.0"
     }
   ],
-  "catalog_revision": 5
+  "catalog_revision": 6
 }

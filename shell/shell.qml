@@ -684,6 +684,19 @@ ShellRoot {
                     } else if (command[0] === "focus") {
                         connection.write(JSON.stringify(root.focusReport()) + "\n");
                         connection.flush();
+                    } else if (command[0] === "generated") {
+                        const panels=Object.values(providers.slots).filter(unit=>unit.activeItem && unit.activeItem.slotName==="ui.generated_panel").map(unit=>unit.activeItem.observation());
+                        connection.write(JSON.stringify(panels)+"\n");connection.flush();
+                    } else if (command[0] === "generation-management") {
+                        // Read-only diagnostics of the actual center's text.
+                        const rows=[];
+                        function visit(node) {
+                            if (!node) return;
+                            if ((node.objectName || "").indexOf("generation")===0 && typeof node.text==="string") rows.push({name:node.objectName,text:node.text,visible:node.visible,width:node.width,height:node.height});
+                            for (const child of (node.children || [])) visit(child);
+                        }
+                        visit(centersLoader.item ? centersLoader.item.diagnosticRoot : null);
+                        connection.write(JSON.stringify(rows)+"\n");connection.flush();
                     } else if (command[0] === "services") {
                         connection.write(JSON.stringify(root.servicesReport()) + "\n");
                         connection.flush();

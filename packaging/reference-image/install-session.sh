@@ -62,7 +62,8 @@ else
 fi
 # ditto-core's crate also builds ditto-worker (the job pool); ditto-confine
 # is the Codex backend's OS boundary; both must sit next to ditto-core.
-cargo build --locked --release -p ditto-core -p ditto-supervisor -p dittoctl -p ditto-confine
+cargo build --locked --release -p ditto-core -p ditto-supervisor -p dittoctl -p ditto-confine -p ditto-test-host
+bash "$workspace/tools/generation-host/build.sh" release
 # The filtering session-bus proxy for the backend's keyring access: the
 # pinned build (Ubuntu's 0.1.5 drops zbus clients).
 bash "$workspace/tools/dbus-proxy/build.sh" release >/dev/null

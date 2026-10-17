@@ -1,0 +1,7 @@
+{
+  "kind": "shape",
+  "description": "Legacy non-generated mounts remain unchanged without artifact identity",
+  "type": "shell-report-input",
+  "valid": true,
+  "value": {"mounts": [{"slot": "ui.dock", "entry_id": "ent-dock", "mounted": true, "visible": true}], "appearance": null, "avatar": null}
+}

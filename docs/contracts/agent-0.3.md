@@ -36,3 +36,13 @@ Shell 控制 socket 新增：`chat`（唯讀 JSON：狀態、事件種類、變�
 - Core 以 `desktop.approval_requested` 通知 Shell。Shell 顯示的內容來自 Core 紀錄的能力與 resource scope；Agent 填的 `purpose` 只放在診斷並標示「未經驗證」。鍵盤預設焦點在「拒絕」，Esc 與關閉視窗都等於拒絕。
 - 刪除設定檔（`desktop.profiles.delete`）無法復原，另有 `profiles.delete` 範圍：Agent 預設沒有這項授予，所以每一次刪除都要問。請求須附上該次呼叫的 `arguments`；Core 核對它們的雜湊等於 `intent_hash`，讀出設定檔名稱放進 approval 的 `target` 給 Shell 顯示，`arguments` 本身不保存。
 - `allowed-once` 只讓 Core 在共用授權路徑放行**同一 turn、同一能力、同一參數雜湊**的一次呼叫（`approvals::consume`）；不建立持久 grant。
+
+生成寫入與啟用進入 coordinator 的序列化接受點時，再檢查工作階段鎖定與當前 grant，避免排隊期間撤銷後仍寫入。已消耗的同次 `allowed-once` 由 Core 內部 receipt 維持；它不是 wire 欄位，不能由模型、參數或 caller metadata 自行聲明，也不給下一次呼叫使用。
+
+## 5. G3 Shell 掛載回讀的相容增補
+
+依 D-39 的明確相容規則，`PanelMount` 新增選用 `artifact_id: string | null`，由 Rust 匯出至 `participant-observation`、`participant-state-output` 與 `shell-report-input`。普通供應者仍省略該欄位；舊格式在新 Core 上可解碼，普通插件的判定保持相容。
+
+G3 固定模板由 Shell **實際掛載物件的 config** 回報 artifact id。Core 只有在 id 與預期生成版本相同、元件已掛載可見時，才承認啟用成功。缺 id 或仍回報舊 id，會進入既有 readback 失敗與補償路徑。升版不能只憑不變的 entry id 判定成功。
+
+舊 Core 的 strict schema 不接受此新增欄位，故新增欄位只由配對的 G3 Core／Shell build 使用；混用舊 Core 會明確拒絕，不忽略欄位。新 Core 配舊 Shell 可以維持普通桌面；生成啟用因缺少版本證據而失敗，不宣告成功。此增補不新增事件、錯誤列舉或 approval 類型。三個共用向量涵蓋舊格式、新格式及錯誤型別拒絕。

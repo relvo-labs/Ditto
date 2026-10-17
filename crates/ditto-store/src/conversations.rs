@@ -574,6 +574,7 @@ pub fn delete(store: &mut Store, id: &str) -> StoreResult<SessionDeleteOutput> {
         ));
     }
     store.write(|tx| {let n=tx.execute("UPDATE conversations SET deleted_at=COALESCE(deleted_at,?2),writer_connection=NULL,writer_lease=NULL WHERE session_id=?1",rusqlite::params![id,time::now()])?;
+        crate::generated::redact_session_sources(tx,id)?;
         if n==0 {return Err(StoreError::NotFound("conversation".into()));}
         tx.execute("DELETE FROM agent_approvals WHERE json_extract(approval_json,'$.request.session_id')=?1",[id])?;
         // Keep the causal ids/change references, never the deleted tool content.

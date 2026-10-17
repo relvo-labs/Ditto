@@ -291,7 +291,7 @@ QtObject {
             return null;
         }
         const object = active.object;
-        return {
+        const mount = {
             slot: reportedSlot,
             entry_id: active.binding.entry_id,
             mounted: !!object,
@@ -299,6 +299,10 @@ QtObject {
             // on screen, not merely shown.
             visible: !!object && object.shown === true && (!inArea || host.isPlaced(object))
         };
+        if (active.binding.qml_url === "ditto-generated:fixed") {
+            mount.artifact_id = object && object.config ? object.config.artifact_id || null : null;
+        }
+        return mount;
     }
 
     /// `healthy()` must answer within 2 s of the candidate being ready.

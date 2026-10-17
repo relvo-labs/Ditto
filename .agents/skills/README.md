@@ -40,7 +40,7 @@
 | Skill | Status | 交付 | 職責 |
 |---|---|---|---|
 | [ditto-agent-changeset](ditto-agent-changeset/SKILL.md) | stable | Wave 2 | Agent 從自然語言到結構化 ChangeSet 的規劃行為。 |
-| [ditto-generation-safety](ditto-generation-safety/SKILL.md) | draft | Wave 3 | 受限生成與隔離執行：模板優先、限制能力、隔離驗證、預算與回復。 |
+| [ditto-generation-safety](ditto-generation-safety/SKILL.md) | stable | Wave 3 | 受限生成與隔離執行：模板優先、限制能力、隔離驗證、預算與回復。 |
 
 ## Category: shell
 

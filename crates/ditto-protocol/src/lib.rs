@@ -5,6 +5,7 @@
 pub mod agent;
 pub mod catalog;
 pub mod change;
+pub mod generation;
 pub mod host;
 pub mod ids;
 pub mod jcs;

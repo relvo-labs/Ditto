@@ -222,6 +222,7 @@ pub struct PackageRow {
     pub summary: PackageSummary,
     pub tree_sha256: String,
     pub manifest: Manifest,
+    pub generated: Option<ditto_protocol::generation::GeneratedArtifact>,
 }
 
 const COLUMNS: &str =
@@ -249,6 +250,11 @@ fn build(
     let manifest: Manifest = serde_json::from_str(&manifest_json)?;
     let referenced_by = references(connection, &package_id, &version)?;
     Ok(PackageRow {
+        generated: if source == "generated" {
+            crate::generated::by_package(connection, &package_id, &version)?
+        } else {
+            None
+        },
         summary: PackageSummary {
             package_id,
             version,

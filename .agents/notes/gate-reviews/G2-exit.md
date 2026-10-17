@@ -1,4 +1,6 @@
-# G2 出口評審｜開發證據與待評審項目
+# G2 出口評審｜功能接受與量測追蹤
+
+2026-10-13 owner 裁定「G2 目前功能已經算完成」，見 [D-46](../decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md)。G2 功能依此接受，G3 繼續完整整合；下文保留早期開發證據；參考機實際量測新增於 §3.6，未完成項由 #35～#39 追蹤，不改寫原 run。
 
 | 欄位 | 內容 |
 | --- | --- |
@@ -7,7 +9,7 @@
 | 範圍 | `main@787b44a` 之後分支 `codex/g2-agent-foundation` 的全部提交（自 `108d25e` 起） |
 | 評審者 | owner（依 D-38 慣例，實際使用裁定）；本檔只陳列事實、缺口與提案 |
 
-證據類別：`development-host`（開發機、fixture compositor、腳本模型）、`development headless desktop`（開發機巢狀 headless Wayfire＋真 Shell）、`development-vm`（還原快照的 VM，HWE 7.0 核心）、`development-host-real-subscription`（本人以 device code 登入的真實訂閱，模型 `gpt-6.1-sol`、effort low）。開發機雖是參考機，以下**都不是**參考機出口量測：沒有一項是冷登入或實體座位；語意集在巢狀 headless 桌面跑，不是參考機出口流程。
+證據類別：`development-host`（開發機、fixture compositor、腳本模型）、`development headless desktop`（開發機巢狀 headless Wayfire＋真 Shell）、`development-vm`（還原快照的 VM，HWE 7.0 核心）、`development-host-real-subscription`（本人以 device code 登入的真實訂閱，模型 `gpt-6.1-sol`、effort low）。開發機雖是參考機，§3.1～3.5 屬早期開發證據，**不是**參考機出口量測；§3.6 是後續新增的冷登入與實體座位證據，兩者分開記錄。
 
 ## 1. 結論摘要
 
@@ -17,7 +19,7 @@
 - **真實訂閱已執行（2026-10-09）**：瀏覽器 OAuth 被 OpenAI 以 `invalid_client`（originator `ditto`）拒絕，改用 device code 登入（owner 指示）。帳號矩陣 10 項通過、2 項無法產生（配額耗盡、第二個帳號）。語意集第一輪（oracle v1）**固定集 42／50、保留集 41／50**；修正 token 可發現性、撤銷歸屬與 oracle／夾具缺陷後重跑（oracle v2）**固定集 45／50、保留集 46／50**（§3.4）。owner 核定 D-43（「詢問」不限問號、刪除設定檔經 approval 詢問後依本人決定放行）後以 oracle v3 重跑：**固定集 48／50、保留集 47／50**，兩組都達 45／50、保留集降 2 pp。
 - **v3 的未通過**：5 題，都不是基礎設施錯誤；4 題是模型行為（該做而問、該問而做），1 題（F-E05）turn 以 `interrupted` 結束、沒有回答，原因未留下紀錄；見 §3.4。v1、v2 的分數保留不改。
 - **owner 決策（2026-10-09）**：D-39～D-44 依 §5 提案核定，紀錄見 `.agents/notes/decisions/2026-10-09-d39`～`d44`。
-- **阻擋出口、需要參考機流程**：EX2-12／13／14 的冷登入與實體座位量測要登出目前的桌面工作階段，參考機上未執行。工具已在 VM 以真 GDM 自動登入完整跑過一輪（四狀態各三次、暖機 300 秒、採樣 600 秒；§3.5），數字是 development-vm 證據、不判定。**VM 上 Agent 暖態 PSS 三次 p95 168.5～171.6 MiB，超過 150 MiB 預算**，其中 Codex app-server 約 150 MiB；參考機量測若同樣超出，依原則 5 提出數據與調整提案，不調高門檻。
+- **2026-10-09 歷史缺口（後續 §3.6 已補參考機量測）**：EX2-12／13／14 的冷登入與實體座位量測要登出目前的桌面工作階段，參考機上未執行。工具已在 VM 以真 GDM 自動登入完整跑過一輪（四狀態各三次、暖機 300 秒、採樣 600 秒；§3.5），數字是 development-vm 證據、不判定。**VM 上 Agent 暖態 PSS 三次 p95 168.5～171.6 MiB，超過 150 MiB 預算**，其中 Codex app-server 約 150 MiB；參考機量測若同樣超出，依原則 5 提出數據與調整提案，不調高門檻。
 - **本輪修正的產品缺陷**：區域布局在用戶端提交尺寸前就判定「已驗證」（Firefox 保留自己的寬度時會假成功）；Codex 模型服務失敗被報成 `interrupted`；Core 連線關閉洩漏執行緒與 socket；Profile 可綁定 Core 保留的快捷鍵。
 
 ## 2. 十九項出口逐項

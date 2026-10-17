@@ -371,7 +371,7 @@ pub fn head_document(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::testing;
     use ditto_protocol::profile::*;

@@ -1,0 +1,241 @@
+{
+  "$defs": {
+    "Content": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "max_items": {
+              "format": "uint8",
+              "maximum": 20,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "order": {
+              "$ref": "#/$defs/TaskOrder"
+            },
+            "show_completed": {
+              "type": "boolean"
+            },
+            "template": {
+              "const": "tasks_summary_v1",
+              "type": "string"
+            }
+          },
+          "required": [
+            "template",
+            "max_items",
+            "show_completed",
+            "order"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actions": {
+              "items": {
+                "$ref": "#/$defs/WorkspaceAction"
+              },
+              "maxItems": 16,
+              "minItems": 1,
+              "type": "array"
+            },
+            "template": {
+              "const": "workspace_actions_v1",
+              "type": "string"
+            }
+          },
+          "required": [
+            "template",
+            "actions"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DataMigration": {
+      "additionalProperties": false,
+      "properties": {
+        "defaults": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "from_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "remove": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rename": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "rollback": {
+          "$ref": "#/$defs/RollbackPolicy"
+        }
+      },
+      "required": [
+        "from_version",
+        "rollback"
+      ],
+      "type": "object"
+    },
+    "DataPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/DataType"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "migration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DataMigration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schema_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "DataType": {
+      "enum": [
+        "text",
+        "integer",
+        "boolean",
+        "text_list"
+      ],
+      "type": "string"
+    },
+    "Description": {
+      "additionalProperties": false,
+      "properties": {
+        "accent": {
+          "type": "string"
+        },
+        "content": {
+          "$ref": "#/$defs/Content"
+        },
+        "data": {
+          "$ref": "#/$defs/DataPlan",
+          "default": {
+            "fields": {},
+            "schema_version": 1
+          }
+        },
+        "format_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "plugin_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "width": {
+          "format": "uint16",
+          "maximum": 640,
+          "minimum": 160,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "format_version",
+        "plugin_id",
+        "version",
+        "title",
+        "width",
+        "accent",
+        "content"
+      ],
+      "type": "object"
+    },
+    "RollbackPolicy": {
+      "enum": [
+        "snapshot",
+        "compatible",
+        "unavailable"
+      ],
+      "type": "string"
+    },
+    "TaskOrder": {
+      "enum": [
+        "source",
+        "title"
+      ],
+      "type": "string"
+    },
+    "WorkspaceAction": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "workspace_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "label"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "$ref": "#/$defs/Description"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "parent_id": {
+      "default": null,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "request_summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "description",
+    "request_summary",
+    "idempotency_key"
+  ],
+  "title": "GenerateInput",
+  "type": "object"
+}

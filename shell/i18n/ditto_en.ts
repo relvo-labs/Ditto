@@ -171,8 +171,16 @@
         <translation>This allows it once; Ditto asks again next time. Refusing leaves your desktop as it is.</translation>
     </message>
     <message>
+        <source>存取、升版或回復生成插件的資料</source>
+        <translation>Access, migrate or restore generated plugin data</translation>
+    </message>
+    <message>
         <source>安裝或管理插件</source>
         <translation>Install or manage plugins</translation>
+    </message>
+    <message>
+        <source>建立、驗證、安裝或啟用受限生成插件</source>
+        <translation>Create, validate, install or enable restricted generated plugins</translation>
     </message>
     <message>
         <source>拒絕</source>
@@ -1813,6 +1821,10 @@
         <translation>Dock</translation>
     </message>
     <message>
+        <source>slot.ui.generated_panel</source>
+        <translation>Generated panels</translation>
+    </message>
+    <message>
         <source>slot.ui.launcher</source>
         <translation>Launcher</translation>
     </message>
@@ -1839,6 +1851,10 @@
     <message>
         <source>trust.core_builtin</source>
         <translation>Built into Core; runs no code of its own.</translation>
+    </message>
+    <message>
+        <source>trust.generated_fixed_template</source>
+        <translation>Interprets a restricted description using fixed desktop templates. Package code is not executed. This does not grant general QML isolation.</translation>
     </message>
     <message>
         <source>trust.same_host_no_isolation.cordis</source>
@@ -1929,6 +1945,165 @@
     <message>
         <source>（已釘選）</source>
         <translation> (pinned)</translation>
+    </message>
+</context>
+<context>
+    <name>GeneratedArtifacts</name>
+    <message>
+        <source>互動檢查</source>
+        <translation>Checking interaction</translation>
+    </message>
+    <message>
+        <source>原始碼、驗證與啟用紀錄</source>
+        <translation>Source, validation and activation history</translation>
+    </message>
+    <message>
+        <source>取消驗證</source>
+        <translation>Cancel validation</translation>
+    </message>
+    <message>
+        <source>契約檢查</source>
+        <translation>Checking the contract</translation>
+    </message>
+    <message>
+        <source>套用這個版本</source>
+        <translation>Apply this version</translation>
+    </message>
+    <message>
+        <source>安裝這個版本</source>
+        <translation>Install this version</translation>
+    </message>
+    <message>
+        <source>寬度</source>
+        <translation>Width</translation>
+    </message>
+    <message>
+        <source>工作已完成</source>
+        <translation>Job complete</translation>
+    </message>
+    <message>
+        <source>工作未完成，請檢查診斷後再試</source>
+        <translation>The job did not complete. Check diagnostics before trying again.</translation>
+    </message>
+    <message>
+        <source>已停止自動修復。請檢查診斷，重新說明需求後再試。</source>
+        <translation>Automatic repair has stopped. Check diagnostics, then describe your request again.</translation>
+    </message>
+    <message>
+        <source>已取消並完成清理</source>
+        <translation>Cancelled; cleanup complete</translation>
+    </message>
+    <message>
+        <source>已安裝，尚未啟用</source>
+        <translation>Installed; not enabled</translation>
+    </message>
+    <message>
+        <source>強調色</source>
+        <translation>Accent color</translation>
+    </message>
+    <message>
+        <source>曾成功啟用；目前組合請見下方</source>
+        <translation>Previously enabled successfully; see the current composition below</translation>
+    </message>
+    <message>
+        <source>未執行</source>
+        <translation>Not run</translation>
+    </message>
+    <message>
+        <source>未通過</source>
+        <translation>Failed</translation>
+    </message>
+    <message>
+        <source>未通過，請檢查診斷並建立修正版</source>
+        <translation>Not passed; check diagnostics and create a corrected version</translation>
+    </message>
+    <message>
+        <source>本版本修改：%1</source>
+        <translation>Changed in this version: %1</translation>
+    </message>
+    <message>
+        <source>標題</source>
+        <translation>Title</translation>
+    </message>
+    <message>
+        <source>正在取消並清理</source>
+        <translation>Cancelling and cleaning up</translation>
+    </message>
+    <message>
+        <source>正在隔離環境中驗證</source>
+        <translation>Validating in an isolated environment</translation>
+    </message>
+    <message>
+        <source>測試資料預覽已開啟</source>
+        <translation>Test-data preview is open</translation>
+    </message>
+    <message>
+        <source>準備隔離環境</source>
+        <translation>Preparing the isolated environment</translation>
+    </message>
+    <message>
+        <source>焦點檢查</source>
+        <translation>Checking keyboard focus</translation>
+    </message>
+    <message>
+        <source>生成的插件</source>
+        <translation>Generated plugins</translation>
+    </message>
+    <message>
+        <source>等待其他工作完成</source>
+        <translation>Waiting for other jobs to finish</translation>
+    </message>
+    <message>
+        <source>等待驗證</source>
+        <translation>Waiting for validation</translation>
+    </message>
+    <message>
+        <source>語法檢查</source>
+        <translation>Checking syntax</translation>
+    </message>
+    <message>
+        <source>資料格式</source>
+        <translation>Data format</translation>
+    </message>
+    <message>
+        <source>載入檢查</source>
+        <translation>Checking loading</translation>
+    </message>
+    <message>
+        <source>通過</source>
+        <translation>Passed</translation>
+    </message>
+    <message>
+        <source>開啟測試資料預覽</source>
+        <translation>Preview with test data</translation>
+    </message>
+    <message>
+        <source>關閉測試資料預覽</source>
+        <translation>Close test-data preview</translation>
+    </message>
+    <message>
+        <source>隔離條件不足，只能檢查</source>
+        <translation>Isolation is incomplete; inspection only</translation>
+    </message>
+    <message>
+        <source>需求：%1</source>
+        <translation>Request: %1</translation>
+    </message>
+    <message>
+        <source>顯示內容</source>
+        <translation>Displayed content</translation>
+    </message>
+    <message>
+        <source>顯示最近十個版本。每次修改都建立新版本並重新驗證；舊版本保留供檢查與回復。</source>
+        <translation>Shows the ten most recent versions. Changes create a new version and run validation again. Previous versions remain available for inspection and restoration.</translation>
+    </message>
+    <message>
+        <source>驗證</source>
+        <translation>Validate</translation>
+    </message>
+    <message>
+        <source>驗證通過，尚未安裝</source>
+        <translation>Validation passed; not installed</translation>
     </message>
 </context>
 <context>
@@ -2202,7 +2377,7 @@
     </message>
     <message>
         <source>強調色</source>
-        <translation>Accent colour</translation>
+        <translation>Accent color</translation>
     </message>
     <message>
         <source>強調色 %1</source>
@@ -2722,6 +2897,25 @@
     </message>
 </context>
 <context>
+    <name>TasksSummary</name>
+    <message>
+        <source>尚未取得待辦資料</source>
+        <translation>Task data is not available yet</translation>
+    </message>
+    <message>
+        <source>待辦摘要</source>
+        <translation>Task summary</translation>
+    </message>
+    <message>
+        <source>沒有符合條件的待辦</source>
+        <translation>No matching tasks</translation>
+    </message>
+    <message>
+        <source>預覽使用測試資料</source>
+        <translation>Preview uses test data</translation>
+    </message>
+</context>
+<context>
     <name>Tr</name>
     <message>
         <source>（未翻譯的項目）</source>
@@ -2730,6 +2924,21 @@
     <message>
         <source>（無）</source>
         <translation>(none)</translation>
+    </message>
+</context>
+<context>
+    <name>WorkspaceActions</name>
+    <message>
+        <source>工作區捷徑</source>
+        <translation>Workspace shortcuts</translation>
+    </message>
+    <message>
+        <source>工作區操作目前不可用</source>
+        <translation>Workspace actions are currently unavailable</translation>
+    </message>
+    <message>
+        <source>預覽使用測試資料</source>
+        <translation>Preview uses test data</translation>
     </message>
 </context>
 <context>

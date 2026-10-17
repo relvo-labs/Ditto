@@ -1,0 +1,40 @@
+# G3 開發驗證
+
+| 命令 | 範圍 | 證據限制 |
+| --- | --- | --- |
+| `bash tools/dev-vm/test-artifact-collection.sh` | 唯讀套件證據的內容／來源權限保留、接收副本可刪除；不需 VM | CI checkout 回歸，不是候選執行證據 |
+| `bash tests/g3/run.sh` | Rust 描述／資料／修復、固定模板與正式管理中心 QtTest、native runner 建置 | 兩組 QtTest 共 13 項；不能代替真實模型 |
+| `node tests/g3/integration/run.mjs` | 正式 Core → 工作池 → 隔離 native 五關 → 發布；缺 Shell 啟用安全中止；三類未信任 archive 安裝／啟用拒絕 | 生產政策與故障交易的開發證據 |
+| `DITTO_G3_TRUST_ONLY=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/ditto-g3-test-bus node tests/g3/integration/run.mjs` | 真正不可用隔離的 QML／Node／原生 ELF 安裝矩陣、權威拒絕與 revision／執行見證 | 不模擬 full；同一矩陣也在 full／partial Core 整合執行 |
+| `bash tests/g3/desktop/build.sh` | hostd／Agent 與內建套件建置 | 執行前先 `pnpm install --frozen-lockfile` |
+| `bash tests/g3/desktop/run.sh` | 真 Wayfire／Shell／hostd：兩槽、升版 undo、連續兩次修改回第一版、相容回退保留新值、不可逆拒絕、移除保留資料、實際按鈕與原生應用存活 | headless 開發桌面；不是實體座位／效能驗收 |
+| `bash tests/g3/restart/run.sh` | 兩個真實預覽中止 Core、回收舊 scope、回讀歷程並啟動新工作 | headless 開發故障證據 |
+| `bash tests/g3/agent/run.sh` | 釘選 app-server + loopback，真實動態工具、一次性啟用 approval 且無永久 data grant、原生驗證、多輪修改、來源刪除與退出後存活 | 不使用真訂閱、外部模型或既有帳號；不計模型品質 |
+| `python3 tests/g3/native-failures/driver.py` | 真 Qt runner 的 syntax／contract／load／focus／interaction 逐關失敗及非法 import；各自受實際 cgroup 與 confine 限制，後續關卡不執行 | 可信測試 fixture；不新增任意候選入口或正式 fault switch |
+| `bash tests/g3/native-failures/run-pipeline.sh` | 真 Core 持久管線的無效 QML／非法 import／逾時，保留關卡、拒絕發布、不可變來源與 revision | 獨立 `fault-injection` 測試二進位；VM 跑完整 13 項，CI 設 `DITTO_G3_SKIP_TIMEOUT=1` 僅跑 8 項無效 QML／import，不在共用 runner 執行忙碌逾時 |
+| `python3 tests/g3/host/rejection.py` | 缺 bus、早期檔案系統錯誤、長 checkout 實際 network 邊界、非法命令／deadline／私有 runner 拒絕 | 只執行受控 network 診斷，不執行超限程式 |
+| `bash tools/dev-vm/run-g3.sh` | 還原閒置 VM、建置、上述流程與十項 OS 故障 | D-25 開發 VM，保存所有失敗與未執行 |
+| `DITTO_VM_SNAPSHOT=ditto-base DITTO_G3_EXPECT_OLD_ABI=1 bash tools/dev-vm/run-g3.sh` | ABI <6 的診斷與正式 Core partial 拒絕 | 完整候選執行刻意 `not_run`，runner 退出 2 |
+| `bash tests/g3/host/run.sh` | cgroup、Landlock、seccomp、OOM／fork／timeout／取消／清理 | VM 先跑；參考機另保留桌面 PID／revision |
+
+執行 Core 整合前 `cargo build --locked -p ditto-core -p ditto-test-host -p ditto-confine`，再 `bash tools/generation-host/build.sh`；桌面入口使用固定 Wayfire／Qt 前綴與 Quickshell。OS driver 在實際額度成立後才執行故障，原始 JSON、stderr 與 summary 留在 artifacts/g3；VM 收集至 artifacts/g3-vm。ExecStopPost 在候選工作區外保存 systemd 的終止原因，避免瞬時單位被回收後失去 timeout／OOM 事實。
+
+新整合紀錄包含 git commit、dirty 與整棵來源 SHA256（含尚未追蹤檔）、kernel、native runner hash；validation 保存 service unit、cgroup、runner PID、實際政策與五關結果。診斷探針使用 diagnostic-v1，永遠沒有啟用資格；正式候選必須 generated-templates-v1/full 且清理完成。
+
+VM 收集使用 `vm_collect_artifacts`，只增加接收證據副本的 owner 讀寫／目錄進入權限，保留來源內容、時間戳與 guest 唯讀套件；非 VM Core 整合則在停止私有 fixture 後恢復其測試 store 的 owner 寫入權限。兩者都保留原始證據，避免下一次 CI checkout 被 `0500` 套件目錄阻擋。
+
+修復回歸包含三輪上限、同錯停止、無連續關卡進展／退步停止，以及重新開啟 Store 後同回合改接舊父版本／更換插件 ID 的拒絕。完整工作包與剩餘驗收見 [plan/05 完成缺口盤點](../../plan/05/07-completion-audit.md)。
+
+真實模型與參考機完整流程仍依 #28／G3-exit 逐項記錄；腳本模型不可代替。首次交付時真實訂閱測試因既有帳號／外部傳送授權不明遭自動核准拒絕；本次取得使用者明確授權後，headless 真模型 oracle 已有 15 項通過證據，見 [後續評審](../../.agents/notes/gate-reviews/G3-followup-2026-10-14.md)。實體座位、資源 p95／動畫／中文與雙螢幕不由本套件宣告通過。
+
+本次進一步修正實際 artifact 回讀與 coordinator 撤權檢查，新增 5 個 Core 交易測試（包含三個啟用失敗時點、資料提交失敗、兩次升版回退、不可逆／損壞快照拒絕及撤權），另補管理中心重開／進度／雙預覽鍵盤取消。最新真模型四回合 **19 項通過**；完整結果與版本差異見 [功能補齊紀錄](../../.agents/notes/gate-reviews/G3-functional-completion-2026-10-14.md)。前一輪 15 項仍保留原始計數。
+
+`tests/g3/agent/real.sh` 與四回合 natural-language oracle 只在明確授權後設定 `DITTO_G3_ALLOW_REAL_MODEL=1` 及私有開發測試 `DITTO_G3_SUBSCRIPTION_STORE` 執行。它新建 default 測試 Profile，檢查實際面板與工作區按鈕，完成後獨立恢復原 Profile／設定、撤銷本次授予並逐項回讀；清理失敗也保留證據並退出失敗。不在 CI 自動執行。
+
+實體座位入口為 `tests/g3/reference/launch.sh MODE UNIQUE_RUN_ID`，模式為 `full／desktop／faults／partial／unavailable`；`desktop` 只重驗桌面互動，不呼叫模型。執行前必須已取得中斷登入與既有訂閱測試授權，設定 `DITTO_G3_ALLOW_PHYSICAL_LOGIN=1`、`DITTO_G3_ALLOW_REAL_MODEL=1` 及上述私有 store，並以 `install-session.sh --verification-relay` 安裝正式版本。runner 拒絕活動 CI worker，暫停 CI runner，透過獨立 user service 切換實體登入與私有 Core store；結束後移除 runtime 覆寫、恢復原 GDM 設定／正常資料目錄及 CI runner，回讀原配置 hash。不能與其他 `ditto-*.scope` 測試並跑：登入清理會終止這些 scope。
+
+`observe.py guard` 檢查 logind seat0／Wayland／active、實際 HDMI 輸出與已連接 DRM、Core 執行路徑及私有資料目錄。實體預覽有原生視窗、截圖與合成 Tab／Space 輸入；各故障保存 Core／Shell／hostd／Wayfire／原生應用 PID、starttime、cgroup、前後 revision。合成輸入不算人工鍵盤、中文或錄影驗收，也不算效能量測。
+
+其他模式用 `prepare-contexts.py NEW_PRIVATE_DIRECTORY` 複製實際 release；先另建 `cargo build --locked -p ditto-test-host --bin ditto-generation-host --features fault-injection --target-dir target/g3-fault-fixtures`。`faults` 僅替換私有副本的測試宿主；其 sibling `generation-fault.txt` 只接受三個固定 fixture 名稱，Description 無法選取或提供 QML，正式 release 沒有該讀取器且 CI 有正／負控制。`partial` 使用實際空 Qt 允許目錄使 native 無法啟動；`unavailable` 實際缺 native helper。以 `DITTO_BINARIES=NEW_PRIVATE_DIRECTORY/MODE` 指向各副本，逐一執行且等待恢復完成，不偽造 ABI、驗證報告或 full。
+
+2026-10-14 最新[實體座位證據](../../.agents/notes/gate-reviews/G3-reference-seat-2026-10-14.md)已包含真模型 19 項、桌面 45 項、原生 7 案例、OS 十探針、雙預覽鍵盤取消及三態九格封鎖；新實作的乾淨 G3 VM 回歸 15 步全通過。舊 headless／15 項紀錄仍按原時間點保留，正式 G3 出口由 owner 審查。

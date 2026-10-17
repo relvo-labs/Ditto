@@ -1,0 +1,35 @@
+name: g3-generation
+on:
+  push:
+    branches: [main]
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/ditto-generation/**', 'crates/ditto-test-host/**', 'crates/ditto-confine/**', 'tests/g3/**', 'plan/05/**', 'tools/generation-host/**', 'tools/dev-vm/**', 'scripts/sync-generated-templates.py', 'crates/ditto-core/**', 'crates/ditto-store/**', 'crates/ditto-protocol/**', 'shell/generated/**', 'shell/centers/GeneratedArtifacts.qml', 'packages/agent-runtime/**', 'packages/protocol/**', 'packaging/reference-image/install-session.sh', '.github/workflows/g3-foundation.yml']
+  pull_request:
+    paths: ['Cargo.toml', 'Cargo.lock', 'crates/ditto-generation/**', 'crates/ditto-test-host/**', 'crates/ditto-confine/**', 'tests/g3/**', 'plan/05/**', 'tools/generation-host/**', 'tools/dev-vm/**', 'scripts/sync-generated-templates.py', 'crates/ditto-core/**', 'crates/ditto-store/**', 'crates/ditto-protocol/**', 'shell/generated/**', 'shell/centers/GeneratedArtifacts.qml', 'packages/agent-runtime/**', 'packages/protocol/**', 'packaging/reference-image/install-session.sh', '.github/workflows/g3-foundation.yml']
+jobs:
+  verify:
+    runs-on: [self-hosted, ditto-ci]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Rust and fixed QML SDK checks
+        run: bash tests/g3/run.sh
+      - name: Core and isolated native runner integration
+        run: |
+          cargo build --locked -p ditto-core -p ditto-confine -p ditto-test-host
+          node tests/g3/integration/run.mjs
+      - name: Independent infrastructure lint
+        run: cargo clippy --locked -p ditto-test-host -p ditto-generation --all-targets -- -D warnings
+      - name: Refuse unavailable isolation and invalid commands
+        run: python3 tests/g3/host/rejection.py
+      - name: Native five-stage failure gates
+        run: python3 tests/g3/native-failures/driver.py
+      - name: Durable native failure reports
+        run: DITTO_G3_SKIP_TIMEOUT=1 bash tests/g3/native-failures/run-pipeline.sh
+      - name: Unavailable isolation trust matrix
+        run: DITTO_G3_TRUST_ONLY=1 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/ditto-g3-test-bus node tests/g3/integration/run.mjs
+      # Resource exhaustion stays in tools/dev-vm/run-g3.sh (D-25), not in a
+      # shared CI runner session. VM and reference-seat evidence remain separate.

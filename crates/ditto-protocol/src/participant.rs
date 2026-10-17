@@ -198,6 +198,10 @@ pub struct PanelMount {
     pub entry_id: String,
     pub mounted: bool,
     pub visible: bool,
+    /// Identity read from the mounted fixed-template instance, never merely
+    /// copied from the requested projection. Required to verify G3 upgrades.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]

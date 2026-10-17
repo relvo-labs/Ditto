@@ -329,6 +329,13 @@
     "PanelMount": {
       "additionalProperties": false,
       "properties": {
+        "artifact_id": {
+          "description": "Identity read from the mounted fixed-template instance, never merely\ncopied from the requested projection. Required to verify G3 upgrades.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "entry_id": {
           "type": "string"
         },

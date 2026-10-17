@@ -3,6 +3,8 @@
 //! protocol 0.2 over socket pairs. What the fakes report is what Core reads
 //! back, so a lying fake is how readback mismatches are tested.
 
+mod generation_transactions;
+
 use super::*;
 use crate::{
     core::{Core, CoreConfig},
@@ -349,6 +351,8 @@ struct ShellState {
     candidates: HashMap<String, (ShellProjection, Option<ShellProjection>)>,
     /// Refuse candidates of this package at prepare (a QML load failure).
     broken_package: Option<String>,
+    /// A loaded candidate fails its commit-time health check.
+    unhealthy_package: Option<String>,
     /// Report the old mounts after commit: a Shell that says "done" but did not.
     lie_after_commit: bool,
     /// At rollback, report this slot as not restored (the thing it placed
@@ -372,6 +376,7 @@ fn shell_observation(shell: &ShellState) -> Value {
                 "mounts": projection.slots.iter().map(|slot| json!({
                     "slot": slot.slot, "entry_id": slot.entry_id, "mounted": true,
                     "visible": shell.hidden_package.as_ref() != Some(&slot.package),
+                    "artifact_id": slot.config.get("artifact_id"),
                 })).collect::<Vec<_>>(),
                 "appearance": projection.appearance,
                 "avatar": projection.avatar,
@@ -459,9 +464,14 @@ fn fake_shell(core: &Arc<Core>, state: Arc<Mutex<ShellState>>) -> Arc<TestPeer> 
                 if !shell.lie_after_commit {
                     shell.committed = Some(target.clone());
                 }
-                Ok(
-                    json!({"items": target.slots.iter().map(|slot| json!({"key": slot.slot, "status": "applied"})).collect::<Vec<_>>()}),
-                )
+                Ok(json!({"items": target.slots.iter().map(|slot| {
+                    let key = if ditto_protocol::profile::is_area(&slot.slot) { &slot.entry_id } else { &slot.slot };
+                    if shell.unhealthy_package.as_ref() == Some(&slot.package) {
+                        json!({"key":key,"status":"failed","reason":"provider_unhealthy"})
+                    } else {
+                        json!({"key":key,"status":"applied"})
+                    }
+                }).collect::<Vec<_>>()}))
             }
             "participant.abort" => {
                 shell.candidates.remove(&change_id);
@@ -2560,6 +2570,10 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
         "context-reference" => through::<ditto_protocol::agent::ContextReference>(value),
         "credential-status" => through::<ditto_protocol::agent::CredentialStatus>(value),
         "job" => through::<ditto_protocol::services::Job>(value),
+        "generated-description" => through::<ditto_protocol::generation::Description>(value),
+        "generation-validation" => {
+            through::<ditto_protocol::generation::GenerationValidation>(value)
+        }
         "change-record" => through::<change::ChangeRecord>(value),
         "participant-prepare-params" => through::<participant::PrepareParams>(value),
         "shell-report-input" => through::<participant::ShellObservation>(value),
@@ -2912,4 +2926,99 @@ fn a_profile_cannot_bind_core_reserved_chords() {
             "{response}"
         );
     }
+}
+
+#[test]
+fn generation_without_native_host_keeps_candidate_inspectable_and_refuses_execution() {
+    let h = harness("generation-unavailable");
+    let cli = TestPeer::connect(&h.core, "dittoctl", None);
+    let before = head(&cli);
+    let descriptor = cli.result(catalog::CAPABILITIES_LIST, json!({}))["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["capability_id"] == catalog::DEVELOPMENT_VALIDATE)
+        .unwrap()
+        .clone();
+    assert_eq!(descriptor["availability"]["available"], false);
+    let description: Value = serde_json::from_str(include_str!(
+        "../../ditto-generation/examples/tasks-summary.json"
+    ))
+    .unwrap();
+    let a=cli.result(catalog::DEVELOPMENT_CREATE,json!({"description":description,"request_summary":"inspect only","idempotency_key":"candidate"}));
+    for method in [catalog::DEVELOPMENT_VALIDATE, catalog::DEVELOPMENT_PREVIEW] {
+        let r = cli.call(
+            method,
+            json!({"artifact_id":a["artifact_id"],"idempotency_key":"missing-host"}),
+        );
+        assert_eq!(r["error"]["name"], "unavailable");
+    }
+    assert_eq!(
+        cli.result(
+            catalog::DEVELOPMENT_GET,
+            json!({"artifact_id":a["artifact_id"]})
+        )["state"],
+        "candidate"
+    );
+    assert_eq!(
+        cli.call(
+            catalog::DEVELOPMENT_PUBLISH,
+            json!({"artifact_id":a["artifact_id"]})
+        )["error"]["name"],
+        "invalid_params"
+    );
+    assert_eq!(head(&cli), before);
+}
+
+#[test]
+fn a_manifest_cannot_self_declare_a_generated_qml_or_node_trust_exception() {
+    let root = root("generation-spoofed-manifest");
+    let builtin = root.join("builtin");
+    std::fs::create_dir_all(&builtin).unwrap();
+    builtin_packages(&builtin);
+    for (id, kind, host, slot) in [
+        (
+            "local.fake.qml",
+            "qml_provider",
+            "qml",
+            "ui.generated_panel",
+        ),
+        ("local.fake.node", "service", "cordis", "svc.tasks"),
+    ] {
+        pack(
+            &builtin,
+            &manifest(
+                id,
+                kind,
+                host,
+                &[slot],
+                json!({"source":"generated","trust_level":"untrusted"}),
+            ),
+        );
+    }
+    let core = start_at(&root, false);
+    let cli = TestPeer::connect(&core, "dittoctl", None);
+    let before = head(&cli);
+    for (id, host, slot) in [
+        ("local.fake.qml", "qml", "ui.generated_panel"),
+        ("local.fake.node", "cordis", "svc.tasks"),
+    ] {
+        let refused=cli.call(catalog::CHANGES_PROPOSE,json!({"base_revision":before,"ops":[{"op":"add_entry","entry":{"package":id,"version":"1.0.0","host":host},"slot":slot}]}));
+        assert_eq!(refused["error"]["name"], "preflight_rejected");
+        let change = record(&cli.result(
+            catalog::CHANGES_GET,
+            json!({"change_id":refused["error"]["data"]["change_id"]}),
+        ));
+        assert_eq!(change.state, ChangeState::Rejected);
+        assert!(change
+            .reasons
+            .iter()
+            .any(|r| r.detail.get("why") == Some(&json!("trust_policy"))));
+        assert!(change.operations.is_empty());
+        assert_eq!(head(&cli), before);
+    }
+    drop(cli);
+    drop(core);
+    let _ = ditto_store::packages::make_writable(&root);
+    let _ = std::fs::remove_dir_all(root);
 }

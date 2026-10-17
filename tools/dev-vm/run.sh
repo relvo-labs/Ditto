@@ -45,7 +45,7 @@ check() {
 }
 
 finish() {
-  vm_rsync neil@"$(vm_ip)":funlab/Ditto/artifacts/ "$out/vm-artifacts/" >/dev/null 2>&1 || true
+  vm_collect_artifacts neil@"$(vm_ip)":funlab/Ditto/artifacts/ "$out/vm-artifacts/" >/dev/null 2>&1 || true
   virsh_vm shutdown "$VM_NAME" >/dev/null 2>&1 || true
   for _ in $(seq 1 30); do
     [[ "$(virsh_vm domstate "$VM_NAME" 2>/dev/null)" == "shut off" ]] && break

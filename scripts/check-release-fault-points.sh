@@ -16,6 +16,7 @@ patterns=(
   'injected SQLITE_IOERR'
   'fault.abort_process'
   'fault.hold'
+  'generation-fault.txt'
 )
 status=0
 for binary in "$@"; do
