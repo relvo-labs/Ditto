@@ -242,6 +242,10 @@
         <translation>助理</translation>
     </message>
     <message>
+        <source>待命中</source>
+        <translation>待命中</translation>
+    </message>
+    <message>
         <source>開啟助理對話</source>
         <translation>開啟助理對話</translation>
     </message>
@@ -1114,6 +1118,10 @@
         <translation>已停止</translation>
     </message>
     <message>
+        <source>待命中</source>
+        <translation>待命中</translation>
+    </message>
+    <message>
         <source>桌面服務未連線</source>
         <translation>桌面服務未連線</translation>
     </message>
@@ -1203,10 +1211,6 @@
 </context>
 <context>
     <name>DittoKeys</name>
-    <message>
-        <source>diff.avatar.presentation</source>
-        <translation>助理呈現</translation>
-    </message>
     <message>
         <source>card.kind.appearance</source>
         <translation>外觀調整</translation>
@@ -1462,6 +1466,10 @@
     <message>
         <source>diff.avatar.output</source>
         <translation>角色所在螢幕</translation>
+    </message>
+    <message>
+        <source>diff.avatar.presentation</source>
+        <translation>助理呈現</translation>
     </message>
     <message>
         <source>diff.avatar.scale</source>

@@ -38,6 +38,9 @@ TestCase {
         function key(text, args) { return text; }
         function capabilityAvailable(name) { return false; }
         function capability(name, args, ok, fail) { if (ok) ok({}); }
+        function watchTopics(topics, event, resync, ready, error) {
+            ready({ subscription_id: "fixture-subscription" });
+        }
     }
     Chat.ConversationState { id: conversation; client: client }
     property var mounted: []
@@ -68,22 +71,26 @@ TestCase {
         StubDesktop.screenWidth = 1280; StubDesktop.screenHeight = 800;
         const legacy = data.presentation === "legacy";
         const scene = data.scene;
+        const preopen = scene === "collapsed";
         tokens.appearance = { theme: legacy ? "soft-jelly" : "soft-jelly-light", tokens: {}, reduced_motion: true };
+        conversation.wanted = false;
+        conversation.subscriptionId = "";
         client.online = scene !== "offline";
-        conversation.settings = { enabled: true };
-        conversation.provider = { available: true, authenticated: true };
-        conversation.sessionId = "fixture-session-r3";
+        conversation.wanted = !preopen;
+        conversation.settings = preopen ? null : { enabled: true };
+        conversation.provider = preopen ? null : { available: true, authenticated: true };
+        conversation.sessionId = preopen ? "" : "fixture-session-r3";
         conversation.turn = scene === "unknown" ? { turn_id: "fixture-unknown", state: "unknown" }
             : scene === "approval" ? { turn_id: "fixture-approval", state: "awaiting_approval" } : null;
-        conversation.draft = "尚未送出的草稿 / unsent draft";
-        conversation.events = [{ seq: 0, type: "user/message", data: { text: "Fixture: adjust the desktop" } }];
+        conversation.draft = preopen ? "" : "尚未送出的草稿 / unsent draft";
+        conversation.events = preopen ? [] : [{ seq: 0, type: "user/message", data: { text: "Fixture: adjust the desktop" } }];
         conversation.streamText = "";
         conversation.sessions = [];
         const output = { name: "fixture-output", width: 1280, height: 800 };
         let entryRect;
         if (legacy) {
             mount("shell/avatar/Avatar.qml", { tokens: tokens, animations: false,
-                avatarState: conversation.taskState, width: 220, height: 220, x: 1028, y: 486 });
+                avatarState: conversation.wanted ? conversation.taskState : "idle", width: 220, height: 220, x: 1028, y: 486 });
             entryRect = { x: 1028, y: 486, width: 220, height: 250 };
         } else {
             const entry = mount("shell/assistant/AssistantSurface.qml", {
@@ -112,9 +119,10 @@ TestCase {
             renderer: "offscreen/software", compositor: "stub", profile: data.presentation,
             profile_hash: null, session_id: conversation.sessionId, turn_id: conversation.turn ? conversation.turn.turn_id : null,
             operation_ids: [], task_state: conversation.taskState, state_text: conversation.stateText,
+            wanted: conversation.wanted, settings_known: !!conversation.settings,
             entry: entryRect, pending_approval: scene === "approval" }));
         // Switching surface never replaces the shared draft, events or turn.
-        compare(conversation.draft, "尚未送出的草稿 / unsent draft");
-        compare(conversation.events.length, 1);
+        compare(conversation.draft, preopen ? "" : "尚未送出的草稿 / unsent draft");
+        compare(conversation.events.length, preopen ? 0 : 1);
     }
 }

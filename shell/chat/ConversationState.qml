@@ -108,20 +108,30 @@ QtObject {
     readonly property string transportText: reconnecting
         ? client.t(qsTr("正在重新連線；將查詢實際結果")) : ""
 
+    /// Unknown settings/provider are not readback that AI is disabled/offline.
+    /// `enabled` remains fail-closed for controls while these reads are pending.
+    readonly property string offlineReason: client.online === false
+        ? client.t(qsTr("桌面服務未連線"))
+        : settings && settings.enabled === false
+            ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
+            : settings && settings.enabled === true && provider && !connected
+                ? client.t(qsTr("模型尚未連接；桌面仍可照常操作")) : ""
+
     readonly property string stateText: {
-        // A lost transport or provider must not erase a known terminal result.
-        if (turn && ["partial", "unknown", "cancelled"].indexOf(turn.state) >= 0) return failureText(turn);
+        const result = turn && ["partial", "unknown", "cancelled"].indexOf(turn.state) >= 0
+            ? failureText(turn) : "";
+        if (taskState === "offline") {
+            // Keep both the known terminal outcome and the current readback.
+            if (result) return result + (offlineReason ? " · " + offlineReason : "");
+            return offlineReason || client.t(qsTr("待命中"));
+        }
+        if (result) return result;
         if (turn && turn.state === "cancelling") return client.t(qsTr("正在停止"));
         switch (taskState) {
-        case "offline":
-            return !client.online ? client.t(qsTr("桌面服務未連線"))
-                : !enabled ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
-                : client.t(qsTr("模型尚未連接；桌面仍可照常操作"));
         case "starting":
             return client.t(qsTr("正在啟動對話"));
         case "thinking":
-            return turn && turn.state === "cancelling" ? client.t(qsTr("正在停止"))
-                : client.t(qsTr("正在理解需求；可停止"));
+            return client.t(qsTr("正在理解需求；可停止"));
         case "executing":
             return client.t(qsTr("正在套用並確認桌面變更"));
         case "awaiting":

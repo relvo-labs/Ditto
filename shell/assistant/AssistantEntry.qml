@@ -8,6 +8,11 @@ Rectangle {
     required property var conversation
     required property var client
     property string symbolVariant: "neutral"
+    // Opening is explicit; a fresh projection must not invent an AI setting.
+    readonly property string statusText: client.online === false
+        ? conversation.stateText
+        : !conversation.wanted || !conversation.settings
+            ? client.t(qsTr("待命中")) : conversation.stateText
     signal activated()
     implicitWidth: Math.max(218, label.implicitWidth + 84)
     implicitHeight: Math.max(54, label.implicitHeight + status.implicitHeight + 12)
@@ -44,7 +49,7 @@ Rectangle {
         Text {
             id: status
             width: parent.width
-            text: entry.conversation.stateText + (entry.conversation.transportText ? " · " + entry.conversation.transportText : "")
+            text: entry.statusText + (entry.conversation.transportText ? " · " + entry.conversation.transportText : "")
             color: entry.tokens.foregroundMuted
             font.pixelSize: entry.tokens.fontSmall
             elide: Text.ElideRight

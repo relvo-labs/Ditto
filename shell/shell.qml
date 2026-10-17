@@ -215,16 +215,18 @@ ShellRoot {
             if (focused) root.lastFocusedApplication = focused.id;
         }
     }
+    ChatFocusReturn {
+        id: chatFocusReturn
+        client: root.shellClient
+        enabled: root.assistantPresentation
+        returnWindow: root.chatReturnWindow
+        lastFocusedApplication: root.lastFocusedApplication
+        chatOpen: chat.open
+        blocked: !!approvalLoader.item || centers.open
+    }
     function closeChat() {
         chat.open = false;
-        // Restore only the explicitly opened assistant's previous application.
-        // Approval keeps its own keyboard and Escape=reject contract.
-        if (assistantPresentation && chatReturnWindow && !approvalLoader.item && !centers.open) {
-            const id = chatReturnWindow;
-            Qt.callLater(() => {
-                if (!chat.open && client.windows.some(window => window.id === id)) client.focusWindow(id);
-            });
-        }
+        chatFocusReturn.restore();
     }
     function openChat(mode) {
         if (!chat.open && assistantPresentation) {
@@ -251,9 +253,10 @@ ShellRoot {
             streaming: conversation.streamText.length,
             sessions: conversation.sessions.length,
             draft: conversation.draft,
-            state: conversation.taskState,
+            state: conversation.taskState === "offline" && !conversation.offlineReason
+                ? "idle" : conversation.taskState,
             text: conversation.stateText,
-            enabled: conversation.enabled,
+            enabled: conversation.settings ? conversation.enabled : null,
             connected: conversation.connected,
             session_id: conversation.sessionId,
             turn_state: conversation.turn ? conversation.turn.state : null,

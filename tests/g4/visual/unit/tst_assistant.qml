@@ -15,9 +15,17 @@ TestCase {
         id: client
         property bool online: true
         property int writes: 0
+        property int reads: 0
         signal disconnected()
         function t(text) { return text; }
-        function capability(method, params, ok, fail) { writes++; }
+        function capability(method, params, ok, fail) {
+            if (["agent.settings.describe", "agent.turns.get"].indexOf(method) >= 0) reads++;
+            else writes++;
+        }
+        function watchTopics(topics, event, resync, ready, error) {
+            reads++;
+            ready({ subscription_id: "fixture-subscription" });
+        }
     }
     Jelly.Tokens { id: tokens }
     Chat.ConversationState { id: conversation; client: client }
@@ -40,12 +48,47 @@ TestCase {
     SignalSpy { id: accepted; target: input; signalName: "accepted" }
     function init() {
         input.focusInput();
-        activated.clear(); accepted.clear(); client.writes = 0;
+        activated.clear(); accepted.clear();
+        conversation.wanted = false;
+        conversation.subscriptionId = "";
         client.online = true;
-        conversation.settings = { enabled: true };
-        conversation.provider = { available: true, authenticated: true };
+        client.writes = 0; client.reads = 0;
+        conversation.settings = null;
+        conversation.provider = null;
         conversation.turn = null; conversation.events = []; conversation.runtime = null;
         conversation.reconnecting = false;
+    }
+    function readback() {
+        conversation.wanted = true;
+        conversation.settings = { enabled: true };
+        conversation.provider = { available: true, authenticated: true };
+    }
+    function test_unknown_settings_after_open() {
+        conversation.wanted = true;
+        compare(conversation.stateText, "待命中");
+        compare(entry.Accessible.description, "待命中");
+        conversation.settings = { enabled: true };
+        compare(conversation.stateText, "待命中"); // provider is also still unknown
+        conversation.settings = { enabled: false };
+        verify(entry.Accessible.description.indexOf("AI 對話已關閉") >= 0);
+    }
+    function test_preopen_data() {
+        return [{ tag: "online", online: true }, { tag: "offline", online: false }];
+    }
+    function test_preopen(data) {
+        conversation.settings = null;
+        conversation.provider = null;
+        conversation.wanted = false;
+        client.online = data.online;
+        const description = entry.Accessible.description;
+        if (data.online) {
+            compare(description, "待命中");
+            verify(description.indexOf("關閉") < 0 && description.indexOf("未連線") < 0);
+        } else {
+            compare(description, "桌面服務未連線");
+        }
+        compare(client.writes, 0);
+        compare(client.reads, 0);
     }
     function test_button_keys_and_candidates() {
         verify(!entry.activeFocus);
@@ -84,13 +127,45 @@ TestCase {
         ];
     }
     function test_readback_states(data) {
+        readback();
         conversation.turn = data.turn ? { turn_id: "fixture-turn", state: data.turn } : null;
         conversation.runtime = data.phase ? { phase: data.phase } : null;
         compare(conversation.taskState, data.state);
         verify(conversation.stateText.length > 0);
         compare(client.writes, 0);
     }
+    function test_terminal_and_offline_reason_data() {
+        const rows = [];
+        for (const terminal of ["partial", "unknown", "cancelled"]) {
+            for (const reason of ["core", "disabled", "provider"]) {
+                rows.push({ tag: terminal + "-" + reason, terminal: terminal, reason: reason });
+            }
+        }
+        return rows;
+    }
+    function test_terminal_and_offline_reason(data) {
+        readback();
+        conversation.turn = { turn_id: "fixture-terminal", state: data.terminal };
+        const result = conversation.stateText;
+        let reason;
+        if (data.reason === "core") {
+            client.online = false;
+            reason = "桌面服務未連線";
+        } else if (data.reason === "disabled") {
+            conversation.settings = { enabled: false };
+            reason = "AI 對話已關閉";
+        } else {
+            conversation.provider = { available: false, authenticated: false };
+            reason = "模型尚未連接";
+        }
+        compare(conversation.taskState, "offline");
+        verify(conversation.stateText.indexOf(result) >= 0);
+        verify(conversation.stateText.indexOf(reason) >= 0);
+        compare(entry.Accessible.description, conversation.stateText);
+        compare(client.writes, 0);
+    }
     function test_executing_and_terminal_offline() {
+        readback();
         conversation.turn = { turn_id: "fixture-turn", state: "running" };
         conversation.events = [{ type: "tool/call", data: { turn_id: "fixture-turn", operation_id: "fixture-op" } }];
         compare(conversation.taskState, "executing");
@@ -100,7 +175,8 @@ TestCase {
             conversation.turn = { turn_id: "fixture-turn", state: state };
             const result = conversation.stateText;
             client.online = false;
-            compare(conversation.stateText, result);
+            verify(conversation.stateText.indexOf(result) >= 0);
+            verify(conversation.stateText.indexOf("桌面服務未連線") >= 0);
             client.online = true;
         }
         conversation.turn = null;

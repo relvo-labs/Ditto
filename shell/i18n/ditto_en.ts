@@ -242,6 +242,10 @@
         <translation>Assistant</translation>
     </message>
     <message>
+        <source>待命中</source>
+        <translation>Idle</translation>
+    </message>
+    <message>
         <source>開啟助理對話</source>
         <translation>Open assistant conversation</translation>
     </message>
@@ -1114,6 +1118,10 @@
         <translation>Stopped</translation>
     </message>
     <message>
+        <source>待命中</source>
+        <translation>Idle</translation>
+    </message>
+    <message>
         <source>桌面服務未連線</source>
         <translation>Desktop service not connected</translation>
     </message>
@@ -1203,10 +1211,6 @@
 </context>
 <context>
     <name>DittoKeys</name>
-    <message>
-        <source>diff.avatar.presentation</source>
-        <translation>Assistant presentation</translation>
-    </message>
     <message>
         <source>card.kind.appearance</source>
         <translation>Appearance</translation>
@@ -1462,6 +1466,10 @@
     <message>
         <source>diff.avatar.output</source>
         <translation>Character screen</translation>
+    </message>
+    <message>
+        <source>diff.avatar.presentation</source>
+        <translation>Assistant presentation</translation>
     </message>
     <message>
         <source>diff.avatar.scale</source>

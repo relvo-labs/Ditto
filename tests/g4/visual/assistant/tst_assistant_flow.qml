@@ -18,6 +18,10 @@ TestCase {
         property bool online: true
         property var packages: []
         property int writes: 0
+        property var windows: [{ id: "X", focused: true }, { id: "Y", focused: false }]
+        property string focusedApplication: "X"
+        property var focusCalls: []
+        function focusWindow(id) { focusCalls = focusCalls.concat([id]); focusedApplication = id; }
         signal changeUpdated(var change)
         signal disconnected()
         function t(text) { return text; }
@@ -39,6 +43,7 @@ TestCase {
         StubDesktop.layer = layer;
         client.writes = 0;
         tokens.appearance = { theme: "soft-jelly", reduced_motion: true, tokens: {} };
+        conversation.wanted = true;
         conversation.settings = { enabled: true };
         conversation.provider = { available: true, authenticated: true };
         conversation.events = [];
@@ -47,6 +52,57 @@ TestCase {
     function cleanup() {
         for (const object of mounted) object.destroy();
         mounted = []; wait(20);
+    }
+    function test_fresh_entry_flow() {
+        conversation.wanted = false;
+        conversation.settings = null;
+        conversation.provider = null;
+        const surface = mount("shell/assistant/AssistantSurface.qml", { tokens: tokens, client: client,
+            conversation: conversation, screen: { name: "fixture", width: 1280, height: 800 } });
+        const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
+        verify(!!entry);
+        compare(entry.Accessible.description, "待命中");
+        compare(client.writes, 0);
+    }
+    function test_focus_return_respects_application_switch() {
+        client.focusCalls = [];
+        client.focusedApplication = "X";
+        const policy = mount("shell/chat/ChatFocusReturn.qml", { client: client,
+            returnWindow: "X", lastFocusedApplication: "X", chatOpen: true });
+        // Open from X, switch to Y while the panel stays open, then close.
+        client.focusedApplication = "Y";
+        policy.lastFocusedApplication = "Y";
+        policy.chatOpen = false;
+        policy.restore();
+        wait(1);
+        compare(client.focusedApplication, "Y");
+        compare(client.focusCalls.length, 0);
+
+        // Returning to X is allowed when focus has not moved to another app.
+        policy.lastFocusedApplication = "X";
+        policy.restore();
+        tryCompare(client, "focusedApplication", "X");
+        compare(client.focusCalls.length, 1);
+
+        // A switch after scheduling must also preserve Y.
+        client.focusCalls = [];
+        policy.restore();
+        client.focusedApplication = "Y";
+        policy.lastFocusedApplication = "Y";
+        wait(1);
+        compare(client.focusedApplication, "Y");
+        compare(client.focusCalls.length, 0);
+
+        policy.lastFocusedApplication = "X";
+        policy.blocked = true; // approval/center retains ownership
+        policy.restore();
+        wait(1);
+        compare(client.focusCalls.length, 0);
+        policy.blocked = false;
+        policy.restore();
+        policy.chatOpen = true; // reopened before the deferred callback
+        wait(1);
+        compare(client.focusCalls.length, 0);
     }
     function test_legacy_pixels_and_geometry_data() {
         return ["bottom_right", "bottom_left", "top_right", "top_left"].map(corner => ({ tag: corner, corner: corner }));

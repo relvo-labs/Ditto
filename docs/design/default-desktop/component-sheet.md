@@ -122,7 +122,7 @@
 
 ## 5. 交接需求（#71 原交接，R3 更新 H1／H3）
 
-- **H1 預設主題（#45／Core）**：R3 依 D-48 已把新「預設」文件改為 `soft-jelly-light`；agent 依 #71 交接實作，owner 可反悔，既有 store 不改。依 #69 的共用 appearance 契約，新 store 的「開發」「簡報」也共用「預設」完整 appearance（含 `soft-jelly-light` 與 tokens）；助理呈現仍僅「預設」選用，兩份用途組合維持 legacy avatar。以下保留 token 層的後續問題：`APPEARANCE_TOKENS` 每個 token 只有一個預設值，所以個人化中心與 Agent 看到的仍是深色預設。需要決定：要嘛依主題列出預設值，要嘛換掉預設值並同步更新 `appearance_tokens_match_the_shell` 測試。`defaults.rs` 目前把 accent 覆寫為 `#b9a4ff`，在淺色 recipe 下對比仍達標。
+- **H1 預設主題（#45／Core）**：R3 依 D-48 已把新「預設」文件改為 `soft-jelly-light`；agent 依 #71 交接實作，owner 可反悔，既有已儲存的文件不改寫；日後在既有 store 透過 `desktop.profiles.create {from: default}` 建立的新 Profile 也使用這份預設模板。依 #69 的共用 appearance 契約，新 store 的「開發」「簡報」也共用「預設」完整 appearance（含 `soft-jelly-light` 與 tokens）；助理呈現仍僅「預設」選用，兩份用途組合維持 legacy avatar。以下保留 token 層的後續問題：`APPEARANCE_TOKENS` 每個 token 只有一個預設值，所以個人化中心與 Agent 看到的仍是深色預設。需要決定：要嘛依主題列出預設值，要嘛換掉預設值並同步更新 `appearance_tokens_match_the_shell` 測試。`defaults.rs` 目前把 accent 覆寫為 `#b9a4ff`，在淺色 recipe 下對比仍達標。
 - **H2 桌布欄位（Core／#45／#51／#49）**：Profile `appearance` 需要一個由 Core 管理的桌布引用（素材 ID 或 Core 資料區內的資產，加 fit 方式，必要時分輸出），並經 ChangeSet 寫入。Shell 端只接 `Backdrop.wallpaperSource`，不讀環境變數或自訂設定檔。多螢幕的 crop／fit 由 #49 決定。素材與授權由 #51 決定。
 - **H3 Dock 綁定（#45）**：R3 依 D-48 已把新「預設」文件改綁已安裝的 `ditto.dock.pill`，缺套件時保留原供應者；agent 依 #71 交接實作，owner 可反悔。釘選清單沿用已註冊供應者設定（不捏造應用）；既有 store 與「簡報」不變。
 - **H4 內建套件版本（#50）**：`ditto.dock.pill` 內容改了，但版本仍是 `1.1.0`。G1／G2 測試與語意任務集逐字引用 `1.1.0`。已有 store 的機器在 seed 時會記 `boot.builtin_refused`（同版本不同內容），保留舊內容，只有新 store 會拿到新 Dock。升版與升級路徑屬內建套件升版工作。
@@ -154,13 +154,13 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 
 Core 的 `avatar.presentation = "assistant"` 明確選擇新入口；absent／null 仍是 legacy，與 theme、hidden、enabled 分開。Schema、Rust／TS 與契約向量一起生成；輸出角落、顯示器消失 fallback、隱藏與停用沿用原 Core 投影。`AssistantSymbol.qml` 是可替換候選接點，未形成新角色品牌。
 
-入口為可見膠囊命中區，文字「助理」和真實任務狀態並列，無假 editor、無獨立 sparkle 按鈕。點擊、Enter／Space 或 Super+A 開同一 ConversationState。compact 的位置來自實際入口矩形（output-local），完整視窗與收合保留草稿、串流、歷史與待決 turn。收合只移除表面；停止、撤銷、approval、preview 沿用既有路徑。Escape composing guard 在 ChatBody／ChatInput；非 composing 才收合，Shell 保存先前應用並透過既有 focus 能力回焦。實際 Wayfire 回焦與輸入法尚未執行。
+入口為可見膠囊命中區，文字「助理」和真實任務狀態並列，無假 editor、無獨立 sparkle 按鈕。點擊、Enter／Space 或 Super+A 開同一 ConversationState。compact 的位置來自實際入口矩形（output-local），完整視窗與收合保留草稿、串流、歷史與待決 turn。收合只移除表面；停止、撤銷、approval、preview 沿用既有路徑。登入前或設定尚未回讀時入口顯示中性「待命中」，只有 client 明確斷線才顯示桌面服務未連線；終態與已知離線／停用原因並列。若使用者已切換到其他應用，收合不會把焦點拉回原應用，延後回焦前會再次檢查。Escape composing guard 在 ChatBody／ChatInput；非 composing 才收合，Shell 保存先前應用並透過既有 focus 能力回焦。實際 Wayfire 回焦與輸入法尚未執行。
 
 Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 逐字相同；legacy compact 四角像素及幾何相同。共用 IME guard、重連回讀與保留已知 partial／unknown／stopped 結果的修正適用兩種呈現；這些修正不改已保存的 Profile。助理縮放後的命中區使用表面的實際尺寸，圓角外不攔截。
 
 | Slice | 改動／oracle | 開發證據 | 限制 |
 | --- | --- | --- | --- |
-| S1 狀態／同一對話 | `shell/assistant/`、`shell/chat/`、shell 掛載；Core turn／工具事件推導狀態，不重播工具 | `tst_assistant.qml` 15 項；`assistant/tst_assistant_flow.qml` 10 項；12 張 normal／legacy 場景 | fixture，不是真實 Core／模型端到端；IPC 在 sandbox BLOCKED |
+| S1 狀態／同一對話 | `shell/assistant/`、`shell/chat/`、shell 掛載；Core turn／工具事件推導狀態，不重播工具 | `tst_assistant.qml` 27 項；`assistant/tst_assistant_flow.qml` 12 項；12 張 normal／legacy 場景 | fixture，不是真實 Core／模型端到端；IPC 在 sandbox BLOCKED |
 | S2 相容 | protocol optional 欄位、defaults、docops、projection、builtin_profiles；absent digest、全部既有 avatar 欄位、匯出匯入、undo／切換儲存操作、關閉 Store 後 Core 開機回讀 | protocol 29／store 51；Core 新增 assistant 4 項通過；舊 schema 拒絕新版、明確降版後接受；33 個 TS shape vectors | 完整參與者切換／undo 的 IPC gate BLOCKED；無自動降版 |
 | A1 鍵盤／IME | 真實 Enter／Space／Escape、composing policy、approval Escape 拒絕；四角定位、縮放與隱藏 | QtTest、legacy 逐像素／結構比對 | 未注入真正 QInputMethodEvent；實體 IME、回焦、Orca、大字、多屏熱插拔未執行，交 #47／#49 |
 
