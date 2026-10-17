@@ -330,6 +330,15 @@ ShellRoot {
             color: tokens.background
             WlrLayershell.layer: WlrLayer.Background
             WlrLayershell.namespace: "ditto-background"
+
+            /// The canvas (a gradient in the light recipe). No wallpaper yet:
+            /// the asset and its Profile field are still to be decided
+            /// (docs/design/default-desktop/component-sheet.md).
+            Backdrop {
+                anchors.fill: parent
+                tokens: root.shellTokens
+                wallpaperSource: ""
+            }
         }
     }
 

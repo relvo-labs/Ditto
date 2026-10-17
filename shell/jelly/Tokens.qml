@@ -12,6 +12,14 @@ import Quickshell.Io
 /// movement). The low-power style turns blur and shadow off and is measured as
 /// its own style (NFR-05). The system's reduced-motion preference is honoured
 /// alongside the Profile's.
+///
+/// Two recipes share the token names. `soft-jelly` (and a Profile without a
+/// theme) keeps the dark values Core lists in its token table
+/// (`APPEARANCE_TOKENS`); `soft-jelly-light` is the light lavender recipe of
+/// the default-desktop reference (docs/design/default-desktop/
+/// component-sheet.md, a proposal until the owner confirms it). Which recipe
+/// a new Profile starts with, and the defaults Core lists for it, are Core's
+/// (#45); this file only answers for the theme it is given.
 QtObject {
     id: tokens
 
@@ -34,6 +42,12 @@ QtObject {
     readonly property bool lowPower: environmentLowPower
         || (appearance ? appearance.low_power_style === true : false)
     readonly property string theme: appearance && appearance.theme ? appearance.theme : "soft-jelly"
+    /// The light recipe; every other theme name keeps the dark values.
+    readonly property bool lightRecipe: theme === "soft-jelly-light"
+    /// Shader effects (the material's soft shadow) are allowed. Reduced
+    /// transparency and the low-power style take the non-shader path; the
+    /// content, focus and hit regions are the same on both paths.
+    readonly property bool effectsEnabled: !reducedTransparency && !lowPower
 
     function colorToken(name, fallback) {
         const value = overrides[name];
@@ -56,20 +70,48 @@ QtObject {
     }
 
     // ---- colour ----------------------------------------------------------------
-    readonly property color accent: colorToken("accent", "#b9a4ff")
-    readonly property color onAccent: colorToken("on_accent", "#1a1626")
-    readonly property color background: colorToken("background", "#12121a")
-    readonly property color surfaceBase: colorToken("surface", "#1d1f2b")
-    readonly property color surface: reducedTransparency ? surfaceBase : withAlpha(surfaceBase, 0.62)
-    readonly property color surfaceStrong: colorToken("surface_strong", reducedTransparency ? "#2a2e42" : "#242739")
-    readonly property color foreground: colorToken("foreground", "#f2f3f8")
-    readonly property color foregroundMuted: colorToken("foreground_muted", reducedTransparency ? "#c9cde0" : "#a9aec4")
-    readonly property color border: reducedTransparency ? colorToken("border", "#5a6180") : withAlpha(colorToken("border", "#3a3f55"), 0.45)
-    readonly property color focus: colorToken("focus", "#f2f3f8")
-    readonly property color warning: colorToken("warning", "#ffcf8b")
-    readonly property color danger: colorToken("danger", "#ff9b9b")
-    readonly property color success: colorToken("success", "#9be3b4")
-    readonly property color scrim: reducedTransparency ? "#12121a" : "#b312121a"
+    // Each dark value is the default in Core's token table; a test there reads
+    // this file and compares them, so they stay written out in full.
+    // Light values: contrast against the composited surfaces is computed in
+    // tests/g4/visual/tst_tokens.qml and listed in component-sheet.md.
+    readonly property color accent: lightRecipe ? colorToken("accent", "#9d8cf0") : colorToken("accent", "#b9a4ff")
+    readonly property color onAccent: lightRecipe ? colorToken("on_accent", "#1c1830") : colorToken("on_accent", "#1a1626")
+    readonly property color background: lightRecipe ? colorToken("background", "#d3cff9") : colorToken("background", "#12121a")
+    readonly property color surfaceBase: lightRecipe ? colorToken("surface", "#fbfaff") : colorToken("surface", "#1d1f2b")
+    /// Alpha of the translucent surface colour (before `surfaceOpacity`).
+    readonly property real surfaceAlpha: reducedTransparency ? 1.0 : (lightRecipe ? 0.9 : 0.62)
+    readonly property color surface: reducedTransparency ? surfaceBase : withAlpha(surfaceBase, surfaceAlpha)
+    readonly property color surfaceStrong: lightRecipe
+        ? colorToken("surface_strong", reducedTransparency ? "#e6e2f8" : "#ece8fb")
+        : colorToken("surface_strong", reducedTransparency ? "#2a2e42" : "#242739")
+    readonly property color foreground: lightRecipe ? colorToken("foreground", "#211e35") : colorToken("foreground", "#f2f3f8")
+    readonly property color foregroundMuted: lightRecipe
+        ? colorToken("foreground_muted", reducedTransparency ? "#46425e" : "#57536f")
+        : colorToken("foreground_muted", reducedTransparency ? "#c9cde0" : "#a9aec4")
+    readonly property color border: lightRecipe
+        ? (reducedTransparency ? colorToken("border", "#7d75ad") : withAlpha(colorToken("border", "#b3abe0"), 0.8))
+        : (reducedTransparency ? colorToken("border", "#5a6180") : withAlpha(colorToken("border", "#3a3f55"), 0.45))
+    readonly property color focus: lightRecipe ? colorToken("focus", "#4c3fb5") : colorToken("focus", "#f2f3f8")
+    // Status colours keep their own hues in both recipes (not tinted to the
+    // accent); the light ones are dark enough to be read as text.
+    readonly property color warning: lightRecipe ? colorToken("warning", "#7a4a00") : colorToken("warning", "#ffcf8b")
+    readonly property color danger: lightRecipe ? colorToken("danger", "#a8231b") : colorToken("danger", "#ff9b9b")
+    readonly property color success: lightRecipe ? colorToken("success", "#17663a") : colorToken("success", "#9be3b4")
+    // Light: a near-white veil, so text drawn straight on it (the launcher
+    // grid's names and hint) stays readable; a dark veil left the hint at 2.2:1.
+    readonly property color scrim: lightRecipe
+        ? (reducedTransparency ? background : withAlpha(surfaceBase, 0.86))
+        : (reducedTransparency ? "#12121a" : "#b312121a")
+
+    // Derived values, not overridable on their own: they follow the tokens above.
+    /// The thin bright edge just inside a surface; none with reduced transparency.
+    readonly property color highlight: reducedTransparency ? "transparent"
+        : (lightRecipe ? Qt.rgba(1, 1, 1, 0.85) : Qt.rgba(1, 1, 1, 0.08))
+    /// The desktop canvas behind every surface while no wallpaper is shown:
+    /// a soft gradient in the light recipe, the flat background otherwise.
+    readonly property color canvasTop: background
+    readonly property color canvasBottom: lightRecipe ? Qt.tint(background, Qt.rgba(1, 1, 1, 0.12)) : background
+    readonly property color canvasGlow: lightRecipe ? Qt.rgba(1, 1, 1, 0.42) : "transparent"
 
     // ---- material --------------------------------------------------------------
     /// Blur is requested only where the compositor offers a background effect;
@@ -78,7 +120,7 @@ QtObject {
     readonly property real surfaceOpacity: reducedTransparency ? 1.0 : numberToken("surface_opacity", 0.94, 0.5, 1.0)
     readonly property bool shadowEnabled: !lowPower
     readonly property real shadowRadius: shadowEnabled ? numberToken("shadow_radius", 14, 0, 48) : 0
-    readonly property color shadowColor: "#66000000"
+    readonly property color shadowColor: lightRecipe ? Qt.rgba(0.165, 0.141, 0.345, 0.22) : "#66000000"
 
     // ---- shape -----------------------------------------------------------------
     readonly property real radiusScale: numberToken("radius_scale", 1.0, 0, 2)

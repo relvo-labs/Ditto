@@ -1,0 +1,2 @@
+module DittoStub
+singleton StubDesktop 1.0 StubDesktop.qml

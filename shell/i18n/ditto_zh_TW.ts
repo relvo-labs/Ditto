@@ -1939,6 +1939,10 @@
         <translation>釘選沒有變更</translation>
     </message>
     <message>
+        <source>（使用中）</source>
+        <translation>（使用中）</translation>
+    </message>
+    <message>
         <source>（執行中）</source>
         <translation>（執行中）</translation>
     </message>

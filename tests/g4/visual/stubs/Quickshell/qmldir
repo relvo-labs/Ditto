@@ -1,0 +1,11 @@
+module Quickshell
+singleton Quickshell 1.0 Quickshell.qml
+Scope 1.0 Scope.qml
+PanelWindow 1.0 PanelWindow.qml
+PanelAnchors 1.0 PanelAnchors.qml
+PanelMargins 1.0 PanelMargins.qml
+PopupWindow 1.0 PopupWindow.qml
+PopupAnchor 1.0 PopupAnchor.qml
+PopupRect 1.0 PopupRect.qml
+SystemClock 1.0 SystemClock.qml
+Region 1.0 Region.qml
