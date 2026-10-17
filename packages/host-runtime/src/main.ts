@@ -88,10 +88,10 @@ async function main(): Promise<void> {
     kind: env['DITTO_CLIENT_KIND'] ?? 'hostd',
     version: env['DITTO_CLIENT_VERSION'] ?? hostdVersion,
   })
-  handshakeComplete = true
   const hello = await link.request<HelloResult>('host.hello', runtime.helloParams())
   log.info('connected', { host_generation: hello.host_generation ?? handshake.host_generation, mode: hello.mode, strategy: runtime.strategy })
   runtime.startBackground(hello)
+  handshakeComplete = true
 
   process.on('SIGTERM', () => { void stop(0, 'SIGTERM') })
   process.on('SIGINT', () => { void stop(0, 'SIGINT') })
