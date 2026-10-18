@@ -31,7 +31,28 @@ Scope {
         return client ? client.t(source) : source;
     }
 
-    Component.onCompleted: ready = true
+    // Presentation-only projection: window updates must not reset input.
+    readonly property var windows: client ? client.windows : []
+    ListModel { id: tileModel; dynamicRoles: true }
+    function syncTiles() {
+        if (!ready) return;
+        for (let i = tileModel.count - 1; i >= 0; --i) {
+            if (!windows.some(window => window.id === tileModel.get(i).key)) tileModel.remove(i);
+        }
+        for (let i = 0; i < windows.length; ++i) {
+            let found = i;
+            while (found < tileModel.count && tileModel.get(found).key !== windows[i].id) ++found;
+            if (found === tileModel.count) {
+                tileModel.insert(i, { key: windows[i].id, entryData: windows[i] });
+            } else {
+                if (found !== i) tileModel.move(found, i, 1);
+                if (JSON.stringify(tileModel.get(i).entryData) !== JSON.stringify(windows[i]))
+                    tileModel.setProperty(i, "entryData", windows[i]);
+            }
+        }
+    }
+    onWindowsChanged: syncTiles()
+    Component.onCompleted: { ready = true; syncTiles(); }
 
     PanelWindow {
         id: dock
@@ -71,10 +92,11 @@ Scope {
             spacing: provider.tokens.space
 
             Repeater {
-                model: provider.client ? provider.client.windows : []
+                model: tileModel
 
                 Rectangle {
-                    required property var modelData
+                    required property var entryData
+                    readonly property var modelData: entryData
                     width: 150
                     height: 34
                     radius: provider.tokens.radiusSmall

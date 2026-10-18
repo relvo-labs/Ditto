@@ -74,3 +74,30 @@ QtTest 使用實際 AssistantEntry、MotionValue、staged DockPill／ChatPanel�
 盤點：DockPill 的 `Repeater(entries)` 曾在 delegate 的 `onCurrentChanged` 啟動確認，因此是新增 F1。DockBottom 的 `Repeater(client.windows)` 同樣會重建互動暫態，但只有靜態 focused 色／字，沒有確認動畫；屬 legacy F3。PanelTop 讀 focused title、Shell 保存 lastFocusedApplication、ChatFocusReturn 以 ID 防止錯誤回焦，均不啟動 tile 確認。TasksPanel 和 launcher 依 task／app model 顯示，不是焦點確認消費者。本修正保留原 array model，**F3 的 hover／press／鍵盤焦點重設留待另案**。
 
 **F2 未驗證**：真實 Quickshell window 隱藏是否同步傳到 child Item.visible，沿用既有 Avatar 慣例；offscreen stub 不證明這件事，交 #47／#68 實體驗證。原 native video 保留為歷史；修正後另錄同一原生樣本，補同 ID 的 title／geometry／無關視窗更新與實際確認啟動次數，放 repo 外 `…/evidence/repair1/media/`。完整 RED→GREEN、gate／來源／blob 綁定由 `…/evidence/repair1/manifest.json` 索引。參數與 instant close 邊界不變，不代表 #66 全部通過。
+
+## F3 Dock tile 互動生命週期（#83）
+
+上段「保留原 array model」記錄的是 PR #82 的修正邊界。#83 改以 provider 內的 `ListModel` 驅動兩個 Dock 的 Repeater；保留原資料來源與 DockPill 的 `entries` 查詢投影。這只是 Shell 呈現暫態，不是第二份 Core／Profile 權威，也沒有新 RPC、輪詢或持久化。
+
+DockPill 以 `app:<pinned appId>` 識別釘選 tile，以 `window:<window id>` 識別其他執行中 tile；DockBottom 直接使用 window id。對照新投影只 remove 真正消失的 key、insert 新 key、move 排序改變的 key，並在資料值變更時 set 單一 `entryData` role。保留完整 entry payload，讓既有 activation、Accessible name、running／current 與 geometry 回讀照常更新；無須逐欄重新定義視窗 schema。兩個 provider 各自保有小型 reconciliation 函式，維持獨立套件，不引入跨 provider／Shell 路徑依賴。`stage-providers.mjs` 只多列 DockBottom，仍僅移除 layer-shell 行。
+
+身分取捨：釘選 app 的視窗關閉／重新開啟仍使用同一 tile；同 app 的非釘選多視窗分別保有 window id。既有 schema 允許重複 pinned appId，diff 依出現順序配對，最後移除多餘列，不改原配置或去重。pin／unpin 會切換 app／window key，視為舊 tile 消失、新 tile 出現，不把已消失身分的 focus／press 偷渡過去。tile 移動後，hover 仍以實際游標位置判定；pointer grab 與鍵盤焦點跟著原物件，不凍結舊 hit region。確認動畫仍由 provider 觀測 focused window id，保留 T01–T16、#84 的快照基線與斷線處理，沒有更改動畫參數。
+
+新增測試在 `tests/g4/motion/tst_dock_tile_lifetime.qml`：
+
+| 驗收 | Provider／測試（省略 `test_`） |
+| --- | --- |
+| title、geometry、無關 open／close、apps reload／reorder、pinned reorder、真正焦點變更時保留 hover／press／activeFocus；操作使用最新 payload | DockPill：`upsert_preserves_input`（3 種 input × 8 種更新） |
+| feedback 插值不中斷，20 次 geometry stream 及 title／apps／pinned／focus 更新不重啟 | DockPill：`feedback_stream_continues_without_restart`（hover／press／focus；實際值與 Animation.started 次數） |
+| title、geometry、無關 open／close、window reorder、焦點變更時保留 press／activeFocus | DockBottom：`bottom_preserves_input`（2 × 6）；原來沒有 hover 樣式或確認動畫，不增加新的效果 |
+| 排序真的移動 tile，保留 keyboard focus／pointer grab，Tab 依新順序走 | 兩者：`move_keeps_delegate_and_keyboard_order`、`move_pressed_tile` |
+| 釘選 app 視窗替換、同 app 多視窗仍分立 | DockPill：`pinned_identity_survives_window_replacement`、`unpinned_window_ids_do_not_collapse_same_app`、`duplicate_pinned_count_reduction_removes_only_retired_tile` |
+| 移除無殘影／錯誤 focus／鄰居誤觸，重新出現不繼承舊 press／focus | 兩者：`removed_identity_retires_input` |
+| release 隱藏／清 exclusiveZone，destroy 後無 tile，替換後不繼承 input 且單次觸發 | 兩者：`release_and_replacement`；原有 reduced-motion／hidden settle 由 `tst_dock_motion.qml` 回歸 |
+| legacy bubble 外觀與靜態效果 | `legacy_keeps_static_style_and_input`，加上 visual suite 的既有 legacy 幾何／像素比較 |
+
+RED 在 main `34dd21c` 與本案基底 `a29bca2` 的真實 DockPill 上各得到 18 項行為失敗（8 passed／18 failed／0 skipped），沒有 compile／undefined 失敗。原始測試與兩版 provider、log、執行方式在 repo 外 `/data/hermes/ditto-runs/g4-impl/fix83/evidence/red/`。首個 checkpoint motion 94／94；補強排序、移除與串流測試後，完整 gates 及 source／head 綁定見同 evidence 目錄的 `manifest.json`。重複 pinned appId 縮減的額外 RED（殘留 4 列，應剩 3 列）另存 `red/duplicate-pinned.log`。開發期間尚未等 layout polish／動畫真正 stopped 就檢查的失敗 log 也保留在 `checkpoint/`，同步點修正為等待實際狀態，沒有改 production 時長或放寬原斷言。
+
+上述均為 Qt 6.10.2 offscreen 開發證據，Core 與 layer-shell 仍為 fixture。實體 Wayfire 鍵盤／hit-region、F2 window 隱藏傳遞、IME／Orca、NFR-05／資源量測與新錄影均**未執行**；#47／#68 的原生驗收與 owner 動態核定仍獨立進行，不以本套測試代替。
+
+本 runner 的 canonical `node scripts/lint-shell-i18n.mjs` 在 Node `spawnSync(lrelease)` 回報 `EPERM`（exit 1），該 gate 記為 BLOCKED，未改 lint 或略過其檢查。直接執行同一 Qt lrelease 的兩語系產物與 repo `.qm` 完全相同，僅作補充證據，不能取代 canonical gate。沒有使用者可見文字變動。
