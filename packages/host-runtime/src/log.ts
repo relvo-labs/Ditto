@@ -16,14 +16,23 @@ export interface LogRecord {
 
 export type LogSink = (record: LogRecord) => void
 
+// Content is always private, regardless of its type (including Error/null).
+const contentKeys = new Set(['title', 'summary', 'body', 'clipboard', 'text', 'content', 'window_title',
+  'message', 'stack', 'payload', 'data', 'config', 'args', 'logger', 'name', 'topics'])
+
 // Reviewed string fields only. Unknown fields/containers cannot bless nested
 // strings by using a safe key. Error diagnostics have their own closed schema.
 export const safeLogStringFields = [
   'component', 'part', 'source', 'entry_id', 'plugin_id', 'change_id',
-  'operation_id', 'session_id', 'grant_id', 'subscription_id', 'capability_id',
+  'grant_id', 'subscription_id', 'capability_id',
   'lease_id', 'presented', 'renewed', 'expired', 'method', 'key', 'status',
-  'why', 'mode', 'strategy', 'point', 'action', 'path',
+  'why', 'mode', 'strategy', 'point', 'action',
 ] as const
+export const safeLogNumberFields = ['pid', 'bytes', 'timeout_ms', 'hit', 'host_generation',
+  'min_semi_space_mib', 'max_semi_space_mib'] as const
+export const safeLogBooleanFields = ['fixed', 'reclaim'] as const
+const numberFields = new Set<string>(safeLogNumberFields)
+const booleanFields = new Set<string>(safeLogBooleanFields)
 const stringFields = new Set<string>(safeLogStringFields)
 const errorNames = new Set(['Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError',
   'URIError', 'EvalError', 'AggregateError', 'DittoError', 'NonError'])
@@ -94,6 +103,7 @@ function redactPaths(text: string): string {
 }
 
 function redact(key: string, value: unknown): unknown {
+  if (contentKeys.has(key)) return '[redacted]'
   if (key === 'error' || key === 'reason' || value instanceof Error) return errorDiagnostic(value)
   if (key === 'message_fingerprint') return typeof value === 'string' && /^hmac-sha256:[a-f0-9]{64}$/.test(value) ? value : '[redacted]'
   if (typeof value === 'string') return stringFields.has(key) ? redactPaths(value) : '[redacted]'
@@ -102,7 +112,11 @@ function redact(key: string, value: unknown): unknown {
     if (key !== 'items') return '[redacted]'
     return Object.fromEntries(Object.entries(value).map(([child, item]) => [child, redact(child, item)]))
   }
-  return value
+  if (typeof value === 'number' && numberFields.has(key)) return value
+  if (typeof value === 'boolean' && booleanFields.has(key)) return value
+  // V8's unspecified semi-space sizes are intentionally reported as null.
+  if (value === null && (key === 'min_semi_space_mib' || key === 'max_semi_space_mib')) return null
+  return '[redacted]'
 }
 
 function redactedRecord(record: LogRecord): LogRecord {

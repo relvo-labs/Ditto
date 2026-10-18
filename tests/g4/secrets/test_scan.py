@@ -3,6 +3,7 @@ from contextlib import closing, redirect_stdout
 import io
 import json
 from pathlib import Path
+import random
 import runpy
 import sqlite3
 import subprocess
@@ -151,9 +152,6 @@ class ScannerTests(unittest.TestCase):
                                         for hit in report["hits"]))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class NonceFormsTests(unittest.TestCase):
     def test_invalid_nonce_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -183,14 +181,18 @@ class NonceFormsTests(unittest.TestCase):
             forms = [('literal', lambda value: value.encode()),
                      ('hex-lower', lambda value: value.encode().hex().encode()),
                      ('hex-upper', lambda value: value.encode().hex().upper().encode())]
+            rng = random.Random(74099)  # Reproducible random prefixes; independent of scanner construction.
             for offset in range(3):
-                for urlsafe in (False, True):
-                    for padding in (False, True):
-                        def encode(value, offset=offset, urlsafe=urlsafe, padding=padding):
-                            fn = base64.urlsafe_b64encode if urlsafe else base64.b64encode
-                            result = fn(b'x' * offset + value.encode() + b'!suffix')
-                            return result if padding else result.rstrip(b'=')
-                        forms.append((f'base64-{offset}-{urlsafe}-{padding}', encode))
+                prefixes = [('empty', b'')] if offset == 0 else [
+                    ('ff', b'\xff' * offset), ('zero', b'\x00' * offset), ('random', rng.randbytes(offset))]
+                for prefix_name, prefix in prefixes:
+                    for urlsafe in (False, True):
+                        for padding in (False, True):
+                            def encode(value, prefix=prefix, urlsafe=urlsafe, padding=padding):
+                                fn = base64.urlsafe_b64encode if urlsafe else base64.b64encode
+                                result = fn(prefix + value.encode() + b'!suffix')
+                                return result if padding else result.rstrip(b'=')
+                            forms.append((f'base64-{offset}-{prefix_name}-{urlsafe}-{padding}', encode))
             for name, encode in forms:
                 for value, expected in ((nonce, False), (unrelated, True)):
                     with self.subTest(form=name, leaked=value == nonce):

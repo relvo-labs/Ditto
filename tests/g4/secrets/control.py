@@ -25,7 +25,7 @@ nonce = "qa04-7e98c63da14b492bbd21-synthetic-only"
 sentinel = "sk-prefix-" + nonce + "-suffix"
 if args.inject_leak:
     value = {'literal': sentinel.encode(), 'hex': nonce.encode().hex().upper().encode(),
-             'base64-offset-1': base64.b64encode(b'x' + nonce.encode() + b'!').rstrip(b'=')}[args.leak_form]
+             'base64-offset-1': base64.b64encode(b'\xff' + nonce.encode() + b'!').rstrip(b'=')}[args.leak_form]
     (product / "deliberate-leak.log").write_bytes(value)
 manifest = args.output / "manifest.json"
 manifest.write_text(json.dumps({"roots": {"scanner_fixture": str(product)}, "sentinels": {"key": sentinel}, "nonce": nonce}))

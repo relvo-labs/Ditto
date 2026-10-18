@@ -114,7 +114,7 @@ if not status['ok']:
         status['blocked'] = 'sandbox socket'
 if args.inject_leak:
     leak = {"literal": sentinels["token"].encode(), "hex": nonce.encode().hex().upper().encode(),
-            "base64-offset-1": base64.b64encode(b'x' + nonce.encode() + b'!').rstrip(b'=')}[args.leak_form]
+            "base64-offset-1": base64.b64encode(b'\xff' + nonce.encode() + b'!').rstrip(b'=')}[args.leak_form]
     (product / "logs/intentional-leak.log").write_bytes(leak)
 report = scan(manifest["roots"], sentinels, nonce=nonce)
 privacy = scan({category: manifest["roots"][category] for category in ("logs", "exports", "diagnostics")},
