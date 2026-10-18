@@ -88,12 +88,32 @@
         <translation>unknown</translation>
     </message>
     <message>
+        <source>桌面服務未連線；連線後會再讀取 AI 設定。</source>
+        <translation>The desktop service is not connected; AI settings will be read again once it reconnects.</translation>
+    </message>
+    <message>
         <source>模型</source>
         <translation>Model</translation>
     </message>
     <message>
         <source>模型名稱</source>
         <translation>Model name</translation>
+    </message>
+    <message>
+        <source>正在讀取 AI 設定…</source>
+        <translation>Reading AI settings…</translation>
+    </message>
+    <message>
+        <source>正在讀取模型連線狀態…</source>
+        <translation>Reading the model connection status…</translation>
+    </message>
+    <message>
+        <source>無法讀取 AI 設定，目前無法確認開或關。</source>
+        <translation>Could not read AI settings, so whether AI is on or off is not confirmed.</translation>
+    </message>
+    <message>
+        <source>無法讀取模型連線狀態；目前無法確認是否已登入。</source>
+        <translation>Could not read the model connection status; whether you are signed in is not confirmed.</translation>
     </message>
     <message>
         <source>登出</source>
@@ -118,6 +138,10 @@
     <message>
         <source>連接方式</source>
         <translation>Connection</translation>
+    </message>
+    <message>
+        <source>重新讀取</source>
+        <translation>Read again</translation>
     </message>
     <message>
         <source>金鑰直接存進系統鑰匙圈，設定裡只留它的代號；端點必須是 HTTPS（本機除外）。費用依供應商計價，Ditto 尚無費率資料。</source>
@@ -1164,6 +1188,14 @@
     <message>
         <source>沒有完成；可以再試一次</source>
         <translation>Not done; you can try again</translation>
+    </message>
+    <message>
+        <source>無法確認模型連線；重新開啟會再讀取</source>
+        <translation>Could not confirm the model connection; reopening reads it again</translation>
+    </message>
+    <message>
+        <source>無法讀取 AI 設定；重新開啟會再讀取</source>
+        <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>

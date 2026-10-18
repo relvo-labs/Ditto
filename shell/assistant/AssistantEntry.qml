@@ -18,9 +18,10 @@ Rectangle {
         && conversation.connected && conversation.turn && conversation.turn.state === "running"
         && ["thinking", "executing"].indexOf(conversation.taskState) >= 0
     // Opening is explicit; a fresh projection must not invent an AI setting.
+    // A failed read is not 待命中: the shared text says it could not be read.
     readonly property string statusText: client.online === false
         ? conversation.stateText
-        : !conversation.wanted || !conversation.settings
+        : !conversation.wanted || (conversation.aiStatus === "pending" && !conversation.settings)
             ? client.t(qsTr("待命中")) : conversation.stateText
     signal activated()
     implicitWidth: Math.max(218, label.implicitWidth + 84)

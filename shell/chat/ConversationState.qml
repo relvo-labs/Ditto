@@ -36,6 +36,12 @@ QtObject {
     /// The last error, in product language; diagnostics separately.
     property string errorText: ""
     property string errorDiagnostic: ""
+    /// The latest settings or provider status read ended in an error (other
+    /// than "the Agent is still starting", which is read again). Nothing was
+    /// confirmed by it: neither ready, nor off, nor offline. A new read
+    /// clears it until its answer.
+    property bool settingsFailed: false
+    property bool providerFailed: false
 
     // ---- what the user has not sent -------------------------------------------------
     property string draft: ""
@@ -105,6 +111,22 @@ QtObject {
         return Object.keys(open).length > 0;
     }
 
+    /// What Core's readback says about AI being usable now:
+    /// pending (not read yet, or a read is still out) | failed (a read failed;
+    /// nothing confirmed) | disabled | model_offline (unavailable or signed
+    /// out) | core_offline | ready. Display only; controls stay fail-closed.
+    readonly property string aiStatus: client.online === false ? "core_offline"
+        : !settings ? (settingsFailed ? "failed" : "pending")
+        : settings.enabled !== true ? "disabled"
+        : connected ? "ready"
+        : provider ? "model_offline"
+        : providerFailed ? "failed" : "pending"
+
+    /// A failed read in product language; empty unless aiStatus is "failed".
+    readonly property string readFailureText: aiStatus !== "failed" ? ""
+        : !settings ? client.t(qsTr("無法讀取 AI 設定；重新開啟會再讀取"))
+            : client.t(qsTr("無法確認模型連線；重新開啟會再讀取"))
+
     readonly property string transportText: reconnecting
         ? client.t(qsTr("正在重新連線；將查詢實際結果")) : ""
 
@@ -122,8 +144,9 @@ QtObject {
             ? failureText(turn) : "";
         if (taskState === "offline") {
             // Keep both the known terminal outcome and the current readback.
-            if (result) return result + (offlineReason ? " · " + offlineReason : "");
-            return offlineReason || client.t(qsTr("待命中"));
+            const reason = offlineReason || readFailureText;
+            if (result) return result + (reason ? " · " + reason : "");
+            return reason || client.t(qsTr("待命中"));
         }
         if (result) return result;
         if (turn && turn.state === "cancelling") return client.t(qsTr("正在停止"));
@@ -170,6 +193,19 @@ QtObject {
         return client.t(qsTr("沒有完成；可以再試一次"));
     }
 
+    /// The status part of the `chat` control line. Unconfirmed (not read, or
+    /// the read failed) is not reported as idle or as a confirmed value:
+    /// state/enabled/connected are null and ai_status says which.
+    function statusReport() {
+        return {
+            state: taskState === "offline" && !offlineReason ? null : taskState,
+            ai_status: aiStatus,
+            text: stateText,
+            enabled: settings ? enabled : null,
+            connected: provider ? connected : null
+        };
+    }
+
     function setError(error) {
         errorText = error ? client.errorText(error) : "";
         errorDiagnostic = error ? client.diagnosticText(error) : "";
@@ -209,6 +245,7 @@ QtObject {
     }
 
     function refreshSettings() {
+        settingsFailed = false;
         client.capability("agent.settings.describe", {}, function (result) {
             settings = result;
             if (settings.enabled) {
@@ -216,6 +253,7 @@ QtObject {
                 loadSession();
             }
         }, function (error) {
+            settingsFailed = true;
             setError(error);
         });
     }
@@ -227,6 +265,7 @@ QtObject {
     }
 
     function refreshProvider(then) {
+        providerFailed = false;
         refreshRuntime();
         client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
             provider = result;
@@ -241,7 +280,8 @@ QtObject {
             provider = null;
             refreshRuntime();
             // The Agent may still be starting; ask once more shortly.
-            if (error.name === "unavailable" && wanted) {
+            providerFailed = !(error.name === "unavailable" && wanted);
+            if (!providerFailed) {
                 providerRetry.restart();
             } else {
                 setError(error);

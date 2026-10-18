@@ -48,7 +48,10 @@ Flickable {
             tokens: page.tokens
             title: page.t(qsTr("AI 對話"))
             note: page.t(qsTr("關閉時不連接模型；桌面、設定中心與救援照常使用。"))
+            // Until Core's settings are read the switch is not shown at all:
+            // an unread or unreadable setting is neither 開 nor 關.
             Toggle {
+                visible: !!page.settings
                 tokens: page.tokens
                 text: page.t(qsTr("啟用 AI 對話"))
                 labelOn: page.t(qsTr("開"))
@@ -56,6 +59,34 @@ Flickable {
                 checked: page.conversation.enabled
                 enabled: !!page.settings
                 onToggled: value => page.conversation.setEnabled(value)
+            }
+            Row {
+                visible: !page.settings
+                width: parent.width
+                spacing: page.tokens.space
+                Text {
+                    objectName: "aiSettingsStatus"
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, parent.width - (settingsRetry.visible ? settingsRetry.width + parent.spacing : 0))
+                    wrapMode: Text.WordWrap
+                    text: page.client.online === false
+                        ? page.t(qsTr("桌面服務未連線；連線後會再讀取 AI 設定。"))
+                        : page.conversation.settingsFailed
+                            ? page.t(qsTr("無法讀取 AI 設定，目前無法確認開或關。"))
+                            : page.t(qsTr("正在讀取 AI 設定…"))
+                    color: page.tokens.foreground
+                    font.pixelSize: page.tokens.fontBody
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
+                Button {
+                    id: settingsRetry
+                    objectName: "aiSettingsRetry"
+                    visible: page.client.online !== false && page.conversation.settingsFailed
+                    tokens: page.tokens
+                    text: page.t(qsTr("重新讀取"))
+                    onClicked: page.conversation.refreshSettings()
+                }
             }
         }
 
@@ -82,9 +113,13 @@ Flickable {
             note: page.t(qsTr("在瀏覽器以官方頁面登入並輸入代碼。登入資料存在系統鑰匙圈；Ditto 不讀取、不顯示它。額度用完時會等待重設，不會改用付費 API。"))
 
             Text {
+                objectName: "aiProviderStatus"
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: !page.provider ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
+                text: !page.provider
+                    ? (!page.conversation.enabled ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
+                        : page.conversation.providerFailed ? page.t(qsTr("無法讀取模型連線狀態；目前無法確認是否已登入。"))
+                        : page.t(qsTr("正在讀取模型連線狀態…")))
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
                         : page.conversation.login ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg(page.conversation.login.auth_url).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
@@ -127,6 +162,13 @@ Flickable {
                     kind: "subtle"
                     text: page.t(qsTr("登出"))
                     onClicked: page.conversation.logout()
+                }
+                Button {
+                    objectName: "aiProviderRetry"
+                    visible: !page.provider && page.conversation.enabled && page.conversation.providerFailed
+                    tokens: page.tokens
+                    text: page.t(qsTr("重新讀取"))
+                    onClicked: page.conversation.refreshProvider()
                 }
             }
             Text {
