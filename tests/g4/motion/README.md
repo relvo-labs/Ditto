@@ -22,3 +22,5 @@ python3 tests/g4/motion/record-native.py /data/hermes/ditto-runs/g4-impl/r2-moti
 canonical `tests/g4/visual/run.sh` 與 `run-assistant.sh` 仍須各自完整執行。靜態 capture 保留正常模式的 production motion，等實際 Dock reveal／feedback、助理符號與 compact opacity settle 後才抓圖；不全域關閉動畫換取通過。正常 capture、fallback 與動態錄影有不同目的。
 
 F1 repair 1 加入 focused window ID 過渡矩陣與僅作路徑適配的 reviewer reproducer。確認動畫屬 provider 生命週期，不屬被重建的 tile；測試用實際 Animation.started 次數與各 tile 的 confirmedScale 區分真正 ID 過渡和 title／geometry／apps reload 等同身分事件。錄影另包含同 ID upsert 不重播的關卡；舊錄影不覆寫。F2 真實 window 隱藏傳遞未驗證；F3 legacy array 重建的 hover／press／keyboard focus 仍是獨立 follow-up。
+
+#83 在 `tst_dock_tile_lifetime.qml` 補上 F3 的互動生命週期回歸：實際 hover／press／activeFocus、feedback 插值與啟動次數、兩個 Dock 的排序／Tab／pointer grab、釘選 app 與非釘選 window 身分、移除／release／替換，以及 legacy 靜態樣式。canonical staging 現在也包含 DockBottom，仍只剝除 Wayland attached properties；production 外觀與動態參數不變。前段 F3 留待 follow-up 是歷史邊界；本次 QtTest 證據不替代實體 Wayfire 焦點與 hit-region 驗收。詳細映射與未執行項見 `docs/design/default-desktop/motion-candidate.md` 的 F3 段落。
