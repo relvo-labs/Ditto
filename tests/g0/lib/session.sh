@@ -153,6 +153,54 @@ start_core() {
   return 1
 }
 
+# G0's character fixtures (EX-04 hotpath, G0-SHELL-03 hit mask) measure the
+# legacy character surface. Since D-48 a new store's default Profile presents
+# the assistant entry instead, so the fixture puts the legacy presentation
+# back through an ordinary ChangeSet once the Shell is connected (Core reads
+# the Shell back before committing). The assistant entry is measured on its
+# own, not under these G0 ids (#90).
+#
+# Before the Profile reaches it the Shell briefly loads the legacy surface, so
+# a "hit mask" line can predate the pin. wait_legacy_surface <log> <count>
+# waits for a mask line after the pin when the pin changed anything.
+PINNED_LEGACY=""
+pin_legacy_avatar() {
+  local profile avatar base record
+  PINNED_LEGACY=""
+  profile="$("$BINARIES/dittoctl" --json probe call desktop.profiles.get '{}')" || {
+    echo 'pin_legacy_avatar: desktop.profiles.get failed' >&2; return 1; }
+  read -r base avatar < <(python3 -c '
+import json, sys
+result = json.loads(sys.argv[1])["result"]
+avatar = dict(result["document"]["avatar"])
+print(result["profile"]["head_revision"], json.dumps(avatar) if avatar.pop("presentation", None) else "-")
+' "$profile")
+  [[ "$avatar" == - ]] && return 0
+  record="$("$BINARIES/dittoctl" --json probe call desktop.changes.propose \
+    "{\"base_revision\":\"$base\",\"ops\":[{\"op\":\"set_value\",\"path\":\"/avatar\",\"after\":$avatar}]}")" || {
+    echo "pin_legacy_avatar: propose failed: $record" >&2; return 1; }
+  python3 -c '
+import json, sys
+result = json.loads(sys.argv[1]).get("result") or {}
+if result.get("state") != "committed":
+    sys.exit(f"pin_legacy_avatar: change not committed: {sys.argv[1][:400]}")
+' "$record"
+  PINNED_LEGACY=1
+  echo 'legacy avatar presentation pinned for this G0 fixture'
+}
+
+wait_legacy_surface() {
+  local log="$1" floor=0 _
+  [[ -n "$PINNED_LEGACY" ]] && floor="$2"
+  for _ in $(seq 1 100); do
+    (( $(grep -ac 'hit mask rectangles=24' "$log" || true) > floor )) && return 0
+    sleep 0.1
+  done
+  tail -40 "$log" >&2
+  echo 'the legacy character surface did not load' >&2
+  return 1
+}
+
 start_window() {
   local app_id="$1"
   foot --app-id="$app_id" sh -c 'sleep infinity' >"$RUNTIME_DIR/$app_id.log" 2>&1 &

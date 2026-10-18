@@ -33,6 +33,11 @@ quickshell --no-color -p "$WORKSPACE/shell/shell.qml" >"$RUNTIME_DIR/shell.log" 
 SHELL_PID=$!
 for _ in $(seq 1 200); do grep -aq 'desktop.events.subscribe' "$RUNTIME_DIR/shell.log" && break; sleep 0.05; done
 grep -aq 'ditto-shell started' "$RUNTIME_DIR/shell.log" || { tail -20 "$RUNTIME_DIR/shell.log"; echo 'the shell did not start' >&2; exit 1; }
+# The phases measure the legacy character (its FrameProbe and gaze), so a
+# store whose default presents the assistant entry is pinned back first.
+masks="$(grep -ac 'hit mask rectangles=24' "$RUNTIME_DIR/shell.log" || true)"
+pin_legacy_avatar
+wait_legacy_surface "$RUNTIME_DIR/shell.log" "$masks"
 start_window ditto-hotpath
 
 if command -v cc >/dev/null && command -v wayland-scanner >/dev/null \
@@ -169,6 +174,8 @@ animation_phases = ["idle", "pointer", "drag"]
 offending = {name: report["phases"][name]["requests"]
              for name in animation_phases
              if report["phases"].get(name, {}).get("requests")}
+missing = [name for name in ["idle", "pointer", "drag", "commands"]
+           if not report["phases"].get(name, {}).get("frames")]
 for name, values in report["phases"].items():
     print(f'{name:10} frames={values["frames"]:5} p95={values["p95_ms"]} '
           f'within-16.7ms={values["share_within_16_7ms"]} requests={len(values["requests"])}')
@@ -178,6 +185,9 @@ crosscheck = report["presentation_crosscheck"]
 print(f'wp_presentation samples={crosscheck["samples"]} p95={crosscheck["p95_ms"]} '
       f'within-16.7ms={crosscheck["share_within_16_7ms"]} '
       f'median={crosscheck["median_ms"]} qml-median={crosscheck["qml_median_ms"]}')
+if missing:
+    print(f"no frame samples in phase(s) {missing}: the frame probe did not run, so there is no frame-time evidence")
+    raise SystemExit(1)
 if offending:
     print(f"hot path issued requests: {offending}")
     raise SystemExit(1)

@@ -17,8 +17,13 @@ if [[ -z "${DITTO_REFERENCE_MACHINE:-}" ]]; then export QT_QUICK_BACKEND=softwar
 shell_log="$RUNTIME_DIR/avatar-hit-shell.log"
 quickshell --no-color -p "$WORKSPACE/shell/shell.qml" >"$shell_log" 2>&1 &
 SHELL_PID=$!
-for _ in $(seq 1 100); do grep -aq 'hit mask rectangles=24' "$shell_log" && break; sleep 0.1; done
-grep -aq 'hit mask rectangles=24' "$shell_log" || { tail -40 "$shell_log" >&2; exit 1; }
+for _ in $(seq 1 200); do grep -aq 'desktop.events.subscribe' "$shell_log" && break; sleep 0.05; done
+grep -aq 'ditto-shell started' "$shell_log" || { tail -40 "$shell_log" >&2; echo 'the shell did not start' >&2; exit 1; }
+# The mask belongs to the legacy character; a new store's default presents
+# the assistant entry (D-48), so pin the legacy presentation for this check.
+masks="$(grep -ac 'hit mask rectangles=24' "$shell_log" || true)"
+pin_legacy_avatar
+wait_legacy_surface "$shell_log" "$masks"
 
 start_window ditto-avatar-under
 start_window ditto-avatar-other
