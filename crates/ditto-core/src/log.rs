@@ -51,6 +51,70 @@ pub fn store_error_code(error: &ditto_store::StoreError) -> &'static str {
     }
 }
 
+/// The protocol enum has no inherent `as_str` yet. Keep log codes aligned
+/// with its wire names without formatting Debug or any error payload.
+pub trait ErrorNameLogCode {
+    fn as_str(&self) -> &'static str;
+}
+
+impl ErrorNameLogCode for ditto_protocol::ErrorName {
+    fn as_str(&self) -> &'static str {
+        use ditto_protocol::ErrorName;
+        match self {
+            ErrorName::Unsupported => "unsupported",
+            ErrorName::InvalidParams => "invalid_params",
+            ErrorName::NotFound => "not_found",
+            ErrorName::PermissionDenied => "permission_denied",
+            ErrorName::Timeout => "timeout",
+            ErrorName::Cancelled => "cancelled",
+            ErrorName::Conflict => "conflict",
+            ErrorName::Unavailable => "unavailable",
+            ErrorName::ProtocolVersionUnsupported => "protocol_version_unsupported",
+            ErrorName::IdentityRejected => "identity_rejected",
+            ErrorName::PreflightRejected => "preflight_rejected",
+            ErrorName::Internal => "internal",
+        }
+    }
+}
+
+/// Stable log vocabulary: unlisted and future I/O kinds stay `other`.
+pub fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
+    use std::io::ErrorKind;
+    match kind {
+        ErrorKind::NotFound => "not_found",
+        ErrorKind::PermissionDenied => "permission_denied",
+        ErrorKind::ConnectionRefused => "connection_refused",
+        ErrorKind::ConnectionReset => "connection_reset",
+        ErrorKind::ConnectionAborted => "connection_aborted",
+        ErrorKind::NotConnected => "not_connected",
+        ErrorKind::AddrInUse => "addr_in_use",
+        ErrorKind::AddrNotAvailable => "addr_not_available",
+        ErrorKind::BrokenPipe => "broken_pipe",
+        ErrorKind::AlreadyExists => "already_exists",
+        ErrorKind::WouldBlock => "would_block",
+        ErrorKind::InvalidInput => "invalid_input",
+        ErrorKind::InvalidData => "invalid_data",
+        ErrorKind::TimedOut => "timed_out",
+        ErrorKind::WriteZero => "write_zero",
+        ErrorKind::Interrupted => "interrupted",
+        ErrorKind::Unsupported => "unsupported",
+        ErrorKind::UnexpectedEof => "unexpected_eof",
+        ErrorKind::OutOfMemory => "out_of_memory",
+        ErrorKind::StorageFull => "storage_full",
+        _ => "other",
+    }
+}
+
+/// Diagnostic only; share the handshake's exact allowlist, never peer text
+/// outside that finite set. This does not grant or validate identity.
+pub(crate) fn connection_kind(kind: &str) -> &str {
+    if crate::subject_for_kind(kind).is_some() {
+        kind
+    } else {
+        "unknown"
+    }
+}
+
 /// Diagnostic category only; this does not validate or grant caller identity.
 pub fn subject_kind(subject: &str) -> &'static str {
     use ditto_protocol::Subject;
@@ -122,9 +186,11 @@ mod tests {
         let store = ditto_store::StoreError::Invalid(private.into());
         let store_code = store_error_code(&store);
         let io = std::io::Error::new(std::io::ErrorKind::PermissionDenied, private);
-        let io_code = format!("{:?}", io.kind());
+        let io_code = io_error_code(io.kind());
         let core = crate::error::CoreError::internal(private);
-        let core_code = format!("{:?}", core.name);
+        let core_code = core.name.as_str();
+        assert_eq!(io_code, "permission_denied");
+        assert_eq!(core_code, "internal");
         // All 27 original reason sites, including both builtin failure paths.
         let sites = [
             (
@@ -139,24 +205,24 @@ mod tests {
             ("boot.builtin_refused", Some(store_code)), // unpack
             ("generation.journal_failed", Some(store_code)),
             ("change.commit_write_failed", Some(store_code)),
-            ("change.timed_revert_failed", Some(core_code.as_str())),
+            ("change.timed_revert_failed", Some(core_code)),
             ("recovery.read_failed", Some(store_code)),
             ("host.lost", Some("connection_closed")),
-            ("lock.start_failed", Some(io_code.as_str())),
+            ("lock.start_failed", Some(io_code)),
             ("generation.journal_recovery_failed", Some(store_code)),
-            ("host.start_refused", Some(io_code.as_str())),
+            ("host.start_refused", Some(io_code)),
             ("connection.identity_rejected", Some("binding_mismatch")),
-            ("compositor.unreachable", Some(io_code.as_str())),
+            ("compositor.unreachable", Some(io_code)),
             ("system.component_unavailable", None),
             ("core.store_refused", Some(store_code)),
-            ("shortcut.command_failed", Some(core_code.as_str())),
-            ("launch.failed", Some(io_code.as_str())),
-            ("connection.ended", Some(io_code.as_str())),
+            ("shortcut.command_failed", Some(core_code)),
+            ("launch.failed", Some(io_code)),
+            ("connection.ended", Some(io_code)),
             ("outputs.rescue_failed", Some("internal")),
             ("outputs.window_stranded", Some("unsupported")),
             ("outputs.notice_failed", Some("failed")),
-            ("shell.start_failed", Some(io_code.as_str())),
-            ("shell.rescue_ui_failed", Some(io_code.as_str())),
+            ("shell.start_failed", Some(io_code)),
+            ("shell.rescue_ui_failed", Some(io_code)),
         ];
         for (event, code) in sites {
             let mut fields = vec![
@@ -175,6 +241,110 @@ mod tests {
             assert_eq!(logged.get("reason_code"), code.map(|c| json!(c)).as_ref());
             assert_eq!(logged["change_id"], "chg-cause");
             assert_eq!(logged["operation_id"], "op-cause");
+        }
+    }
+
+    #[test]
+    fn core_error_log_codes_match_the_wire_names() {
+        for name in ditto_protocol::ErrorName::ALL {
+            let error = crate::error::CoreError::new(name, "QA79_PRIVATE_ERROR");
+            let code = error.name.as_str();
+            for event in ["change.timed_revert_failed", "shortcut.command_failed"] {
+                let text = line(event, &[("reason", &error.message), ("reason_code", code)]);
+                let logged: Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(
+                    logged["reason_code"],
+                    serde_json::to_value(&error.name).unwrap()
+                );
+                assert_eq!(logged["reason"], "[redacted]");
+                assert!(!text.contains("QA79_PRIVATE"));
+            }
+        }
+    }
+
+    #[test]
+    fn io_error_log_codes_are_closed_snake_case_and_ignore_payloads() {
+        use std::io::ErrorKind;
+        let cases = [
+            (ErrorKind::NotFound, "not_found"),
+            (ErrorKind::PermissionDenied, "permission_denied"),
+            (ErrorKind::ConnectionRefused, "connection_refused"),
+            (ErrorKind::ConnectionReset, "connection_reset"),
+            (ErrorKind::ConnectionAborted, "connection_aborted"),
+            (ErrorKind::NotConnected, "not_connected"),
+            (ErrorKind::AddrInUse, "addr_in_use"),
+            (ErrorKind::AddrNotAvailable, "addr_not_available"),
+            (ErrorKind::BrokenPipe, "broken_pipe"),
+            (ErrorKind::AlreadyExists, "already_exists"),
+            (ErrorKind::WouldBlock, "would_block"),
+            (ErrorKind::InvalidInput, "invalid_input"),
+            (ErrorKind::InvalidData, "invalid_data"),
+            (ErrorKind::TimedOut, "timed_out"),
+            (ErrorKind::WriteZero, "write_zero"),
+            (ErrorKind::Interrupted, "interrupted"),
+            (ErrorKind::Unsupported, "unsupported"),
+            (ErrorKind::UnexpectedEof, "unexpected_eof"),
+            (ErrorKind::OutOfMemory, "out_of_memory"),
+            (ErrorKind::StorageFull, "storage_full"),
+            (ErrorKind::Other, "other"),
+            // A kind outside the explicit set must not add a new log code.
+            (ErrorKind::NotADirectory, "other"),
+        ];
+        for (kind, expected) in cases {
+            let error = std::io::Error::new(kind, "QA79_PRIVATE_IO\n\u{1b}");
+            let text = line(
+                "connection.ended",
+                &[
+                    ("reason", &error.to_string()),
+                    ("reason_code", io_error_code(error.kind())),
+                ],
+            );
+            let logged: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(logged["reason_code"], expected);
+            assert_eq!(logged["reason"], "[redacted]");
+            assert!(!text.contains("QA79_PRIVATE"));
+        }
+    }
+
+    #[test]
+    fn identity_rejected_kind_only_logs_recognized_client_kinds() {
+        let long = "QA79_PRIVATE_KIND".repeat(4096);
+        let cases = [
+            ("quickshell", "quickshell"),
+            ("dittoctl", "dittoctl"),
+            ("dittoctl-rescue", "dittoctl-rescue"),
+            ("rescue-shell", "rescue-shell"),
+            ("agent", "agent"),
+            ("lock", "lock"),
+            ("hostd", "hostd"),
+            ("", "unknown"),
+            ("unknown", "unknown"),
+            ("core", "unknown"),
+            ("Agent", "unknown"),
+            ("agent\n\r\t\0\u{1b}QA79_PRIVATE_KIND", "unknown"),
+            ("QA79_PRIVATE_KIND 私人", "unknown"),
+            (long.as_str(), "unknown"),
+        ];
+        for (kind, expected) in cases {
+            assert_eq!(
+                crate::subject_for_kind(kind).is_some(),
+                expected != "unknown"
+            );
+            for reason in ["binding_mismatch", "unknown_kind"] {
+                let text = line(
+                    "connection.identity_rejected",
+                    &[
+                        ("kind", connection_kind(kind)),
+                        ("reason_code", reason),
+                        ("pid", "123"),
+                    ],
+                );
+                let logged: Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(logged["kind"], expected);
+                assert_eq!(logged["reason_code"], reason);
+                assert_eq!(logged["pid"], "123");
+                assert!(!text.contains("QA79_PRIVATE"));
+            }
         }
     }
 

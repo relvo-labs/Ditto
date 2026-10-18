@@ -490,7 +490,7 @@ impl Core {
                     "lock.start_failed",
                     &[
                         ("reason", &error.to_string()),
-                        ("reason_code", &format!("{:?}", error.kind())),
+                        ("reason_code", crate::log::io_error_code(error.kind())),
                     ],
                 );
                 false
