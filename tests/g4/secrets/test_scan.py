@@ -85,7 +85,9 @@ class ScannerTests(unittest.TestCase):
                  ("unexpected-leak", True, True, True, 1),
                  ("clean-positive", True, False, False, 0),
                  ("leaking-positive", True, True, False, 1),
-                 ("private-proposal-leak", True, "proposal", False, 1)]
+                 ("private-proposal-leak", True, "proposal", False, 1),
+                 ("hex", True, False, True, 0),
+                 ("base64-offset-1", True, False, True, 0)]
         for name, flow_ok, unexpected, inject, expected in cases:
             with self.subTest(name=name):
                 output = self.root / name
@@ -107,6 +109,8 @@ class ScannerTests(unittest.TestCase):
                             sentinel = ("QA04_PRIVATE_PROPOSAL_CONTENT" if unexpected == "proposal"
                                         else json.loads(env["DITTO_QA04_SENTINELS"])["token"])
                             (product / "logs/unexpected.log").write_text(sentinel)
+                        (Path(env['DITTO_RUNTIME_DIR']) / 'keyring.json').write_text(json.dumps({
+                            'calls': {'CreateItem': 3, 'GetSecret': 3}}))
                         (output / "driver.json").write_text(json.dumps({"ok": flow_ok, "checks": ["simulated flow only"]}))
 
                     def poll(self):
@@ -115,8 +119,18 @@ class ScannerTests(unittest.TestCase):
                     def wait(self, timeout):
                         return 0
 
-                argv = [str(runner), "--output", str(output)] + (["--inject-leak"] if inject else [])
-                with patch("sys.argv", argv), patch.object(Path, "glob", builtin_glob), \
+                class BusFixture:
+                    def __init__(self, scratch, *_args):
+                        self.address = 'unix:path=' + str(scratch) + '/bus'
+                    def start(self):
+                        return self.address
+                    def stop(self):
+                        pass
+
+                argv = [str(runner), "--output", str(output), '--scratch', str(self.root)] + (["--inject-leak"] if inject else [])
+                if name in ('hex', 'base64-offset-1'):
+                    argv += ['--leak-form', name]
+                with patch('private_bus.PrivateBus', BusFixture), patch("sys.argv", argv), patch.object(Path, "glob", builtin_glob), \
                      patch("subprocess.Popen", FlowFixture), patch("os.killpg"), \
                      patch("resource.setrlimit"), redirect_stdout(io.StringIO()):
                     with self.assertRaises(SystemExit) as exited:
@@ -164,3 +178,7 @@ class NonceFormsTests(unittest.TestCase):
                         self.assertEqual(result['ok'], expected)
                         self.assertEqual(bool(result['hits']), not expected)
                         self.assertNotIn(nonce, json.dumps(result['hits']))
+
+
+if __name__ == "__main__":
+    unittest.main()
