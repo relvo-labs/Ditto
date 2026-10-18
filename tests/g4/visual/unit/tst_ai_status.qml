@@ -111,8 +111,8 @@ TestCase {
         return page;
     }
     function report() {
-        verify(typeof conversation.statusReport === "function", "statusReport() missing");
-        return conversation.statusReport();
+        verify(typeof conversation.chatStatus === "function", "chatStatus() missing");
+        return conversation.chatStatus();
     }
 
     // ---- settings -----------------------------------------------------------------

@@ -248,7 +248,7 @@ ShellRoot {
     function chatReport() {
         const last = conversation.events.filter(event => event.type === "assistant/message").slice(-1)[0];
         // Not read or failed to read is null (with ai_status), never idle.
-        const status = conversation.statusReport();
+        const status = conversation.chatStatus();
         return {
             open: chat.open,
             mode: chat.mode,

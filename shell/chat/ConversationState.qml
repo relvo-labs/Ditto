@@ -196,7 +196,7 @@ QtObject {
     /// The status part of the `chat` control line. Unconfirmed (not read, or
     /// the read failed) is not reported as idle or as a confirmed value:
     /// state/enabled/connected are null and ai_status says which.
-    function statusReport() {
+    function chatStatus() {
         return {
             state: taskState === "offline" && !offlineReason ? null : taskState,
             ai_status: aiStatus,
