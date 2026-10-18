@@ -156,17 +156,24 @@ choose_and_apply() {
 # ① swaps to whichever Dock is not in use. Choosing the Dock already in use
 # leaves nothing to apply, so 「套用」 is (rightly) not shown; since #71 the
 # default Profile starts on the pill Dock (#92).
-dock_now="$("${READ[@]}" slot-package ui.dock)"
-if [[ "$dock_now" == ditto.dock.pill ]]; then
-  dock_target=ditto.dock.bottom dock_label="視窗列 Dock"
-else
-  dock_target=ditto.dock.pill dock_label="膠囊式 Dock"
-fi
+# Only a known Dock counts as "Dock A": an unbound slot or a failed readback
+# would turn ① into adding a Dock, not replacing one, so ① fails instead.
+dock_now="$("${READ[@]}" slot-package ui.dock 2>&1)" || dock_now="readback failed: $dock_now"
+case "$dock_now" in
+  ditto.dock.pill) dock_target=ditto.dock.bottom dock_label="視窗列 Dock" ;;
+  ditto.dock.bottom) dock_target=ditto.dock.pill dock_label="膠囊式 Dock" ;;
+  *) dock_target="" dock_label="" ;;
+esac
 
 open_center composition.open
 before="$("${READ[@]}" last-change)"
-run_step dock-swap choose_and_apply Dock "$dock_label" \
-  && step dock-swap "① Dock B ($dock_target) replaces Dock A (${dock_now:-unset})" swap "$before" ui.dock "$dock_target"
+if [[ -z "$dock_target" ]]; then
+  check dock-swap fail "① the Dock in use is not a known Dock ($dock_now); there is no Dock A to replace"
+  printf '{"step":"dock-swap","status":"fail","detail":%s}\n' "$(jq -Rn --arg d "unknown Dock A: $dock_now" '$d')" >>"$steps"
+else
+  run_step dock-swap choose_and_apply Dock "$dock_label" \
+    && step dock-swap "① $dock_target replaces the Dock in use ($dock_now)" swap "$before" ui.dock "$dock_target"
+fi
 
 before="$("${READ[@]}" last-change)"
 run_step launcher-swap choose_and_apply "啟動器" "搜尋式啟動器" \
