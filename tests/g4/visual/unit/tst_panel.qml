@@ -208,6 +208,19 @@ TestCase {
         verify(item("panelVolumeFallback").visible);
         compare(item("panelVolumeFallback").text, "音量不可用");
     }
+    function test_status_region_survives_theme_switch() {
+        const p = mount();
+        const region = p.statusRegion;
+        const member = Qt.createQmlObject('import QtQuick; Rectangle { width: 40; height: 18; color: "red" }', region);
+        for (const theme of ["soft-jelly", "soft-jelly-light", "other", "soft-jelly-light"]) {
+            tokens.appearance = { theme: theme, tokens: {} };
+            wait(0);
+            compare(p.statusRegion, region, "the host retains its region and mounted members");
+            verify(member.visible, "status member stays visible without host remount");
+            compare(member.parent, p.statusRegion);
+        }
+        member.destroy();
+    }
     function test_menu_feedback_and_lifecycle() {
         const p = mount();
         item("panelMenu").forceActiveFocus(); keyClick(Qt.Key_Return);
@@ -236,10 +249,12 @@ TestCase {
         for (const appearance of [null, { theme: "soft-jelly", tokens: {} }, { theme: "other", tokens: {} }]) {
             tokens.appearance = appearance;
             const base = mount(true);
+            Qt.createQmlObject('import QtQuick; Rectangle { width: 40; height: 18; color: "red" }', base.statusRegion);
             waitForRendering(desktop);
             const before = grabImage(desktop);
             base.release(); base.destroy(); mounted = []; wait(20);
             const current = mount();
+            Qt.createQmlObject('import QtQuick; Rectangle { width: 40; height: 18; color: "red" }', current.statusRegion);
             waitForRendering(desktop);
             const after = grabImage(desktop);
             verify(before.equals(after), "legacy panel pixels match bound base");

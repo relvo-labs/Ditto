@@ -155,7 +155,7 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 
 基底 `b434c93b7b739c053aabe70352aef211e7a4c268`；分支 `hermes/g4-65-topbar`。證據在 repo 外 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/`，`manifest.json` 綁定 source hashes、commit、指令與結果；`visual/comparison.json` 記錄逐膠囊幾何及實際圖示來源，normal／reduced-transparency／low-power 幾何相同。離線 harness 沒有音訊／網路服務，所以 capture 顯示真實「不可用」文字與圖示，連線／靜音等由明確 fixture 的 QtTest 驗證。
 
-`unit/tst_panel.qml` 檢查幾何、Region 聯集與圓角／透明間隙、三種模式／2× 字級、狀態圖示與文字 fallback（含 Image.Error）、滑鼠／Enter／Space capability guard、Tab／Backtab、音量操作、狀態項掛載、選單與縮放生命週期，以及三種 legacy 主題的基底像素。RED 在 `red/panel.log`；選單縮放另有真實值 RED（1，預期 0.96）在 `red/menu-scale.log`。完整 gates、環境限制與通過數見證據索引；這些都是 **development**，不證明 Wayfire 真實 input region／work-area／焦點、Orca、IME、NFR 或 owner 忠實視覺接受。
+`unit/tst_panel.qml` 檢查幾何、Region 聯集與圓角／透明間隙、三種模式／2× 字級、狀態圖示與文字 fallback（含 Image.Error）、滑鼠／Enter／Space capability guard、Tab／Backtab、音量操作、狀態項掛載、選單與縮放生命週期，以及三種 legacy 主題的基底像素（含已掛載狀態項）。`statusRegion` 維持同一個 Row，切主題只移動它的呈現容器，既有狀態項不需宿主重新掛載；切換測試的 RED 見 `red/status-region.log`。RED 在 `red/panel.log`；選單縮放另有真實值 RED（1，預期 0.96）在 `red/menu-scale.log`。完整 gates、環境限制與通過數見證據索引；這些都是 **development**，不證明 Wayfire 真實 input region／work-area／焦點、Orca、IME、NFR 或 owner 忠實視覺接受。
 
 ## 7. R3 助理呈現與開發證據（#67）
 

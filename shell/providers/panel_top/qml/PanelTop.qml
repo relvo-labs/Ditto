@@ -33,7 +33,7 @@ Scope {
 
     readonly property string reservedEdge: "top"
     readonly property bool soft: tokens && tokens.lightRecipe === true
-    readonly property Item statusRegion: soft ? lightStatusRow : statusRow
+    readonly property Item statusRegion: statusRow
     property bool ready: false
     property bool menuOpen: false
 
@@ -292,11 +292,10 @@ Scope {
             }
 
             /// Status items (`ui.status_item`), placed here by the Shell.
-            Row {
-                id: statusRow
-                spacing: provider.tokens.spaceWide
-                Accessible.role: Accessible.StatusBar
-                Accessible.name: provider.t(qsTr("狀態列項目"))
+            Item {
+                id: legacyStatusHost
+                width: statusRow.implicitWidth
+                height: statusRow.implicitHeight
             }
 
             Text {
@@ -461,13 +460,11 @@ Scope {
                             if (known) sink.audio.volume = Math.max(0, Math.min(1.5, sink.audio.volume + (delta > 0 ? 0.05 : -0.05)));
                         }
                     }
-                    Row {
-                        id: lightStatusRow
-                        objectName: "panelStatusItems"
+                    Item {
+                        id: lightStatusHost
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: provider.tokens.spaceWide
-                        Accessible.role: Accessible.StatusBar
-                        Accessible.name: provider.t(qsTr("狀態列項目"))
+                        width: statusRow.implicitWidth
+                        height: statusRow.implicitHeight
                     }
                     Text {
                         objectName: "panelClock"
@@ -482,6 +479,17 @@ Scope {
                 }
             }
         }
+    }
+
+    // StatusArea retains this exact Item between appearance transactions.
+    // Move its layout host, never the members or the public region identity.
+    Row {
+        id: statusRow
+        objectName: "panelStatusItems"
+        parent: provider.soft ? lightStatusHost : legacyStatusHost
+        spacing: provider.tokens.spaceWide
+        Accessible.role: Accessible.StatusBar
+        Accessible.name: provider.t(qsTr("狀態列項目"))
     }
 
     component SoftCapsule: Rectangle {
