@@ -100,9 +100,9 @@ Scope {
         mask: provider.soft ? lightRegion : null
         Region {
             id: lightRegion
-            Region { item: provider.soft ? leftCapsule : null; radius: leftCapsule.radius }
-            Region { item: provider.soft ? workspaceCapsule : null; radius: workspaceCapsule.radius }
-            Region { item: provider.soft ? statusCapsule : null; radius: statusCapsule.radius }
+            Region { intersection: Intersection.Combine; item: provider.soft ? leftCapsule : null; radius: leftCapsule.radius }
+            Region { intersection: Intersection.Combine; item: provider.soft ? workspaceCapsule : null; radius: workspaceCapsule.radius }
+            Region { intersection: Intersection.Combine; item: provider.soft ? statusCapsule : null; radius: statusCapsule.radius }
         }
 
         Item {
@@ -497,6 +497,7 @@ Scope {
         id: button
         property string accessibleLabel: ""
         property bool interactive: true
+        property int pointerButtons: Qt.LeftButton
         readonly property real feedbackTarget: !visible || !provider.shown ? 1
             : area.pressed ? 0.90 : area.containsMouse || activeFocus ? 0.96 : 1
         property real feedbackScale: 1
@@ -543,7 +544,7 @@ Scope {
                 id: area
                 anchors.fill: parent
                 hoverEnabled: true
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                acceptedButtons: button.pointerButtons
                 onClicked: mouse => { if (button.interactive) button.activated(mouse.button); }
                 onWheel: wheel => { if (button.interactive) button.scrolled(wheel.angleDelta.y); }
             }
@@ -552,6 +553,7 @@ Scope {
 
     component StatusButton: FeedbackButton {
         id: statusButton
+        pointerButtons: Qt.LeftButton | Qt.RightButton
         property string iconName: ""
         property string marker: ""
         width: statusIcon.status === Image.Ready ? 28 : fallback.implicitWidth + 8
@@ -622,7 +624,26 @@ Scope {
                 ]
 
                 Rectangle {
+                    id: menuItem
                     required property var modelData
+                    readonly property bool motionActive: provider.soft && visible && provider.shown && provider.tokens.motionEnabled
+                    readonly property real feedbackTarget: !provider.soft || !visible || !provider.shown ? 1
+                        : itemArea.pressed ? 0.90 : itemArea.containsMouse || activeFocus ? 0.96 : 1
+                    property real feedbackScale: 1
+                    readonly property bool motionRunning: menuFeedback.running
+                    function retargetFeedback() {
+                        menuFeedback.stop();
+                        if (!motionActive) { feedbackScale = feedbackTarget; return; }
+                        menuFeedback.from = feedbackScale; menuFeedback.to = feedbackTarget; menuFeedback.start();
+                    }
+                    onFeedbackTargetChanged: retargetFeedback()
+                    onMotionActiveChanged: if (!motionActive) { menuFeedback.stop(); feedbackScale = feedbackTarget; }
+                    NumberAnimation {
+                        id: menuFeedback
+                        target: menuItem; property: "feedbackScale"
+                        duration: 120
+                        easing.type: Easing.OutCubic
+                    }
                     readonly property string capabilityId: modelData.session
                         ? "desktop.session." + modelData.session : "desktop.commands.invoke"
                     visible: provider.client && provider.client.capabilityAvailable(capabilityId)
@@ -646,6 +667,7 @@ Scope {
 
                     Text {
                         id: itemText
+                        scale: menuItem.feedbackScale
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left
                         anchors.leftMargin: provider.tokens.space

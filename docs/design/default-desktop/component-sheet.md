@@ -15,8 +15,8 @@
 | --- | --- | --- | --- |
 | Canvas／桌布 | 全幅。淺薰衣草，左側偏飽和（≈`#ccc8fa`），右側偏亮（≈`#e6e1fb`）；右側大型 Ditto 約 x 690–1215、y 145–570，帶泡泡、反光與水面 | `shell/jelly/Backdrop.qml`（由 `shell.qml` 的背景 PanelWindow 掛載） | 漸層 canvas **已實作**；桌布 Image 接點**已實作，待素材**（#51）與 Profile 欄位（§5 H2） |
 | 左上標題／副標 | x≈25、y≈8–38；`01 — SOFT JELLY`、`A softer desktop for brighter days` | 無 | **待 owner**：是 caption、桌布字樣還是 widget 尚未決定；本 slice 不畫、不裁切 |
-| 頂部工作區 | 置中浮動膠囊，x≈570–715、y≈4–32（≈145×28），作用中 `1` 為紫色小膠囊 | `shell/providers/panel_top`（不在 R1 寫入範圍） | **未改**：目前是全寬半透明列，工作區在左側（§4 D3） |
-| 頂部狀態 | 右側 x≈1020–1262：Wi-Fi、音量、電池圖示、日期時間、搜尋 | 同上 | **未改**：目前是文字（「音量不可用」「網路未連線」）；狀態圖示待素材 |
+| 頂部工作區 | 置中浮動膠囊，x≈570–715、y≈4–32（≈145×28），作用中 `1` 為紫色小膠囊 | `shell/providers/panel_top/qml/PanelTop.qml` | **淺色已實作**：四工作區 capture 為 `(568,4) 144×28`，中心 x=640；與目測寬差約 1 px。作用中 accent 小膠囊，非四個工作區時依清單伸縮，不硬編數目（§4 D3） |
+| 頂部狀態 | 右側 x≈1020–1262：Wi-Fi、音量、電池圖示、日期時間、搜尋 | 同上 | **淺色已實作**：`(1020,4) 242×28`，靠右 18 px；主題 symbolic 網路／音量圖示＋Accessible 文字、真實日期時間、原 `statusRegion`。不可用加 `!`、未知加 `?`，缺圖退現行文字並隨內容加寬。電池／搜尋沒有資料或命令，不畫（D3／D6） |
 | 天氣／手寫字 | 右上 x≈1180–1255、y≈52–102；右側手寫字兩處 | 無 | **待 owner**：桌布還是 widget 未定；不做假天氣 |
 | 後方視窗（Files） | x≈37、y≈63、643×455；圓角≈14–16；標題列≈36；側欄≈120 寬 | 第三方應用。Ditto 只提供材質樣本 `shell/jelly/Material.qml` 供自有表面使用 | **待 owner**：實際應用與首次登入是否開啟；不重繪第三方 app |
 | 前方視窗（Notes） | x≈77、y≈465、535×230 | 同上 | 同上 |
@@ -24,7 +24,7 @@
 | 右下助理 | x≈1065–1260、y≈710–764（≈197×54） | 無（R3／#67） | **不在 R1**：錨點保留空白，不畫假入口 |
 | 留白 | 右半部留給桌布角色；視窗與 Dock 之間≈20 px；Dock 兩側大面積空白 | `Backdrop` 不放任何內容 | 已保留；無桌布時右側只有漸層（§4 D1） |
 
-原生 capture 的實測幾何（offscreen，`capture.log` 的 `CAPTURE_META`）：頂部 0,0,1280×34；Dock 膠囊 444,720,392×68（本機裝有 6 個對應應用）；兩個材質樣本由 harness 放在原圖視窗位置，不是產品行為。
+原生 capture 的實測幾何（offscreen，`capture.log` 的 `CAPTURE_META`）：淺色頂部視窗 0,0,1280×36，只有三個可見膠囊接收輸入，無全寬底色；legacy 頂部仍為 0,0,1280×34；Dock 膠囊 444,720,392×68（本機裝有 6 個對應應用）；兩個材質樣本由 harness 放在原圖視窗位置，不是產品行為。
 
 ## 2. 淺色 token recipe（`soft-jelly-light`）
 
@@ -86,6 +86,7 @@
 | Backdrop／`shell.qml` 背景 | 中性 | 漸層兩端同色、沒有光暈、沒有桌布：與原本純色逐像素相同 |
 | Surface.qml | 未改 | — |
 | DockPill：52 px 圖示格、厚度 84、浮動膠囊、圖示、底板／長條／圓點、尾段名稱比對 | 只在淺色 | 40 px 字母圓、厚度 60、原本的膠囊與圓點，逐像素相同（底部與左側） |
+| PanelTop：中央工作區／右側狀態／左側功能膠囊、symbolic 圖示與文字 fallback、局部互動縮放 | 只在淺色 | 其餘主題保留原 34 px 全寬列與原有子元件；對照本 slice 基底 `b434c93` 的像素相同（無 theme／`soft-jelly`／其他 theme）。測試只將兩個替身時鐘固定為同一取樣時間，避免跨分鐘誤差；capture 仍用當下真實時間 |
 | DockPill：輸入區＝可見膠囊（圓角） | 中性修正 | 不改像素；舊版膠囊外的透明邊與圓角外不再攔截點擊 |
 | DockPill：無障礙名稱加「（使用中）」 | 中性修正 | 不改像素；使用中原本只靠 accent 顏色表達 |
 
@@ -110,10 +111,10 @@
 | --- | --- | --- | --- | --- | --- |
 | D1 | 桌布 | 插畫桌布：大型 Ditto、泡泡、水面 | 兩段漸層 canvas | 沒有乾淨桌布原檔與散布授權（#51）；不從效果圖裁切或整張鋪底 | 待素材 |
 | D2 | 左上標題、天氣、手寫字 | 有 | 未畫 | 用途未定；不硬編、不做假天氣 | 待 owner |
-| D3 | 頂部 | 中央浮動工作區膠囊，右側狀態圖示，沒有整條實底列 | 全寬半透明列，左側「Ditto ▾」與工作區，中間視窗標題，右側文字狀態 | `panel_top` 不在 R1 寫入範圍；狀態圖示缺素材 | 未做，交後續 slice |
+| D3 | 頂部 | 中央浮動工作區膠囊，右側狀態圖示，沒有整條實底列 | 淺色：中央 `(568,4) 144×28`、右側 `(1020,4) 242×28`；新增左側 `(18,4) 360×28` 保留 Ditto 選單、作用中視窗標題與視窗數／離線文字；其餘透明 | 中央與右側接近原圖目測尺寸；左側功能是原有入口，不刪除。電池／搜尋沒有本 slice 的資料來源或命令，天氣仍依 D2 不做。供應者與預設綁定不變 | 開發證據通過；功能性偏離待 owner 確認，Wayfire 未驗證 |
 | D4 | 雙窗 | Files、Notes 實際應用畫面 | harness 放兩塊空白材質樣本並標明「非應用視窗」 | 不做假 app；第三方應用內部外觀不歸 Ditto；應用選擇待 owner | 待 owner |
 | D5 | 視窗材質 | 近白、亮邊、寬淡柔影 | capture 走 software 的 `layered` 路徑，陰影有階梯感；正文取樣 `#f2f0fa`，原圖 `#faf9ff` | 本機沒有 GPU renderer，`effect` 路徑**未擷取**（§6） | 部分 |
-| D6 | Dock 圖示 | 7 個柔亮彩色自繪圖示 | 本機已安裝應用的主題圖示（Yaru、Firefox snap）；沒有音樂應用，只有 6 個 | 圖示集的來源與權利未定（#51）；不用原圖的圖示 | 待素材 |
+| D6 | Dock／頂部圖示 | 7 個柔亮彩色自繪 Dock 圖示，頂部 Wi-Fi／音量／電池／搜尋 | Dock 維持已安裝應用主題圖示（6 個）；頂部用 symbolic 主題圖示（本機 Yaru），沒有電池／搜尋 | 不複製原圖素材；圖示主題由系統解析，不新增隨包圖示。harness 記錄路徑與 SHA-256；#51 權利盤點與 H9 實機查找仍待驗證 | 頂部接點完成；原圖圖示風格待素材 |
 | D7 | Dock 狀態 | 原圖看不出執行中／使用中 | 使用中：底板＋長條；執行中：圓點；鍵盤焦點：外框 | 提案；三者形狀不同，不只靠顏色 | 待 owner |
 | D8 | 次要文字 | `#9695a3` 在 `#faf9ff` 上 = 2.82:1 | `#57536f`（6.68:1） | 原圖的值低於 WCAG AA，可讀性優先 | 刻意偏離 |
 | D9 | 圓角 | 視窗≈14–16 | token `radiusLarge` 20、`radiusMedium` 12；樣本用 16 | 沒有「視窗圓角」token | 待凍結 |
@@ -127,7 +128,7 @@
 - **H3 Dock 綁定（#45）**：R3 依 D-48 已把新「預設」文件改綁已安裝的 `ditto.dock.pill`，缺套件時保留原供應者；agent 依 #71 交接實作，owner 可反悔。釘選清單沿用已註冊供應者設定（不捏造應用）；既有 store 與「簡報」不變。
 - **H4 內建套件版本（#50）**：`ditto.dock.pill` 內容改了，但版本仍是 `1.1.0`。G1／G2 測試與語意任務集逐字引用 `1.1.0`。已有 store 的機器在 seed 時會記 `boot.builtin_refused`（同版本不同內容），保留舊內容，只有新 store 會拿到新 Dock。升版與升級路徑屬內建套件升版工作。
 - **H5 `on_accent` 既有缺陷**：`Tokens.qml` 的 `onAccent` 屬性名稱以 `on`＋大寫開頭，被 QML 當成訊號處理器名稱，綁定沒有生效。實際值一律是 `#000000`，Profile 的 `on_accent` 覆寫也無效；`main` 上同樣如此。黑字在兩種 accent 上都達 AA。修正需要改名或另設 token，會影響所有呼叫端，本 PR 不動。
-- **H6 頂部 slice**：浮動工作區膠囊與狀態圖示屬於 `panel_top` 供應者或新供應者，需要圖示素材，也要決定供應者 ID 與預設綁定（#45）。
+- **H6 頂部 slice（本次交付）**：沿用 `ditto.panel.top`，由 `tokens.lightRecipe === true` 選浮動呈現，其他主題不變；不需要新 token、供應者或預設綁定。工作區的滑鼠／Enter／Space／Accessible action 共用既有 capability 判斷；音量靜音／滾輪／右鍵設定、網路設定、選單四中心與電源、標題、時鐘和 `statusRegion` 均保留。輸入區為三個圓角膠囊的 Region 聯集，陰影／透明間隙不攔截；高度 28＋上下各 4 px，`exclusiveZone=36`，大字隨字級增加。hover／focus 0.96、press 0.90，120 ms OutCubic；命中與焦點框不縮放，reduced-motion／low-power／隱藏立即 settle。`ditto.panel.top` manifest 仍為 `1.1.0`；升版與已有 store 的同版不同內容處理交 #50（同 H4），本次沒有改版本。
 - **H7 一致性**：管理中心、對話、試看列、通知、啟動器改用 `Material` 或同一組亮邊與陰影，需要逐一確認焦點與可讀性（#47）。
 - **H8 硬體驗證（#52／#53／R4）**：`effect` 路徑的畫面、幀時（NFR-05），以及正常／降低透明度／低效能三種模式的 A/B，都要在實體參考機量測。本機只有 software renderer，未執行。
 - **H9 圖示解析**：產品端用 `Quickshell.iconPath(name, true)`。harness 用 `capture/prepare.py` 模擬主題查找；實機選到的檔案可能不同，參考機要重驗。
@@ -139,16 +140,22 @@
 1. 把 `dock_pill`、`panel_top` 複製到 `.staged/`。只移除 layer-shell 的三行，逐行記在 `staging.json`。
 2. 跑 qmltestrunner 單元測試。
 3. 讀本機的 desktop entry 與圖示主題。
-4. 以 1280×800、scale 1 渲染五張圖：normal、reduced-transparency、low-power、dock-states（淺色），以及 legacy-soft-jelly（舊版主題）。
+4. 以 1280×800、scale 1 渲染六張桌面圖：normal、reduced-transparency、low-power、dock-states（淺色），以及 legacy-soft-jelly、legacy-no-theme（舊版主題）；同目錄的既有控制項／助理場景亦執行。`run.sh` 先準備助理 staging，乾淨 checkout 不依賴另一 runner 的快取。
 5. 產出 side-by-side、50/50 疊圖（標出元件框）與逐元件取樣 `comparison.json`。
 
-標明的測試資料：四個工作區（第一個作用中）、釘選清單、dock-states 圖中的兩筆視窗記錄。時鐘是執行當下的真實時間。#65 的五個既有場景不畫桌布、標題、天氣或助理；#67 的獨立助理場景與限制見下節。PNG 只放證據目錄，不進 git。
+標明的測試資料：四個工作區（第一個作用中）、釘選清單、dock-states 圖中的兩筆視窗記錄。時鐘是執行當下的真實時間。#65 的六個桌面場景不畫桌布、標題、天氣或助理；#67 的獨立助理場景與限制見下節。PNG 只放證據目錄，不進 git。
 
 Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscreen 也只有 software renderer。因此 capture 用 `tests/g4/visual/stubs/` 的純 QML 替身代替 Quickshell 型別（PanelWindow 依 layer-shell 規則擺放）。這是開發證據：證明 QML 能建出這個畫面，但**不能**證明 Wayfire 上的實際合成、輸入區、焦點或效能。
 
 ## 6.1 D-48
 
 新預設改右下助理的決策紀錄見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。
+
+## 6.2 頂部列後續 slice（#65 D3／H6）
+
+基底 `b434c93b7b739c053aabe70352aef211e7a4c268`；分支 `hermes/g4-65-topbar`。證據在 repo 外 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/`，`manifest.json` 綁定 source hashes、commit、指令與結果；`visual/comparison.json` 記錄逐膠囊幾何及實際圖示來源，normal／reduced-transparency／low-power 幾何相同。離線 harness 沒有音訊／網路服務，所以 capture 顯示真實「不可用」文字與圖示，連線／靜音等由明確 fixture 的 QtTest 驗證。
+
+`unit/tst_panel.qml` 檢查幾何、Region 聯集與圓角／透明間隙、三種模式／2× 字級、狀態圖示與文字 fallback（含 Image.Error）、滑鼠／Enter／Space capability guard、Tab／Backtab、音量操作、狀態項掛載、選單與縮放生命週期，以及三種 legacy 主題的基底像素。RED 在 `red/panel.log`；選單縮放另有真實值 RED（1，預期 0.96）在 `red/menu-scale.log`。完整 gates、環境限制與通過數見證據索引；這些都是 **development**，不證明 Wayfire 真實 input region／work-area／焦點、Orca、IME、NFR 或 owner 忠實視覺接受。
 
 ## 7. R3 助理呈現與開發證據（#67）
 

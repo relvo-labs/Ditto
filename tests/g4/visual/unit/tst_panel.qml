@@ -164,6 +164,74 @@ TestCase {
         item("panelNetwork").forceActiveFocus(); keyClick(Qt.Key_Space);
         verify(client.calls.indexOf("nm-connection-editor") >= 0);
     }
+    function test_tab_order_and_status_controls() {
+        mount();
+        item("panelMenu").forceActiveFocus();
+        for (const name of ["panelWorkspace_1", "panelWorkspace_2", "panelWorkspace_3", "panelWorkspace_4", "panelNetwork", "panelVolume"]) {
+            keyClick(Qt.Key_Tab);
+            verify(item(name).activeFocus, name + " follows visual order");
+        }
+        Pipewire.ready = true; Pipewire.defaultAudioSink = sink;
+        const volume = item("panelVolume");
+        mouseClick(volume); compare(audio.muted, true);
+        mouseWheel(volume, volume.width / 2, volume.height / 2, 0, 120);
+        compare(audio.volume, 0.55);
+        mouseClick(volume, volume.width / 2, volume.height / 2, Qt.RightButton);
+        compare(client.calls, ["pavucontrol"]);
+        keyClick(Qt.Key_Backtab); verify(item("panelNetwork").activeFocus);
+    }
+    function test_modes_font_scale_and_status_slot() {
+        const p = mount();
+        for (const extra of [{}, { reduced_transparency: true }, { low_power_style: true }, { tokens: { font_scale: 2 } }]) {
+            tokens.appearance = Object.assign({ theme: "soft-jelly-light", tokens: {} }, extra);
+            wait(0);
+            const ws = item("panelWorkspaces");
+            const status = item("panelStatus");
+            compare(ws.x + ws.width / 2, 640);
+            compare(status.x + status.width, 1262);
+            verify(ws.x + ws.width < status.x);
+            const window = p.data.find(x => x.exclusiveZone !== undefined);
+            compare(window.exclusiveZone, ws.height + 8);
+            if (extra.reduced_transparency) compare(status.color.a, 1);
+        }
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        const member = Qt.createQmlObject('import QtQuick; Rectangle { width: 40; height: 18; color: "red" }', p.statusRegion);
+        tryCompare(p.statusRegion, "width", 40);
+        verify(member.visible);
+        verify(item("panelStatus").width >= 242);
+        member.destroy();
+    }
+    function test_icon_error_still_has_text() {
+        mount();
+        Quickshell.iconMap = { "audio-card-symbolic": Qt.resolvedUrl("../fixtures/does-not-exist.svg") };
+        tryCompare(item("panelVolumeIcon"), "status", Image.Error);
+        verify(item("panelVolumeFallback").visible);
+        compare(item("panelVolumeFallback").text, "音量不可用");
+    }
+    function test_menu_feedback_and_lifecycle() {
+        const p = mount();
+        item("panelMenu").forceActiveFocus(); keyClick(Qt.Key_Return);
+        let entry = null;
+        function walk(root) {
+            for (const child of root.children) {
+                if (child.visible && child.Accessible.role === Accessible.MenuItem && child.Accessible.name === "組合中心") entry = child;
+                walk(child);
+            }
+        }
+        walk(desktop);
+        verify(entry !== null, "composition menu entry exists");
+        entry.forceActiveFocus();
+        const text = entry.children.find(child => child.text !== undefined);
+        tryCompare(text, "scale", 0.96);
+        mousePress(entry); tryCompare(text, "scale", 0.90);
+        tokens.appearance = { theme: "soft-jelly-light", reduced_motion: true, tokens: {} };
+        verify(!entry.motionRunning);
+        mouseRelease(entry);
+        p.release();
+        verify(!entry.motionRunning);
+        compare(item("panelMenu").feedbackScale, 1);
+        verify(!item("panelMenu").motionRunning);
+    }
     function test_legacy_pixels() {
         for (const appearance of [null, { theme: "soft-jelly", tokens: {} }, { theme: "other", tokens: {} }]) {
             tokens.appearance = appearance;
