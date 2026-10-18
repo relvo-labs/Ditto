@@ -153,10 +153,27 @@ choose_and_apply() {
     && gui "套用" --group "$group" && "${GUI[@]}" press
 }
 
+# ① swaps to whichever Dock is not in use. Choosing the Dock already in use
+# leaves nothing to apply, so 「套用」 is (rightly) not shown; since #71 the
+# default Profile starts on the pill Dock (#92).
+# Only a known Dock counts as "Dock A": an unbound slot or a failed readback
+# would turn ① into adding a Dock, not replacing one, so ① fails instead.
+dock_now="$("${READ[@]}" slot-package ui.dock 2>&1)" || dock_now="readback failed: $dock_now"
+case "$dock_now" in
+  ditto.dock.pill) dock_target=ditto.dock.bottom dock_label="視窗列 Dock" ;;
+  ditto.dock.bottom) dock_target=ditto.dock.pill dock_label="膠囊式 Dock" ;;
+  *) dock_target="" dock_label="" ;;
+esac
+
 open_center composition.open
 before="$("${READ[@]}" last-change)"
-run_step dock-swap choose_and_apply Dock "膠囊式 Dock" \
-  && step dock-swap "① Dock B (pill) replaces Dock A (bottom bar)" swap "$before" ui.dock ditto.dock.pill
+if [[ -z "$dock_target" ]]; then
+  check dock-swap fail "① the Dock in use is not a known Dock ($dock_now); there is no Dock A to replace"
+  printf '{"step":"dock-swap","status":"fail","detail":%s}\n' "$(jq -Rn --arg d "unknown Dock A: $dock_now" '$d')" >>"$steps"
+else
+  run_step dock-swap choose_and_apply Dock "$dock_label" \
+    && step dock-swap "① $dock_target replaces the Dock in use ($dock_now)" swap "$before" ui.dock "$dock_target"
+fi
 
 before="$("${READ[@]}" last-change)"
 run_step launcher-swap choose_and_apply "啟動器" "搜尋式啟動器" \
@@ -174,7 +191,7 @@ duplicate_as() {
     && gui "複製" --group "$source" && "${GUI[@]}" press && sleep 1 \
     && gui "使用這個組合" --group "$name" && "${GUI[@]}" press
 }
-expected='{"ui.dock":"ditto.dock.pill","ui.launcher":"ditto.launcher.search","layout.strategy":"ditto.layout.simple-tile"}'
+expected="$(jq -cn --arg dock "$dock_target" '{"ui.dock":$dock,"ui.launcher":"ditto.launcher.search","layout.strategy":"ditto.layout.simple-tile"}')"
 run_step save-dev duplicate_as "$active_name" "手動測試開發" \
   && step save-dev "④ the composition saved as a new profile 「手動測試開發」 and in use" saved-as "手動測試開發" "$expected"
 

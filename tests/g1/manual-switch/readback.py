@@ -183,12 +183,21 @@ def main(argv: list[str]) -> None:
             return appearance(argv[1] or None, argv[2], argv[3], argv[4])
         if step == "compared":
             return compared(argv[1], argv[2], argv[3])
+        if step == "slot-package":
+            _, document = active_document()
+            package = slot_package(document, argv[1])
+            if not package:
+                raise SystemExit(f"slot {argv[1]} has no binding")
+            return print(package)
         if step == "owners":
             ok, detail = owners_unique()
             return emit(ok, "no command or shortcut has two owners" if ok else "duplicate owners", **detail)
         raise SystemExit(f"unknown step {step}")
     except Exception as error:  # a readback that fails is a failed step
         emit(False, f"readback failed: {error}")
+        if step == "slot-package":
+            # Its stdout is a package id, not a step record: fail the caller.
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":
