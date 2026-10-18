@@ -40,6 +40,7 @@ TestCase {
     function init() {
         StubDesktop.layer = desktop;
         StubDesktop.screenWidth = 1280;
+        client.workspaces = Array.from({ length: 4 }, (_, i) => ({ id: String(i + 1), name: String(i + 1), active: i === 0 }));
         tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
         client.allowed = true; client.online = true; client.calls = [];
         comparisonTime = new Date();
@@ -260,5 +261,164 @@ TestCase {
             verify(before.equals(after), "legacy panel pixels match bound base");
             current.release(); current.destroy(); mounted = []; wait(20);
         }
+    }
+    function test_layout_matrix_data() {
+        const rows = [];
+        for (const width of [1280, 1024, 800, 640])
+            for (const scale of [1, 1.5, 2])
+                for (const count of [4, 9, 10])
+                    for (const icons of [false, true])
+                        for (const members of [0, 2])
+                            rows.push({ tag: [width, scale, count, icons, members].join("-"), width, scale, count, icons, members });
+        return rows;
+    }
+    function inside(item, capsule, context) {
+        if (!item.visible || item.width === 0 || item.height === 0) return;
+        const p = item.mapToItem(capsule, 0, 0);
+        verify(p.x >= -0.1 && p.y >= -0.1 && p.x + item.width <= capsule.width + 0.1
+               && p.y + item.height <= capsule.height + 0.1, context + " fits capsule: " + [p.x, p.y, item.width, item.height, capsule.width, capsule.height]);
+        for (const child of item.children) inside(child, capsule, context);
+    }
+    function test_layout_matrix(data) {
+        StubDesktop.screenWidth = data.width;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: { font_scale: data.scale } };
+        client.workspaces = Array.from({ length: data.count }, (_, i) => ({ id: String(i + 1), name: String(i + 1), active: i === 0 }));
+        if (data.icons) Quickshell.iconMap = {
+            "audio-card-symbolic": Qt.resolvedUrl("../fixtures/test-icon.svg"),
+            "network-error-symbolic": Qt.resolvedUrl("../fixtures/test-icon.svg")
+        };
+        const p = mount();
+        for (let i = 0; i < data.members; ++i) Qt.createQmlObject('import QtQuick; Rectangle { width: ' + (40 * data.scale) + '; height: 18; color: "red" }', p.statusRegion);
+        if (data.icons) {
+            tryCompare(item("panelVolumeIcon"), "status", Image.Ready);
+            tryCompare(item("panelNetworkIcon"), "status", Image.Ready);
+        }
+        wait(30); // positioner polish after the last service/member update
+        const capsules = [item("panelLeft"), item("panelWorkspaces"), item("panelStatus")];
+        const window = p.data.find(x => x.exclusiveZone !== undefined);
+        compare(window.width, data.width);
+        for (let i = 0; i < capsules.length; ++i) {
+            const c = capsules[i];
+            verify(c.x >= 0 && c.x + c.width <= data.width, "capsule stays on screen");
+            if (i) verify(capsules[i - 1].x + capsules[i - 1].width + 8 <= c.x, "capsules and Regions do not overlap");
+            inside(c, c, "capsule " + i);
+            const region = window.mask.regions[i];
+            compare(region.item, c);
+            compare(region.radius, c.radius);
+            verify(region.contains(c.width / 2, c.height / 2));
+            verify(!region.contains(0, 0));
+            if (i) verify(!window.mask.contains((capsules[i - 1].x + capsules[i - 1].width + c.x) / 2, 18));
+        }
+        compare(window.exclusiveZone, Math.max(...capsules.map(c => c.height)) + 8);
+        if (data.width === 1280 && data.scale === 1 && data.count === 4 && data.members === 0 && data.icons) {
+            compare(capsules[1].x, 568); compare(capsules[1].width, 144);
+            compare(capsules[2].x, 1020); compare(capsules[2].width, 242);
+        }
+    }
+    function test_disabled_workspace_is_inert() {
+        mount();
+        client.allowed = false;
+        const button = item("panelWorkspace_2");
+        mouseMove(button, button.width / 2, button.height / 2);
+        mousePress(button); wait(150);
+        compare(button.feedbackScale, 1);
+        verify(!button.motionRunning);
+        verify(!button.enabled);
+        mouseRelease(button);
+        item("panelMenu").forceActiveFocus(); keyClick(Qt.Key_Tab);
+        verify(item("panelNetwork").activeFocus, "disabled workspace buttons are absent from Tab order");
+        client.allowed = true;
+        button.forceActiveFocus(); tryCompare(button, "feedbackScale", 0.96);
+    }
+    function test_symbolic_tint_and_mute_marker() {
+        Quickshell.iconMap = { "audio-volume-muted-symbolic": Qt.resolvedUrl("../fixtures/half-opacity-symbolic.svg") };
+        Pipewire.ready = true; Pipewire.defaultAudioSink = sink; audio.muted = true;
+        mount();
+        const icon = item("panelVolumeIcon");
+        tryCompare(icon, "status", Image.Ready);
+        compare(icon.width, 18); compare(icon.height, 18);
+        compare(icon.color, tokens.foreground);
+        const volume = item("panelVolume");
+        verify(volume.marker !== "");
+        compare(volume.tooltipText, volume.Accessible.name);
+        verify(item("panelVolumeMarker").visible);
+        tryVerify(() => icon.painted);
+        waitForRendering(icon);
+        const pixels = grabImage(desktop);
+        const pos = icon.mapToItem(desktop, 9, 9);
+        const centre = pixels.pixel(Math.round(pos.x), Math.round(pos.y));
+        compare(centre, tokens.foreground, "embedded 50% SVG opacity becomes an opaque foreground mask");
+    }
+    function test_light_menu_alignment() {
+        const p = mount();
+        p.menuOpen = true; wait(0);
+        const menu = p.data.find(x => x.anchor !== undefined);
+        compare(menu.anchor.rect.x, item("panelLeft").x);
+    }
+    function test_legacy_interactions_data() {
+        const rows = [];
+        for (const theme of ["none", "soft-jelly", "other"])
+            for (const scale of [1, 2])
+                for (const width of [1280, 800]) rows.push({ tag: [theme, scale, width].join("-"), theme, scale, width });
+        return rows;
+    }
+    function descendants(root, role) {
+        const found = [];
+        for (const child of root.children) {
+            if (!child.visible) continue;
+            if (child.Accessible.role === role) found.push(child);
+            found.push(...descendants(child, role));
+        }
+        return found;
+    }
+    function legacyInteractionSnapshot(base) {
+        client.calls = [];
+        mouseMove(desktop, 600, 400);
+        const p = mount(base);
+        const window = p.data.find(x => x.exclusiveZone !== undefined);
+        Qt.createQmlObject('import QtQuick; Rectangle { width: 40; height: 18; color: "red" }', p.statusRegion);
+        wait(20);
+        const buttons = descendants(window.contentItem, Accessible.Button).filter(button => button.activeFocusOnTab);
+        compare(buttons.length, 5);
+        compare(window.height, 34); compare(window.exclusiveZone, 34);
+        compare(window.mask, null);
+        const statusPos = p.statusRegion.mapToItem(window.contentItem, 0, 0);
+        const result = { status: [statusPos.x, statusPos.y, p.statusRegion.width, p.statusRegion.height], pixels: [], order: [] };
+        buttons[0].forceActiveFocus();
+        waitForRendering(desktop); result.pixels.push(grabImage(desktop));
+        for (let i = 0; i < 4; ++i) {
+            keyClick(Qt.Key_Tab);
+            const focused = buttons.find(button => button.activeFocus);
+            verify(focused !== undefined);
+            result.order.push(focused.Accessible.name);
+        }
+        buttons[1].forceActiveFocus(); keyClick(Qt.Key_Return);
+        mouseClick(buttons[2]);
+        result.calls = client.calls;
+        compare(result.calls, ["1", "2"]);
+        buttons[0].forceActiveFocus(); keyClick(Qt.Key_Return);
+        compare(p.menuOpen, true);
+        waitForRendering(desktop); result.pixels.push(grabImage(desktop));
+        const entries = descendants(desktop, Accessible.MenuItem);
+        compare(entries.length, 9);
+        entries[1].forceActiveFocus();
+        waitForRendering(desktop); result.pixels.push(grabImage(desktop));
+        mouseMove(entries[2], entries[2].width / 2, entries[2].height / 2);
+        waitForRendering(desktop); result.pixels.push(grabImage(desktop));
+        p.release(); compare(window.exclusiveZone, 0);
+        p.destroy(); mounted = mounted.filter(object => object !== p); wait(20);
+        return result;
+    }
+    function test_legacy_interactions(data) {
+        StubDesktop.screenWidth = data.width;
+        tokens.appearance = data.theme === "none" ? { tokens: { font_scale: data.scale } }
+            : { theme: data.theme, tokens: { font_scale: data.scale } };
+        const before = legacyInteractionSnapshot(true);
+        const after = legacyInteractionSnapshot(false);
+        compare(after.status, before.status);
+        compare(after.order, before.order);
+        compare(after.calls, before.calls);
+        for (let i = 0; i < before.pixels.length; ++i)
+            verify(before.pixels[i].equals(after.pixels[i]), "legacy focus/menu/hover pixels match phase " + i);
     }
 }

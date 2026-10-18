@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Controls as Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
@@ -310,15 +311,36 @@ Scope {
             id: lightPanel
             anchors.left: parent.left
             anchors.right: parent.right
-            height: capsuleHeight + 8
+            height: Math.max(leftCapsule.height, workspaceCapsule.height, statusCapsule.height) + 8
             visible: provider.soft
             readonly property real capsuleHeight: Math.max(28, provider.tokens.fontSmall + 12)
+            // All measurements are intrinsic; allocations never depend on the
+            // wrapped positioners, so resize/member updates cannot bind in a loop.
+            readonly property real edge: 18
+            readonly property real gap: 12
+            readonly property real usableWidth: Math.max(0, width - edge * 2 - gap * 2)
+            FontMetrics { id: workspaceMetrics; font.pixelSize: provider.tokens.fontSmall }
+            readonly property real workspaceCell: Math.max(31, ...(provider.client ? provider.client.workspaces : [])
+                .map(workspace => workspaceMetrics.advanceWidth(workspace.name) + 16))
+            readonly property int workspaceCount: provider.client ? provider.client.workspaces.length : 0
+            readonly property real workspaceNatural: Math.max(1, workspaceCount) * workspaceCell + Math.max(0, workspaceCount - 1) * 4 + 8
+            readonly property real statusNatural: lightNetwork.width + lightVolume.width + lightClock.implicitWidth + 40
+                + (statusRow.implicitWidth > 0 ? statusRow.implicitWidth + 12 : 0)
+            readonly property real statusMinimum: Math.max(lightNetwork.width, lightVolume.width, lightClock.implicitWidth, statusRow.implicitWidth) + 16
+            readonly property real statusPreferred: Math.max(242, statusNatural)
+            readonly property real leftMinimum: lightMenu.width + 12
+            readonly property real leftWidth: Math.min(360, Math.max(leftMinimum, usableWidth - workspaceNatural - statusPreferred))
+            readonly property real remainingWidth: usableWidth - leftWidth
+            readonly property real statusWidth: Math.max(statusMinimum, Math.min(statusPreferred, remainingWidth - workspaceNatural))
+            readonly property real workspaceWidth: Math.min(workspaceNatural, Math.max(workspaceCell + 8, remainingWidth - statusWidth))
+            readonly property int workspaceColumns: Math.max(1, Math.min(workspaceCount, Math.floor((workspaceWidth - 8 + 4) / (workspaceCell + 4))))
+            readonly property bool statusWrap: statusWidth + 0.1 < statusNatural
 
             SoftCapsule {
                 id: leftCapsule
                 objectName: "panelLeft"
                 x: 18; y: 4
-                width: Math.max(80, Math.min(360, workspaceCapsule.x - 30))
+                width: lightPanel.leftWidth
                 height: lightPanel.capsuleHeight
                 Row {
                     anchors.fill: parent
@@ -330,6 +352,7 @@ Scope {
                         width: lightBrand.implicitWidth + 12
                         height: leftCapsule.height
                         accessibleLabel: provider.t(qsTr("Ditto 選單"))
+                        tooltipText: lightTitle.text + " · " + windowCount.text
                         onActivated: provider.menuOpen = !provider.menuOpen
                         Text {
                             id: lightBrand
@@ -343,7 +366,8 @@ Scope {
                     Text {
                         id: lightTitle
                         objectName: "panelTitle"
-                        width: Math.max(0, parent.width - lightMenu.width - windowCount.width - 16)
+                        width: Math.max(0, parent.width - lightMenu.width - (windowCount.visible ? windowCount.width + 8 : 0) - 8)
+                        visible: width > 0
                         height: parent.height
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
@@ -358,6 +382,7 @@ Scope {
                     }
                     Text {
                         id: windowCount
+                        visible: leftCapsule.width >= lightMenu.width + implicitWidth + 28
                         height: parent.height
                         verticalAlignment: Text.AlignVCenter
                         font.pixelSize: provider.tokens.fontSmall
@@ -372,12 +397,15 @@ Scope {
             SoftCapsule {
                 id: workspaceCapsule
                 objectName: "panelWorkspaces"
-                x: (lightPanel.width - width) / 2; y: 4
-                width: workspaceStrip.implicitWidth + 8
-                height: lightPanel.capsuleHeight
-                Row {
+                x: Math.max(leftCapsule.x + leftCapsule.width + lightPanel.gap,
+                    Math.min((lightPanel.width - width) / 2, statusCapsule.x - lightPanel.gap - width))
+                y: 4
+                width: lightPanel.workspaceWidth
+                height: Math.max(lightPanel.capsuleHeight, workspaceStrip.implicitHeight + 6)
+                Grid {
                     id: workspaceStrip
                     anchors.centerIn: parent
+                    columns: lightPanel.workspaceColumns
                     spacing: 4
                     Repeater {
                         model: provider.client ? provider.client.workspaces : []
@@ -385,8 +413,8 @@ Scope {
                             id: workspaceButton
                             required property var modelData
                             objectName: "panelWorkspace_" + modelData.id
-                            width: Math.max(31, workspaceText.implicitWidth + 16)
-                            height: workspaceCapsule.height - 6
+                            width: lightPanel.workspaceCell
+                            height: lightPanel.capsuleHeight - 6
                             interactive: provider.client && provider.client.capabilityAvailable("desktop.workspaces.activate")
                             accessibleLabel: provider.t(qsTr("工作區 %1")).arg(modelData.name)
                                 + (modelData.active ? provider.t(qsTr("（目前）")) : "")
@@ -412,16 +440,19 @@ Scope {
                 id: statusCapsule
                 objectName: "panelStatus"
                 x: lightPanel.width - width - 18; y: 4
-                width: Math.max(242, statusStrip.implicitWidth + 16)
-                height: lightPanel.capsuleHeight
-                Row {
+                width: lightPanel.statusWidth
+                height: Math.max(lightPanel.capsuleHeight, statusStrip.implicitHeight + 4)
+                Grid {
                     id: statusStrip
                     anchors.centerIn: parent
-                    spacing: 12
+                    columns: lightPanel.statusWrap ? 1 : 4
+                    columnSpacing: 12
+                    rowSpacing: 4
+                    verticalItemAlignment: Grid.AlignVCenter
                     StatusButton {
                         id: lightNetwork
                         objectName: "panelNetwork"
-                        height: statusCapsule.height - 4
+                        height: lightPanel.capsuleHeight - 4
                         readonly property bool available: Networking.backend !== NetworkBackendType.None
                         readonly property bool connected: {
                             const devices = Networking.devices ? Networking.devices.values : [];
@@ -440,7 +471,7 @@ Scope {
                     StatusButton {
                         id: lightVolume
                         objectName: "panelVolume"
-                        height: statusCapsule.height - 4
+                        height: lightPanel.capsuleHeight - 4
                         readonly property var sink: Pipewire.defaultAudioSink
                         readonly property bool known: Pipewire.ready && sink !== null && sink.audio !== null
                         accessibleLabel: !known ? provider.t(qsTr("音量不可用"))
@@ -449,7 +480,7 @@ Scope {
                         iconName: !known ? "audio-card-symbolic" : sink.audio.muted ? "audio-volume-muted-symbolic"
                             : sink.audio.volume === 0 ? "audio-volume-low-symbolic"
                             : sink.audio.volume < 0.67 ? "audio-volume-medium-symbolic" : "audio-volume-high-symbolic"
-                        marker: !known ? "!" : ""
+                        marker: !known ? "!" : sink.audio.muted ? "∕" : ""
                         onActivated: button => {
                             // Keyboard and right click open details; left click toggles mute.
                             if (button !== Qt.LeftButton) {
@@ -462,13 +493,13 @@ Scope {
                     }
                     Item {
                         id: lightStatusHost
-                        anchors.verticalCenter: parent.verticalCenter
                         width: statusRow.implicitWidth
                         height: statusRow.implicitHeight
                     }
                     Text {
+                        id: lightClock
                         objectName: "panelClock"
-                        height: statusCapsule.height - 4
+                        height: lightPanel.capsuleHeight - 4
                         verticalAlignment: Text.AlignVCenter
                         color: provider.tokens.foreground
                         font.pixelSize: provider.tokens.fontSmall
@@ -493,7 +524,7 @@ Scope {
     }
 
     component SoftCapsule: Rectangle {
-        radius: height / 2
+        radius: Math.floor(Math.min(width, height) / 2)
         // Only the fill's alpha changes, so text/focus remain fully opaque.
         color: Qt.rgba(provider.tokens.surface.r, provider.tokens.surface.g, provider.tokens.surface.b,
                        provider.tokens.reducedTransparency ? 1 : provider.tokens.surface.a * provider.tokens.surfaceOpacity)
@@ -505,18 +536,24 @@ Scope {
         id: button
         property string accessibleLabel: ""
         property bool interactive: true
+        property string tooltipText: ""
+        enabled: interactive
         property int pointerButtons: Qt.LeftButton
-        readonly property real feedbackTarget: !visible || !provider.shown ? 1
+        readonly property real feedbackTarget: !interactive || !visible || !provider.shown ? 1
             : area.pressed ? 0.90 : area.containsMouse || activeFocus ? 0.96 : 1
         property real feedbackScale: 1
         readonly property bool motionRunning: feedback.running
-        readonly property bool motionActive: visible && provider.shown && provider.tokens.motionEnabled
+        readonly property bool motionActive: interactive && visible && provider.shown && provider.tokens.motionEnabled
         default property alias content: visual.data
         signal activated(int button)
         signal scrolled(real delta)
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: accessibleLabel
+        Accessible.description: tooltipText
+        Controls.ToolTip.visible: tooltipText !== "" && interactive && (area.containsMouse || activeFocus)
+        Controls.ToolTip.text: tooltipText
+        Controls.ToolTip.delay: 600
         Accessible.onPressAction: if (interactive) activated(Qt.NoButton)
         Keys.onReturnPressed: if (interactive) activated(Qt.NoButton)
         Keys.onSpacePressed: if (interactive) activated(Qt.NoButton)
@@ -564,19 +601,21 @@ Scope {
         pointerButtons: Qt.LeftButton | Qt.RightButton
         property string iconName: ""
         property string marker: ""
+        tooltipText: accessibleLabel
         width: statusIcon.status === Image.Ready ? 28 : fallback.implicitWidth + 8
-        Image {
+        SymbolicIcon {
             id: statusIcon
             objectName: statusButton.objectName + "Icon"
             anchors.centerIn: parent
-            width: 16; height: 16
+            width: 18; height: 18
+            color: provider.tokens.foreground
             source: Quickshell.iconPath(statusButton.iconName, true)
-            sourceSize.width: 16; sourceSize.height: 16
-            visible: status === Image.Ready
+            visible: status !== Image.Null && status !== Image.Error
         }
         Text {
+            objectName: statusButton.objectName + "Marker"
             anchors.right: parent.right; anchors.top: parent.top
-            visible: statusIcon.visible && statusButton.marker !== ""
+            visible: statusIcon.status === Image.Ready && statusButton.marker !== ""
             text: statusButton.marker
             color: provider.tokens.foreground
             font.pixelSize: provider.tokens.fontSmall
@@ -593,12 +632,68 @@ Scope {
         }
     }
 
+    // Paint only when source/colour/size changes (18×18 at the default
+    // recipe). This CPU alpha mask also works without shaders. Symbolic SVGs
+    // may embed 50% opacity in their state glyph: restore that body to opaque
+    // while keeping fractional coverage on antialiased edges. No source RGB
+    // or state opacity reaches the final foreground-coloured glyph.
+    component SymbolicIcon: Item {
+        id: glyph
+        property alias source: sourceImage.source
+        property color color: provider.tokens.foreground
+        readonly property int status: sourceImage.status !== Image.Ready ? sourceImage.status
+            : paint.loaded && painted ? Image.Ready : Image.Loading
+        property bool painted: false
+        function loadSource() {
+            painted = false;
+            paint.loaded = false;
+            if (String(source) !== "") {
+                paint.loadImage(source);
+                // Cached Canvas images may already be ready without emitting
+                // another imageLoaded signal for this URL.
+                paint.loaded = paint.isImageLoaded(source);
+                paint.requestPaint();
+            }
+        }
+        onSourceChanged: loadSource()
+        Component.onCompleted: loadSource()
+        onColorChanged: paint.requestPaint()
+        Image { id: sourceImage; visible: false; sourceSize.width: glyph.width; sourceSize.height: glyph.height }
+        Canvas {
+            id: paint
+            anchors.fill: parent
+            property bool loaded: false
+            onImageLoaded: { loaded = isImageLoaded(glyph.source); requestPaint(); }
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            onPaint: {
+                if (!loaded || width <= 0 || height <= 0) return;
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(glyph.source, 0, 0, width, height);
+                const pixels = ctx.getImageData(0, 0, width, height);
+                ctx.clearRect(0, 0, width, height);
+                ctx.fillStyle = glyph.color;
+                for (let y = 0; y < height; ++y) {
+                    for (let x = 0; x < width; ++x) {
+                        const alpha = pixels.data[(y * width + x) * 4 + 3];
+                        if (alpha === 0) continue;
+                        ctx.globalAlpha = Math.min(1, alpha / 127);
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+                ctx.globalAlpha = 1;
+                glyph.painted = true;
+            }
+        }
+    }
+
     /// The Ditto menu: the four centers, the launcher and the session.
     PopupWindow {
         id: menu
         visible: provider.shown && provider.menuOpen
         anchor.window: panel
-        anchor.rect.x: 8
+        anchor.rect.x: provider.soft ? leftCapsule.x : 8
         anchor.rect.y: panel.height
         implicitWidth: 220
         implicitHeight: menuColumn.implicitHeight + provider.tokens.space * 2
