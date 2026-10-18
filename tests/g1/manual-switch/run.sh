@@ -153,10 +153,20 @@ choose_and_apply() {
     && gui "套用" --group "$group" && "${GUI[@]}" press
 }
 
+# ① swaps to whichever Dock is not in use. Choosing the Dock already in use
+# leaves nothing to apply, so 「套用」 is (rightly) not shown; since #71 the
+# default Profile starts on the pill Dock (#92).
+dock_now="$("${READ[@]}" slot-package ui.dock)"
+if [[ "$dock_now" == ditto.dock.pill ]]; then
+  dock_target=ditto.dock.bottom dock_label="視窗列 Dock"
+else
+  dock_target=ditto.dock.pill dock_label="膠囊式 Dock"
+fi
+
 open_center composition.open
 before="$("${READ[@]}" last-change)"
-run_step dock-swap choose_and_apply Dock "膠囊式 Dock" \
-  && step dock-swap "① Dock B (pill) replaces Dock A (bottom bar)" swap "$before" ui.dock ditto.dock.pill
+run_step dock-swap choose_and_apply Dock "$dock_label" \
+  && step dock-swap "① Dock B ($dock_target) replaces Dock A (${dock_now:-unset})" swap "$before" ui.dock "$dock_target"
 
 before="$("${READ[@]}" last-change)"
 run_step launcher-swap choose_and_apply "啟動器" "搜尋式啟動器" \
@@ -174,7 +184,7 @@ duplicate_as() {
     && gui "複製" --group "$source" && "${GUI[@]}" press && sleep 1 \
     && gui "使用這個組合" --group "$name" && "${GUI[@]}" press
 }
-expected='{"ui.dock":"ditto.dock.pill","ui.launcher":"ditto.launcher.search","layout.strategy":"ditto.layout.simple-tile"}'
+expected="$(jq -cn --arg dock "$dock_target" '{"ui.dock":$dock,"ui.launcher":"ditto.launcher.search","layout.strategy":"ditto.layout.simple-tile"}')"
 run_step save-dev duplicate_as "$active_name" "手動測試開發" \
   && step save-dev "④ the composition saved as a new profile 「手動測試開發」 and in use" saved-as "手動測試開發" "$expected"
 

@@ -183,6 +183,9 @@ def main(argv: list[str]) -> None:
             return appearance(argv[1] or None, argv[2], argv[3], argv[4])
         if step == "compared":
             return compared(argv[1], argv[2], argv[3])
+        if step == "slot-package":
+            _, document = active_document()
+            return print(slot_package(document, argv[1]) or "")
         if step == "owners":
             ok, detail = owners_unique()
             return emit(ok, "no command or shortcut has two owners" if ok else "duplicate owners", **detail)
