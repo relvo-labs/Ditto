@@ -59,6 +59,11 @@ Scope {
         const window = client ? client.windows.find(item => item.focused === true) : null;
         return window ? window.id : "";
     }
+    /// The windows list is a Core snapshot only while the client is online:
+    /// before the first subscribe answer it is the empty placeholder, and
+    /// after a disconnect it is stale. A client without `online` (fixtures)
+    /// counts as always holding a snapshot.
+    readonly property bool windowsSnapshot: !!client && client.online !== false
     property bool focusObserved: false
     property string observedFocusId: ""
     property string confirmationWindowId: ""
@@ -77,12 +82,12 @@ Scope {
         confirmationWindowId = "";
     }
     function observeFocus() {
-        if (!ready) return;
+        if (!ready || !windowsSnapshot) return;
         const next = focusedWindowId;
         if (!focusObserved) {
             focusObserved = true;
             observedFocusId = next;
-            return; // Initial readback is a baseline, not a focus transition.
+            return; // The first snapshot is a baseline, not a focus transition.
         }
         if (next === observedFocusId) return;
         observedFocusId = next; // Observe even while hidden / motion disabled.
@@ -93,6 +98,15 @@ Scope {
         }
     }
     onFocusedWindowIdChanged: observeFocus()
+    // Going offline forgets the baseline, so the snapshot after a reconnect
+    // establishes a new one instead of replaying what changed meanwhile.
+    onWindowsSnapshotChanged: {
+        if (!windowsSnapshot) {
+            focusObserved = false;
+            settleConfirmation();
+        }
+        observeFocus();
+    }
     onMotionEnabledChanged: if (!motionEnabled) { settlePresentation(); settleConfirmation(); }
     onPositionChanged: { settlePresentation(); settleConfirmation(); }
     onScreenChanged: { settlePresentation(); settleConfirmation(); }

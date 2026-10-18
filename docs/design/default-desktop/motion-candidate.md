@@ -66,6 +66,10 @@ QtTest 使用實際 AssistantEntry、MotionValue、staged DockPill／ChatPanel�
 | T12 | 同 app 兩視窗切換；多 alias tile 同窗 | 以 window ID 判斷；每次只有一個目標 tile | `T12_same_app_two_window_identity`、`T12_one_target_when_alias_tiles_share_a_window` |
 | T13 | 快速 A→B→A、重複同 ID、再到 C | 每個真正觀測過渡至多一次；只留最新插值，沒有舊 completion 重播 | `T13_rapid_burst_latest_id_only` |
 | T14 | legacy 主題，初始／後續回讀 | 不新增確認動態，原靜態指示沿用 | `T01_initial_observation(legacy-focused)`、`T08_T11_T14_eligibility(legacy)` |
+| T15 | Dock 先顯示、第一份快照後到；快照先到再載入 Dock | 兩種順序都以第一份快照建基線，0 次確認；其後真正過渡照常 | `T15_dock_shown_before_first_snapshot`、`T15_snapshot_before_dock` |
+| T16 | 斷線→重連（焦點不變／離線期間改變／重連後無焦點） | 斷線即停止進行中確認並清基線；重連快照重新建基線，0 次重播 | `T16_reconnect_rebaselines_without_replay`、`T16_disconnect_settles_running_confirmation` |
+
+#84 修正：「第一份快照」以 client `online`（subscribe 回應已套用 snapshot）界定；`online` 之前的空陣列與斷線後的舊清單都不算快照。沒有 `online` 屬性的 fixture client 視為一直持有快照。不新增 RPC、輪詢或持久化；實體 Wayfire 的實際啟動順序未執行。
 
 盤點：DockPill 的 `Repeater(entries)` 曾在 delegate 的 `onCurrentChanged` 啟動確認，因此是新增 F1。DockBottom 的 `Repeater(client.windows)` 同樣會重建互動暫態，但只有靜態 focused 色／字，沒有確認動畫；屬 legacy F3。PanelTop 讀 focused title、Shell 保存 lastFocusedApplication、ChatFocusReturn 以 ID 防止錯誤回焦，均不啟動 tile 確認。TasksPanel 和 launcher 依 task／app model 顯示，不是焦點確認消費者。本修正保留原 array model，**F3 的 hover／press／鍵盤焦點重設留待另案**。
 

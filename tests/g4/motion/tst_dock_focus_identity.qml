@@ -16,6 +16,8 @@ TestCase {
     QtObject {
         id: client
         property var windows: []
+        /// undefined = fixture without a connection state (always a snapshot).
+        property var online: undefined
         function t(text) { return text; }
         function capability(method, args, ok, fail) {
             ok({ apps: [{ app_id: "fixture", name: "Fixture", icon: "" },
@@ -28,8 +30,9 @@ TestCase {
         return ["A", "B", "C"].map((key, index) => ({ id: key,
             app_id: index === 0 ? "fixture" : "other", focused: key === id, title: key, x: 0, y: 0, width: 640, height: 480 }));
     }
-    function mount(initial, theme) {
+    function mount(initial, theme, online) {
         StubDesktop.layer = layer;
+        client.online = online;
         tokens.appearance = { theme: theme || "soft-jelly-light" };
         client.windows = initial;
         const component = Qt.createComponent(Qt.resolvedUrl("../visual/.staged/providers/DockPill.qml"));
@@ -47,6 +50,7 @@ TestCase {
     function cleanup() {
         if (provider) { provider.release(); provider.destroy(); }
         provider = null;
+        client.online = undefined;
         wait(10);
     }
     function matchingTiles(id) {
@@ -206,5 +210,50 @@ TestCase {
         wait(220);
         retired(3);
         compare(provider.confirmationWindowId, "C");
+    }
+
+    // #84: the baseline is the first Core snapshot, not component load.
+    // Same order as DittoClient.subscribe(): windows first, then online.
+    function arriveSnapshot(list) {
+        client.windows = list;
+        client.online = true;
+    }
+    function test_T15_dock_shown_before_first_snapshot() {
+        mount([], undefined, false);
+        arriveSnapshot(windows("A"));
+        compare(provider.observedFocusId, "A");
+        wait(30);
+        retired(0);
+        compare(tile("A").confirmedScale, 1);
+        project("B"); active("B", 1); // later genuine transitions still animate
+    }
+    function test_T15_snapshot_before_dock() {
+        mount(windows("A"), undefined, true);
+        compare(provider.observedFocusId, "A");
+        retired(0);
+        project("B"); active("B", 1);
+    }
+    function test_T16_reconnect_rebaselines_without_replay_data() {
+        return [{ tag: "same-focus", id: "A" }, { tag: "focus-changed-while-offline", id: "B" },
+            { tag: "nothing-focused-after", id: "" }];
+    }
+    function test_T16_reconnect_rebaselines_without_replay(data) {
+        mount(windows("A"), undefined, true);
+        client.online = false; // disconnect keeps the stale list
+        arriveSnapshot(data.id ? windows(data.id) : []);
+        compare(provider.observedFocusId, data.id);
+        wait(30);
+        retired(0);
+        project("C"); active("C", 1);
+    }
+    function test_T16_disconnect_settles_running_confirmation() {
+        mount(windows("A"), undefined, true);
+        project("B"); active("B", 1);
+        client.online = false;
+        retired(1);
+        compare(provider.confirmationWindowId, "");
+        arriveSnapshot(windows("B"));
+        wait(30);
+        retired(1);
     }
 }
