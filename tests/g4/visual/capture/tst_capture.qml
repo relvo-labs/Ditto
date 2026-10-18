@@ -180,13 +180,15 @@ TestCase {
             appearance: appearance, material_shadow_path: findChild(screen, "materialSample_back").children[0].shadowPath,
             motion: { enabled: sceneTokens.motionEnabled, settled: true, dock_reveal: dock.reveal },
             fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null,
-                       system_status: statusFixture ? { muted: fixtureAudio.muted, network_connectivity: Networking.connectivity } : null },
+                       system_status: statusFixture ? { muted: fixtureAudio.muted, volume: fixtureAudio.volume,
+                           network_connectivity: Networking.connectivity } : null },
             panel_presentation: panel.soft ? "light" : "legacy",
             panel_icons: panel.soft ? ["panelNetwork", "panelVolume"].map(name => {
                 const button = findChild(layer, name);
                 const icon = findChild(layer, name + "Icon");
                 return { name: button.iconName, text: button.Accessible.name, source: String(icon.source),
-                         tint: String(icon.color), marker: button.marker, glyph: rect(icon),
+                         tint: String(icon.color), error_tint: String(icon.errorColor), marker: button.marker, glyph: rect(icon),
+                         marker_glyph: button.marker ? rect(findChild(layer, name + "Marker")) : null,
                          status: icon.status === Image.Ready ? "ready" : "text-fallback" };
             }) : [],
             geometry: Object.assign({ dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
@@ -254,6 +256,11 @@ TestCase {
         Networking.devices = { values: [{ connected: true }] };
         render("panel-muted-connected", light(), [], null);
         fixtureAudio.muted = false;
+        for (const level of [{ value: 0, name: "low" }, { value: 0.4, name: "medium" }, { value: 1, name: "high" }]) {
+            fixtureAudio.volume = level.value;
+            render("panel-volume-" + level.name, light(), [], null);
+        }
+        fixtureAudio.volume = 0.5;
         Networking.connectivity = NetworkConnectivity.Unknown;
         Networking.devices = { values: [] };
         render("panel-unknown", light(), [], null);

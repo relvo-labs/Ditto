@@ -159,6 +159,8 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 
 ## 6.3 PR #101 Repair 1（F1／F2／F3／F4／F8）
 
+本節保留 Repair 1 當時的實作與量測；F2 的 alpha 恢復政策與對比表已由下節 Repair 2 取代，其他佈局／互動驗證仍適用。
+
 修復基底 `9f5875578f955d4113106cb54d273f669fee88ac`，證據在 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/repair1/`。這是開發機 offscreen/software 證據；原有實機／NFR 限制不變。
 
 - **F1 佈局**：三膠囊保留左右各 18 px、相鄰 12 px 間隙。先縮短並省略左側視窗標題，再放寬右側 242 px 留白；必要時左側只剩選單，選單 tooltip／Accessible description 仍提供完整標題與視窗數／離線文字。工作區位置夾限於兩側膠囊之間，能在螢幕中心放下時仍真正置中。極端組合的單列內容總寬超過畫面，工作區 Grid 及狀態 Grid 換行，所有入口仍可見；沒有裁掉操作或縮小文字。`exclusiveZone` 跟隨最高膠囊＋8 px，避免遮窗。圓角取整且不超過單列半徑，換行後不把底部文字切到透明角落；Region 與可見表面一致。1280、字級 1、四工作區、無外掛狀態項時，原 `(568,4) 144×28`／`(1020,4) 242×28` **不變**。
@@ -179,6 +181,29 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 量測比較的是實際圖形核心與相鄰平坦膠囊像素；反鋸齒輪廓邊緣不作核心最低值，細線圖形可能只有部分覆蓋。這不是宣稱每一個邊緣像素都 ≥4.5:1。QtTest 另用明確 50% opacity SVG，斷言中心最後畫成不透明 `foreground`；不是只檢查 tint 屬性。
 
 `red/panel.log` 在 9f58755 上得到 42 pass／107 fail，包含重疊／溢出、disabled press=0.90、16 px 圖示與選單 x=8 的真實 RED。normal 新舊／原圖對照、最終 source hashes、HEAD、gates 及全部原始紀錄由 `repair1/manifest.json` 索引。F5 音量鍵盤靜音、F6 有線圖示、F7 時鐘 locale／星期依本輪範圍留 follow-up。`ditto.panel.top` manifest 仍為 `1.1.0`，升版交 #50。
+
+## 6.4 PR #101 Repair 2（N1／N3 a11y）
+
+修復基底 `dce0242bbcd20a428504f75d31ec6a4d1326abef`，證據在 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/repair2/`。本輪只修圖示語意及重複 description；N2 窄版高度、N3 tooltip 位置、N4 置中／2× 銳利度仍為 follow-up。
+
+**N1**：SymbolicIcon 現在以 `alpha / 255` 保留來源透明層次與抗鋸齒，不再把 Yaru 用 50% 聲波表達的音量等級拉滿。中性形狀使用 `tokens.foreground`；紅色主導的錯誤像素映射到既有 `tokens.danger`（本 recipe `#a8231b`），不將錯誤徽章染成深色。18 px 尺寸、圖示查找、fallback、標記、tooltip、命中區與幾何不變；沒有新增 token。
+
+`capture/prepare.py` 另固定查找本機安裝的真實 Yaru SVG 作測試輸入，記錄路徑與 SHA-256；`run.sh` 在 unit import 前準備來源，乾淨 checkout 不依賴 capture 快取。音量 0%／40%／100%／muted 的 18×18 圖示，任兩者須有至少 6 個像素的任一 RGB 通道相差 ≥64/255。RED 的 low／medium 只有 4 個；GREEN 六對為 10、22、71、12、81、93 個。這個門檻排除只有抗鋸齒輪廓微變卻看起來一樣的結果。錯誤徽章另斷言至少 8 個不透明 danger 像素（實際 31 個）；50% opacity fixture 改驗證來源 alpha 的實際合成像素與 ≥3:1 圖形對比，不再要求變成全強度。
+
+最終 PNG 的實測對比（與 §6.3 相同的 WCAG sRGB 方法，核心／標記分開；抗鋸齒邊緣不是最低值宣稱）：
+
+| 部分 | 實際色／鄰近膠囊色 | 對比 |
+| --- | --- | --- |
+| 不透明喇叭核心（low／medium／high） | `#211e35`／`#f7f6fe` | 15.03:1 |
+| 保留 50% 的 muted 圖形 | `#8c8a99`／`#f7f6fe` | 3.15:1 |
+| muted 的不透明 `∕` 標記核心 | 實際字形核心像素 | 14.14:1 |
+| 網路錯誤徽章 | `#a8231b`／`#f7f6fe` | 6.70:1（降低透明度 6.92:1） |
+| 未知網路圖形／`?` 標記 | 50% 圖形與字形分別取樣 | 3.15:1／13.44:1 |
+| 保留來源透明度的未連線細線圖形 | `#908d9c`／`#f7f6fe` | 3.02:1 |
+
+不透明核心／標記仍超過 4.5:1；來源半透明形狀保留層次，按圖形門檻 ≥3:1 驗證。測試使用實際像素，沒有用 tint 屬性代替回讀。新增 low／medium／high 的明確服務 fixture capture，原 normal／legacy 場景仍用各次真實時間；1280 預設工作區 `(568,4) 144×28`、右側 `(1020,4) 242×28`、保留高度 36 px 不變。
+
+**N3 a11y**：只將 StatusButton 的 `Accessible.description` 設空，避免重複讀取 name；tooltip 與 name 保留相同的狀態文字。Ditto 選單的補充視窗標題／數量 description 繼續保留。`red/panel.log`、`red/volume-levels.log`、最終 `visual/unit-tests.log`、capture 對照及 source／HEAD／gate 結果由 `repair2/manifest.json` 索引。全部仍為 offscreen development 證據；沒有新增實機或 NFR 宣稱。`ditto.panel.top` manifest 維持 `1.1.0`，升版交 #50。
 
 ## 7. R3 助理呈現與開發證據（#67）
 
