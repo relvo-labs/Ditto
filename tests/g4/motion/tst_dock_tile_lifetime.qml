@@ -179,17 +179,29 @@ TestCase {
     function test_move_keeps_delegate_and_keyboard_order(data) {
         mount(data.kind);
         const a = tile("A"), b = tile("B"), c = tile("C");
-        a.forceActiveFocus();
-        if (data.kind === "Pill") provider.config = { pinned: ["third", "fixture", "other"] };
-        else client.windows = [client.windows[2], client.windows[0], client.windows[1]];
+        // Focus the tile that actually moves, so focus survival covers a move.
+        c.forceActiveFocus();
+        // [A,B,C] -> [A,C,B] changes every directed Tab step, so a focus chain left in
+        // the old order cannot satisfy the Tab/Backtab steps below (#87).
+        if (data.kind === "Pill") provider.config = { pinned: ["fixture", "third", "other"] };
+        else client.windows = [client.windows[0], client.windows[2], client.windows[1]];
         wait(0);
         compare(tile("A"), a); compare(tile("B"), b); compare(tile("C"), c);
-        verify(a.activeFocus);
-        tryVerify(() => c.x < a.x && a.x < b.x, 1000, "real layout follows reordered model");
+        verify(c.activeFocus, "moved tile keeps keyboard focus");
+        tryVerify(() => a.x < c.x && c.x < b.x, 1000, "real layout follows reordered model");
+        a.forceActiveFocus();
         keyClick(Qt.Key_Tab);
-        verify(b.activeFocus, "tab order follows moved delegates");
+        verify(c.activeFocus, "tab A -> C follows moved delegates");
+        keyClick(Qt.Key_Tab);
+        verify(b.activeFocus, "tab C -> B follows moved delegates");
+        keyClick(Qt.Key_Backtab);
+        verify(c.activeFocus, "backtab B -> C follows moved delegates");
+        keyClick(Qt.Key_Backtab);
+        verify(a.activeFocus, "backtab C -> A follows moved delegates");
+        keyClick(Qt.Key_Tab);
+        verify(c.activeFocus);
         keyClick(Qt.Key_Return);
-        compare(client.calls, ["B"]);
+        compare(client.calls, ["C"]);
     }
     function test_pinned_identity_survives_window_replacement() {
         mount();
