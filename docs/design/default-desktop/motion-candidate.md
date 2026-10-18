@@ -90,7 +90,7 @@ DockPill 以 `app:<pinned appId>` 識別釘選 tile，以 `window:<window id>` �
 | title、geometry、無關 open／close、apps reload／reorder、pinned reorder、真正焦點變更時保留 hover／press／activeFocus；操作使用最新 payload | DockPill：`upsert_preserves_input`（3 種 input × 8 種更新） |
 | feedback 插值不中斷，20 次 geometry stream 及 title／apps／pinned／focus 更新不重啟 | DockPill：`feedback_stream_continues_without_restart`（hover／press／focus；實際值與 Animation.started 次數） |
 | title、geometry、無關 open／close、window reorder、焦點變更時保留 press／activeFocus | DockBottom：`bottom_preserves_input`（2 × 6）；原來沒有 hover 樣式或確認動畫，不增加新的效果 |
-| 排序真的移動 tile，保留 keyboard focus／pointer grab，Tab 依新順序走 | 兩者：`move_keeps_delegate_and_keyboard_order`、`move_pressed_tile` |
+| 排序真的移動 tile，保留 keyboard focus／pointer grab，Tab 與 Backtab 依新順序走（`[A,B,C]→[A,C,B]` 讓每組 Tab 前後關係都改變；#87） | 兩者：`move_keeps_delegate_and_keyboard_order`、`move_pressed_tile` |
 | 釘選 app 視窗替換、同 app 多視窗仍分立 | DockPill：`pinned_identity_survives_window_replacement`、`unpinned_window_ids_do_not_collapse_same_app`、`duplicate_pinned_count_reduction_removes_only_retired_tile` |
 | 移除無殘影／錯誤 focus／鄰居誤觸，重新出現不繼承舊 press／focus | 兩者：`removed_identity_retires_input` |
 | release 隱藏／清 exclusiveZone，destroy 後無 tile，替換後不繼承 input 且單次觸發 | 兩者：`release_and_replacement`；原有 reduced-motion／hidden settle 由 `tst_dock_motion.qml` 回歸 |
