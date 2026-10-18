@@ -304,6 +304,7 @@ TestCase {
             verify(c.x >= 0 && c.x + c.width <= data.width, "capsule stays on screen");
             if (i) verify(capsules[i - 1].x + capsules[i - 1].width + 8 <= c.x, "capsules and Regions do not overlap");
             inside(c, c, "capsule " + i);
+            verify(c.radius <= Math.floor(Math.max(28, tokens.fontSmall + 12) / 2), "wrapped content keeps the single-row corner radius");
             const region = window.mask.regions[i];
             compare(region.item, c);
             compare(region.radius, c.radius);

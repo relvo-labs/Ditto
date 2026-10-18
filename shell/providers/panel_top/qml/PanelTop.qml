@@ -524,7 +524,7 @@ Scope {
     }
 
     component SoftCapsule: Rectangle {
-        radius: Math.floor(Math.min(width, height) / 2)
+        radius: Math.floor(Math.min(width, height, lightPanel.capsuleHeight) / 2)
         // Only the fill's alpha changes, so text/focus remain fully opaque.
         color: Qt.rgba(provider.tokens.surface.r, provider.tokens.surface.g, provider.tokens.surface.b,
                        provider.tokens.reducedTransparency ? 1 : provider.tokens.surface.a * provider.tokens.surfaceOpacity)

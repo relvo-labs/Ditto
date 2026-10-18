@@ -161,7 +161,7 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 
 修復基底 `9f5875578f955d4113106cb54d273f669fee88ac`，證據在 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/repair1/`。這是開發機 offscreen/software 證據；原有實機／NFR 限制不變。
 
-- **F1 佈局**：三膠囊保留左右各 18 px、相鄰 12 px 間隙。先縮短並省略左側視窗標題，再放寬右側 242 px 留白；必要時左側只剩選單，選單 tooltip／Accessible description 仍提供完整標題與視窗數／離線文字。工作區位置夾限於兩側膠囊之間，能在螢幕中心放下時仍真正置中。極端組合的單列內容總寬超過畫面，工作區 Grid 及狀態 Grid 換行，所有入口仍可見；沒有裁掉操作或縮小文字。`exclusiveZone` 跟隨最高膠囊＋8 px，避免遮窗。圓角取整且不超過短邊一半，Region 與可見表面一致。1280、字級 1、四工作區、無外掛狀態項時，原 `(568,4) 144×28`／`(1020,4) 242×28` **不變**。
+- **F1 佈局**：三膠囊保留左右各 18 px、相鄰 12 px 間隙。先縮短並省略左側視窗標題，再放寬右側 242 px 留白；必要時左側只剩選單，選單 tooltip／Accessible description 仍提供完整標題與視窗數／離線文字。工作區位置夾限於兩側膠囊之間，能在螢幕中心放下時仍真正置中。極端組合的單列內容總寬超過畫面，工作區 Grid 及狀態 Grid 換行，所有入口仍可見；沒有裁掉操作或縮小文字。`exclusiveZone` 跟隨最高膠囊＋8 px，避免遮窗。圓角取整且不超過單列半徑，換行後不把底部文字切到透明角落；Region 與可見表面一致。1280、字級 1、四工作區、無外掛狀態項時，原 `(568,4) 144×28`／`(1020,4) 242×28` **不變**。
 - **F2 圖示**：改為 18×18、`tokens.foreground`（本 recipe `#211e35`）遮罩，局部 Canvas 僅在來源／尺寸／色彩改變時重畫，不逐幀處理。還原 symbolic SVG 內建 50% 透明度的圖形本體，保留邊緣覆蓋率；software／低效能不用 shader。靜音增加 `∕`，不可用 `!`、未知 `?`，並保留各狀態名稱和 hover／focus tooltip；缺圖繼續退文字。
 - **F3／F4**：淺色選單 x=18，legacy 仍 x=8。capability 不可用時工作區 Item disabled，退出 Tab 路徑，立即停止 hover／press 縮放並回 1；啟用後仍為 0.96／0.90、120 ms OutCubic。
 - **F8 測試**：`tst_panel.qml` 的 144 組矩陣涵蓋寬 1280／1024／800／640 × 字級 1／1.5／2 × 4／9／10 工作區 × 圖示有／無 × 0／2 狀態項，斷言膠囊與 Region 不重疊、內容不溢出、保留高度及預設幾何。另有 12 組 legacy（無主題／soft-jelly／其他 × 1／2 字級 × 1280／800）：固定同一取樣時鐘，逐像素比較選單開啟、鍵盤焦點、hover，並比對 Tab、34／隱藏 0 exclusive zone、無 mask、status region 位置與 Enter／點擊工作區啟用。
