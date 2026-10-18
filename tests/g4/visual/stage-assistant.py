@@ -16,6 +16,10 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 OUT = HERE / '.staged/assistant'
 BASE = '25c0b726ef3c3bc7c8e00232514604cc0498007e'
+# The merged R1/R3 base includes the statusForeground contrast correction.
+# Keep the old rendering oracle above, but require untouched avatar source
+# against the actual motion lease base, rather than rejecting that merged fix.
+MOTION_BASE = 'f99b4ea0db5ceff1ef98956b7e32895784746157'
 OUT.mkdir(parents=True, exist_ok=True)
 (HERE / '.staged/out').mkdir(parents=True, exist_ok=True)
 report = []
@@ -77,8 +81,8 @@ current_shell = source('shell/shell.qml')
 start = '        PanelWindow {\n            id: avatarSurface'
 end = '\n    /// The shell\'s control path:'
 assert base_shell[base_shell.index(start):base_shell.index(end)] == current_shell[current_shell.index(start):current_shell.index(end)]
-assert source('shell/avatar/Avatar.qml', True) == source('shell/avatar/Avatar.qml')
+assert subprocess.check_output(['git', 'show', f'{MOTION_BASE}:shell/avatar/Avatar.qml'], cwd=ROOT).decode() == source('shell/avatar/Avatar.qml')
 assert source('shell/chat/ApprovalWindow.qml', True) == source('shell/chat/ApprovalWindow.qml')
-report.append({'oracle': 'legacy avatar surface, Avatar.qml, ApprovalWindow.qml match 25c0b72 byte for byte'})
+report.append({'oracle': 'legacy avatar surface and ApprovalWindow.qml match 25c0b72; Avatar.qml matches f99b4ea byte for byte (merged statusForeground correction)'})
 (OUT / 'staging.json').write_text(json.dumps(report, indent=2) + '\n')
 print('assistant staged; legacy structure and approval match 25c0b72')

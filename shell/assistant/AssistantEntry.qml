@@ -1,4 +1,5 @@
 import QtQuick
+import "../jelly" as Jelly
 
 /// A labelled button, never a pretend input field. State is a projection of
 /// the shared conversation; no subscription, timer or context acquisition here.
@@ -8,6 +9,14 @@ Rectangle {
     required property var conversation
     required property var client
     property string symbolVariant: "neutral"
+    property bool expanded: false
+    property bool animations: true
+    readonly property bool motionEnabled: visible && animations && tokens.motionEnabled
+    // Cancelling is still mapped to thinking by the existing seven-state
+    // projection. Explicitly exclude it; no progress is inferred from a click.
+    readonly property bool working: client.online && !conversation.reconnecting
+        && conversation.connected && conversation.turn && conversation.turn.state === "running"
+        && ["thinking", "executing"].indexOf(conversation.taskState) >= 0
     // Opening is explicit; a fresh projection must not invent an AI setting.
     readonly property string statusText: client.online === false
         ? conversation.stateText
@@ -30,10 +39,42 @@ Rectangle {
     Keys.onSpacePressed: entry.activated()
 
     AssistantSymbol {
+        id: symbol
         x: 12
         anchors.verticalCenter: parent.verticalCenter
         tokens: entry.tokens
         variant: entry.symbolVariant
+        scale: feedback.value * presentation.value
+        opacity: entry.working ? entry.workLevel : 1
+    }
+    Jelly.MotionValue {
+        id: presentation
+        value: 0.96
+        active: entry.motionEnabled
+        duration: entry.tokens.motionPresent
+    }
+    Jelly.MotionValue {
+        id: feedback
+        targetValue: !entry.visible ? 1 : area.pressed ? 0.90
+            : area.containsMouse || entry.activeFocus ? 0.96 : entry.expanded ? 0.98 : 1
+        active: entry.motionEnabled
+        duration: entry.tokens.motionFeedback
+    }
+    // Only the glyph changes, inside the unchanged capsule/input region.
+    property real workLevel: 1
+    SequentialAnimation {
+        id: workCue
+        running: entry.motionEnabled && entry.working
+        loops: Animation.Infinite
+        NumberAnimation { target: entry; property: "workLevel"; to: 0.65; duration: 650; easing.type: Easing.InOutQuad }
+        NumberAnimation { target: entry; property: "workLevel"; to: 1; duration: 650; easing.type: Easing.InOutQuad }
+        onRunningChanged: if (!running) entry.workLevel = 1
+    }
+    readonly property bool workingCueRunning: workCue.running
+    readonly property bool feedbackRunning: feedback.running
+    function settleMotion() {
+        feedback.settle();
+        presentation.settle();
     }
     Column {
         x: 54

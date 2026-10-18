@@ -42,6 +42,60 @@ Scope {
 
     /// The light recipe's presentation; false keeps the earlier one.
     readonly property bool soft: tokens !== null && tokens.lightRecipe === true
+    readonly property bool motionEnabled: soft && tokens.motionEnabled && shown
+    property real reveal: 1
+    property NumberAnimation revealAnimation: NumberAnimation {
+        target: provider; property: "reveal"; from: 0.98; to: 1
+        duration: provider.tokens ? provider.tokens.motionPresent : 0
+        easing.type: Easing.OutCubic
+    }
+    function settlePresentation() {
+        revealAnimation.stop();
+        reveal = 1;
+    }
+    // Focus confirmation belongs to the provider's observation lifetime, not
+    // the array-model delegates (which rebuild on any window upsert).
+    readonly property string focusedWindowId: {
+        const window = client ? client.windows.find(item => item.focused === true) : null;
+        return window ? window.id : "";
+    }
+    property bool focusObserved: false
+    property string observedFocusId: ""
+    property string confirmationWindowId: ""
+    property real focusScale: 1
+    readonly property int confirmationIndex: entries.findIndex(entry =>
+        entry.window && entry.window.id === confirmationWindowId)
+    property NumberAnimation confirmationAnimation: NumberAnimation {
+        target: provider; property: "focusScale"; from: 0.94; to: 1
+        duration: provider.tokens ? provider.tokens.motionPresent : 0
+        easing.type: Easing.OutBack
+        easing.overshoot: 0
+    }
+    function settleConfirmation() {
+        confirmationAnimation.stop();
+        focusScale = 1;
+        confirmationWindowId = "";
+    }
+    function observeFocus() {
+        if (!ready) return;
+        const next = focusedWindowId;
+        if (!focusObserved) {
+            focusObserved = true;
+            observedFocusId = next;
+            return; // Initial readback is a baseline, not a focus transition.
+        }
+        if (next === observedFocusId) return;
+        observedFocusId = next; // Observe even while hidden / motion disabled.
+        settleConfirmation();
+        if (next && shown && soft && tokens.motionEnabled) {
+            confirmationWindowId = next;
+            confirmationAnimation.start();
+        }
+    }
+    onFocusedWindowIdChanged: observeFocus()
+    onMotionEnabledChanged: if (!motionEnabled) { settlePresentation(); settleConfirmation(); }
+    onPositionChanged: { settlePresentation(); settleConfirmation(); }
+    onScreenChanged: { settlePresentation(); settleConfirmation(); }
     readonly property int iconSize: 42
     readonly property int tileSize: soft ? 52 : 40
     readonly property int pillPadding: 8
@@ -167,8 +221,16 @@ Scope {
         });
     }
 
-    onShownChanged: if (shown) loadApps()
-    Component.onCompleted: ready = true
+    onShownChanged: {
+        settlePresentation();
+        if (!shown) settleConfirmation();
+        if (shown) loadApps();
+        // motionEnabled also depends on shown; its notification may follow
+        // this handler. Read the new intent directly so show starts (and hide
+        // never starts) the presentation, even on an immediate reverse.
+        if (shown && soft && tokens.motionEnabled) revealAnimation.start();
+    }
+    Component.onCompleted: { ready = true; observeFocus(); }
 
     PanelWindow {
         id: dock
@@ -242,7 +304,7 @@ Scope {
             /// Soft shadow from stacked translucent shapes (no shader); none
             /// in the low-power style.
             Repeater {
-                model: provider.soft && provider.tokens.shadowEnabled ? [0.30, 0.16, 0.07] : []
+                model: provider.shown && provider.soft && provider.tokens.shadowEnabled ? [0.30, 0.16, 0.07] : []
 
                 Rectangle {
                     required property real modelData
@@ -294,8 +356,47 @@ Scope {
                 Item {
                     id: tile
                     required property var modelData
+                    required property int index
                     readonly property bool running: !!modelData.window
                     readonly property bool current: running && modelData.window.focused === true
+                    readonly property bool motionActive: provider.motionEnabled && visible
+                    readonly property real feedbackTarget: !visible || !provider.shown ? 1
+                        : area.pressed ? 0.90 : area.containsMouse || activeFocus ? 0.96 : 1
+                    property real feedbackScale: 1
+                    readonly property bool confirming: current && modelData.window.id === provider.confirmationWindowId
+                        && index === provider.confirmationIndex
+                    readonly property real confirmedScale: confirming ? provider.focusScale : 1
+                    readonly property bool motionRunning: feedbackAnimation.running
+                        || (confirming && provider.confirmationAnimation.running)
+                    // Providers are standalone packages: use the same one-value
+                    // stop/retarget policy locally, without importing Shell paths.
+                    function retargetFeedback() {
+                        feedbackAnimation.stop();
+                        if (!motionActive || feedbackScale === feedbackTarget) {
+                            feedbackScale = feedbackTarget;
+                            return;
+                        }
+                        feedbackAnimation.from = feedbackScale;
+                        feedbackAnimation.to = feedbackTarget;
+                        feedbackAnimation.start();
+                    }
+                    function settleMotion() {
+                        feedbackAnimation.stop();
+                        feedbackScale = feedbackTarget;
+                    }
+                    onFeedbackTargetChanged: retargetFeedback()
+                    onMotionActiveChanged: if (!motionActive) settleMotion()
+                    NumberAnimation {
+                        id: feedbackAnimation
+                        target: tile; property: "feedbackScale"
+                        duration: provider.tokens.motionFeedback
+                        easing.type: Easing.OutCubic
+                    }
+                    Connections {
+                        target: provider
+                        function onPositionChanged() { tile.settleMotion(); }
+                        function onScreenChanged() { tile.settleMotion(); }
+                    }
                     objectName: "dockTile_" + modelData.appId
                     width: provider.tileSize
                     height: provider.tileSize
@@ -371,12 +472,14 @@ Scope {
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         smooth: true
+                        scale: tile.feedbackScale * tile.confirmedScale * provider.reveal
                         visible: provider.soft && status === Image.Ready
                     }
 
                     /// Fallback: a lettered tile with the application's name.
                     Rectangle {
                         objectName: "dockIconFallback"
+                        scale: tile.feedbackScale * tile.confirmedScale * provider.reveal
                         anchors.centerIn: parent
                         width: provider.iconSize
                         height: provider.iconSize

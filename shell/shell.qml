@@ -529,6 +529,7 @@ ShellRoot {
             corner: root.avatarCorner
             avatarHeight: avatarLoader.item ? avatarLoader.item.implicitHeight : 0
             entryRect: root.assistantPresentation && root.avatarPlacement.visible ? root.avatarPlacement : null
+            animations: !(root.avatarSettings && root.avatarSettings.animations === false)
             counter: rpcCounter
             onCloseRequested: root.closeChat()
             onExpandRequested: chat.mode = "window"
@@ -556,6 +557,8 @@ ShellRoot {
             conversation: root.shellConversation
             screen: root.avatarScreen
             corner: root.avatarCorner
+            expanded: chat.open
+            animations: !(root.avatarSettings && root.avatarSettings.animations === false)
             entryScale: root.avatarSettings && root.avatarSettings.scale > 0
                 ? Math.max(0.5, Math.min(2.0, root.avatarSettings.scale)) : 1
             shown: !(root.avatarSettings && root.avatarSettings.hidden === true) || root.avatarRecalled
