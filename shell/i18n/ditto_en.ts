@@ -2327,6 +2327,14 @@
         <source>（目前）</source>
         <translation> (current)</translation>
     </message>
+    <message>
+        <source>網路不可用</source>
+        <translation>Network unavailable</translation>
+    </message>
+    <message>
+        <source>網路狀態未知</source>
+        <translation>Network status unknown</translation>
+    </message>
 </context>
 <context>
     <name>PersonalizationCenter</name>

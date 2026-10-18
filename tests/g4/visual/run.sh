@@ -22,6 +22,10 @@ export QT_QPA_PLATFORM=offscreen
 cd "$root"
 node "$here/stage-providers.mjs"
 cp "$here/.staged/staging.json" "$evidence/staging.json"
+# The capture directory also includes the assistant scene. Prepare its real
+# QML sources on a clean checkout, without relying on another runner's cache.
+python3 "$here/stage-assistant.py" > "$evidence/assistant-staging.log"
+cp "$here/.staged/assistant/staging.json" "$evidence/assistant-staging.json"
 
 echo "== unit tests"
 "$runner" -import "$here/stubs" -input "$here/unit" 2>&1 | tee "$evidence/unit-tests.log"

@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -31,7 +32,8 @@ Scope {
     property bool shown: false
 
     readonly property string reservedEdge: "top"
-    readonly property Item statusRegion: statusRow
+    readonly property bool soft: tokens && tokens.lightRecipe === true
+    readonly property Item statusRegion: soft ? lightStatusRow : statusRow
     property bool ready: false
     property bool menuOpen: false
 
@@ -79,8 +81,8 @@ Scope {
 
         visible: provider.shown
         anchors { top: true; left: true; right: true }
-        implicitHeight: 34
-        exclusiveZone: provider.shown ? 34 : 0
+        implicitHeight: provider.soft ? lightPanel.height : 34
+        exclusiveZone: provider.shown ? implicitHeight : 0
         color: "transparent"
         // Mapped without keyboard interactivity, then on demand: a surface
         // that maps on demand is given the keyboard focus by the compositor,
@@ -95,6 +97,17 @@ Scope {
         WlrLayershell.keyboardFocus: mapped ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
         WlrLayershell.namespace: "ditto-panel-top"
 
+        mask: provider.soft ? lightRegion : null
+        Region {
+            id: lightRegion
+            Region { item: provider.soft ? leftCapsule : null; radius: leftCapsule.radius }
+            Region { item: provider.soft ? workspaceCapsule : null; radius: workspaceCapsule.radius }
+            Region { item: provider.soft ? statusCapsule : null; radius: statusCapsule.radius }
+        }
+
+        Item {
+            anchors.fill: parent
+            visible: !provider.soft
         Rectangle {
             anchors.fill: parent
             anchors.margins: 2
@@ -291,6 +304,282 @@ Scope {
                 font.pixelSize: provider.tokens.fontSmall
                 text: Qt.formatDateTime(clock.date, "HH:mm")
             }
+        }
+        } // Original presentation, retained for every other recipe.
+
+        Item {
+            id: lightPanel
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: capsuleHeight + 8
+            visible: provider.soft
+            readonly property real capsuleHeight: Math.max(28, provider.tokens.fontSmall + 12)
+
+            SoftCapsule {
+                id: leftCapsule
+                objectName: "panelLeft"
+                x: 18; y: 4
+                width: Math.max(80, Math.min(360, workspaceCapsule.x - 30))
+                height: lightPanel.capsuleHeight
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: 4; anchors.rightMargin: 8
+                    spacing: 8
+                    FeedbackButton {
+                        id: lightMenu
+                        objectName: "panelMenu"
+                        width: lightBrand.implicitWidth + 12
+                        height: leftCapsule.height
+                        accessibleLabel: provider.t(qsTr("Ditto 選單"))
+                        onActivated: provider.menuOpen = !provider.menuOpen
+                        Text {
+                            id: lightBrand
+                            anchors.centerIn: parent
+                            text: "Ditto ▾"
+                            color: provider.tokens.foreground
+                            font.pixelSize: provider.tokens.fontSmall
+                            font.bold: true
+                        }
+                    }
+                    Text {
+                        id: lightTitle
+                        objectName: "panelTitle"
+                        width: Math.max(0, parent.width - lightMenu.width - windowCount.width - 16)
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        color: provider.tokens.foreground
+                        font.pixelSize: provider.tokens.fontSmall
+                        text: {
+                            const focused = provider.client ? provider.client.windows.find(item => item.focused) : null;
+                            return focused ? focused.title : provider.t(qsTr("沒有作用中的視窗"));
+                        }
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: text
+                    }
+                    Text {
+                        id: windowCount
+                        height: parent.height
+                        verticalAlignment: Text.AlignVCenter
+                        font.pixelSize: provider.tokens.fontSmall
+                        color: provider.client && provider.client.online ? provider.tokens.foregroundMuted : provider.tokens.warning
+                        text: provider.client && provider.client.online
+                            ? provider.t(qsTr("%1 個視窗")).arg(provider.client.windows.length)
+                            : (provider.client ? provider.client.status : "")
+                    }
+                }
+            }
+
+            SoftCapsule {
+                id: workspaceCapsule
+                objectName: "panelWorkspaces"
+                x: (lightPanel.width - width) / 2; y: 4
+                width: workspaceStrip.implicitWidth + 8
+                height: lightPanel.capsuleHeight
+                Row {
+                    id: workspaceStrip
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Repeater {
+                        model: provider.client ? provider.client.workspaces : []
+                        FeedbackButton {
+                            id: workspaceButton
+                            required property var modelData
+                            objectName: "panelWorkspace_" + modelData.id
+                            width: Math.max(31, workspaceText.implicitWidth + 16)
+                            height: workspaceCapsule.height - 6
+                            interactive: provider.client && provider.client.capabilityAvailable("desktop.workspaces.activate")
+                            accessibleLabel: provider.t(qsTr("工作區 %1")).arg(modelData.name)
+                                + (modelData.active ? provider.t(qsTr("（目前）")) : "")
+                            onActivated: if (interactive) provider.client.activateWorkspace(modelData.id)
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: height / 2
+                                color: workspaceButton.modelData.active ? provider.tokens.accent : "transparent"
+                            }
+                            Text {
+                                id: workspaceText
+                                anchors.centerIn: parent
+                                text: workspaceButton.modelData.name
+                                color: workspaceButton.modelData.active ? provider.tokens.accentForeground : provider.tokens.foreground
+                                font.pixelSize: provider.tokens.fontSmall
+                            }
+                        }
+                    }
+                }
+            }
+
+            SoftCapsule {
+                id: statusCapsule
+                objectName: "panelStatus"
+                x: lightPanel.width - width - 18; y: 4
+                width: Math.max(242, statusStrip.implicitWidth + 16)
+                height: lightPanel.capsuleHeight
+                Row {
+                    id: statusStrip
+                    anchors.centerIn: parent
+                    spacing: 12
+                    StatusButton {
+                        id: lightNetwork
+                        objectName: "panelNetwork"
+                        height: statusCapsule.height - 4
+                        readonly property bool available: Networking.backend !== NetworkBackendType.None
+                        readonly property bool connected: {
+                            const devices = Networking.devices ? Networking.devices.values : [];
+                            return devices.some(device => device.connected);
+                        }
+                        readonly property bool unknown: available && !connected && Networking.connectivity === NetworkConnectivity.Unknown
+                        accessibleLabel: !available ? provider.t(qsTr("網路不可用"))
+                            : unknown ? provider.t(qsTr("網路狀態未知"))
+                            : connected ? provider.t(qsTr("網路已連線")) : provider.t(qsTr("網路未連線"))
+                        iconName: !available ? "network-error-symbolic" : unknown ? "network-idle-symbolic"
+                            : connected ? "network-wireless-signal-excellent-symbolic" : "network-wireless-offline-symbolic"
+                        // A mark still distinguishes unknown/unavailable if a theme aliases icons.
+                        marker: !available ? "!" : unknown ? "?" : ""
+                        onActivated: if (provider.client) provider.client.launchApp("nm-connection-editor")
+                    }
+                    StatusButton {
+                        id: lightVolume
+                        objectName: "panelVolume"
+                        height: statusCapsule.height - 4
+                        readonly property var sink: Pipewire.defaultAudioSink
+                        readonly property bool known: Pipewire.ready && sink !== null && sink.audio !== null
+                        accessibleLabel: !known ? provider.t(qsTr("音量不可用"))
+                            : sink.audio.muted ? provider.t(qsTr("音量 靜音"))
+                            : provider.t(qsTr("音量 %1%")).arg(Math.round(sink.audio.volume * 100))
+                        iconName: !known ? "audio-card-symbolic" : sink.audio.muted ? "audio-volume-muted-symbolic"
+                            : sink.audio.volume === 0 ? "audio-volume-low-symbolic"
+                            : sink.audio.volume < 0.67 ? "audio-volume-medium-symbolic" : "audio-volume-high-symbolic"
+                        marker: !known ? "!" : ""
+                        onActivated: button => {
+                            // Keyboard and right click open details; left click toggles mute.
+                            if (button !== Qt.LeftButton) {
+                                if (provider.client) provider.client.launchApp("pavucontrol");
+                            } else if (known) sink.audio.muted = !sink.audio.muted;
+                        }
+                        onScrolled: delta => {
+                            if (known) sink.audio.volume = Math.max(0, Math.min(1.5, sink.audio.volume + (delta > 0 ? 0.05 : -0.05)));
+                        }
+                    }
+                    Row {
+                        id: lightStatusRow
+                        objectName: "panelStatusItems"
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: provider.tokens.spaceWide
+                        Accessible.role: Accessible.StatusBar
+                        Accessible.name: provider.t(qsTr("狀態列項目"))
+                    }
+                    Text {
+                        objectName: "panelClock"
+                        height: statusCapsule.height - 4
+                        verticalAlignment: Text.AlignVCenter
+                        color: provider.tokens.foreground
+                        font.pixelSize: provider.tokens.fontSmall
+                        text: Qt.formatDateTime(clock.date, "MM/dd HH:mm")
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: text
+                    }
+                }
+            }
+        }
+    }
+
+    component SoftCapsule: Rectangle {
+        radius: height / 2
+        // Only the fill's alpha changes, so text/focus remain fully opaque.
+        color: Qt.rgba(provider.tokens.surface.r, provider.tokens.surface.g, provider.tokens.surface.b,
+                       provider.tokens.reducedTransparency ? 1 : provider.tokens.surface.a * provider.tokens.surfaceOpacity)
+        border.color: provider.tokens.reducedTransparency ? provider.tokens.border : provider.tokens.highlight
+        border.width: 1
+    }
+
+    component FeedbackButton: Item {
+        id: button
+        property string accessibleLabel: ""
+        property bool interactive: true
+        readonly property real feedbackTarget: !visible || !provider.shown ? 1
+            : area.pressed ? 0.90 : area.containsMouse || activeFocus ? 0.96 : 1
+        property real feedbackScale: 1
+        readonly property bool motionRunning: feedback.running
+        readonly property bool motionActive: visible && provider.shown && provider.tokens.motionEnabled
+        default property alias content: visual.data
+        signal activated(int button)
+        signal scrolled(real delta)
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: accessibleLabel
+        Accessible.onPressAction: if (interactive) activated(Qt.NoButton)
+        Keys.onReturnPressed: if (interactive) activated(Qt.NoButton)
+        Keys.onSpacePressed: if (interactive) activated(Qt.NoButton)
+        function retarget() {
+            feedback.stop();
+            if (!motionActive) { feedbackScale = feedbackTarget; return; }
+            feedback.from = feedbackScale; feedback.to = feedbackTarget; feedback.start();
+        }
+        onFeedbackTargetChanged: retarget()
+        onMotionActiveChanged: if (!motionActive) { feedback.stop(); feedbackScale = feedbackTarget; }
+        data: [
+            Item {
+                id: visual
+                anchors.fill: parent
+                scale: button.feedbackScale
+            },
+            NumberAnimation {
+                id: feedback
+                target: button; property: "feedbackScale"
+                duration: 120
+                easing.type: Easing.OutCubic
+            },
+            Rectangle {
+                objectName: button.objectName + "_focus"
+                anchors.fill: parent
+                radius: height / 2
+                color: "transparent"
+                border.color: provider.tokens.focus
+                border.width: 2
+                visible: button.activeFocus
+            },
+            MouseArea {
+                id: area
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: mouse => { if (button.interactive) button.activated(mouse.button); }
+                onWheel: wheel => { if (button.interactive) button.scrolled(wheel.angleDelta.y); }
+            }
+        ]
+    }
+
+    component StatusButton: FeedbackButton {
+        id: statusButton
+        property string iconName: ""
+        property string marker: ""
+        width: statusIcon.status === Image.Ready ? 28 : fallback.implicitWidth + 8
+        Image {
+            id: statusIcon
+            objectName: statusButton.objectName + "Icon"
+            anchors.centerIn: parent
+            width: 16; height: 16
+            source: Quickshell.iconPath(statusButton.iconName, true)
+            sourceSize.width: 16; sourceSize.height: 16
+            visible: status === Image.Ready
+        }
+        Text {
+            anchors.right: parent.right; anchors.top: parent.top
+            visible: statusIcon.visible && statusButton.marker !== ""
+            text: statusButton.marker
+            color: provider.tokens.foreground
+            font.pixelSize: provider.tokens.fontSmall
+            font.bold: true
+        }
+        Text {
+            id: fallback
+            objectName: statusButton.objectName + "Fallback"
+            anchors.centerIn: parent
+            visible: statusIcon.status !== Image.Ready
+            text: statusButton.accessibleLabel
+            color: provider.tokens.foregroundMuted
+            font.pixelSize: provider.tokens.fontSmall
         }
     }
 

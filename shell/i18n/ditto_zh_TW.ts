@@ -2327,6 +2327,14 @@
         <source>（目前）</source>
         <translation>（目前）</translation>
     </message>
+    <message>
+        <source>網路不可用</source>
+        <translation>網路不可用</translation>
+    </message>
+    <message>
+        <source>網路狀態未知</source>
+        <translation>網路狀態未知</translation>
+    </message>
 </context>
 <context>
     <name>PersonalizationCenter</name>

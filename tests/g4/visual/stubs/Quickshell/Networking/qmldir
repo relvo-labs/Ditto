@@ -1,2 +1,4 @@
 module Quickshell.Networking
 singleton Networking 1.0 Networking.qml
+singleton NetworkBackendType 1.0 NetworkBackendType.qml
+singleton NetworkConnectivity 1.0 NetworkConnectivity.qml

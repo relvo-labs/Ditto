@@ -148,6 +148,10 @@ TestCase {
             }
             return true;
         }, 5000, "icons settled");
+        if (panel.soft) {
+            tryVerify(() => ["panelNetworkIcon", "panelVolumeIcon"].every(name =>
+                findChild(layer, name).status !== Image.Loading), 5000, "status icons settled");
+        }
         if (focusApp) {
             findChild(layer, "dockTile_" + focusApp).forceActiveFocus();
         }
@@ -171,10 +175,20 @@ TestCase {
             appearance: appearance, material_shadow_path: findChild(screen, "materialSample_back").children[0].shadowPath,
             motion: { enabled: sceneTokens.motionEnabled, settled: true, dock_reveal: dock.reveal },
             fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null },
-            geometry: { dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
+            panel_presentation: panel.soft ? "light" : "legacy",
+            panel_icons: panel.soft ? ["panelNetwork", "panelVolume"].map(name => {
+                const button = findChild(layer, name);
+                const icon = findChild(layer, name + "Icon");
+                return { name: button.iconName, text: button.Accessible.name, source: String(icon.source),
+                         status: icon.status === Image.Ready ? "ready" : "text-fallback" };
+            }) : [],
+            geometry: Object.assign({ dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
                         panel_window: rect(layer.children.find(item => item.objectName === "stubPanelWindow" && item.visible
                                                                   && item !== capsule.parent && item.y === 0)),
                         sample_back: rect(findChild(screen, "materialSample_back")), sample_front: rect(findChild(screen, "materialSample_front")) },
+                        panel.soft ? { workspace_capsule: rect(findChild(layer, "panelWorkspaces")),
+                                       status_capsule: rect(findChild(layer, "panelStatus")),
+                                       menu_title_capsule: rect(findChild(layer, "panelLeft")) } : {}),
             dock_icons: icons, wallpaper_shown: backdrop.wallpaperShown,
             dock_presentation: dock.soft ? "light" : "legacy",
             dock_input_region: { item: rect(region.item), radius: region.radius,
