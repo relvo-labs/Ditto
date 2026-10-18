@@ -15,6 +15,11 @@ QtObject {
     required property var client
 
     // ---- what Core says -------------------------------------------------------------
+    /// `settings` and `provider` hold only readback confirmed on the current
+    /// connection; null is the one meaning of "not confirmed" for every
+    /// status, text and control. A lost connection or a failed settings read
+    /// clears both, a failed provider read clears `provider`. A re-read on the
+    /// same connection keeps the confirmed value until it answers.
     property var settings: null
     property var provider: null
     property var runtime: null
@@ -248,11 +253,16 @@ QtObject {
         settingsFailed = false;
         client.capability("agent.settings.describe", {}, function (result) {
             settings = result;
+            settingsFailed = false;
             if (settings.enabled) {
                 refreshProvider();
                 loadSession();
             }
         }, function (error) {
+            // Unconfirmed settings: the provider status under them is not
+            // shown as confirmed either (it is read again after settings).
+            settings = null;
+            provider = null;
             settingsFailed = true;
             setError(error);
         });
@@ -269,6 +279,7 @@ QtObject {
         refreshRuntime();
         client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
             provider = result;
+            providerFailed = false;
             if (result.authenticated) {
                 login = null;
             }
@@ -690,6 +701,9 @@ QtObject {
         function onDisconnected() {
             state.reconnecting = state.wanted;
             state.subscriptionId = "";
+            // Readback from the lost connection is not confirmed any more.
+            state.settings = null;
+            state.provider = null;
         }
         function onOnlineChanged() {
             if (state.client.online && state.wanted && state.subscriptionId.length === 0) {

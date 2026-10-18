@@ -110,6 +110,25 @@ TestCase {
         verify(page !== null);
         return page;
     }
+    /// With settings unconfirmed the model line must not read as 尚未連線.
+    function providerDeferred(page) {
+        const line = named(page, "aiProviderStatus");
+        verify(line, "no provider status line");
+        if (!line.visible) return;
+        verify(line.text.indexOf("尚未連線") < 0, "unconfirmed settings shown as disconnected: " + line.text);
+        verify(line.text.indexOf("讀取 AI 設定後") >= 0, line.text);
+    }
+    /// The two ways a read happens again: the surface is opened again, or
+    /// the connection to Core drops and comes back.
+    function reread(kind) {
+        if (kind === "reopen") {
+            conversation.open();
+        } else {
+            client.online = false;
+            client.disconnected();
+            client.online = true;
+        }
+    }
     function report() {
         verify(typeof conversation.chatStatus === "function", "chatStatus() missing");
         return conversation.chatStatus();
@@ -131,6 +150,7 @@ TestCase {
         verify(status.text.indexOf("正在讀取") >= 0, status.text);
         compare(status.Accessible.name, status.text);
         verify(!named(page, "aiSettingsRetry").visible);
+        providerDeferred(page);
         compare(conversation.aiStatus, "pending");
         const r = report();
         compare(r.state, null);
@@ -173,6 +193,7 @@ TestCase {
         const status = named(page, "aiSettingsStatus");
         verify(status && status.visible, "no failure text");
         verify(status.text.indexOf("無法讀取 AI 設定") >= 0, status.text);
+        providerDeferred(page);
         const retry = named(page, "aiSettingsRetry");
         verify(retry && retry.visible);
         answer({ "agent.settings.describe": { ok: settingsOff } });
@@ -220,6 +241,120 @@ TestCase {
             compare(count("agent.providers.status"), 0); // off: the model is not contacted
         }
         compare(entry.Accessible.description, conversation.stateText);
+        readsOnly();
+    }
+
+    /// F1: a read that fails after an earlier success is not confirmed by
+    /// that earlier success — not ready, not off — until a read succeeds.
+    function test_settings_lifecycle_data() {
+        const rows = [];
+        for (const kind of ["reopen", "reconnect"]) {
+            for (const on of [true, false]) rows.push({ tag: kind + (on ? "-on" : "-off"), kind: kind, on: on });
+        }
+        return rows;
+    }
+    function test_settings_lifecycle(data) {
+        const confirmed = { "agent.settings.describe": { ok: data.on ? settingsOn : settingsOff },
+                            "agent.providers.status": { ok: ready } };
+        answer(confirmed);
+        conversation.open();
+        const page = settingsPage();
+        const toggle = toggleOf(page);
+        const status = named(page, "aiSettingsStatus");
+        compare(conversation.aiStatus, data.on ? "ready" : "disabled");
+        verify(toggle.visible && toggle.enabled);
+
+        answer({ "agent.settings.describe": { fail: error("internal") }, "agent.providers.status": { ok: ready } });
+        reread(data.kind);
+        compare(conversation.aiStatus, "failed");
+        verify(conversation.stateText.indexOf("無法讀取 AI 設定") >= 0, conversation.stateText);
+        compare(entry.Accessible.description, conversation.stateText);
+        compare(conversation.enabled, false); // fail-closed controls
+        let r = report();
+        compare(r.state, null);
+        compare(r.ai_status, "failed");
+        compare(r.enabled, null);
+        compare(r.text, conversation.stateText);
+        verify(!(toggle.visible && toggle.enabled), "cached switch still usable after a failed read");
+        verify(!toggle.visible, "cached switch still shown after a failed read");
+        verify(status.visible && status.text.indexOf("無法讀取 AI 設定") >= 0, status.text);
+        verify(named(page, "aiSettingsRetry").visible);
+        providerDeferred(page);
+
+        answer(confirmed);
+        reread(data.kind);
+        compare(conversation.aiStatus, data.on ? "ready" : "disabled");
+        r = report();
+        compare(r.state, data.on ? "idle" : "offline");
+        compare(r.enabled, data.on);
+        verify(toggle.visible && toggle.enabled);
+        compare(toggle.checked, data.on);
+        verify(!status.visible);
+        compare(entry.Accessible.description, conversation.stateText);
+        readsOnly();
+    }
+
+    function test_provider_lifecycle_data() {
+        return [{ tag: "reopen", kind: "reopen" }, { tag: "reconnect", kind: "reconnect" }];
+    }
+    function test_provider_lifecycle(data) {
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
+        conversation.open();
+        const page = settingsPage();
+        const line = named(page, "aiProviderStatus");
+        compare(conversation.aiStatus, "ready");
+
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { fail: error("internal") } });
+        reread(data.kind);
+        compare(conversation.aiStatus, "failed");
+        verify(conversation.stateText.indexOf("無法確認模型連線") >= 0, conversation.stateText);
+        compare(entry.Accessible.description, conversation.stateText);
+        let r = report();
+        compare(r.state, null);
+        compare(r.connected, null);
+        compare(r.enabled, true);
+        verify(line.text.indexOf("無法讀取模型連線狀態") >= 0, line.text);
+        verify(named(page, "aiProviderRetry").visible);
+        verify(toggleOf(page).visible && toggleOf(page).checked); // settings were confirmed
+
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
+        reread(data.kind);
+        compare(conversation.aiStatus, "ready");
+        r = report();
+        compare(r.state, "idle");
+        compare(r.connected, true);
+        verify(!named(page, "aiProviderRetry").visible);
+        readsOnly();
+    }
+
+    /// After the connection to Core dropped, nothing read before counts:
+    /// while the new reads are out the status is pending, not the old value.
+    function test_reconnect_pending_is_not_stale() {
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
+        conversation.open();
+        compare(conversation.aiStatus, "ready");
+        answer({});
+        reread("reconnect");
+        compare(count("agent.settings.describe"), 2);
+        compare(conversation.aiStatus, "pending");
+        compare(conversation.stateText, "待命中");
+        compare(report().state, null);
+        compare(report().enabled, null);
+        compare(report().connected, null);
+    }
+
+    /// Reopening on the same live connection keeps what this connection
+    /// confirmed until the new read answers, so a running turn does not
+    /// flash offline (legacy avatar and entry unchanged). A failure clears it.
+    function test_reopen_keeps_confirmed_until_answer() {
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
+        conversation.open();
+        conversation.turn = { turn_id: "fixture-turn", state: "running" };
+        compare(conversation.taskState, "thinking");
+        answer({});
+        reread("reopen");
+        compare(conversation.taskState, "thinking");
+        compare(conversation.aiStatus, "ready");
         readsOnly();
     }
 

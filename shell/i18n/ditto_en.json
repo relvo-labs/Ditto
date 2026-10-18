@@ -430,6 +430,7 @@
   "語言": "Language",
   "請先輸入名稱": "Enter a name first",
   "請求的權限：%1": "Requested permissions: %1",
+  "讀取 AI 設定後才能確認模型連線。": "The model connection can be confirmed once AI settings are read.",
   "讀取待辦事項": "Read your tasks",
   "讀取通知內容": "Read your notifications",
   "變更": "Change",

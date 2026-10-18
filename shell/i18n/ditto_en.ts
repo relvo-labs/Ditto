@@ -136,6 +136,10 @@
         <translation>Ask me</translation>
     </message>
     <message>
+        <source>讀取 AI 設定後才能確認模型連線。</source>
+        <translation>The model connection can be confirmed once AI settings are read.</translation>
+    </message>
+    <message>
         <source>連接方式</source>
         <translation>Connection</translation>
     </message>

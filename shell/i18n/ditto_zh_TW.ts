@@ -136,6 +136,10 @@
         <translation>詢問我</translation>
     </message>
     <message>
+        <source>讀取 AI 設定後才能確認模型連線。</source>
+        <translation>讀取 AI 設定後才能確認模型連線。</translation>
+    </message>
+    <message>
         <source>連接方式</source>
         <translation>連接方式</translation>
     </message>
