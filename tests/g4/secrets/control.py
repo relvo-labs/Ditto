@@ -2,6 +2,7 @@
 """Scanner-only CLI controls; these are never product-flow evidence."""
 import argparse
 import base64
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -16,7 +17,7 @@ args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=False)
 product = args.output / "fixture"
 product.mkdir()
-with sqlite3.connect(product / "store.sqlite") as db:
+with closing(sqlite3.connect(product / "store.sqlite")) as db, db:
     db.execute("CREATE TABLE settings (credential_ref TEXT)")
     db.execute("INSERT INTO settings VALUES ('cred-test-reference')")
 (product / "log.json").write_text('{"credential_ref":"cred-test-reference"}')

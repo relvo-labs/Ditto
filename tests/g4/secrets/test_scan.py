@@ -35,7 +35,7 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(report["hits"][0]["source"], str(log))
 
     def test_utf16_sqlite_content_is_decoded(self):
-        with sqlite3.connect(self.root / "store.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "store.sqlite")) as db, db:
             db.execute("PRAGMA encoding='UTF-16'")
             db.execute("CREATE TABLE secrets (value TEXT)")
             db.execute("INSERT INTO secrets VALUES (?)", [self.sentinels["key"]])

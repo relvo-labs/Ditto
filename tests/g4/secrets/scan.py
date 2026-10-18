@@ -2,6 +2,7 @@
 """Synthetic sentinel and shared nonce scan. No third-party modules, no network."""
 import argparse
 import base64
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -80,7 +81,7 @@ def scan(roots, sentinels, nonce=None):
                 inspect(data, str(path))  # Includes WAL, freelist and deleted pages.
                 if data.startswith(b"SQLite format 3\0"):
                     # SQL values as well as bytes: SQLite UTF-16 text is not UTF-8.
-                    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as db:
+                    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
                         for index, row in enumerate(db.iterdump()):
                             inspect(row.encode(), f"{path}#sql:{index}")
                     result["sqlite_databases"].append(str(path))
