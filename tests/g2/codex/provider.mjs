@@ -23,7 +23,11 @@ const provider=await startProvider(body=>{
     // Deleting a Profile cannot be undone: Core asks the person each time.
     if(!outputs.has('list-profiles'))return [call('desktop__profiles__list',{},'list-profiles')]
     if(!outputs.has('delete-profile')){
-      const spare=JSON.parse(outputs.get('list-profiles')).profiles.find(p=>!p.active)
+      // The request names the Profile in 「」 (#91): first login has three,
+      // so "the other one" would be a guess. No named, inactive match: no call.
+      const named=[...userText(body).matchAll(/「([^」]+)」/g)].at(-1)?.[1]
+      const spare=JSON.parse(outputs.get('list-profiles')).profiles.find(p=>!p.active&&p.name===named)
+      if(!spare)return [say('找不到要刪除的設定檔。')]
       return [call('desktop__profiles__delete',{profile_id:spare.profile_id},'delete-profile')]
     }
     return [say(outputs.get('delete-profile').includes('"error"')?'設定檔沒有刪除。':'已刪除設定檔。')]
