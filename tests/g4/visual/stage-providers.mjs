@@ -18,6 +18,7 @@ mkdirSync(out, { recursive: true });
 
 const providers = [
   'shell/providers/dock_pill/qml/DockPill.qml',
+  'shell/providers/dock_bottom/qml/DockBottom.qml',
   'shell/providers/panel_top/qml/PanelTop.qml',
   'shell/providers/launcher_grid/qml/LauncherGrid.qml',
   'shell/providers/launcher_search/qml/LauncherSearch.qml',

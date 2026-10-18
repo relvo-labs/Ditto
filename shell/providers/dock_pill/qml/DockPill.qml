@@ -54,7 +54,7 @@ Scope {
         reveal = 1;
     }
     // Focus confirmation belongs to the provider's observation lifetime, not
-    // the array-model delegates (which rebuild on any window upsert).
+    // the tiles, whose lifetime follows pinned app / window identity.
     readonly property string focusedWindowId: {
         const window = client ? client.windows.find(item => item.focused === true) : null;
         return window ? window.id : "";
@@ -203,6 +203,34 @@ Scope {
         return list;
     }
 
+    // A JS-array model resets every delegate on each projection. Keep the
+    // projection above for lookup, but reconcile the presentation by identity.
+    // Namespaces distinguish a pinned app from an unpinned window of that app.
+    ListModel { id: tileModel; dynamicRoles: true }
+    function syncTiles() {
+        if (!ready) return;
+        const next = entries.map(entry => ({
+            key: entry.pinned ? "app:" + entry.appId : "window:" + entry.window.id,
+            entryData: entry
+        }));
+        for (let i = tileModel.count - 1; i >= 0; --i) {
+            if (!next.some(row => row.key === tileModel.get(i).key)) tileModel.remove(i);
+        }
+        for (let i = 0; i < next.length; ++i) {
+            let found = i;
+            while (found < tileModel.count && tileModel.get(found).key !== next[i].key) ++found;
+            if (found === tileModel.count) {
+                tileModel.insert(i, next[i]);
+            } else {
+                if (found !== i) tileModel.move(found, i, 1);
+                // Avoid role notifications for unchanged data (e.g. app reload).
+                if (JSON.stringify(tileModel.get(i).entryData) !== JSON.stringify(next[i].entryData))
+                    tileModel.setProperty(i, "entryData", next[i].entryData);
+            }
+        }
+    }
+    onEntriesChanged: syncTiles()
+
     function activate(entry) {
         if (entry.window) {
             client.focusWindow(entry.window.id);
@@ -244,7 +272,7 @@ Scope {
         // never starts) the presentation, even on an immediate reverse.
         if (shown && soft && tokens.motionEnabled) revealAnimation.start();
     }
-    Component.onCompleted: { ready = true; observeFocus(); }
+    Component.onCompleted: { ready = true; syncTiles(); observeFocus(); }
 
     PanelWindow {
         id: dock
@@ -365,11 +393,12 @@ Scope {
             horizontalItemAlignment: provider.soft ? Grid.AlignHCenter : Grid.AlignLeft
 
             Repeater {
-                model: provider.entries
+                model: tileModel
 
                 Item {
                     id: tile
-                    required property var modelData
+                    required property var entryData
+                    readonly property var modelData: entryData
                     required property int index
                     readonly property bool running: !!modelData.window
                     readonly property bool current: running && modelData.window.focused === true
