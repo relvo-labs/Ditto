@@ -1,6 +1,8 @@
 import QtQuick
 import QtTest
 import Quickshell
+import Quickshell.Services.Pipewire
+import Quickshell.Networking
 import DittoStub
 import "../../../../shell/jelly" as Jelly
 import "../.staged/capture-data.js" as Data
@@ -79,6 +81,9 @@ TestCase {
         id: sceneTokens
         appearance: ({ theme: "soft-jelly-light", tokens: {}, locale: "zh-TW" })
     }
+    QtObject { id: fixtureAudio; property bool muted: false; property real volume: 0.5 }
+    QtObject { id: fixtureSink; property var audio: fixtureAudio }
+    property bool statusFixture: false
 
     QtObject {
         id: client
@@ -174,12 +179,14 @@ TestCase {
             renderer: screen.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "hardware(" + screen.GraphicsInfo.api + ")",
             appearance: appearance, material_shadow_path: findChild(screen, "materialSample_back").children[0].shadowPath,
             motion: { enabled: sceneTokens.motionEnabled, settled: true, dock_reveal: dock.reveal },
-            fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null },
+            fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null,
+                       system_status: statusFixture ? { muted: fixtureAudio.muted, network_connectivity: Networking.connectivity } : null },
             panel_presentation: panel.soft ? "light" : "legacy",
             panel_icons: panel.soft ? ["panelNetwork", "panelVolume"].map(name => {
                 const button = findChild(layer, name);
                 const icon = findChild(layer, name + "Icon");
                 return { name: button.iconName, text: button.Accessible.name, source: String(icon.source),
+                         tint: String(icon.color), marker: button.marker, glyph: rect(icon),
                          status: icon.status === Image.Ready ? "ready" : "text-fallback" };
             }) : [],
             geometry: Object.assign({ dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
@@ -234,6 +241,29 @@ TestCase {
     function test_6_no_theme() {
         render("legacy-no-theme", { tokens: {}, locale: "zh-TW" },
                [{ id: "fixture-legacy", app_id: Data.pinned[0], title: "fixture", focused: true }], null);
+    }
+
+    // Explicit service fixtures for contrast/state inspection; the six
+    // original scenes above continue to reflect unavailable local services.
+    function test_7_panel_statuses() {
+        statusFixture = true;
+        Pipewire.ready = true; Pipewire.defaultAudioSink = fixtureSink;
+        fixtureAudio.muted = true;
+        Networking.backend = NetworkBackendType.NetworkManager;
+        Networking.connectivity = NetworkConnectivity.Full;
+        Networking.devices = { values: [{ connected: true }] };
+        render("panel-muted-connected", light(), [], null);
+        fixtureAudio.muted = false;
+        Networking.connectivity = NetworkConnectivity.Unknown;
+        Networking.devices = { values: [] };
+        render("panel-unknown", light(), [], null);
+        Networking.connectivity = NetworkConnectivity.None;
+        render("panel-offline", light(), [], null);
+        statusFixture = false;
+        Pipewire.ready = false; Pipewire.defaultAudioSink = null;
+        Networking.backend = NetworkBackendType.None;
+        Networking.connectivity = NetworkConnectivity.Unknown;
+        Networking.devices = null;
     }
 
     function initTestCase() {

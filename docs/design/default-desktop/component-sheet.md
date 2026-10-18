@@ -128,7 +128,7 @@
 - **H3 Dock 綁定（#45）**：R3 依 D-48 已把新「預設」文件改綁已安裝的 `ditto.dock.pill`，缺套件時保留原供應者；agent 依 #71 交接實作，owner 可反悔。釘選清單沿用已註冊供應者設定（不捏造應用）；既有 store 與「簡報」不變。
 - **H4 內建套件版本（#50）**：`ditto.dock.pill` 內容改了，但版本仍是 `1.1.0`。G1／G2 測試與語意任務集逐字引用 `1.1.0`。已有 store 的機器在 seed 時會記 `boot.builtin_refused`（同版本不同內容），保留舊內容，只有新 store 會拿到新 Dock。升版與升級路徑屬內建套件升版工作。
 - **H5 `on_accent` 既有缺陷**：`Tokens.qml` 的 `onAccent` 屬性名稱以 `on`＋大寫開頭，被 QML 當成訊號處理器名稱，綁定沒有生效。實際值一律是 `#000000`，Profile 的 `on_accent` 覆寫也無效；`main` 上同樣如此。黑字在兩種 accent 上都達 AA。修正需要改名或另設 token，會影響所有呼叫端，本 PR 不動。
-- **H6 頂部 slice（本次交付）**：沿用 `ditto.panel.top`，由 `tokens.lightRecipe === true` 選浮動呈現，其他主題不變；不需要新 token、供應者或預設綁定。工作區的滑鼠／Enter／Space／Accessible action 共用既有 capability 判斷；音量靜音／滾輪／右鍵設定、網路設定、選單四中心與電源、標題、時鐘和 `statusRegion` 均保留。輸入區為三個圓角膠囊的 Region 聯集，陰影／透明間隙不攔截；高度 28＋上下各 4 px，`exclusiveZone=36`，大字隨字級增加。hover／focus 0.96、press 0.90，120 ms OutCubic；命中與焦點框不縮放，reduced-motion／low-power／隱藏立即 settle。`ditto.panel.top` manifest 仍為 `1.1.0`；升版與已有 store 的同版不同內容處理交 #50（同 H4），本次沒有改版本。
+- **H6 頂部 slice（本次交付）**：沿用 `ditto.panel.top`，由 `tokens.lightRecipe === true` 選浮動呈現，其他主題不變；不需要新 token、供應者或預設綁定。工作區的滑鼠／Enter／Space／Accessible action 共用既有 capability 判斷；音量靜音／滾輪／右鍵設定、網路設定、選單四中心與電源、標題、時鐘和 `statusRegion` 均保留。輸入區為三個圓角膠囊的 Region 聯集，陰影／透明間隙不攔截；預設高度 28＋上下各 4 px，`exclusiveZone=36`；大字及窄寬度換行時，以最高膠囊＋8 px 更新保留高度（Repair 1，§6.3）。hover／focus 0.96、press 0.90，120 ms OutCubic；命中與焦點框不縮放，reduced-motion／low-power／隱藏立即 settle。`ditto.panel.top` manifest 仍為 `1.1.0`；升版與已有 store 的同版不同內容處理交 #50（同 H4），本次沒有改版本。
 - **H7 一致性**：管理中心、對話、試看列、通知、啟動器改用 `Material` 或同一組亮邊與陰影，需要逐一確認焦點與可讀性（#47）。
 - **H8 硬體驗證（#52／#53／R4）**：`effect` 路徑的畫面、幀時（NFR-05），以及正常／降低透明度／低效能三種模式的 A/B，都要在實體參考機量測。本機只有 software renderer，未執行。
 - **H9 圖示解析**：產品端用 `Quickshell.iconPath(name, true)`。harness 用 `capture/prepare.py` 模擬主題查找；實機選到的檔案可能不同，參考機要重驗。
@@ -140,7 +140,7 @@
 1. 把 `dock_pill`、`panel_top` 複製到 `.staged/`。只移除 layer-shell 的三行，逐行記在 `staging.json`。
 2. 跑 qmltestrunner 單元測試。
 3. 讀本機的 desktop entry 與圖示主題。
-4. 以 1280×800、scale 1 渲染六張桌面圖：normal、reduced-transparency、low-power、dock-states（淺色），以及 legacy-soft-jelly、legacy-no-theme（舊版主題）；同目錄的既有控制項／助理場景亦執行。`run.sh` 先準備助理 staging，乾淨 checkout 不依賴另一 runner 的快取。
+4. 以 1280×800、scale 1 渲染六張既有桌面圖：normal、reduced-transparency、low-power、dock-states（淺色），以及 legacy-soft-jelly、legacy-no-theme（舊版主題）；另加三張明確標示服務 fixture 的頂部狀態圖：panel-muted-connected、panel-unknown、panel-offline；同目錄的既有控制項／助理場景亦執行。`run.sh` 先準備助理 staging，乾淨 checkout 不依賴另一 runner 的快取。
 5. 產出 side-by-side、50/50 疊圖（標出元件框）與逐元件取樣 `comparison.json`。
 
 標明的測試資料：四個工作區（第一個作用中）、釘選清單、dock-states 圖中的兩筆視窗記錄。時鐘是執行當下的真實時間。#65 的六個桌面場景不畫桌布、標題、天氣或助理；#67 的獨立助理場景與限制見下節。PNG 只放證據目錄，不進 git。
@@ -156,6 +156,29 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 基底 `b434c93b7b739c053aabe70352aef211e7a4c268`；分支 `hermes/g4-65-topbar`。證據在 repo 外 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/`，`manifest.json` 綁定 source hashes、commit、指令與結果；`visual/comparison.json` 記錄逐膠囊幾何及實際圖示來源，normal／reduced-transparency／low-power 幾何相同。離線 harness 沒有音訊／網路服務，所以 capture 顯示真實「不可用」文字與圖示，連線／靜音等由明確 fixture 的 QtTest 驗證。
 
 `unit/tst_panel.qml` 檢查幾何、Region 聯集與圓角／透明間隙、三種模式／2× 字級、狀態圖示與文字 fallback（含 Image.Error）、滑鼠／Enter／Space capability guard、Tab／Backtab、音量操作、狀態項掛載、選單與縮放生命週期，以及三種 legacy 主題的基底像素（含已掛載狀態項）。`statusRegion` 維持同一個 Row，切主題只移動它的呈現容器，既有狀態項不需宿主重新掛載；切換測試的 RED 見 `red/status-region.log`。RED 在 `red/panel.log`；選單縮放另有真實值 RED（1，預期 0.96）在 `red/menu-scale.log`。完整 gates、環境限制與通過數見證據索引；這些都是 **development**，不證明 Wayfire 真實 input region／work-area／焦點、Orca、IME、NFR 或 owner 忠實視覺接受。
+
+## 6.3 PR #101 Repair 1（F1／F2／F3／F4／F8）
+
+修復基底 `9f5875578f955d4113106cb54d273f669fee88ac`，證據在 `/data/hermes/ditto-runs/g4-impl/topbar/evidence/repair1/`。這是開發機 offscreen/software 證據；原有實機／NFR 限制不變。
+
+- **F1 佈局**：三膠囊保留左右各 18 px、相鄰 12 px 間隙。先縮短並省略左側視窗標題，再放寬右側 242 px 留白；必要時左側只剩選單，選單 tooltip／Accessible description 仍提供完整標題與視窗數／離線文字。工作區位置夾限於兩側膠囊之間，能在螢幕中心放下時仍真正置中。極端組合的單列內容總寬超過畫面，工作區 Grid 及狀態 Grid 換行，所有入口仍可見；沒有裁掉操作或縮小文字。`exclusiveZone` 跟隨最高膠囊＋8 px，避免遮窗。圓角取整且不超過短邊一半，Region 與可見表面一致。1280、字級 1、四工作區、無外掛狀態項時，原 `(568,4) 144×28`／`(1020,4) 242×28` **不變**。
+- **F2 圖示**：改為 18×18、`tokens.foreground`（本 recipe `#211e35`）遮罩，局部 Canvas 僅在來源／尺寸／色彩改變時重畫，不逐幀處理。還原 symbolic SVG 內建 50% 透明度的圖形本體，保留邊緣覆蓋率；software／低效能不用 shader。靜音增加 `∕`，不可用 `!`、未知 `?`，並保留各狀態名稱和 hover／focus tooltip；缺圖繼續退文字。
+- **F3／F4**：淺色選單 x=18，legacy 仍 x=8。capability 不可用時工作區 Item disabled，退出 Tab 路徑，立即停止 hover／press 縮放並回 1；啟用後仍為 0.96／0.90、120 ms OutCubic。
+- **F8 測試**：`tst_panel.qml` 的 144 組矩陣涵蓋寬 1280／1024／800／640 × 字級 1／1.5／2 × 4／9／10 工作區 × 圖示有／無 × 0／2 狀態項，斷言膠囊與 Region 不重疊、內容不溢出、保留高度及預設幾何。另有 12 組 legacy（無主題／soft-jelly／其他 × 1／2 字級 × 1280／800）：固定同一取樣時鐘，逐像素比較選單開啟、鍵盤焦點、hover，並比對 Tab、34／隱藏 0 exclusive zone、無 mask、status region 位置與 Enter／點擊工作區啟用。
+
+實際 PNG 的 WCAG sRGB 對比（`status-contrast.json`）：
+
+| 場景／圖形 | 實際核心色／鄰近膠囊色 | 對比 |
+| --- | --- | --- |
+| normal／low-power、不可用圖示 | `#211e35`／`#f7f6fe` | 15.03:1 |
+| reduced-transparency、不可用圖示 | `#211e35`／`#fbfaff` | 15.53:1 |
+| panel-muted-connected、Yaru 靜音喇叭（原 SVG opacity=.5） | `#211e35`／`#f7f6fe` | 15.03:1 |
+| panel-unknown、Yaru 未知網路 | `#211e35`／`#f7f6fe` | 15.03:1 |
+| panel-offline、Yaru 未連線細線圖形 | `#29263c`／`#f7f6fe` | 13.62:1 |
+
+量測比較的是實際圖形核心與相鄰平坦膠囊像素；反鋸齒輪廓邊緣不作核心最低值，細線圖形可能只有部分覆蓋。這不是宣稱每一個邊緣像素都 ≥4.5:1。QtTest 另用明確 50% opacity SVG，斷言中心最後畫成不透明 `foreground`；不是只檢查 tint 屬性。
+
+`red/panel.log` 在 9f58755 上得到 42 pass／107 fail，包含重疊／溢出、disabled press=0.90、16 px 圖示與選單 x=8 的真實 RED。normal 新舊／原圖對照、最終 source hashes、HEAD、gates 及全部原始紀錄由 `repair1/manifest.json` 索引。F5 音量鍵盤靜音、F6 有線圖示、F7 時鐘 locale／星期依本輪範圍留 follow-up。`ditto.panel.top` manifest 仍為 `1.1.0`，升版交 #50。
 
 ## 7. R3 助理呈現與開發證據（#67）
 

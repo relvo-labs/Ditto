@@ -551,7 +551,7 @@ Scope {
         Accessible.role: Accessible.Button
         Accessible.name: accessibleLabel
         Accessible.description: tooltipText
-        Controls.ToolTip.visible: tooltipText !== "" && interactive && (area.containsMouse || activeFocus)
+        Controls.ToolTip.visible: provider.shown && button.visible && tooltipText !== "" && interactive && (area.containsMouse || activeFocus)
         Controls.ToolTip.text: tooltipText
         Controls.ToolTip.delay: 600
         Accessible.onPressAction: if (interactive) activated(Qt.NoButton)

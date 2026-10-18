@@ -106,6 +106,7 @@ TestCase {
         const volume = item("panelVolume"); const network = item("panelNetwork");
         compare(volume.Accessible.name, "音量不可用");
         compare(network.Accessible.name, "網路不可用");
+        compare(network.marker, "!");
         verify(item("panelVolumeFallback").visible);
         const unavailable = volume.iconName;
         Pipewire.ready = true; Pipewire.defaultAudioSink = sink;
@@ -116,6 +117,7 @@ TestCase {
         compare(volume.iconName, "audio-volume-muted-symbolic");
         Networking.backend = NetworkBackendType.NetworkManager;
         compare(network.Accessible.name, "網路狀態未知");
+        compare(network.marker, "?");
         const unknown = network.iconName;
         Networking.connectivity = NetworkConnectivity.None;
         Networking.devices = { values: [{ connected: false }] };
