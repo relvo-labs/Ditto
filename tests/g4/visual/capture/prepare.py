@@ -155,13 +155,23 @@ def main():
             icon_map[name] = "file://" + resolved
         status_sources.append({"icon_name": name, "icon_file": resolved,
                                "icon_sha256": sha256(resolved) if resolved else None})
+    # Pin the N1 regression to real installed Yaru SVGs even when the active
+    # desktop theme differs. These are test inputs, not bundled product icons.
+    yaru_map, yaru_sources = {}, []
+    for name in status_names:
+        resolved = resolve_icon(name, ["Yaru"])
+        if resolved:
+            yaru_map[name] = "file://" + resolved
+        yaru_sources.append({"icon_name": name, "icon_file": resolved,
+                             "icon_sha256": sha256(resolved) if resolved else None})
     with open(os.path.join(STAGED, "capture-data.js"), "w", encoding="utf-8") as out:
         out.write(".pragma library\n")
         out.write("var apps = " + json.dumps(apps, ensure_ascii=False) + ";\n")
         out.write("var iconMap = " + json.dumps(icon_map) + ";\n")
+        out.write("var yaruIconMap = " + json.dumps(yaru_map) + ";\n")
         out.write("var pinned = " + json.dumps(pinned) + ";\n")
     with open(os.path.join(STAGED, "capture-sources.json"), "w", encoding="utf-8") as out:
-        json.dump({"icon_theme": theme, "theme_chain": chain, "roles": sources, "status_icons": status_sources}, out, ensure_ascii=False, indent=2)
+        json.dump({"icon_theme": theme, "theme_chain": chain, "roles": sources, "status_icons": status_sources, "yaru_test_icons": yaru_sources}, out, ensure_ascii=False, indent=2)
         out.write("\n")
     for source in sources:
         if source["installed"]:

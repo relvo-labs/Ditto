@@ -602,6 +602,7 @@ Scope {
         property string iconName: ""
         property string marker: ""
         tooltipText: accessibleLabel
+        Accessible.description: ""
         width: statusIcon.status === Image.Ready ? 28 : fallback.implicitWidth + 8
         SymbolicIcon {
             id: statusIcon
@@ -634,13 +635,14 @@ Scope {
 
     // Paint only when source/colour/size changes (18×18 at the default
     // recipe). This CPU alpha mask also works without shaders. Symbolic SVGs
-    // may embed 50% opacity in their state glyph: restore that body to opaque
-    // while keeping fractional coverage on antialiased edges. No source RGB
-    // or state opacity reaches the final foreground-coloured glyph.
+    // encode levels in their alpha, so retain it (including antialiasing).
+    // Neutral shapes use foreground; red error accents use the semantic
+    // danger colour instead of losing their secondary colour cue.
     component SymbolicIcon: Item {
         id: glyph
         property alias source: sourceImage.source
         property color color: provider.tokens.foreground
+        property color errorColor: provider.tokens.danger
         readonly property int status: sourceImage.status !== Image.Ready ? sourceImage.status
             : paint.loaded && painted ? Image.Ready : Image.Loading
         property bool painted: false
@@ -658,6 +660,7 @@ Scope {
         onSourceChanged: loadSource()
         Component.onCompleted: loadSource()
         onColorChanged: paint.requestPaint()
+        onErrorColorChanged: paint.requestPaint()
         Image { id: sourceImage; visible: false; sourceSize.width: glyph.width; sourceSize.height: glyph.height }
         Canvas {
             id: paint
@@ -673,12 +676,15 @@ Scope {
                 ctx.drawImage(glyph.source, 0, 0, width, height);
                 const pixels = ctx.getImageData(0, 0, width, height);
                 ctx.clearRect(0, 0, width, height);
-                ctx.fillStyle = glyph.color;
                 for (let y = 0; y < height; ++y) {
                     for (let x = 0; x < width; ++x) {
-                        const alpha = pixels.data[(y * width + x) * 4 + 3];
+                        const offset = (y * width + x) * 4;
+                        const alpha = pixels.data[offset + 3];
                         if (alpha === 0) continue;
-                        ctx.globalAlpha = Math.min(1, alpha / 127);
+                        const red = pixels.data[offset];
+                        const isError = red > pixels.data[offset + 1] * 1.5 && red > pixels.data[offset + 2] * 1.25;
+                        ctx.fillStyle = isError ? glyph.errorColor : glyph.color;
+                        ctx.globalAlpha = alpha / 255;
                         ctx.fillRect(x, y, 1, 1);
                     }
                 }

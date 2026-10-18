@@ -5,6 +5,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Networking
 import DittoStub
 import "../../../../shell/jelly" as Jelly
+import "../.staged/capture-data.js" as Theme
 
 // Actual provider; layer-shell, system services and Core are fixtures.
 TestCase {
@@ -350,7 +351,13 @@ TestCase {
         const pixels = grabImage(desktop);
         const pos = icon.mapToItem(desktop, 9, 9);
         const centre = pixels.pixel(Math.round(pos.x), Math.round(pos.y));
-        compare(centre, tokens.foreground, "embedded 50% SVG opacity becomes an opaque foreground mask");
+        const capsule = item("panelStatus");
+        const surface = pixels.pixel(capsule.x + 20, capsule.y + capsule.height / 2);
+        verify(contrast(centre, surface) >= 3, "50% graphics retain >=3:1 contrast");
+        const alpha = 127 / 255;
+        for (const channel of ["r", "g", "b"])
+            fuzzyCompare(centre[channel], tokens.foreground[channel] * alpha + surface[channel] * (1 - alpha), 1.1 / 255,
+                         "source 50% alpha is preserved: " + channel);
     }
     function test_light_menu_alignment() {
         const p = mount();
@@ -423,5 +430,75 @@ TestCase {
         compare(after.calls, before.calls);
         for (let i = 0; i < before.pixels.length; ++i)
             verify(before.pixels[i].equals(after.pixels[i]), "legacy focus/menu/hover pixels match phase " + i);
+    }
+    function luminance(color) {
+        const linear = x => x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+        return linear(color.r) * 0.2126 + linear(color.g) * 0.7152 + linear(color.b) * 0.0722;
+    }
+    function contrast(a, b) {
+        return (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+    }
+    function renderedPixels(target, width, height) {
+        waitForRendering(desktop, 250);
+        const image = grabImage(desktop);
+        const p = target.mapToItem(desktop, 0, 0);
+        const pixels = [];
+        for (let y = 0; y < height; ++y)
+            for (let x = 0; x < width; ++x) pixels.push(image.pixel(Math.round(p.x) + x, Math.round(p.y) + y));
+        return pixels;
+    }
+    function test_yaru_volume_levels_remain_distinct() {
+        Quickshell.iconMap = Theme.yaruIconMap;
+        Pipewire.ready = true; Pipewire.defaultAudioSink = sink;
+        mount();
+        const button = item("panelVolume");
+        const icon = item("panelVolumeIcon");
+        const samples = [];
+        for (const state of [{ volume: 0, muted: false, name: "low" }, { volume: 0.4, muted: false, name: "medium" },
+                             { volume: 1, muted: false, name: "high" }, { volume: 0.4, muted: true, name: "muted" }]) {
+            const iconName = "audio-volume-" + state.name + "-symbolic";
+            verify(String(Theme.yaruIconMap[iconName]).indexOf("/Yaru/") >= 0, "real Yaru fixture from capture/prepare.py: " + iconName);
+            audio.volume = state.volume; audio.muted = state.muted;
+            tryCompare(button, "iconName", iconName);
+            tryCompare(icon, "status", Image.Ready);
+            compare(String(icon.source), String(Theme.yaruIconMap[iconName]));
+            samples.push(renderedPixels(icon, 18, 18));
+            const pixels = renderedPixels(button, Math.floor(button.width), Math.floor(button.height));
+            const capsule = item("panelStatus");
+            const surface = grabImage(desktop).pixel(capsule.x + 20, capsule.y + capsule.height / 2);
+            verify(Math.max(...pixels.map(pixel => contrast(pixel, surface))) >= 4.5,
+                   "opaque speaker core or mute marker retains F2 contrast");
+        }
+        for (let a = 0; a < samples.length; ++a) {
+            for (let b = a + 1; b < samples.length; ++b) {
+                let count = 0;
+                for (let i = 0; i < samples[a].length; ++i)
+                    if (Math.max(...["r", "g", "b"].map(c => Math.abs(samples[a][i][c] - samples[b][i][c]))) * 255 >= 64) ++count;
+                console.log("VOLUME_DIFF " + JSON.stringify({ states: [a, b], pixels_delta_at_least_64: count }));
+                verify(count >= 6, "Yaru states " + a + "/" + b + " differ in >=6 pixels by >=64/255; got " + count);
+            }
+        }
+    }
+    function test_yaru_error_badge_keeps_semantic_color() {
+        Quickshell.iconMap = Theme.yaruIconMap;
+        verify(String(Theme.yaruIconMap["network-error-symbolic"]).indexOf("/Yaru/") >= 0);
+        mount();
+        const icon = item("panelNetworkIcon");
+        tryCompare(icon, "status", Image.Ready);
+        const pixels = renderedPixels(icon, 18, 18);
+        const dangerPixels = pixels.filter(pixel => String(pixel) === String(tokens.danger)).length;
+        verify(dangerPixels >= 8, "error badge retains >=8 opaque semantic danger pixels; got " + dangerPixels);
+        const capsule = item("panelStatus");
+        const surface = grabImage(desktop).pixel(capsule.x + 20, capsule.y + capsule.height / 2);
+        verify(contrast(tokens.danger, surface) >= 3);
+    }
+    function test_status_description_does_not_repeat_name() {
+        mount();
+        for (const name of ["panelNetwork", "panelVolume"]) {
+            const button = item(name);
+            compare(button.Accessible.description, "");
+            compare(button.tooltipText, button.Accessible.name);
+        }
+        verify(item("panelMenu").Accessible.description.length > 0, "menu keeps its supplemental window information");
     }
 }
