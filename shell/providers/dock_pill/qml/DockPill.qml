@@ -228,6 +228,9 @@ Scope {
                     tileModel.setProperty(i, "entryData", next[i].entryData);
             }
         }
+        // The config permits repeated pinned ids. Matching consumes them in
+        // order; dropping one occurrence must also remove its surplus row.
+        if (tileModel.count > next.length) tileModel.remove(next.length, tileModel.count - next.length);
     }
     onEntriesChanged: syncTiles()
 

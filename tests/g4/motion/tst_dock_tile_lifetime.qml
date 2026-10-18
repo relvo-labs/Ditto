@@ -310,4 +310,17 @@ TestCase {
         compare(client.calls, ["A2"]);
     }
 
+    function test_duplicate_pinned_count_reduction_removes_only_retired_tile() {
+        mount();
+        provider.config = { pinned: ["fixture", "fixture", "other", "third"] };
+        const duplicates = tiles().filter(item => item.modelData.appId === "fixture");
+        compare(duplicates.length, 2);
+        const retained = duplicates[0];
+        retained.forceActiveFocus();
+        provider.config = { pinned: ["fixture", "other", "third"] };
+        compare(tiles().length, 3, "reducing repeated app keys removes the surplus delegate");
+        compare(tile("A"), retained);
+        verify(retained.activeFocus);
+    }
+
 }
