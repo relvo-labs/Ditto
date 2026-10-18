@@ -44,6 +44,6 @@ class FakeKeyringTests(unittest.TestCase):
 
     def test_actual_dbus_decorators_and_plain_secret_wire_shapes_without_socket(self):
         # Use installed distro dbus-python/GLib, never install into the runner Python.
-        result = subprocess.run(['/usr/bin/python3', str(Path(__file__).with_name('keyring_wire_test.py'))],
+        result = subprocess.run(['/usr/bin/python3', str(Path(__file__).with_name('keyring_wire_check.py'))],
                                 capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stderr.decode())

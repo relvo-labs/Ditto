@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
+import urllib.parse
 from unittest.mock import patch
 
 from scan import scan
@@ -87,7 +88,8 @@ class ScannerTests(unittest.TestCase):
                  ("leaking-positive", True, True, False, 1),
                  ("private-proposal-leak", True, "proposal", False, 1),
                  ("hex", True, False, True, 0),
-                 ("base64-offset-1", True, False, True, 0)]
+                 ("base64-offset-1", True, False, True, 0),
+                 ("unresolved-keyring", True, False, False, 1)]
         for name, flow_ok, unexpected, inject, expected in cases:
             with self.subTest(name=name):
                 output = self.root / name
@@ -110,7 +112,7 @@ class ScannerTests(unittest.TestCase):
                                         else json.loads(env["DITTO_QA04_SENTINELS"])["token"])
                             (product / "logs/unexpected.log").write_text(sentinel)
                         (Path(env['DITTO_RUNTIME_DIR']) / 'keyring.json').write_text(json.dumps({
-                            'calls': {'CreateItem': 3, 'GetSecret': 3}}))
+                            'calls': {'CreateItem': 3, 'GetSecret': 0 if name == 'unresolved-keyring' else 3}}))
                         (output / "driver.json").write_text(json.dumps({"ok": flow_ok, "checks": ["simulated flow only"]}))
 
                     def poll(self):
@@ -136,7 +138,7 @@ class ScannerTests(unittest.TestCase):
                     with self.assertRaises(SystemExit) as exited:
                         runpy.run_path(str(runner), run_name="__main__")
                 report = json.loads((output / "result.json").read_text())
-                self.assertEqual(report["flow"]["ok"], flow_ok)
+                self.assertEqual(report["flow"]["ok"], flow_ok and name != "unresolved-keyring")
                 self.assertEqual(exited.exception.code, expected)
                 if unexpected == "proposal":
                     self.assertEqual(report["hit_count"], 0)
@@ -153,6 +155,25 @@ if __name__ == "__main__":
     unittest.main()
 
 class NonceFormsTests(unittest.TestCase):
+    def test_invalid_nonce_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'clean').write_text('safe reference')
+            for nonce in ('', 'too-short', 42):
+                self.assertFalse(scan({'fixture': directory}, {'key': 'long-synthetic-sentinel'}, nonce=nonce)['ok'])
+
+    def test_full_sentinel_forms_and_unrelated_content(self):
+        sentinel = 'sk-QA04-測試-"/synthetic-only!'
+        forms = [lambda value: value.encode(), lambda value: json.dumps(value)[1:-1].encode(),
+                 lambda value: urllib.parse.quote(value, safe='').encode()]
+        with tempfile.TemporaryDirectory() as directory:
+            for index, encode in enumerate(forms):
+                for value, hit in ((sentinel, True), ('completely-unrelated-content', False)):
+                    with self.subTest(form=index, hit=hit):
+                        (Path(directory) / 'log').write_bytes(encode(value))
+                        result = scan({'fixture': directory}, {'key': sentinel})
+                        self.assertEqual(bool(result['hits']), hit)
+                        self.assertEqual(result['ok'], not hit)
+
     def test_nonce_forms_and_unrelated_content(self):
         # Unicode makes standard and URL-safe alphabets differ at every offset.
         nonce = 'a9f03b7e測試🿿' * 3

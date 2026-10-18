@@ -52,7 +52,7 @@ python3 tests/g4/secrets/control.py --inject-leak --leak-form base64-offset-1 --
 
 控制預期依序 exit 0、0、0、1、1、1；三個負例的 `hit_count` 都必須大於 0（scanner `ok=false`）。`run.py --inject-leak` 成功負例控制仍 exit 0，但要求真實 flow 完成、唯一命中來源為 `intentional-leak.log`；流程失敗不算負例成功。`test_scan.py` 也對 runner 三種負例的退出政策執行 fixture 回歸；不冒充產品證據。
 
-`test_keyring.py` 驗證記憶體 create／replace／search／get／delete、拒絕真實 bus／備援地址，並以已安裝的 distro Python 執行 `keyring_wire_test.py`，直接核對實際 dbus-python decorator 簽章與資料形狀。這不建立 socket，也不聲稱完成跨程序 D-Bus 協定驗證。本機實跑 `run.py` 正／負例在私有 bus bind 被 sandbox 以 `Operation not permitted` 拒絕，**BLOCKED（sandbox socket）**；完整流程須由 coordinator 在 sandbox 外使用上面的精確指令重跑。
+`test_keyring.py` 驗證記憶體 create／replace／search／get／delete、拒絕真實 bus／備援地址，並以已安裝的 distro Python 執行 `keyring_wire_check.py`，直接核對實際 dbus-python decorator 簽章與資料形狀。這不建立 socket，也不聲稱完成跨程序 D-Bus 協定驗證。本機實跑 `run.py` 正／負例在私有 bus bind 被 sandbox 以 `Operation not permitted` 拒絕，**BLOCKED（sandbox socket）**；完整流程須由 coordinator 在 sandbox 外使用上面的精確指令重跑。
 
 ## 崩潰／診斷路徑盤點與缺口
 
