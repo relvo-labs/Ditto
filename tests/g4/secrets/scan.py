@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exact synthetic sentinel scan. No third-party modules, no network."""
+"""Synthetic sentinel and shared nonce scan. No third-party modules, no network."""
 import argparse
 import base64
 import json
@@ -9,23 +9,45 @@ import subprocess
 import urllib.parse
 
 
-def scan(roots, sentinels):
+def encoded_forms(value):
+    raw = value.encode()
+    yield "literal", raw
+    yield "json", json.dumps(value)[1:-1].encode()
+    yield "url", urllib.parse.quote(value, safe="").encode()
+    yield "hex-lower", raw.hex().encode()
+    yield "hex-upper", raw.hex().upper().encode()
+    # Keep only characters whose six bits are entirely inside the value.
+    # Boundary characters depend on surrounding bytes, even without padding.
+    for offset in range(3):
+        start = (offset * 8 + 5) // 6
+        end = ((offset + len(raw)) * 8) // 6
+        for name, encode in (("base64", base64.b64encode), ("base64url", base64.urlsafe_b64encode)):
+            encoded = encode(b"x" * offset + raw)
+            if end > start:
+                yield f"{name}-offset-{offset}", encoded[start:end]
+
+
+def scan(roots, sentinels, nonce=None):
     result = {"scope": {}, "files": [], "file_count": 0, "hit_count": 0,
               "hits": [], "errors": [], "sqlite_databases": [], "archives": []}
     needles = []
     if not sentinels:
         result["errors"].append("no injection sentinels configured")
-    for label, value in sentinels.items():
+    values = list(sentinels.items())
+    if nonce is not None:
+        if not isinstance(nonce, str) or len(nonce.encode()) < 16:
+            result["errors"].append("nonce must contain at least 16 bytes")
+        else:
+            values.append(("nonce", nonce))
+    for label, value in values:
         if not isinstance(value, str) or not value:
             result["errors"].append(f"invalid sentinel: {label}")
             continue
         variants = set()
-        for encoding, text in {"literal": value, "json": json.dumps(value)[1:-1],
-                               "url": urllib.parse.quote(value, safe=""),
-                               "base64": base64.b64encode(value.encode()).decode()}.items():
-            if text not in variants:
-                needles.append((label, encoding, text.encode()))
-                variants.add(text)
+        for encoding, needle in encoded_forms(value):
+            if needle not in variants:
+                needles.append((label, encoding, needle))
+                variants.add(needle)
 
     def inspect(data, source):
         for label, encoding, needle in needles:
@@ -86,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
-    report = scan(manifest["roots"], manifest["sentinels"])
+    report = scan(manifest["roots"], manifest["sentinels"], manifest.get("nonce"))
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({key: report[key] for key in ("ok", "file_count", "hit_count", "errors")}))
     raise SystemExit(0 if report["ok"] else 1)

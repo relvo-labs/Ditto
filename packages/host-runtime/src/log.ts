@@ -16,10 +16,15 @@ export interface LogRecord {
 
 export type LogSink = (record: LogRecord) => void
 
-// Same content keys and replacement as Core's log.rs, plus the host's
-// free-text error/payload fields. RPC errors retain their separate wire form.
-const contentKeys = new Set(['title', 'summary', 'body', 'clipboard', 'text', 'content', 'window_title',
-  'message', 'stack', 'payload', 'data', 'config', 'args', 'logger', 'name', 'topics'])
+// Reviewed string fields only. Unknown fields/containers cannot bless nested
+// strings by using a safe key. Error diagnostics have their own closed schema.
+export const safeLogStringFields = [
+  'component', 'part', 'source', 'entry_id', 'plugin_id', 'change_id',
+  'operation_id', 'session_id', 'grant_id', 'subscription_id', 'capability_id',
+  'lease_id', 'presented', 'renewed', 'expired', 'method', 'key', 'status',
+  'why', 'mode', 'strategy', 'point', 'action', 'path',
+] as const
+const stringFields = new Set<string>(safeLogStringFields)
 const errorNames = new Set(['Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError',
   'URIError', 'EvalError', 'AggregateError', 'DittoError', 'NonError'])
 const systemCodes = new Set(['EACCES', 'EPERM', 'ENOENT', 'ENOTDIR', 'EISDIR', 'ECONNREFUSED',
@@ -89,11 +94,14 @@ function redactPaths(text: string): string {
 }
 
 function redact(key: string, value: unknown): unknown {
-  if (contentKeys.has(key)) return '[redacted]'
   if (key === 'error' || key === 'reason' || value instanceof Error) return errorDiagnostic(value)
-  if (typeof value === 'string') return redactPaths(value)
-  if (Array.isArray(value)) return value.map(item => redact('', item))
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([child, item]) => [child, redact(child, item)]))
+  if (key === 'message_fingerprint') return typeof value === 'string' && /^hmac-sha256:[a-f0-9]{64}$/.test(value) ? value : '[redacted]'
+  if (typeof value === 'string') return stringFields.has(key) ? redactPaths(value) : '[redacted]'
+  if (Array.isArray(value) && (key === 'items' || stringFields.has(key))) return value.map(item => redact(key, item))
+  if (value && typeof value === 'object') {
+    if (key !== 'items') return '[redacted]'
+    return Object.fromEntries(Object.entries(value).map(([child, item]) => [child, redact(child, item)]))
+  }
   return value
 }
 

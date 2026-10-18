@@ -137,3 +137,30 @@ class ScannerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class NonceFormsTests(unittest.TestCase):
+    def test_nonce_forms_and_unrelated_content(self):
+        # Unicode makes standard and URL-safe alphabets differ at every offset.
+        nonce = 'a9f03b7e測試🿿' * 3
+        unrelated = 'b8e12c6d獨立🿾' * 3
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'leak'
+            forms = [('literal', lambda value: value.encode()),
+                     ('hex-lower', lambda value: value.encode().hex().encode()),
+                     ('hex-upper', lambda value: value.encode().hex().upper().encode())]
+            for offset in range(3):
+                for urlsafe in (False, True):
+                    for padding in (False, True):
+                        def encode(value, offset=offset, urlsafe=urlsafe, padding=padding):
+                            fn = base64.urlsafe_b64encode if urlsafe else base64.b64encode
+                            result = fn(b'x' * offset + value.encode() + b'!suffix')
+                            return result if padding else result.rstrip(b'=')
+                        forms.append((f'base64-{offset}-{urlsafe}-{padding}', encode))
+            for name, encode in forms:
+                for value, expected in ((nonce, False), (unrelated, True)):
+                    with self.subTest(form=name, leaked=value == nonce):
+                        path.write_bytes(encode(value))
+                        result = scan({'fixture': directory}, {'key': 'sk-prefix-' + nonce + '-suffix'}, nonce=nonce)
+                        self.assertEqual(result['ok'], expected)
+                        self.assertEqual(bool(result['hits']), not expected)
+                        self.assertNotIn(nonce, json.dumps(result['hits']))

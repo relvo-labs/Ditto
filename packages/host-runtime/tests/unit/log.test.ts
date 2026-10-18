@@ -2,7 +2,7 @@ import type { Context, Exporter } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DittoError } from '../../src/errors.ts'
 import { faultPoint, resetFaultHits } from '../../src/fault-enabled.ts'
-import { errorDiagnostic, HostLog, installCordisExporter, type LogRecord, stderrSink } from '../../src/log.ts'
+import { errorDiagnostic, safeLogStringFields, HostLog, installCordisExporter, type LogRecord, stderrSink } from '../../src/log.ts'
 
 const markers = ['QA04_WINDOW_TITLE', 'QA04_DOCUMENT_CONTENT', 'QA04_CLIPBOARD_CONTENT', 'QA04_CONVERSATION_CONTENT']
 const privateText = markers.join(' ')
@@ -111,4 +111,34 @@ describe('default host log privacy', () => {
     expect(JSON.parse(chunks.join(''))).toMatchObject({msg: 'host.fault', action: 'unknown', point: 'heartbeat'})
     expect(chunks.join('')).not.toContain(privateText)
   })
+})
+
+it('redacts unknown string fields at every depth including arrays, children and a direct sink', () => {
+  const records: LogRecord[] = []
+  new HostLog(record => records.push(record)).child({new_field: privateText}).info('connected', {
+    nested: {unexpected: privateText}, values: [privateText],
+    // Safe field names cannot bless strings inside an unknown container.
+    unknown: {entry_id: privateText},
+  })
+  const chunks: string[] = []
+  vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
+  stderrSink({ts: 'test', level: 'info', msg: 'connected', surprise: privateText})
+  expect(JSON.stringify(records) + chunks.join('')).not.toContain('QA04_')
+})
+
+it('pins the reviewed string allow-list and preserves each field including lease arrays', () => {
+  expect([...safeLogStringFields]).toEqual([
+    'component', 'part', 'source', 'entry_id', 'plugin_id', 'change_id',
+    'operation_id', 'session_id', 'grant_id', 'subscription_id', 'capability_id',
+    'lease_id', 'presented', 'renewed', 'expired', 'method', 'key', 'status',
+    'why', 'mode', 'strategy', 'point', 'action', 'path',
+  ])
+  const records: LogRecord[] = []
+  const fields = Object.fromEntries(safeLogStringFields.map(key => [key, 'safe-value']))
+  new HostLog(record => records.push(record)).info('connected', {
+    ...fields, presented: ['lease-1'], renewed: ['lease-2'], expired: ['lease-3'],
+    items: [{key: 'entry', status: 'failed', reason: 'apply_failed: private'}],
+  })
+  expect(records[0]).toMatchObject({...fields, presented: ['lease-1'], renewed: ['lease-2'], expired: ['lease-3'],
+    items: [{key: 'entry', status: 'failed', reason: {code: 'apply_failed'}}]})
 })
