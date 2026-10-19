@@ -106,7 +106,16 @@ pattern = r'        AssistantSurface \{.*?\n        \}'
 selected = re.search(pattern, current_shell, re.S).group(0)
 previous = re.search(pattern, pre_choice, re.S).group(0)
 assert 'entryStyle: "fab"' in selected and 'symbolVariant: "ditto"' in selected
-assert current_shell.replace(selected, previous, 1) == pre_choice
+# PR #115 (87a2462, owner-chosen wallpaper) changed exactly one other hunk: the
+# background Backdrop's comment and `wallpaperSource`. Swap that block back,
+# after checking it differs only there, so the oracle still rejects any other
+# shell.qml change.
+backdrop = r'            /// The canvas.*?\n            Backdrop \{.*?\n            \}'
+backdrop_now = re.search(backdrop, current_shell, re.S).group(0)
+backdrop_before = re.search(backdrop, pre_choice, re.S).group(0)
+assert backdrop_now.splitlines()[3:] == [line.replace('wallpaperSource: ""', 'wallpaperSource: root.shellTokens.wallpaper')
+                                         for line in backdrop_before.splitlines()[3:]]
+assert current_shell.replace(selected, previous, 1).replace(backdrop_now, backdrop_before, 1) == pre_choice
 report.append({'oracle': 'shell.qml changes only AssistantSurface properties; fixed 56/E1 lives in the component, legacy mounting unchanged'})
 
 report.append({'oracle': 'legacy avatar surface and ApprovalWindow.qml match 25c0b72; Avatar.qml matches f99b4ea byte for byte (merged statusForeground correction)'})
