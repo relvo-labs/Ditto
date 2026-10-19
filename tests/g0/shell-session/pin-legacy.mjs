@@ -10,17 +10,18 @@ const save = result => {
   writeFileSync(`${directory}/legacy-pin.json.tmp`, JSON.stringify(result) + '\n');
   renameSync(`${directory}/legacy-pin.json.tmp`, `${directory}/legacy-pin.json`);
 };
-// Also bound a missing response; a disconnected or timed-out pin never passes.
-const watchdog = setTimeout(() => {
-  save({ status: 'failed', error: 'legacy pin driver timed out' });
-  process.exit(1);
-}, 45_000);
+let watchdog;
 let core;
 let change;
 try {
   core = await connect();
   writeFileSync(`${directory}/legacy-pin.ready`, 'ready\n');
   while (!existsSync(`${directory}/legacy-pin.start`)) await sleep(50);
+  // Give the pin its full budget after release, independent of boot latency.
+  watchdog = setTimeout(() => {
+    save({ status: 'failed', error: 'legacy pin driver timed out' });
+    process.exit(1);
+  }, 45_000);
   const before = await core.must('desktop.profiles.get', {});
   const avatar = { ...before.document.avatar };
   delete avatar.presentation;

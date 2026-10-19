@@ -21,6 +21,25 @@ expect() {
   fi
 }
 
+handoff_is_fresh() {
+  local directory="$1" suffix
+  for suffix in ready start json json.tmp; do
+    [[ ! -e "$directory/legacy-pin.$suffix" ]] || return 1
+  done
+}
+
+# Model a persistent reference runtime with stale files from a previous run.
+mkdir "$test_dir/runtime"
+for suffix in ready start json json.tmp; do
+  touch "$test_dir/runtime/legacy-pin.$suffix"
+done
+first_handoff="$(session_handoff_dir "$test_dir/runtime")"
+expect 'stale runtime handoff files are not adopted' 0 '' handoff_is_fresh "$first_handoff"
+touch "$first_handoff/legacy-pin.start"
+second_handoff="$(session_handoff_dir "$test_dir/runtime")"
+expect 'another run gets a different handoff directory' 0 '' test "$first_handoff" != "$second_handoff"
+expect 'another run cannot see the previous start signal' 0 '' handoff_is_fresh "$second_handoff"
+
 # The first three lines were already logged when pinning began.
 expect 'only a pre-pin mask must fail' 1 'check 1 failed:' wait_session_mask "$HERE/fixtures/before-pin.txt" 3 1
 expect 'a new post-pin mask passes' 0 '' wait_session_mask "$HERE/fixtures/after-pin.txt" 3 1
@@ -43,6 +62,12 @@ expect 'frames at or before the floor are stale' 1 'check 5 failed: no continuin
 head -6 "$HERE/fixtures/after-core-exit.txt" >"$test_dir/offline-redraw.txt"
 expect 'one disconnect redraw does not prove continuing animation' 1 'check 5 failed: no continuing' \
   require_session_survival "$test_dir/offline-redraw.txt" 5 2500 "$$"
+printf 'ditto-frame 3000 16\nditto-frame 3500 16\n' >"$test_dir/inside-settle.txt"
+expect 'two frames inside the settle window do not prove continuing animation' 1 'check 5 failed: no continuing' \
+  require_session_survival "$test_dir/inside-settle.txt" 0 2500 "$$"
+printf 'ditto-frame 5000 16\n' >"$test_dir/single-frame.txt"
+expect 'one frame after settling does not prove continuing animation' 1 'check 5 failed: no continuing' \
+  require_session_survival "$test_dir/single-frame.txt" 0 2500 "$$"
 printf 'ditto-frame 2000 16\nditto-frame 2016 16\n' >"$test_dir/buffered.txt"
 expect 'buffered pre-exit timestamps fail even after the floor' 1 'check 5 failed: no continuing' \
   require_session_survival "$test_dir/buffered.txt" 0 2500 "$$"

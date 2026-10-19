@@ -10,7 +10,8 @@ source "$WORKSPACE/tests/g0/shell-session/checks.sh"
 
 WINDOW_PIDS=()
 SHELL_PID=""
-trap '[[ -z "$SHELL_PID" ]] || kill "$SHELL_PID" 2>/dev/null || true; stop_all' EXIT INT TERM
+PIN_DIR=""
+trap '[[ -z "$SHELL_PID" ]] || kill "$SHELL_PID" 2>/dev/null || true; stop_all; [[ -z "$PIN_DIR" ]] || rm -rf -- "$PIN_DIR"' EXIT INT TERM
 
 start_compositor
 export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software DITTO_FRAME_PROBE=1
@@ -28,11 +29,12 @@ NODE="$(readlink -f "$NODE")"
   echo 'built-in packages are missing; run scripts/build-builtin-packages.sh first' >&2
   exit 1
 }
+PIN_DIR="$(session_handoff_dir "$RUNTIME_DIR")"
 
 "$BINARIES/ditto-core" serve --compositor "${DITTO_COMPOSITOR:-wayfire}" \
   --builtin-packages "$WORKSPACE/target/ditto-packages" \
   --launch "quickshell 0.2.0 $QUICKSHELL -p $WORKSPACE/shell/shell.qml" \
-  --launch "dittoctl 0.2.0 $NODE $WORKSPACE/tests/g0/shell-session/pin-legacy.mjs $RUNTIME_DIR" \
+  --launch "dittoctl 0.2.0 $NODE $WORKSPACE/tests/g0/shell-session/pin-legacy.mjs $PIN_DIR" \
   >"$RUNTIME_DIR/core.log" 2>&1 &
 CORE_PID=$!
 for _ in $(seq 1 150); do
@@ -54,27 +56,28 @@ grep -aq '"role":"shell"' "$RUNTIME_DIR/core.log" || { echo 'the Shell participa
 # here. Record the floor BEFORE releasing the driver: the new mask can load
 # during the ChangeSet, before its committed reply reaches the driver.
 for _ in $(seq 1 150); do
-  [[ -f "$RUNTIME_DIR/legacy-pin.ready" ]] && break
+  [[ -f "$PIN_DIR/legacy-pin.ready" ]] && break
   sleep 0.1
 done
-[[ -f "$RUNTIME_DIR/legacy-pin.ready" ]] || { cat "$RUNTIME_DIR/core.log"; echo 'legacy pin driver did not authenticate' >&2; exit 1; }
+[[ -f "$PIN_DIR/legacy-pin.ready" ]] || { cat "$RUNTIME_DIR/core.log"; echo 'legacy pin driver did not authenticate' >&2; exit 1; }
 pin_floor="$(wc -l <"$RUNTIME_DIR/core.log")"
-touch "$RUNTIME_DIR/legacy-pin.start"
+touch "$PIN_DIR/legacy-pin.start"
 for _ in $(seq 1 450); do
-  [[ -f "$RUNTIME_DIR/legacy-pin.json" ]] && break
+  [[ -f "$PIN_DIR/legacy-pin.json" ]] && break
   sleep 0.1
 done
-[[ -f "$RUNTIME_DIR/legacy-pin.json" ]] || {
+[[ -f "$PIN_DIR/legacy-pin.json" ]] || {
   echo 'legacy pin failed: driver produced no result before the deadline' >&2
   exit 1
 }
-jq -e '.status == "pinned"' "$RUNTIME_DIR/legacy-pin.json" >/dev/null || {
-  cat "$RUNTIME_DIR/legacy-pin.json" >&2
+jq -e '.status == "pinned"' "$PIN_DIR/legacy-pin.json" >/dev/null || {
+  cat "$PIN_DIR/legacy-pin.json" >&2
   echo 'legacy pin failed: no committed ChangeSet with matching Profile readback' >&2
   exit 1
 }
 wait_session_mask "$RUNTIME_DIR/core.log" "$pin_floor"
-echo "check 1: pinned legacy character applied a new hit mask (24 rectangles, after log line $pin_floor)"
+pin_identity="$(jq -r '"change_id=\(.change.change_id) committed_revision=\(.change.committed_revision)"' "$PIN_DIR/legacy-pin.json")"
+echo "check 1: pinned legacy character applied a new hit mask (24 rectangles, after log line $pin_floor; $pin_identity)"
 
 # Exclusive zones are observable: applications must start below the panel and
 # end above the dock.

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Log predicates shared by the session fixture and its seat-free regression.
+# Helpers shared by the session fixture and its seat-free regression.
+
+session_handoff_dir() {
+  mktemp -d "$1/ditto-shell-session-pin.XXXXXX"
+}
 
 wait_session_mask() {
   local log="$1" floor="$2" _
