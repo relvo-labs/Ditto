@@ -277,7 +277,7 @@ impl HostManager {
                     "host.start_refused",
                     &[
                         ("reason", &error.to_string()),
-                        ("reason_code", &format!("{:?}", error.kind())),
+                        ("reason_code", crate::log::io_error_code(error.kind())),
                     ],
                 );
                 inner.run = RunState::Backoff {

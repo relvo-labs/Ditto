@@ -9,6 +9,7 @@ use ditto_core::{
     core::{Core, CoreConfig},
     identity::IdentityRegistry,
     launcher,
+    log::ErrorNameLogCode,
     session::{self, Session},
 };
 use ditto_protocol::rpc::CoreMode;
@@ -192,7 +193,7 @@ fn follow_compositor(
                     "compositor.unreachable",
                     &[
                         ("reason", &error.to_string()),
-                        ("reason_code", &format!("{:?}", error.kind())),
+                        ("reason_code", ditto_core::log::io_error_code(error.kind())),
                     ],
                 ),
             }
@@ -407,7 +408,7 @@ fn main() -> io::Result<()> {
                         &[
                             ("command", command_id),
                             ("reason", &error.message),
-                            ("reason_code", &format!("{:?}", error.name)),
+                            ("reason_code", error.name.as_str()),
                         ],
                     );
                 }
@@ -442,7 +443,7 @@ fn main() -> io::Result<()> {
                     &[
                         ("spec", specification),
                         ("reason", &error.to_string()),
-                        ("reason_code", &format!("{:?}", error.kind())),
+                        ("reason_code", ditto_core::log::io_error_code(error.kind())),
                     ],
                 );
             }
@@ -472,7 +473,7 @@ fn main() -> io::Result<()> {
                     "connection.ended",
                     &[
                         ("reason", &error.to_string()),
-                        ("reason_code", &format!("{:?}", error.kind())),
+                        ("reason_code", ditto_core::log::io_error_code(error.kind())),
                     ],
                 );
             }
