@@ -14,12 +14,16 @@ bash tests/g0/run-in-container.sh <script>
 | --- | --- | --- |
 | `window-matrix` | EX-01 | 能力 × 視窗形態的每一格都有明確結果：回讀一致的成功，或 `unsupported`。輸出 `artifacts/g0/window-matrix-<run_id>.jsonl` |
 | `identity-negative` | EX-07 | 啟動器啟動的客戶端可用；複製的 token、沒有綁定的連線、自填身分三種都被明確拒絕 |
-| `shell-session` | SHELL-01／03／04 | 工作階段啟動、exclusive zone 生效、命中遮罩套用、熱路徑零請求、喚回路徑可達、Core 終止後角色仍存活 |
+| `shell-session` | SHELL-01／03／04 | 受控啟動器以經驗證、提交並回讀的 ChangeSet 固定舊角色；只採計 pin 後新載入的 24 矩形遮罩，再驗 exclusive zone、熱路徑零請求與喚回；Core 終止後同一 Shell 與舊角色繼續產生幀 |
 | `shell-restart-survival` | EX-03 | 20 次重啟（10 次正常、10 次 `SIGKILL`）後參考應用全部存活、未儲存內容雜湊不變 |
 | `hotpath` | EX-04 | 四段互動腳本的逐段幀間隔與請求數；動畫期間 0 個請求，5 次明確命令各 1 個 |
 | `compositor-probe` | EX-02 | 兩層探針（全域列舉＋功能探測）的結構化輸出；未能探測的列標明原因 |
 | `input-method` | EX-08 的自動化診斷 | 記錄 Wayfire 協定、Qt text-input-v3 啟用、Fcitx 引擎與 QML 實際文字；未提交中文即保留 JSON／截圖並失敗。`stipc` 不能代替實體鍵盤；登入後由 `manual-session.sh` 一次完成 QML／foot／Kate、三處候選位置與三方剪貼簿 |
 | `avatar-hit-region` | G0-SHELL-03 生產遮罩 | 對 Shell 實際的 24 個 alpha 遮罩矩形做雙向點擊：透明區穿到下層、實心區由角色收到 |
+
+`shell-session` 的 check 1／5 保留舊角色語意（#96），不量 D-48 的預設助理入口。它需要 Node 執行由 Core 以 `dittoctl` 身分啟動的 pin driver，使用啟動器認證，不用 development token，也不改既有 `pin_legacy_avatar` 呼叫。Shell 完成 boot sync 後先記錄 log 行位移，再放行 driver；ChangeSet 必須 committed 且 Profile 回讀一致，遮罩必須出現在該位移之後。Core 終止並回收後重新記錄行位移與時間；check 5 要求原 Shell PID 存活，且 2 秒穩定期後至少有兩筆新的舊角色 FrameProbe 正間隔樣本。缺少遮罩／幀或 pin 失敗都以非 0 結束並印出原因。這只是功能存活證據，幀時與動畫品質仍交參考機量測；handoff 使用 fixture runtime 下每次執行專屬的暫存目錄，結束時清除；45 秒 pin watchdog 從放行 driver 後起算。check 1 輸出附 `change_id` 與 `committed_revision`，讓 runner artifact 可追溯；原始遮罩與幀仍在 runtime 的 `core.log`。
+
+不需實體座位的判定回歸：`bash tests/g0/shell-session/test.sh`。以合成 log 夾具驗證 pin 前遮罩不能通過、新遮罩可以通過、Core 終止前的舊幀與單次斷線重繪不能充當動畫存活證據；此結果不能取代 `fixture-shell-session` 的 Wayfire／Quickshell 實跑。
 
 ## 在有 `systemd --user` 的主機執行
 

@@ -6,13 +6,16 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "$0")/.." && pwd)/lib/session.sh"
+source "$WORKSPACE/tests/g0/shell-session/checks.sh"
 
 WINDOW_PIDS=()
 SHELL_PID=""
-trap stop_all EXIT INT TERM
+PIN_DIR=""
+trap '[[ -z "$SHELL_PID" ]] || kill "$SHELL_PID" 2>/dev/null || true; stop_all; [[ -z "$PIN_DIR" ]] || rm -rf -- "$PIN_DIR"' EXIT INT TERM
 
 start_compositor
-export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software
+export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software DITTO_FRAME_PROBE=1
+unset DITTO_DEV_TOKEN
 
 # The launcher binds identity to the executable it started, so it needs the
 # real path. Quickshell is not at a fixed location: on the workstation it lives
@@ -20,14 +23,18 @@ export QT_QPA_PLATFORM=wayland QT_QUICK_BACKEND=software
 QUICKSHELL="${DITTO_QUICKSHELL:-$(command -v quickshell)}"
 [[ -x "$QUICKSHELL" ]] || { echo 'quickshell is not on PATH; set DITTO_QUICKSHELL' >&2; exit 1; }
 QUICKSHELL="$(readlink -f "$QUICKSHELL")"
+NODE="$(command -v node)" || { echo 'node is required for the launcher-authenticated pin driver' >&2; exit 1; }
+NODE="$(readlink -f "$NODE")"
 [[ -d "$WORKSPACE/target/ditto-packages" ]] || {
   echo 'built-in packages are missing; run scripts/build-builtin-packages.sh first' >&2
   exit 1
 }
+PIN_DIR="$(session_handoff_dir "$RUNTIME_DIR")"
 
 "$BINARIES/ditto-core" serve --compositor "${DITTO_COMPOSITOR:-wayfire}" \
   --builtin-packages "$WORKSPACE/target/ditto-packages" \
   --launch "quickshell 0.2.0 $QUICKSHELL -p $WORKSPACE/shell/shell.qml" \
+  --launch "dittoctl 0.2.0 $NODE $WORKSPACE/tests/g0/shell-session/pin-legacy.mjs $PIN_DIR" \
   >"$RUNTIME_DIR/core.log" 2>&1 &
 CORE_PID=$!
 for _ in $(seq 1 150); do
@@ -35,18 +42,42 @@ for _ in $(seq 1 150); do
   sleep 0.1
 done
 grep -aq 'ditto-shell started' "$RUNTIME_DIR/core.log" || { cat "$RUNTIME_DIR/core.log"; echo 'the shell did not start' >&2; exit 1; }
-for _ in $(seq 1 150); do
-  grep -aq 'hit mask rectangles=' "$RUNTIME_DIR/core.log" && break
-  sleep 0.1
-done
-grep -aq 'hit mask rectangles=' "$RUNTIME_DIR/core.log" || { echo 'the avatar hit mask was not applied' >&2; exit 1; }
-echo "check 1: the session started and applied its hit mask ($(sed -n 's/.*hit mask rectangles=//p' "$RUNTIME_DIR/core.log" | head -1) rectangles)"
+read -r SHELL_PID _ <"$DITTO_RUNTIME_DIR/shell.pid"
+[[ "$SHELL_PID" =~ ^[0-9]+$ ]] || { echo 'the launched Shell PID is missing' >&2; exit 1; }
 
 for _ in $(seq 1 100); do
   grep -aq '"role":"shell"' "$RUNTIME_DIR/core.log" && break
   sleep 0.1
 done
 grep -aq '"role":"shell"' "$RUNTIME_DIR/core.log" || { echo 'the Shell participant did not finish its boot sync' >&2; exit 1; }
+
+# D-48 defaults to the assistant. Pin the legacy character through Core's
+# controlled launcher, after boot sync; the dev-token helper cannot connect
+# here. Record the floor BEFORE releasing the driver: the new mask can load
+# during the ChangeSet, before its committed reply reaches the driver.
+for _ in $(seq 1 150); do
+  [[ -f "$PIN_DIR/legacy-pin.ready" ]] && break
+  sleep 0.1
+done
+[[ -f "$PIN_DIR/legacy-pin.ready" ]] || { cat "$RUNTIME_DIR/core.log"; echo 'legacy pin driver did not authenticate' >&2; exit 1; }
+pin_floor="$(wc -l <"$RUNTIME_DIR/core.log")"
+touch "$PIN_DIR/legacy-pin.start"
+for _ in $(seq 1 450); do
+  [[ -f "$PIN_DIR/legacy-pin.json" ]] && break
+  sleep 0.1
+done
+[[ -f "$PIN_DIR/legacy-pin.json" ]] || {
+  echo 'legacy pin failed: driver produced no result before the deadline' >&2
+  exit 1
+}
+jq -e '.status == "pinned"' "$PIN_DIR/legacy-pin.json" >/dev/null || {
+  cat "$PIN_DIR/legacy-pin.json" >&2
+  echo 'legacy pin failed: no committed ChangeSet with matching Profile readback' >&2
+  exit 1
+}
+wait_session_mask "$RUNTIME_DIR/core.log" "$pin_floor"
+pin_identity="$(jq -r '"change_id=\(.change.change_id) committed_revision=\(.change.committed_revision)"' "$PIN_DIR/legacy-pin.json")"
+echo "check 1: pinned legacy character applied a new hit mask (24 rectangles, after log line $pin_floor; $pin_identity)"
 
 # Exclusive zones are observable: applications must start below the panel and
 # end above the dock.
@@ -94,13 +125,14 @@ done
 grep -aq 'avatar recalled' "$RUNTIME_DIR/core.log" || { echo 'check 4 failed: the recall path did not reach the shell' >&2; exit 1; }
 echo 'check 4: the keyboard recall path reaches the character layer'
 
-SHELL_PID="$(pgrep -f "^$QUICKSHELL" | head -1)"
-[[ -n "$SHELL_PID" ]] || { echo 'the shell process is gone' >&2; exit 1; }
 kill "$CORE_PID"
+wait "$CORE_PID" || true
 CORE_PID=""
+stopped_at="$(date +%s%3N)"
+survival_floor="$(wc -l <"$RUNTIME_DIR/core.log")"
 sleep 3
-kill -0 "$SHELL_PID" || { echo 'check 5 failed: the shell died with the desktop service' >&2; exit 1; }
-echo 'check 5: the character layer outlives the desktop service; its animation never waited on a request'
+require_session_survival "$RUNTIME_DIR/core.log" "$survival_floor" "$stopped_at" "$SHELL_PID"
+echo 'check 5: the pinned legacy character still produces frames after Core exits; its animation continues without Core'
 if [[ "$(environment_label)" == reference-machine ]]; then
   echo 'reference-machine functional evidence; frame time and PSS remain separate measurements'
 else
