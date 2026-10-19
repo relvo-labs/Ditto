@@ -290,3 +290,40 @@ it('a direct sink call cannot pass private text through ts or level; valid value
   stderrSink(records[0]!)
   expect(JSON.parse(chunks.join(''))).toEqual(records[0])
 })
+
+// A getter that is safe for the first `safeReads` reads and private afterwards.
+function flipping(safe: unknown, safeReads: number): () => unknown {
+  let reads = 0
+  return () => ++reads <= safeReads ? safe : privateText
+}
+
+it('a direct sink reads each field once: accessors cannot pass validation and then emit private text', () => {
+  const chunks: string[] = []
+  vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
+  const fingerprint = 'hmac-sha256:' + 'a'.repeat(64)
+  const cases: [string, (safeReads: number) => object][] = [
+    ['ts', n => Object.defineProperty({level: 'info', msg: 'connected'}, 'ts',
+      {get: flipping('2026-10-19T00:00:00.000Z', n), enumerable: true})],
+    ['level', n => Object.defineProperty({ts: '2026-10-19T00:00:00.000Z', msg: 'connected'}, 'level',
+      {get: flipping('info', n), enumerable: true})],
+    ['msg', n => Object.defineProperty({ts: '2026-10-19T00:00:00.000Z', level: 'info'}, 'msg',
+      {get: flipping('connected', n), enumerable: true})],
+    ['error.code', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty(new Error('x'), 'code', {get: flipping('ENOENT', n)})})],
+    ['Error.name', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty(new Error('x'), 'name', {get: flipping('TypeError', n)})})],
+    ['error.name (summary)', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty({fingerprint}, 'name', {get: flipping('Error', n)})})],
+    ['error.fingerprint (summary)', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty({name: 'Error'}, 'fingerprint', {get: flipping(fingerprint, n)})})],
+    ['error.code (summary)', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty({name: 'Error', fingerprint}, 'code', {get: flipping('ENOENT', n)})})],
+  ]
+  for (const [name, make] of cases) {
+    for (let safeReads = 1; safeReads <= 6; safeReads++) {
+      chunks.length = 0
+      stderrSink(make(safeReads) as LogRecord)
+      expect.soft(chunks.join(''), `${name}, safe for ${safeReads} read(s)`).not.toContain('QA04_')
+    }
+  }
+})
