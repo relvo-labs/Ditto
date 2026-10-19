@@ -51,32 +51,6 @@ pub fn store_error_code(error: &ditto_store::StoreError) -> &'static str {
     }
 }
 
-/// The protocol enum has no inherent `as_str` yet. Keep log codes aligned
-/// with its wire names without formatting Debug or any error payload.
-pub trait ErrorNameLogCode {
-    fn as_str(&self) -> &'static str;
-}
-
-impl ErrorNameLogCode for ditto_protocol::ErrorName {
-    fn as_str(&self) -> &'static str {
-        use ditto_protocol::ErrorName;
-        match self {
-            ErrorName::Unsupported => "unsupported",
-            ErrorName::InvalidParams => "invalid_params",
-            ErrorName::NotFound => "not_found",
-            ErrorName::PermissionDenied => "permission_denied",
-            ErrorName::Timeout => "timeout",
-            ErrorName::Cancelled => "cancelled",
-            ErrorName::Conflict => "conflict",
-            ErrorName::Unavailable => "unavailable",
-            ErrorName::ProtocolVersionUnsupported => "protocol_version_unsupported",
-            ErrorName::IdentityRejected => "identity_rejected",
-            ErrorName::PreflightRejected => "preflight_rejected",
-            ErrorName::Internal => "internal",
-        }
-    }
-}
-
 /// Stable log vocabulary: unlisted and future I/O kinds stay `other`.
 pub fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
     use std::io::ErrorKind;
@@ -175,6 +149,10 @@ pub fn event(name: &str, fields: &[(&str, &str)]) {
     let mut stderr = std::io::stderr().lock();
     let _ = writeln!(stderr, "{text}");
 }
+
+#[cfg(test)]
+#[path = "log_call_sites.rs"]
+mod call_sites;
 
 #[cfg(test)]
 mod tests {
