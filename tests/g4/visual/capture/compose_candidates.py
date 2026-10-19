@@ -34,11 +34,13 @@ def font(size):
 
 
 def label(image, text):
+    """A small tag in the bottom-left corner (wallpaper there, not a title)."""
     draw = ImageDraw.Draw(image)
-    face = font(22)
+    face = font(17)
     box = draw.textbbox((0, 0), text, font=face)
-    draw.rounded_rectangle((8, 8, box[2] + 28, box[3] + 20), radius=10, fill=(35, 29, 59))
-    draw.text((18, 12), text, font=face, fill=(255, 255, 255))
+    top = image.height - (box[3] - box[1]) - 26
+    draw.rounded_rectangle((6, top, box[2] + 22, image.height - 6), radius=9, fill=(35, 29, 59))
+    draw.text((14, top + 4 - box[1]), text, font=face, fill=(255, 255, 255))
     return image
 
 
