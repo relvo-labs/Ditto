@@ -173,6 +173,14 @@ def main():
         out.write("var iconMap = " + json.dumps(icon_map) + ";\n")
         out.write("var yaruIconMap = " + json.dumps(yaru_map) + ";\n")
         out.write("var pinned = " + json.dumps(pinned) + ";\n")
+    # The runtime catalogues the Shell reads (shell/core/Tr.qml), for unit
+    # tests whose client translates like the real one.
+    i18n = os.path.join(HERE, "..", "..", "..", "..", "shell", "i18n")
+    with open(os.path.join(STAGED, "i18n-data.js"), "w", encoding="utf-8") as out:
+        out.write(".pragma library\n")
+        for language, name in (("en", "ditto_en.json"), ("zhTW", "ditto_zh_TW.json")):
+            with open(os.path.join(i18n, name), encoding="utf-8") as catalogue:
+                out.write("var " + language + " = " + json.dumps(json.load(catalogue).get("strings", {}), ensure_ascii=False) + ";\n")
     with open(os.path.join(STAGED, "capture-sources.json"), "w", encoding="utf-8") as out:
         json.dump({"icon_theme": theme, "theme_chain": chain, "roles": sources, "status_icons": status_sources, "yaru_test_icons": yaru_sources}, out, ensure_ascii=False, indent=2)
         out.write("\n")

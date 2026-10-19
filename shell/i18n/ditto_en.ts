@@ -2292,6 +2292,10 @@
         <translation>Ditto menu</translation>
     </message>
     <message>
+        <source>M月d日 ddd HH:mm</source>
+        <translation>ddd MMM d HH:mm</translation>
+    </message>
+    <message>
         <source>個人化設定</source>
         <translation>Personalization</translation>
     </message>

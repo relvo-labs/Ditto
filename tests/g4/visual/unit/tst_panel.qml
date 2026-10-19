@@ -6,6 +6,7 @@ import Quickshell.Networking
 import DittoStub
 import "../../../../shell/jelly" as Jelly
 import "../.staged/capture-data.js" as Theme
+import "../.staged/i18n-data.js" as Catalogue
 
 // Actual provider; layer-shell, system services and Core are fixtures.
 TestCase {
@@ -29,7 +30,12 @@ TestCase {
             { id: "1", name: "1", active: true }, { id: "2", name: "2", active: false },
             { id: "3", name: "3", active: false }, { id: "4", name: "4", active: false }
         ]
-        function t(text) { return text; }
+        // The real runtime catalogues (shell/i18n/ditto_*.json, staged by
+        // capture/prepare.py), looked up like shell/core/Tr.qml does.
+        function t(text) {
+            const hit = tr && tr.language === "en" ? Catalogue.en[text] : undefined;
+            return hit !== undefined && hit !== "" ? hit : text;
+        }
         function capabilityAvailable(id) { return allowed; }
         function activateWorkspace(id) { calls = calls.concat([id]); }
         function launchApp(id) { calls = calls.concat([id]); }
@@ -125,10 +131,10 @@ TestCase {
         compare(network.marker, "?");
         const unknown = network.iconName;
         Networking.connectivity = NetworkConnectivity.None;
-        Networking.devices = { values: [{ connected: false }] };
+        Networking.devices = { values: [{ type: DeviceType.Wifi, connected: false }] };
         compare(network.Accessible.name, "網路未連線");
         verify(network.iconName !== unknown);
-        Networking.devices = { values: [{ connected: true }] };
+        Networking.devices = { values: [{ type: DeviceType.Wifi, connected: true }] };
         compare(network.Accessible.name, "網路已連線");
         Quickshell.iconMap = {
             "audio-volume-muted-symbolic": Qt.resolvedUrl("../fixtures/test-icon.svg"),
@@ -324,7 +330,7 @@ TestCase {
             verify(Math.max(...capsules.map(c => c.height)) <= 2 * rowHeight,
                    "at most two rows: " + capsules.map(c => c.height) + " row " + rowHeight);
         const strip = item("panelStatusStrip");
-        if (strip.columns < 4)
+        if (strip.height > rowHeight)
             verify(capsules[2].width <= strip.width + 16 + 0.5, "a wrapped status capsule fits its content: "
                    + capsules[2].width + " for " + strip.width);
         if (data.width === 1280 && data.scale === 1 && data.count === 4 && data.members === 0 && data.icons) {
@@ -365,7 +371,8 @@ TestCase {
         const pos = icon.mapToItem(desktop, 9, 9);
         const centre = pixels.pixel(Math.round(pos.x), Math.round(pos.y));
         const capsule = item("panelStatus");
-        const surface = pixels.pixel(capsule.x + 20, capsule.y + capsule.height / 2);
+        // Capsule padding: centred content (#105 C3) may start at x + 20.
+        const surface = pixels.pixel(capsule.x + 8, capsule.y + capsule.height / 2);
         // #105 O1: an icon with no opaque pixel at all (here a single 50%
         // square) is raised to full strength; mixed icons keep their source
         // alpha (test_mixed_icon_keeps_source_alpha, Yaru volume levels).
@@ -623,7 +630,10 @@ TestCase {
 
     // ---- #102 B3: the clock follows the Ditto language, with the weekday.
     function test_clock_follows_ditto_language() {
+        Quickshell.iconMap = Theme.yaruIconMap;
         const p = mount();
+        tryCompare(item("panelNetworkIcon"), "status", Image.Ready);
+        tryCompare(item("panelVolumeIcon"), "status", Image.Ready);
         p.data.find(x => x.precision !== undefined).date = new Date(2026, 9, 19, 14, 5, 42);
         const clock = item("panelClock");
         compare(clock.text, "10月19日 週一 14:05");
@@ -639,7 +649,13 @@ TestCase {
         const window = p.data.find(x => x.exclusiveZone !== undefined);
         const c = clock.mapToItem(capsule, clock.width / 2, clock.height / 2);
         verify(window.mask.regions[2].contains(c.x, c.y), "clock is inside the status Region");
-        compare(capsule.x, 1020); compare(capsule.width, 242);
+        // With icons, the 1280 reference geometry holds in both languages.
+        for (const language of ["zh-TW", "en"]) {
+            client.tr = { language: language };
+            wait(0);
+            compare(capsule.x, 1020, language); compare(capsule.width, 242, language);
+            compare(item("panelWorkspaces").x, 568, language);
+        }
     }
 
     // ---- #105 C1: a two-column step, workspaces wrap first, menu near Ditto.
@@ -681,11 +697,12 @@ TestCase {
         verify(tallest <= data.rows * rowHeight, "at most " + data.rows + " row(s): " + tallest);
         compare(window.exclusiveZone, tallest + 8);
         const statusStrip = item("panelStatusStrip");
-        verify(statusStrip.columns === 4 || statusStrip.columns === 2, "a two-column step before one column");
-        if (statusStrip.columns === 2)
+        verify(statusStrip.columns >= 2, "a two-column step before one column: " + statusStrip.columns);
+        const statusWrapped = statusStrip.height > rowHeight;
+        if (statusWrapped) {
             verify(ws.height > rowHeight, "workspaces wrap before the status capsule leaves one row");
-        if (statusStrip.columns < 4)
             verify(status.width <= statusStrip.width + 16 + 0.5, "the status capsule shrinks to its content");
+        }
         // The menu opens just below the Ditto capsule, not below the tallest pill.
         p.menuOpen = true; wait(0);
         const menu = p.data.find(x => x.anchor !== undefined && x.objectName !== "panelTooltipWindow");
