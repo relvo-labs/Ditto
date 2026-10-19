@@ -92,6 +92,12 @@ TestCase {
         object.shown = true;
         return object;
     }
+    // Non-desktop scenes use a geometry fixture; the desktop scene below
+    // replaces it with the actual staged provider, just like the Shell mount.
+    function defaultDockMount(output) {
+        return { binding: { package: "ditto.dock.pill" }, object: { shown: true,
+            reservedEdge: "bottom", screen: output, edgeGap: 12, pillThickness: 68 } };
+    }
     function test_selected_data() {
         return ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"]
             .map(scene => ({ tag: "D1-56-E1-" + scene, scene: scene }));
@@ -119,7 +125,7 @@ TestCase {
         const output = { name: "fixture-output", width: 1280, height: 800 };
         const surface = mount("shell/assistant/AssistantSurface.qml", {
             tokens: tokens, conversation: conversation, client: client, screen: output,
-            entryStyle: "fab", symbolVariant: "ditto"
+            entryStyle: "fab", symbolVariant: "ditto", dockMount: defaultDockMount(output)
         });
         const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
         let chat = null;
@@ -143,6 +149,8 @@ TestCase {
         let dock = null;
         if (scene === "desktop") {
             dock = provider("DockPill.qml", { position: "bottom", pinned: Data.pinned });
+            dock.screen = output;
+            surface.dockMount = { binding: { package: "ditto.dock.pill" }, object: dock };
             provider("PanelTop.qml", {});
             tryCompare(dock, "appsLoaded", true);
             compare(dock.entries.length, Data.pinned.length);
@@ -218,6 +226,7 @@ TestCase {
         } else {
             const entry = mount("shell/assistant/AssistantSurface.qml", {
                 tokens: tokens, conversation: conversation, client: client, screen: output,
+                dockMount: defaultDockMount(output),
                 entryStyle: "fab", symbolVariant: "ditto", labelExpanded: !preopen, expanded: !preopen
             });
             entryRect = { x: entry.contentItem.x, y: entry.contentItem.y,

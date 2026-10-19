@@ -557,6 +557,7 @@ ShellRoot {
             // Owner 2026-10-19: D1 / fixed 56 px / E1 (label, then chat).
             entryStyle: "fab"
             symbolVariant: "ditto"
+            dockMount: providers.slots["ui.dock"] ? providers.slots["ui.dock"].active : null
             tokens: root.shellTokens
             client: root.shellClient
             conversation: root.shellConversation

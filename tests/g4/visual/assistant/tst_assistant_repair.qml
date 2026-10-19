@@ -100,6 +100,8 @@ TestCase {
         const incubator = c.incubateObject(testCase, { tokens: tokens, client: client,
             config: { position: "bottom", pinned: Data.pinned }, shown: false });
         incubator.forceCompletion(); const dock = incubator.object; mounted.push(dock); dock.shown = true;
+        dock.screen = s.screen;
+        s.dockMount = { binding: { package: "ditto.dock.pill" }, object: dock };
         const capsule = findChild(layer, "dockCapsule");
         tryVerify(() => capsule.width > capsule.height * 2);
         const dockCentre = capsule.mapToItem(desktop, capsule.width / 2, capsule.height / 2).y;
@@ -108,6 +110,62 @@ TestCase {
             dock_centre: dockCentre, difference: fabCentre - dockCentre, right_margin: 1280 - s.contentItem.x - s.width }));
         verify(Math.abs(fabCentre - dockCentre) <= 1, "FAB aligned to actual default Dock capsule centre");
         compare(1280 - s.contentItem.x - s.width, 32);
+    }
+    function test_dock_alignment_scope_data() {
+        const cases = [
+            { tag: "default", file: "DockPill.qml", package: "ditto.dock.pill", margin: 18 },
+            { tag: "replacement", file: "DockBottom.qml", package: "ditto.dock.bottom", margin: 32 },
+            { tag: "hidden", file: "DockPill.qml", package: "ditto.dock.pill", hidden: true, margin: 32 },
+            { tag: "left", file: "DockPill.qml", package: "ditto.dock.pill", position: "left", margin: 32 },
+            { tag: "other-output", file: "DockPill.qml", package: "ditto.dock.pill", otherOutput: true, margin: 32 },
+            { tag: "top-entry", file: "DockPill.qml", package: "ditto.dock.pill", corner: "top_right", margin: 32 },
+            { tag: "scale-2", file: "DockPill.qml", package: "ditto.dock.pill", scale: 2, margin: 32 },
+            { tag: "absent", margin: 32 }
+        ];
+        let rows = [];
+        for (const row of cases) rows = rows.concat([false, true].map(label => Object.assign({}, row,
+            { tag: row.tag + (label ? "-label" : "-circle"), label: label })));
+        return rows;
+    }
+    function test_dock_alignment_scope(data) {
+        const s = surface(); s.labelExpanded = data.label; s.entryScale = data.scale || 1;
+        s.corner = data.corner || "bottom_right";
+        let dock = null;
+        if (data.file) {
+            const c = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/" + data.file));
+            compare(c.status, Component.Ready, c.errorString());
+            const incubator = c.incubateObject(testCase, { tokens: tokens, client: client,
+                screen: data.otherOutput ? { name: "other-output" } : s.screen,
+                config: { position: data.position || "bottom", pinned: Data.pinned }, shown: false });
+            incubator.forceCompletion(); dock = incubator.object;
+            verify(dock !== null, c.errorString()); mounted.push(dock);
+            dock.shown = !data.hidden;
+            s.dockMount = { binding: { package: data.package }, object: dock };
+        }
+        compare(s.margins.bottom, data.margin, "exact alignment or fixed 32 px fallback");
+        if (data.corner) compare(s.contentItem.y, 64);
+        else compare(s.contentItem.y + s.height, 800 - data.margin);
+        verify(s.contentItem.x >= 0 && s.contentItem.x + s.width <= 1280);
+        verify(s.contentItem.y >= 0 && s.contentItem.y + s.height <= 800);
+        if (dock && dock.shown && !data.otherOutput) {
+            const windows = layer.children.filter(item => item.objectName === "stubPanelWindow"
+                && item !== s.contentItem && item.visible);
+            verify(windows.length > 0);
+            for (const w of windows) verify(s.contentItem.x + s.width <= w.x || s.contentItem.x >= w.x + w.width
+                || s.contentItem.y + s.height <= w.y || s.contentItem.y >= w.y + w.height,
+                "assistant and Dock window do not overlap in the fixture");
+        }
+        if (data.scale === 2) compare(800 - s.contentItem.y - s.height / 2, 88);
+        // Read live visibility/edge changes, without remounting the assistant.
+        if (data.tag.indexOf("default-") === 0) {
+            dock.shown = false; compare(s.margins.bottom, 32);
+            dock.shown = true; compare(s.margins.bottom, 18);
+            dock.config = { position: "left", pinned: Data.pinned }; compare(s.margins.bottom, 32);
+            dock.config = { position: "bottom", pinned: Data.pinned }; compare(s.margins.bottom, 18);
+            s.dockMount = null; compare(s.margins.bottom, 32);
+        }
+        console.log("DOCK_SCOPE " + JSON.stringify({ scenario: data.tag, scale: s.entryScale,
+            width: s.width, height: s.height, bottom_margin: s.margins.bottom }));
     }
     function test_open_state_data() {
         return [{ tag: "light", theme: "soft-jelly-light", reduced: false },
