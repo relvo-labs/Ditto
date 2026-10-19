@@ -63,9 +63,6 @@ Rectangle {
             event.accepted = true;
         } else event.accepted = false;
     }
-    Controls.ToolTip.visible: entry.entryStyle === "fab" && !entry.labelled && (area.containsMouse || entry.activeFocus)
-    Controls.ToolTip.text: entry.statusText
-    Controls.ToolTip.delay: 0
 
     AssistantSymbol {
         id: symbol
@@ -142,5 +139,26 @@ Rectangle {
             }
         }
         onClicked: entry.activate()
+    }
+    Controls.ToolTip {
+        parent: entry
+        visible: entry.visible && entry.entryStyle === "fab" && !entry.labelled && !entry.expanded
+            && (area.containsMouse || entry.activeFocus)
+        text: entry.statusText
+        x: Math.min(0, entry.width - width)
+        y: -height - 8
+        padding: 8
+        enter: null
+        exit: null
+        contentItem: Text {
+            text: entry.statusText
+            color: entry.tokens.foreground
+            font.pixelSize: entry.tokens.fontSmall
+        }
+        background: Rectangle {
+            radius: 8
+            color: entry.tokens.surfaceStrong
+            border.color: entry.tokens.border
+        }
     }
 }

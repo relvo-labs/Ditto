@@ -21,7 +21,7 @@
 | 後方視窗（Files） | x≈37、y≈63、643×455；圓角≈14–16；標題列≈36；側欄≈120 寬 | 第三方應用。Ditto 只提供材質樣本 `shell/jelly/Material.qml` 供自有表面使用 | **待 owner**：實際應用與首次登入是否開啟；不重繪第三方 app |
 | 前方視窗（Notes） | x≈77、y≈465、535×230 | 同上 | 同上 |
 | Dock | 置中浮動膠囊，x≈379–901、y≈717–787（≈522×70），離底≈13；7 個彩色圖示≈44 px，間距≈75 | `shell/providers/dock_pill/qml/DockPill.qml` | 淺色 recipe 下：膠囊、應用圖示、fallback、使用中／執行中標示**已實作**；其他主題維持原樣（§2.2）。預設 Profile 仍綁 `dock_bottom`（§5 H3）；圖示風格待素材 |
-| 右下助理 | x≈1065–1260、y≈710–764（≈197×54） | 無（R3／#67） | **不在 R1**：錨點保留空白，不畫假入口 |
+| 右下助理 | x≈1065–1260、y≈710–764（≈197×54） | `shell/assistant/`（R3／#67） | **候選待 owner**：2026-10-19 改採小 Ditto＋可展開 FAB；預設仍為現行膠囊，候選與位置見 D11 |
 | 留白 | 右半部留給桌布角色；視窗與 Dock 之間≈20 px；Dock 兩側大面積空白 | `Backdrop` 不放任何內容 | 已保留；無桌布時右側只有漸層（§4 D1） |
 
 原生 capture 的實測幾何（offscreen，`capture.log` 的 `CAPTURE_META`）：淺色頂部視窗 0,0,1280×36，只有三個可見膠囊接收輸入，無全寬底色；legacy 頂部仍為 0,0,1280×34；Dock 膠囊 444,720,392×68（本機裝有 6 個對應應用）；兩個材質樣本由 harness 放在原圖視窗位置，不是產品行為。
@@ -119,7 +119,7 @@
 | D8 | 次要文字 | `#9695a3` 在 `#faf9ff` 上 = 2.82:1 | `#57536f`（6.68:1） | 原圖的值低於 WCAG AA，可讀性優先 | 刻意偏離 |
 | D9 | 圓角 | 視窗≈14–16 | token `radiusLarge` 20、`radiusMedium` 12；樣本用 16 | 沒有「視窗圓角」token | 待凍結 |
 | D10 | Canvas 方塊紋 | 平滑 | software renderer 的漸層有淡方塊紋 | renderer 產物，不是 recipe | 硬體 capture 重驗 |
-| D11 | 右下 | 小 Ditto 頭像＋文字膠囊 | 有標籤的助理膠囊；中性對話符號與非 Ditto 幾何小頭像兩個候選，暫用中性符號 | owner 已要求改助理；本 lane 指示暫用中性，不另畫 Ditto；右端 sparkle 沒有獨立操作所以不新增按鈕 | 待 owner 決定最終符號 |
+| D11 | 右下 | 小 Ditto 頭像＋文字膠囊 | D1 既有 body.png＋QML 臉／D2 純 QML；48／56 px FAB；E1 點擊展開標籤、再點開對話／E2 點擊直開既有 compact；hover／focus 僅回饋，Escape 收合 | owner 2026-10-19 最新留言取代先前不用 Ditto 限制；不恢復大型自由移動 avatar，不改 D-48 結論或產品預設。56 px 展開 195×56 最接近原圖 195×54／35 px 頭像比例；48 px 是緊湊提案。無新增快捷動作或 sparkle 按鈕；D1 授權未釐清，D2 不代表角色權利已解決。[重跑與候選索引](../../../tests/g4/visual/README-assistant.md)；PNG／逐張說明：`/data/hermes/ditto-runs/g4-impl/fab/evidence/candidates/candidates.md` | **候選待 owner**（符號、尺寸、展開方式與觸發尚未定案） |
 
 ## 5. 交接需求（#71 原交接，R3 更新 H1／H3）
 

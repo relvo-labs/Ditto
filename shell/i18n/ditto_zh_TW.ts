@@ -266,6 +266,10 @@
 <context>
     <name>AssistantEntry</name>
     <message>
+        <source>展開助理</source>
+        <translation>展開助理</translation>
+    </message>
+    <message>
         <source>助理</source>
         <translation>助理</translation>
     </message>

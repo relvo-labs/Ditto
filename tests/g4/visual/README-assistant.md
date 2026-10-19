@@ -28,3 +28,26 @@ node --experimental-strip-types tests/g4/visual/check-assistant-contracts.mjs /p
 決策紀錄見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。最終符號待 owner 決定，暫用中性符號；新預設主題與 Dock 是依 #71 的可逆交接選擇。
 
 收合場景現在直接使用 fresh ConversationState（wanted=false、settings/provider=null、無草稿／事件）；不再以已讀設定的 fixture 冒充首次呈現。新預設模板也適用日後 `desktop.profiles.create {from: default}` 建立的新 Profile，既有已儲存文件不改寫。
+
+## #67 小 Ditto＋FAB 候選（2026-10-19）
+
+依 owner 最新留言提供候選，**預設維持現行膠囊／中性符號**；不改 `shell.qml`、Core、Profile 或 D-48 決策結論。component-sheet D11 標記「候選待 owner」。未新增快捷動作。
+
+`AssistantSurface`／`AssistantEntry` 的 opt-in 接點：`entryStyle: "fab"`、`fabSize: 48 | 56`、`symbolVariant: "ditto" | "ditto-vector"`、`expansionMode: "label" | "chat"`。D1 引用既有 body.png（35 px 顯示、70 px 解碼）；D2 是 QML Shape。來源與**未釐清**權利見 [SOURCES](../../../shell/assistant/SOURCES.md)。D2 也不是角色設計權利已解決的宣告。
+
+- E1（label）：click／Enter／Space 先展開「助理＋狀態」膠囊，第二次才送既有 `activated`；Escape 收合。56 px 展開約 195×56，最接近原圖約 195×54 與 35 px 圓形頭像；48 px 為緊湊提案。長字級維持最小尺寸而可增高。
+- E2（chat）：第一次 click／Enter／Space 就送既有 `activated`。候選 host 沿用同一 `ChatPanel`（compact ChatWindow 表面）與 ConversationState，位置是 FAB 真實矩形上方 8 px；Escape 沿既有 composing guard。表面 `collapseRequested` 供 host 收合，沒有 cancel／approval 副作用。
+- hover／focus 只做 0.96 回饋、focus 框及文字狀態提示，press 0.90；沿用 120 ms OutCubic。工作中使用既有真實投影；reduced-motion 同步 settle 並停 pulse。膠囊／圓形命中區不跟符號縮放。
+
+目前 Shell 不選用上述 opt-in。候選測試 host 明確連接 `activated` 到現有 compact；沒有新增第二個聊天元件或訂閱。Owner 選定後才由後續整合在原 shell 接點傳入所選屬性；本次不需要修改 `shell.qml` 便能擷取及操作候選。
+
+離線重跑（Qt／PATH 依 common-b8）：
+
+```sh
+bash tests/g4/visual/run-assistant.sh /data/hermes/ditto-runs/g4-impl/fab/evidence/candidates
+DITTO_ASSISTANT_CAPTURE_OUT=/data/hermes/ditto-runs/g4-impl/fab/evidence/candidates bash tests/g4/visual/run.sh /data/hermes/ditto-runs/g4-impl/fab/evidence/visual
+```
+
+runner 先 stage 現有 providers 及本機圖示資料。每個 D1／D2 × 48／56 × E1／E2，共 8 組各有收合、hover、focus、展開、working 收合、working 展開、reduced-motion、legacy-theme、全桌面 9 張；另保留原 12 張 normal／legacy。全桌面合成使用真正 staged 頂部列及 Dock，背景為現有漸層，沒有拿需求 JPEG 當桌布；無法據此宣稱壁紙／原圖忠實還原。正常動畫保留並等待有限過渡 settle；working 是有意保留的活動 pulse。
+
+PNG、逐張 `candidates.md` 與含幾何、狀態、source／commit／PNG hashes 的 JSON 均在 evidence，不進 git。`DITTO_ASSISTANT_CAPTURE_OUT` 可指定 capture 目的地（run-assistant 自動設為參數目錄）；不設時保留舊 harness 的 staging 目的地。圓形 Region、2× 取樣、Enter／Space／Escape、同一會話保留由 QtTest 檢查。既有 legacy 像素／結構 oracle 保留。真實 Wayfire input region／回焦、IME、Orca、多屏及 NFR 尚未執行。

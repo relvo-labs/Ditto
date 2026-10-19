@@ -133,6 +133,22 @@ TestCase {
         keyClick(Qt.Key_Enter);
         compare(activated.count, 1);
     }
+    function test_fab_working_reduced_motion_and_terminal() {
+        readback();
+        entry.entryStyle = "fab";
+        entry.symbolVariant = "ditto";
+        conversation.turn = { turn_id: "fab-working", state: "running" };
+        compare(entry.workingCueRunning, true);
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {}, reduced_motion: true };
+        compare(entry.workingCueRunning, false);
+        compare(entry.workLevel, 1);
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        compare(entry.workingCueRunning, true);
+        conversation.turn = { turn_id: "fab-working", state: "unknown" };
+        compare(entry.workingCueRunning, false);
+        compare(entry.workLevel, 1);
+        compare(entry.Accessible.description, conversation.stateText);
+    }
     function test_unknown_settings_after_open() {
         conversation.wanted = true;
         compare(conversation.stateText, "待命中");

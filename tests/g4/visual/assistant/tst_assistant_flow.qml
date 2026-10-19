@@ -64,6 +64,23 @@ TestCase {
         compare(entry.Accessible.description, "待命中");
         compare(client.writes, 0);
     }
+    function test_default_button_pixels_unchanged_data() {
+        return [{ tag: "light", theme: "soft-jelly-light" }, { tag: "legacy", theme: "soft-jelly" },
+            { tag: "absent", theme: undefined }];
+    }
+    function test_default_button_pixels_unchanged(data) {
+        tokens.appearance = { theme: data.theme, tokens: {}, reduced_motion: true };
+        const props = { tokens: tokens, client: client, conversation: conversation, width: 218, height: 54 };
+        const base = mount("baseline/shell/assistant/AssistantEntry.qml", props);
+        waitForPolish(base);
+        const before = grabImage(base);
+        base.destroy(); mounted = []; wait(1);
+        const current = mount("shell/assistant/AssistantEntry.qml", props);
+        waitForPolish(current);
+        verify(before.equals(grabImage(current)), "default button pixels match de8d617");
+        compare(current.entryStyle, "capsule");
+        compare(current.symbolVariant, "neutral");
+    }
     function test_focus_return_respects_application_switch() {
         client.focusCalls = [];
         client.focusedApplication = "X";
@@ -146,6 +163,53 @@ TestCase {
             entry.shown = false;
             compare(entry.visible, false);
         }
+    }
+    function test_fab_region_and_e2_same_compact_data() {
+        return [{ tag: "48", size: 48 }, { tag: "56", size: 56 }];
+    }
+    function test_fab_region_and_e2_same_compact(data) {
+        const output = { name: "fixture", width: 1280, height: 800 };
+        const surface = mount("shell/assistant/AssistantSurface.qml", { tokens: tokens, client: client,
+            conversation: conversation, screen: output, entryStyle: "fab", fabSize: data.size,
+            symbolVariant: "ditto", expansionMode: "chat" });
+        for (const scale of [0.5, 1, 2]) {
+            surface.entryScale = scale;
+            compare(surface.implicitWidth, data.size * scale);
+            compare(surface.implicitHeight, data.size * scale);
+            verify(!surface.mask.contains(1, 1));
+            verify(!surface.mask.contains(surface.implicitWidth - 1, 1));
+            verify(surface.mask.contains(surface.implicitWidth / 2, surface.implicitHeight / 2));
+        }
+        surface.entryScale = 1;
+        const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
+        const bodyImage = findChild(entry, "dittoBodyImage");
+        tryCompare(bodyImage, "status", Image.Ready);
+        compare(bodyImage.sourceSize.width, 70);
+        conversation.draft = "fab draft";
+        conversation.streamText = "fab stream";
+        conversation.events = [{ type: "assistant/message", data: { text: "fab history" } }];
+        conversation.turn = { turn_id: "fab-approval", state: "awaiting_approval" };
+        let compact = null;
+        surface.activated.connect(() => {
+            const r = surface.contentItem;
+            compact = mount("shell/chat/ChatPanel.qml", { tokens: tokens, client: client, conversation: conversation,
+                screen: output, entryRect: { x: r.x, y: r.y, width: r.width, height: r.height } });
+            compact.closeRequested.connect(() => { compact.visible = false; surface.expanded = false; });
+            surface.expanded = true;
+        });
+        entry.forceActiveFocus();
+        keyClick(Qt.Key_Space);
+        verify(compact !== null);
+        compare(compact.conversation, conversation);
+        compare(compact.contentItem.y + compact.height + 8, surface.contentItem.y);
+        const body = findChild(compact.contentItem, "chatPresentationContent");
+        body.focusInput(); keyClick(Qt.Key_Escape);
+        compare(compact.visible, false);
+        compare(conversation.turn.state, "awaiting_approval");
+        compare(conversation.draft, "fab draft");
+        compare(conversation.streamText, "fab stream");
+        compare(conversation.events.length, 1);
+        compare(client.writes, 0);
     }
     function test_switch_keeps_draft_stream_history_approval_and_escape() {
         conversation.draft = "unsent fixture";
