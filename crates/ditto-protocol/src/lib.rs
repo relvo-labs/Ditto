@@ -571,10 +571,54 @@ mod tests {
                         args == [default.parse::<f64>().unwrap(), lo, hi]
                     })
                 }
-                profile::TokenKind::Text => qml.contains(&format!("overrides.{name}")),
+                profile::TokenKind::Text => match profile::token_choices(name) {
+                    // choiceToken("name", "default", ["a", "b"]): the same
+                    // default and values, in the same order.
+                    Some(choices) => {
+                        let list = choices
+                            .iter()
+                            .map(|choice| format!("\"{choice}\""))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        qml.contains(&format!("choiceToken(\"{name}\", \"{default}\", [{list}])"))
+                    }
+                    None => qml.contains(&format!("overrides.{name}")),
+                },
             };
             assert!(found, "{name} differs from shell/jelly/Tokens.qml");
         }
+    }
+
+    /// #116 (owner 2026-10-20): three application styles the person picks
+    /// from, J1 jelly glass by default. The default is one of the choices and
+    /// only text tokens carry choices.
+    #[test]
+    fn the_application_style_is_a_closed_choice_defaulting_to_j1() {
+        let style = profile::appearance_tokens()
+            .into_iter()
+            .find(|token| token.name == "ui_style")
+            .expect("ui_style token");
+        assert_eq!(style.kind, profile::TokenKind::Text);
+        assert_eq!(style.default, "j1");
+        assert_eq!(
+            style.choices.as_deref(),
+            Some(&["j1".to_string(), "j2".into(), "j3".into()][..])
+        );
+        for token in profile::appearance_tokens() {
+            if let Some(choices) = &token.choices {
+                assert_eq!(token.kind, profile::TokenKind::Text, "{}", token.name);
+                assert!(choices.contains(&token.default), "{}", token.name);
+            }
+        }
+        // Tokens without choices serialize as before (no `choices` key).
+        let accent = profile::appearance_tokens()
+            .into_iter()
+            .find(|token| token.name == "accent")
+            .unwrap();
+        assert!(serde_json::to_value(&accent)
+            .unwrap()
+            .get("choices")
+            .is_none());
     }
 
     #[test]

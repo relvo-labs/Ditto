@@ -11167,6 +11167,16 @@
             "additionalProperties": false,
             "description": "One appearance token the Shell reads (`shell/jelly/Tokens.qml`).",
             "properties": {
+              "choices": {
+                "description": "The only values a text token takes, when it is a closed choice\n(`ui_style`). Absent for every other token.",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
               "default": {
                 "description": "What the Shell uses while the Profile sets no value.",
                 "type": "string"
@@ -11409,7 +11419,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Token name → value, as a string: `#RRGGBB` for colours, a decimal\nsuch as `\"1.2\"` for numbers. `desktop.appearance.get` lists every\ntoken (corner roundness `radius_scale`, text size `font_scale`,\nspacing, blur, opacity, colours) with its default and range.",
+            "description": "Token name → value, as a string: `#RRGGBB` for colours, a decimal\nsuch as `\"1.2\"` for numbers, one of the listed `choices` for a choice\n(the window style `ui_style`: `j1`, `j2` or `j3`).\n`desktop.appearance.get` lists every token (corner roundness\n`radius_scale`, text size `font_scale`, spacing, blur, opacity,\ncolours, window style) with its default and range or choices.",
             "type": [
               "object",
               "null"

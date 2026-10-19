@@ -183,6 +183,10 @@ pub struct AppearanceToken {
     pub min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max: Option<f64>,
+    /// The only values a text token takes, when it is a closed choice
+    /// (`ui_style`). Absent for every other token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub choices: Option<Vec<String>>,
     pub description: String,
 }
 
@@ -326,7 +330,29 @@ pub const APPEARANCE_TOKENS: &[TokenSpec] = &[
         None,
         "font family of the desktop's text; empty is the system font",
     ),
+    // #116 (owner 2026-10-20): three application styles to choose from, J1
+    // by default. Unset means J1, so existing Profiles are not rewritten.
+    (
+        "ui_style",
+        TokenKind::Text,
+        "j1",
+        None,
+        "style of the desktop's own windows (settings, chat) with the light \
+         soft-jelly theme: j1 jelly glass, j2 gummy, j3 bubble",
+    ),
 ];
+
+/// Text tokens that are a closed choice, and their values in display order.
+/// Preflight refuses any other value; the Shell lists the same ones.
+pub const APPEARANCE_TOKEN_CHOICES: &[(&str, &[&str])] = &[("ui_style", &["j1", "j2", "j3"])];
+
+/// The values a closed-choice token takes; `None` for every other token.
+pub fn token_choices(name: &str) -> Option<&'static [&'static str]> {
+    APPEARANCE_TOKEN_CHOICES
+        .iter()
+        .find(|(token, _)| *token == name)
+        .map(|(_, choices)| *choices)
+}
 
 /// [`APPEARANCE_TOKENS`] as values.
 pub fn appearance_tokens() -> Vec<AppearanceToken> {
@@ -339,6 +365,8 @@ pub fn appearance_tokens() -> Vec<AppearanceToken> {
                 default: (*default).into(),
                 min: range.map(|r| r.0),
                 max: range.map(|r| r.1),
+                choices: token_choices(name)
+                    .map(|choices| choices.iter().map(|c| (*c).to_string()).collect()),
                 description: (*description).into(),
             },
         )

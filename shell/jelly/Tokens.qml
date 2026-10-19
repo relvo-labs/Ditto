@@ -170,18 +170,26 @@ QtObject {
     readonly property int easingEnter: Easing.OutCubic
     readonly property int easingExit: Easing.InCubic
 
-    // ---- #116 Soft Jelly application candidates (opt-in) -------------------------
-    /// Which application-surface candidate the Shell's own windows (centers,
-    /// chat, approval) and the pill Dock draw: "" (unset, the existing
-    /// presentation), "j1" jelly glass, "j2" gummy, "j3" bubble. Development
-    /// switch only (`DITTO_UI_STYLE`, set by tools/ui-candidates/apply.sh);
-    /// no Profile token, no Core schema, nothing persisted. Unknown values
-    /// count as unset. Candidates are proposals for the owner to choose from
-    /// (docs/design/default-desktop/component-sheet.md, #116).
-    property string uiStyle: uiStyleFrom(Quickshell.env("DITTO_UI_STYLE"))
-    function uiStyleFrom(value) {
-        return value === "j1" || value === "j2" || value === "j3" ? value : "";
+    // ---- #116 Soft Jelly application styles ---------------------------------------
+    /// A text token that takes one of `choices`; anything else (or no value)
+    /// is `fallback`. Core refuses other values in preflight; this only keeps
+    /// an older or hand-edited document drawable.
+    function choiceToken(name, fallback, choices) {
+        const value = overrides[name];
+        return typeof value === "string" && choices.indexOf(value) >= 0 ? value : fallback;
     }
+    /// The application style the person chose in personalization (owner
+    /// 2026-10-20: three styles, J1 by default): "j1" jelly glass, "j2" gummy,
+    /// "j3" bubble. It is the Profile's `appearance.tokens.ui_style`, set by
+    /// ChangeSet like every other token; no value is J1, so a Profile written
+    /// before the token existed is not rewritten.
+    readonly property string uiStyleChosen: choiceToken("ui_style", "j1", ["j1", "j2", "j3"])
+    /// What the Shell's own windows (centers, chat, approval) and the pill
+    /// Dock draw. The styles belong to the light recipe: `soft-jelly` (dark)
+    /// and a Profile without a theme keep the existing presentation, "".
+    /// Writable only so tests can render the light recipe's earlier
+    /// presentation for comparison; nothing in the Shell assigns it.
+    property string uiStyle: lightRecipe ? uiStyleChosen : ""
     readonly property bool uiCandidate: uiStyle !== ""
     readonly property bool uiJ1: uiStyle === "j1"
     readonly property bool uiJ2: uiStyle === "j2"
