@@ -61,6 +61,9 @@ status=${PIPESTATUS[0]}
   | tee "$evidence/hidpi.log"
 status=${PIPESTATUS[0]}
 [[ $status -eq 0 ]] || { echo "2x glyph check failed ($status)"; exit "$status"; }
+# #105 C1/C2 review scenes (capture/tst_panel_scenes.qml): narrow bars, menu, tooltip.
+cp "$here/.staged/out/"panel-scene-*.png "$evidence/"
+grep 'SCENE_META ' "$evidence/capture.log" | sed 's/.*SCENE_META //' > "$evidence/panel-scenes.jsonl"
 
 echo "== compose"
 "$python" "$here/capture/compose.py" "$evidence" "$evidence/capture.log"

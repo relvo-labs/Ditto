@@ -122,6 +122,15 @@ TestCase {
         Networking.connectivity = NetworkConnectivity.Full;
     }
 
+    function cleanupTestCase() {
+        Pipewire.ready = false;
+        Pipewire.defaultAudioSink = null;
+        Networking.backend = NetworkBackendType.None;
+        Networking.connectivity = NetworkConnectivity.Unknown;
+        Networking.devices = null;
+        Quickshell.iconMap = Data.iconMap;
+    }
+
     // Opaque glyphs: the sharpness oracle.
     function test_1_wired_high() {
         scene("wired-high", false, [{ type: DeviceType.Wired, connected: true }]);
