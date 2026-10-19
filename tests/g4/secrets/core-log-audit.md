@@ -29,7 +29,7 @@ git grep -n 'log::event\|log::warn\|log::error\|log::info' -- crates/
 | `from_rescue_ui` | 封閉分類 | 布林狀態字串 | 保留 |
 | `generation` | 診斷資料 | host generation 計數 | 保留 |
 | `job_id` | 診斷資料 | Core 建立的 job 識別 | 保留追溯 |
-| `kind` | 診斷資料 | job 類型、連線種類；拒絕 handshake 時也是 peer 提供的種類標籤 | 保留診斷識別；不是文字載荷欄位，不能據此宣稱所有任意識別字均已匿名化 |
+| `kind` | 診斷資料 | job 類型、連線種類；拒絕 handshake 時由 `connection_kind` 限為 `subject_for_kind` 允許集合或 `unknown` | 保留診斷分類；未知 peer 種類不記原文 |
 | `lease_id` | 診斷資料 | Core 建立的 lease 識別 | 保留識別 |
 | `mode` | 封閉分類 | `rescue`／`normal` | 保留 |
 | `moved` | 診斷資料 | outputs rescue 搬移數量 | 保留 |
@@ -74,32 +74,32 @@ Logger 自動欄位 `ts`、`event`、`session_id` 分別是時間、程式碼固
 | `coordinator.rs:349` | `boot.builtin_refused`（unpack） | StoreError Display | 自由文字 | StoreError 變體分類 |
 | `coordinator.rs:798` | `generation.journal_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
 | `coordinator.rs:1516` | `change.commit_write_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:1731` | `change.timed_revert_failed` | CoreError.message | 自由文字 | ErrorName enum 的 Debug 名稱 |
+| `coordinator.rs:1731` | `change.timed_revert_failed` | CoreError.message | 自由文字 | `ErrorName::as_str()` 的 snake_case wire 名稱 |
 | `coordinator.rs:2120` | `recovery.read_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
 | `core.rs:163` | `host.lost` | production detach 僅傳兩個固定 literals | 封閉代碼 | `connection_closed/heartbeat_timeout`；呼叫點明確 match，其餘為 `unknown` |
-| `core.rs:479` | `lock.start_failed` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
+| `core.rs:479` | `lock.start_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
 | `generation.rs:557` | `generation.journal_recovery_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `hosts.rs:276` | `host.start_refused` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
+| `hosts.rs:276` | `host.start_refused` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
 | `lib.rs:236` | `connection.identity_rejected` | 固定分支 literals | 封閉代碼 | `binding_mismatch/unknown_kind` |
-| `main.rs:191` | `compositor.unreachable` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
+| `main.rs:191` | `compositor.unreachable` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
 | `main.rs:330` | `system.component_unavailable` | RealSystem.problems 的 String，可能來自 D-Bus 錯誤 | 自由文字 | 無型別化原因可取；reason 遮蔽，保留 component |
 | `main.rs:351` | `core.store_refused` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `main.rs:396` | `shortcut.command_failed` | CoreError.message | 自由文字 | ErrorName enum 的 Debug 名稱 |
-| `main.rs:427` | `launch.failed` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
-| `main.rs:454` | `connection.ended` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
+| `main.rs:396` | `shortcut.command_failed` | CoreError.message | 自由文字 | `ErrorName::as_str()` 的 snake_case wire 名稱 |
+| `main.rs:427` | `launch.failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `main.rs:454` | `connection.ended` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
 | `outputs.rs:263` | `outputs.rescue_failed` | AdapterError 的含 payload Debug | 自由文字 | 既有 `error_kind` 只 match enum 變體 |
 | `outputs.rs:287` | `outputs.window_stranded` | rescue_windows 的 literals／error_kind，不是視窗文字 | 封閉代碼 | `no_geometry/unsupported/not_found/unavailable/readback/internal` |
 | `outputs.rs:302` | `outputs.notice_failed` | SystemError 的含 payload Debug | 自由文字 | 呼叫點 match：`unavailable/not_found/invalid/failed` |
-| `shell.rs:87` | `shell.start_failed` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
-| `shell.rs:244` | `shell.rescue_ui_failed` | io::Error Display | 自由文字 | `error.kind()` 的 Debug 名稱 |
+| `shell.rs:87` | `shell.start_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `shell.rs:244` | `shell.rescue_ui_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
 
 合計 **4 個封閉代碼、23 個自由文字**。4 個封閉來源移除原 reason 欄位，改記 reason_code。23 個自由文字中，11 個 StoreError、7 個 io::Error、2 個 CoreError、1 個 AdapterError、1 個 SystemError 共 22 個取得安全分類；只有 RealSystem.problems 沒有型別化原因。每個自由文字的 reason 仍保持 `[redacted]`。
 
-StoreError 分類由 `log::store_error_code` 對 8 個 enum 變體逐一 match：`storage_full/storage_io/store_corrupt/store_locked/not_found/conflict/invalid/sqlite`，不讀取 Display、String 或 SQLite message。io::ErrorKind／ErrorName 的 Debug 僅輸出封閉 enum 名稱；compositor connect 已將 adapter 錯誤包成 io::Error::other 的情況只會得到 `Other`，不推測原文原因。
+StoreError 分類由 `log::store_error_code` 對 8 個 enum 變體逐一 match：`storage_full/storage_io/store_corrupt/store_locked/not_found/conflict/invalid/sqlite`，不讀取 Display、String 或 SQLite message。`io_error_code` 將 io::ErrorKind 轉為固定 snake_case 代碼，未列舉與未來的種類一律為 `other`；ErrorName 日誌字串由 protocol crate 的 inherent `ErrorName::as_str()` 提供，與 serde wire 名稱一致。compositor connect 已將 adapter 錯誤包成 io::Error::other 的情況只會得到 `other`，不推測原文原因。
 
 `subject_kind` 只輸出 9 個固定類別：`shell/cli/cli_rescue/rescue_ui/agent/lock/core/host/unknown`。Core 的 `subject_for_kind`、host entry 綁定與內部 core proposal 是來源；`hostd`／`host:<entry>` 只記 `host`，未知值只記 `unknown`。這是診斷分類，不是身分驗證或授權入口。issue 初始的「RPC proposal subject 可帶自然語言」假設不符合現有契約；原 RED 證明的是直接 logger 的防禦缺口，不能據此宣稱發生過產品 RPC subject 原文外洩。
 
-`kind` 在身分拒絕事件中的長度限制是獨立 follow-up，本輪未改。沒有新增 config flag、retention 或 opt-in。
+`kind` 在身分拒絕事件中只保留 `subject_for_kind` 允許的 `quickshell/dittoctl/dittoctl-rescue/rescue-shell/agent/lock/hostd`，其餘一律記 `unknown`；不記任意 peer 字串。沒有新增 config flag、retention 或 opt-in。
 
 ## 回歸與產品覆蓋
 

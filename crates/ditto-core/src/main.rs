@@ -9,7 +9,6 @@ use ditto_core::{
     core::{Core, CoreConfig},
     identity::IdentityRegistry,
     launcher,
-    log::ErrorNameLogCode,
     session::{self, Session},
 };
 use ditto_protocol::rpc::CoreMode;

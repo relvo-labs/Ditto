@@ -45,7 +45,6 @@ use crate::{
     defaults, docops,
     error::CoreError,
     fault,
-    log::ErrorNameLogCode,
     participants::{
         Participant, ParticipantError, RemoteParticipant, ABORT_TIMEOUT, COMMIT_TIMEOUT,
         PREPARE_TIMEOUT, ROLLBACK_TIMEOUT, STATE_TIMEOUT,

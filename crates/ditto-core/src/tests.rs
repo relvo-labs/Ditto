@@ -748,6 +748,93 @@ fn every_catalog_entry_has_a_handler_and_a_consumer() {
 }
 
 #[test]
+fn identity_rejected_handshake_logs_closed_kinds() {
+    let mut cases = Vec::new();
+    for kind in [
+        "quickshell",
+        "dittoctl",
+        "dittoctl-rescue",
+        "rescue-shell",
+        "agent",
+        "lock",
+        "hostd",
+    ] {
+        cases.push((kind.to_string(), kind, "wrong-token", "binding_mismatch"));
+    }
+    for kind in [
+        "".into(),
+        "unknown".into(),
+        "core".into(),
+        "Agent".into(),
+        "agent\n\r\t\0\u{1b}QA98_PRIVATE_KIND 私人".into(),
+        "QA98_PRIVATE_KIND".repeat(4096),
+    ] {
+        for (token, reason) in [(TOKEN, "unknown_kind"), ("wrong-token", "binding_mismatch")] {
+            cases.push((kind.clone(), "unknown", token, reason));
+        }
+    }
+    // Capture the real logger's stderr in an isolated process, without a
+    // global logger override or fd redirection that races other tests.
+    const CHILD: &str = "DITTO_TEST_IDENTITY_LOG_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        let harness = harness("identity-log");
+        let (sink, _outgoing) = mpsc::channel();
+        for (kind, _, token, _) in cases {
+            let request = serde_json::from_value(json!({
+                "jsonrpc": "2.0", "id": "identity-log", "method": "core.handshake",
+                "params": {"protocol_version": PROTOCOL_VERSION,
+                    "client": {"kind": kind, "version": "0.3.0"}, "auth": {"token": token}}
+            }))
+            .unwrap();
+            let response = match handshake(
+                &harness.core,
+                request,
+                &AuthMode::DevelopmentToken(TOKEN),
+                libc::ucred {
+                    pid: 12345,
+                    uid: 1000,
+                    gid: 1000,
+                },
+                &sink,
+            ) {
+                Err(response) => response,
+                Ok(_) => panic!("identity must be rejected"),
+            };
+            assert_eq!(
+                serde_json::to_value(response).unwrap()["error"]["name"],
+                "identity_rejected"
+            );
+        }
+        return;
+    }
+    let output = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "tests::identity_rejected_handshake_logs_closed_kinds",
+            "--nocapture",
+        ])
+        .env(CHILD, "1")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(output.status.success(), "{stderr}");
+    let events: Vec<Value> = stderr
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|event| event["event"] == "connection.identity_rejected")
+        .collect();
+    assert_eq!(events.len(), cases.len(), "{stderr}");
+    for (event, (_, kind, _, reason)) in events.iter().zip(cases) {
+        assert_eq!(event["kind"], kind);
+        assert_eq!(event["reason_code"], reason);
+        assert_eq!(event["pid"], "12345");
+    }
+    assert!(!stderr.contains("QA98_PRIVATE"));
+    assert!(!stderr.contains(TOKEN));
+    assert!(!stderr.contains("wrong-token"));
+}
+
+#[test]
 fn protocol_0_1_clients_and_unknown_kinds_are_refused() {
     let harness = harness("handshake");
     let (client, server) = UnixStream::pair().unwrap();

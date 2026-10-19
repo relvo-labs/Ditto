@@ -388,6 +388,24 @@ pub enum ErrorName {
 }
 
 impl ErrorName {
+    /// The stable serde wire name, also suitable for closed diagnostic codes.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unsupported => "unsupported",
+            Self::InvalidParams => "invalid_params",
+            Self::NotFound => "not_found",
+            Self::PermissionDenied => "permission_denied",
+            Self::Timeout => "timeout",
+            Self::Cancelled => "cancelled",
+            Self::Conflict => "conflict",
+            Self::Unavailable => "unavailable",
+            Self::ProtocolVersionUnsupported => "protocol_version_unsupported",
+            Self::IdentityRejected => "identity_rejected",
+            Self::PreflightRejected => "preflight_rejected",
+            Self::Internal => "internal",
+        }
+    }
+
     pub const ALL: [Self; 12] = [
         Self::Unsupported,
         Self::InvalidParams,
@@ -495,6 +513,25 @@ impl Subject {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn error_name_strings_round_trip_every_schema_variant() {
+        // JsonSchema derives this list from the enum, independently of ALL.
+        // A new variant is exercised even if ALL was not updated.
+        let schema = serde_json::to_value(schemars::schema_for!(ErrorName)).unwrap();
+        let variants = schema["enum"]
+            .as_array()
+            .expect("ErrorName is a closed enum");
+        assert!(!variants.is_empty());
+        for wire in variants {
+            let name: ErrorName = serde_json::from_value(wire.clone()).unwrap();
+            assert_eq!(name.as_str(), wire.as_str().unwrap());
+            let bytes = serde_json::to_vec(wire).unwrap();
+            assert_eq!(serde_json::to_vec(&name).unwrap(), bytes);
+            assert_eq!(serde_json::to_vec(name.as_str()).unwrap(), bytes);
+            assert_eq!(serde_json::from_slice::<ErrorName>(&bytes).unwrap(), name);
+        }
+    }
 
     #[test]
     fn error_codes_are_distinct_and_round_trip() {
