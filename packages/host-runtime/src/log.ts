@@ -110,7 +110,7 @@ function redact(key: string, value: unknown): unknown {
   if (Array.isArray(value) && (key === 'items' || stringFields.has(key))) return value.map(item => redact(key, item))
   if (value && typeof value === 'object') {
     if (key !== 'items') return '[redacted]'
-    return Object.fromEntries(Object.entries(value).map(([child, item]) => [child, redact(child, item)]))
+    return redactFields(value)
   }
   if (typeof value === 'number' && numberFields.has(key)) return value
   if (typeof value === 'boolean' && booleanFields.has(key)) return value
@@ -119,9 +119,21 @@ function redact(key: string, value: unknown): unknown {
   return '[redacted]'
 }
 
+// An undefined field carries no value: omit it rather than imply a hidden one.
+function redactFields(value: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)
+    .map(([key, item]) => [key, redact(key, item)]))
+}
+
+const logLevels = new Set<unknown>(['error', 'warn', 'info', 'debug'] satisfies LogLevel[])
+// Exactly Date#toISOString(); a direct sink call cannot smuggle text in ts.
+const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
 function redactedRecord(record: LogRecord): LogRecord {
-  const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, redact(key, value)]))
-  return { ...fields, ts: record.ts, level: record.level,
+  const fields = redactFields(record)
+  const ts = typeof record.ts === 'string' && isoTimestamp.test(record.ts) ? record.ts : '[redacted]'
+  const level = (logLevels.has(record.level) ? record.level : '[redacted]') as LogLevel
+  return { ...fields, ts, level,
     msg: hostMessages.has(record.msg) ? record.msg : 'host.message',
     ...(!hostMessages.has(record.msg) ? { message_fingerprint: errorDiagnostic(record.msg).fingerprint } : {}) }
 }
