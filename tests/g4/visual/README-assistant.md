@@ -1,30 +1,38 @@
 # R3 助理驗證（#67）
 
-這些測試是 development 證據。正式端到端、IME、Wayfire 焦點、Orca、多屏與 NFR 仍需參考機；fixture 的 session／turn／approval 不是 Core 執行紀錄。
+Owner Neil 於2026-10-19選定 **D1／56／E1**。Shell的AssistantSurface instance僅在既有assistant presentation路徑選用 `entryStyle: "fab"`、`symbolVariant: "ditto"`；元件固定56 px與E1兩段啟動，沒有未選尺寸／展開方式的開關。`capsule`、`neutral`、`portrait`接點與其測試保留。Core／Profile、已儲存文件、開發／簡報、legacy avatar與會話安全契約不變。決策歷史見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。2026-10-19追加已收錄於D-48（commit `f6062a6`）；原結論不改寫。FAB與Dock中心對齊只對預設底部 `ditto.dock.pill`、scale 1 有測試保證：對齊用固定46 px中心離底常數，不讀取實際Dock provider、隱藏狀態或位置；其他provider／scale（例如2×會被底邊距夾成56 px）不保證對齊，見 #108。D1授權仍**未釐清**，來源與修改見 [SOURCES](../../../shell/assistant/SOURCES.md)。
+
+E1第一次click／Enter／Space展開「助理＋真實狀態」標籤膠囊（約195×56），第二次才經原activated路徑開同一compact ChatPanel。Escape收合不取消turn／approval；ChatBody保留IME composing guard。hover／focus僅0.96回饋，press 0.90，120 ms OutCubic；reduced-motion／隱藏會settle。沒有新增快捷動作或聊天權威。
+
+## 視覺修正與 oracle
+
+- D1仍引用既有body.png，35 px顯示，按device pixel ratio作3×解碼（DPR 1為105 px），smooth／mipmap。圓底加深、外環固定，不隨working pulse淡去。像素量測符號外環核心對實際膠囊填色，非只比token；淺色由約1.43:1到6.89:1，legacy約7.85:1，目標≥3:1。抗鋸齒邊緣不冒充核心對比。
+- 預設淺色DockPill中心離底46 px（edgeGap 12＋pillThickness 68／2）；AssistantSurface用具名常數及出處註解，測試直接比較實際provider幾何。1280×800收合／標籤均從y=740修到754，中心差−14→0 px，右距32 px。未編輯provider，也不決定#46移動。
+- chat.open驅動第二圈可見輪廓和Accessible「對話已開啟」文字；包含圓形FAB、標籤膠囊、reduced-motion與legacy theme。這是當前開啟狀態，不改任務投影或操作。
+- E1第二次啟動重現compact範例按鈕超出右界16 px。只在有entryRect的assistant compact啟用boundedSuggestions：按鈕保留既有16 px外邊距，完整文字在其內換行、保留原Accessible name與操作。legacy compact（entryRect=null）與full維持原單行版。ChatPanel只新增該padding opt-in，ChatBody只改範例排版。
+
+## 重跑與證據
+
+Qt／PATH依common-b8；全部是development，Core、session／turn／approval、輸出及layer-shell／FloatingWindow為fixture／替身。不是Wayfire、真模型、實體輸入或NFR證據。
 
 ```sh
-export QT_PREFIX=/data/hermes/.local/toolchains/qt/6.10.2/gcc_64
-bash tests/g4/visual/run-assistant.sh /path/to/evidence
-# 先 stage 助理後，原 R1 runner 也會擷取新增的十二張圖：
-bash tests/g4/visual/run.sh /path/to/evidence/visual
+bash tests/g4/visual/run-assistant.sh /data/hermes/ditto-runs/g4-impl/fab/evidence/repair1/after
+DITTO_ASSISTANT_CAPTURE_OUT=/data/hermes/ditto-runs/g4-impl/fab/evidence/repair1/after bash tests/g4/visual/run.sh /data/hermes/ditto-runs/g4-impl/fab/evidence/repair1/visual
+bash tests/g4/motion/run.sh /data/hermes/ditto-runs/g4-impl/fab/evidence/repair1/motion
 ```
 
-`run-assistant.sh` 不改既有 runner、供應者或共用測試。`stage-assistant.py` 複製實際 QML，只移除有紀錄的 layer-shell 行、以數值替代 stub 缺少的 ExclusionMode enum，並提供 FloatingWindow Item 替身（無真視窗裝飾、focus ownership）。`staging.json` 保存來源 SHA-256 與每個改動。Legacy 來源固定為 `25c0b726ef3c3bc7c8e00232514604cc0498007e`。
+- `unit/tst_assistant.qml`：既有七態、終態與離線原因、IME policy、capsule／neutral／portrait與32項合計；FAB僅56／E1，驗證首次展開不開聊天、鍵盤、透明圓角及reduced-motion。
+- `assistant/tst_assistant_flow.qml`：同一ConversationState、草稿／串流／歷史／approval、E1兩段鍵盤啟動、Escape、縮放Region與取樣；X→Y回焦policy、legacy compact四角像素／幾何與pre-candidate capsule三theme oracle保留。
+- `assistant/tst_assistant_repair.qml`：四項缺陷的實際像素／幾何、a11y與邊距回歸；`REPAIR_MEASURE`輸出原始數據。RED在366f174的來源上得到7項行為失敗，非compile失敗，見repair1/red/visual-regressions.log。
+- `capture/tst_assistant_capture.qml`：D1-56-E1共11場景（收合、hover、focus、標籤展開、working收合／展開、open標籤／圓形、reduced-motion、legacy theme、全桌面），加原normal／legacy各六場景，共23張1280×800。normal依新Shell選擇；legacy仍用原avatar。正常動畫保留並等待有限過渡完成，working pulse持續是有意的狀態提示。
 
-- `unit/tst_assistant.qml`：27 項，真實 pre-open／設定未回讀、終態與離線／停用原因並列、鍵盤、符號候選、圓角命中、IME composing policy、七態／starting／cancelling／reconnecting、未知／部分／停止終態。沒有真正的輸入法事件注入。
-- `assistant/tst_assistant_flow.qml`：12 項，真實 pre-open、X 開啟→切 Y→收合保留 Y（含延後回焦競態），四角 legacy compact 逐像素及幾何、入口真實矩形、0.5／1／2 倍命中區、hidden、表面切換保留草稿／串流／歷史／approval、Escape 收合不取消、approval Escape＝拒絕。真實應用回焦仍未執行。
-- `capture/tst_assistant_capture.qml`：normal／legacy 各六場景：收合、compact、完整、approval 待決、unknown、offline。PNG 放 evidence，不進 git。JSON 記 fixture、場景、幾何、renderer、commit 與 PNG hash；`profile_hash = null` 明確表示沒有真實 Core Profile 快照。
-- staging 另斷言 legacy avatar 掛載區塊、Avatar.qml、ApprovalWindow.qml 對照 base 逐字相同；不變的 approval／preview 仍走既有安全路徑。
+PNG只存repo外的repair1證據目錄，不進git。前後裁圖／量測總索引為 `/data/hermes/ditto-runs/g4-impl/fab/evidence/repair1/repair1.md`；runner逐張索引為after/assistant-captures.md，JSON記錄fixture、幾何、renderer、source／commit／PNG hashes，profile_hash=null。全桌面使用真正staged頂部列及Dock，無乾淨桌布，沒有拿需求JPEG當壁紙，不宣稱忠實還原或owner最終接受。
 
-協定 shape 與舊版拒絕／明確降版，可在沒有 Core socket 時用相同 TS schema checker 驗證：
+stage只移除有紀錄的layer-shell行、替代stub enum、提供FloatingWindow Item替身。legacy avatar掛載／Avatar.qml／ApprovalWindow.qml原始碼oracle保留（avatar按合併過對比修正的f99b4ea比對；其餘25c0b72）。既有schema shape checker仍可離線執行：
 
 ```sh
 git show 25c0b72:schema/profile-document.json > /path/to/evidence/profile-document-base.json
 node --experimental-strip-types tests/g4/visual/check-assistant-contracts.mjs /path/to/evidence/profile-document-base.json
 ```
 
-本 runner 的 sandbox 禁止 socket，也使 Node `spawnSync` 回 EPERM。原 `run.sh` 的 staging、protocol integration test、完整 Core IPC 與 lrelease 子程序 gate 需在 sandbox 外重跑，不能把替代步驟冒充原 gate 通過。本機替代程序直接跑 Python staging、qmltestrunner、`/usr/bin/python3 capture/compose.py`；TS shape checker 不啟動 Core；lrelease 直接執行並以 cmp 檢查 .qm。完整指令、exit、原始失敗及替代結果見 evidence `REPORT.md`／`gate-results.json`。
-
-決策紀錄見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。最終符號待 owner 決定，暫用中性符號；新預設主題與 Dock 是依 #71 的可逆交接選擇。
-
-收合場景現在直接使用 fresh ConversationState（wanted=false、settings/provider=null、無草稿／事件）；不再以已讀設定的 fixture 冒充首次呈現。新預設模板也適用日後 `desktop.profiles.create {from: default}` 建立的新 Profile，既有已儲存文件不改寫。
+實體Wayfire input region／回焦、IME、Orca、多屏熱插拔與NFR均未執行，交原驗收項。此runner的canonical i18n位於scripts/lint-shell-i18n.mjs；若Node啟動lrelease遭EPERM，保留BLOCKED並直接lrelease／cmp作補充，不以替代檢查冒充canonical通過。原R3的socket／IPC限制亦不由本slice解除。

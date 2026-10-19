@@ -7,6 +7,7 @@ by an explicitly recorded Item double. Legacy sources are pinned to 25c0b72.
 """
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -22,6 +23,9 @@ BASE = '25c0b726ef3c3bc7c8e00232514604cc0498007e'
 MOTION_BASE = 'f99b4ea0db5ceff1ef98956b7e32895784746157'
 OUT.mkdir(parents=True, exist_ok=True)
 (HERE / '.staged/out').mkdir(parents=True, exist_ok=True)
+capture_out = Path(os.environ.get('DITTO_ASSISTANT_CAPTURE_OUT', HERE / '.staged/out')).resolve()
+capture_out.mkdir(parents=True, exist_ok=True)
+(OUT / 'capture-output.js').write_text('var outDir = ' + json.dumps(str(capture_out) + '/') + ';\n')
 report = []
 
 
@@ -51,6 +55,19 @@ def stage(path, destination, base=False):
 
 for directory in ['chat', 'ui', 'change', 'assistant', 'jelly', 'avatar']:
     shutil.copytree(ROOT / 'shell' / directory, OUT / 'shell' / directory, dirs_exist_ok=True)
+# Pin the actual pre-candidate default button, including its symbol. The
+# unchanged jelly implementation is shared; do not derive an oracle from the
+# candidate's entryStyle flag.
+candidate_base = 'de8d6176690b472cc0cd101af9bf6d1a6a3b51e8'
+shutil.copytree(ROOT / 'shell/jelly', OUT / 'baseline/shell/jelly', dirs_exist_ok=True)
+for name in ['AssistantEntry.qml', 'AssistantSymbol.qml']:
+    path = 'shell/assistant/' + name
+    text = subprocess.check_output(['git', 'show', f'{candidate_base}:{path}'], cwd=ROOT).decode()
+    target = OUT / 'baseline' / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text)
+    report.append({'source': candidate_base + ':' + path, 'sha256': hashlib.sha256(text.encode()).hexdigest(),
+                   'destination': str(target.relative_to(HERE)), 'removed': []})
 for name in ['chat/ChatPanel.qml', 'assistant/AssistantSurface.qml']:
     stage('shell/' + name, 'shell/' + name)
 for name in ['ChatPanel.qml', 'ChatBody.qml']:
@@ -83,6 +100,15 @@ end = '\n    /// The shell\'s control path:'
 assert base_shell[base_shell.index(start):base_shell.index(end)] == current_shell[current_shell.index(start):current_shell.index(end)]
 assert subprocess.check_output(['git', 'show', f'{MOTION_BASE}:shell/avatar/Avatar.qml'], cwd=ROOT).decode() == source('shell/avatar/Avatar.qml')
 assert source('shell/chat/ApprovalWindow.qml', True) == source('shell/chat/ApprovalWindow.qml')
+# Owner adoption may change only the AssistantSurface instance in shell.qml.
+pre_choice = subprocess.check_output(['git', 'show', '366f1743e3b165df0c210f89e7b9e671176e25a8:shell/shell.qml'], cwd=ROOT).decode()
+pattern = r'        AssistantSurface \{.*?\n        \}'
+selected = re.search(pattern, current_shell, re.S).group(0)
+previous = re.search(pattern, pre_choice, re.S).group(0)
+assert 'entryStyle: "fab"' in selected and 'symbolVariant: "ditto"' in selected
+assert current_shell.replace(selected, previous, 1) == pre_choice
+report.append({'oracle': 'shell.qml changes only AssistantSurface properties; fixed 56/E1 lives in the component, legacy mounting unchanged'})
+
 report.append({'oracle': 'legacy avatar surface and ApprovalWindow.qml match 25c0b72; Avatar.qml matches f99b4ea byte for byte (merged statusForeground correction)'})
 (OUT / 'staging.json').write_text(json.dumps(report, indent=2) + '\n')
 print('assistant staged; legacy structure and approval match 25c0b72')

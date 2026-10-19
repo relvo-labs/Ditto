@@ -116,6 +116,7 @@ PanelWindow {
             opacity: 0.92 + presentation.value * 0.08
             focus: true
             compact: true
+            boundedSuggestions: !!panel.entryRect
             client: panel.client
             tokens: panel.tokens
             conversation: panel.conversation

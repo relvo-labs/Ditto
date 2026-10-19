@@ -1,8 +1,11 @@
 import QtQuick
 import QtTest
+import Quickshell
 import DittoStub
 import "../.staged/assistant/shell/jelly" as Jelly
 import "../.staged/assistant/shell/chat" as Chat
+import "../.staged/capture-data.js" as Data
+import "../.staged/assistant/capture-output.js" as Output
 
 // Development fixture captures of the actual Shell components. Session/turn
 // ids below are explicit fixtures; no model, Core IPC or real approval runs.
@@ -13,7 +16,8 @@ TestCase {
     height: 800
     visible: true
     when: windowShown
-    readonly property string outDir: Qt.resolvedUrl("../.staged/out/").toString().replace("file://", "")
+    readonly property string outDir: Output.outDir
+    property string candidateCaption: ""
     Item {
         id: desktop
         width: 1280
@@ -21,10 +25,16 @@ TestCase {
         Jelly.Backdrop { anchors.fill: parent; tokens: tokens }
         Item { id: layer; anchors.fill: parent }
         Text {
-            x: 24; y: 16
+            x: 24; y: testCase.candidateCaption ? 44 : 16
             text: "Development fixture · no Core / compositor / model"
             color: tokens.foregroundMuted
             font.pixelSize: 14
+        }
+        Text {
+            x: 32; y: 72
+            text: testCase.candidateCaption
+            color: tokens.foreground
+            font.pixelSize: 18
         }
     }
     Jelly.Tokens { id: tokens }
@@ -32,12 +42,20 @@ TestCase {
         id: client
         property bool online: true
         property var packages: []
+        property var windows: []
+        property string status: ""
+        property var workspaces: [
+            { id: "1", name: "1", active: true }, { id: "2", name: "2", active: false },
+            { id: "3", name: "3", active: false }, { id: "4", name: "4", active: false }
+        ]
         signal changeUpdated(var change)
         signal disconnected()
         function t(text) { return text; }
         function key(text, args) { return text; }
         function capabilityAvailable(name) { return false; }
-        function capability(name, args, ok, fail) { if (ok) ok({}); }
+        function capability(name, args, ok, fail) {
+            if (ok) ok(name === "desktop.launcher.list_apps" ? { apps: Data.apps } : {});
+        }
         function watchTopics(topics, event, resync, ready, error) {
             ready({ subscription_id: "fixture-subscription" });
         }
@@ -53,9 +71,111 @@ TestCase {
         return object;
     }
     function cleanup() {
-        for (const object of mounted) object.destroy();
+        mouseMove(desktop, 640, 400);
+        candidateCaption = "";
+        for (const object of mounted) {
+            if (typeof object.release === "function") object.release();
+            object.destroy();
+        }
         mounted = [];
         wait(20);
+    }
+    function provider(file, config) {
+        const component = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/" + file));
+        compare(component.status, Component.Ready, component.errorString());
+        const incubator = component.incubateObject(testCase, { tokens: tokens, client: client, config: config,
+            entryId: file, slotName: "", shown: false });
+        incubator.forceCompletion();
+        const object = incubator.object;
+        verify(object !== null, component.errorString());
+        mounted.push(object);
+        object.shown = true;
+        return object;
+    }
+    function test_selected_data() {
+        return ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"]
+            .map(scene => ({ tag: "D1-56-E1-" + scene, scene: scene }));
+    }
+    function test_selected(data) {
+        StubDesktop.layer = layer;
+        StubDesktop.screenWidth = 1280; StubDesktop.screenHeight = 800;
+        Quickshell.iconMap = Data.iconMap;
+        const scene = data.scene;
+        const isWorking = scene.indexOf("working") === 0;
+        tokens.appearance = { theme: scene === "legacy-theme" ? "soft-jelly" : "soft-jelly-light",
+            tokens: {}, reduced_motion: scene === "reduced-motion" };
+        client.online = true;
+        conversation.wanted = false;
+        conversation.subscriptionId = "";
+        conversation.settings = { enabled: true };
+        conversation.provider = { available: true, authenticated: true };
+        conversation.sessionId = "fixture-fab-session";
+        conversation.turn = isWorking ? { turn_id: "fixture-fab-turn", state: "running" } : null;
+        conversation.events = [];
+        conversation.runtime = null;
+        conversation.reconnecting = false;
+        conversation.draft = "";
+        conversation.streamText = "";
+        const output = { name: "fixture-output", width: 1280, height: 800 };
+        const surface = mount("shell/assistant/AssistantSurface.qml", {
+            tokens: tokens, conversation: conversation, client: client, screen: output,
+            entryStyle: "fab", symbolVariant: "ditto"
+        });
+        const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
+        let chat = null;
+        surface.activated.connect(() => {
+            conversation.wanted = true;
+            const r = surface.contentItem;
+            chat = mount("shell/chat/ChatPanel.qml", { tokens: tokens, client: client, conversation: conversation,
+                screen: output, entryRect: { x: r.x, y: r.y, width: r.width, height: r.height } });
+            chat.closeRequested.connect(() => { chat.visible = false; surface.expanded = false; });
+            surface.expanded = true;
+        });
+        if (["expanded", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"].indexOf(scene) >= 0)
+            mouseClick(entry, entry.width / 2, entry.height / 2);
+        if (["open", "open-collapsed", "reduced-motion", "legacy-theme"].indexOf(scene) >= 0)
+            entry.activate(); // E1 second activation: same compact, no new chat.
+        if (scene === "open-collapsed") surface.labelExpanded = false;
+        if (isWorking) conversation.wanted = true;
+        if (scene === "hover") mouseMove(entry, entry.width / 2, entry.height / 2);
+        else mouseMove(desktop, 640, 400);
+        if (scene === "focus") entry.forceActiveFocus();
+        let dock = null;
+        if (scene === "desktop") {
+            dock = provider("DockPill.qml", { position: "bottom", pinned: Data.pinned });
+            provider("PanelTop.qml", {});
+            tryCompare(dock, "appsLoaded", true);
+            compare(dock.entries.length, Data.pinned.length);
+            const capsule = findChild(layer, "dockCapsule");
+            tryVerify(() => capsule.width > capsule.height * 2, 3000, "Dock laid out with icons");
+            tryCompare(dock, "reveal", 1);
+            tryVerify(() => dock.entries.every(item => !findChild(layer, "dockTile_" + item.appId).motionRunning));
+            tryVerify(() => ["panelNetworkIcon", "panelVolumeIcon"].every(name => findChild(layer, name).status !== Image.Loading));
+        }
+        candidateCaption = "D1 · 56 px · E1 · " + scene
+            + "\n點擊 / Enter / Space 展開；hover / focus 僅回饋；Escape 收合"
+            + "\nowner 選定（2026-10-19）· 無新增快捷動作 · 無桌布素材";
+        tryCompare(findChild(entry, "dittoBodyImage"), "status", Image.Ready);
+        tryCompare(entry, "feedbackRunning", false);
+        if (chat) tryCompare(findChild(chat.contentItem, "chatPresentationContent"), "opacity", 1);
+        // grabImage renders synchronously; wait for layout and the actual
+        // finite motion above, rather than waiting for an unrelated swap.
+        waitForPolish(desktop);
+        const path = outDir + "assistant-" + data.tag + ".png";
+        const capture = grabImage(desktop);
+        compare(capture.width, 1280); compare(capture.height, 800);
+        capture.save(path);
+        console.log("ASSISTANT_CAPTURE " + JSON.stringify({ scene: data.tag, file: path,
+            evidence_class: "development", fixture: true, presentation: "D1-56-E1",
+            symbol: surface.symbolVariant, fab_size: 56, expansion: "E1",
+            trigger: "click/Enter/Space; hover/focus feedback only; Escape collapse",
+            viewport: [1280,800], scale: 1, compositor: "stub", profile_hash: null,
+            renderer: desktop.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "graphics-api-" + desktop.GraphicsInfo.api,
+            entry: { x: surface.contentItem.x, y: surface.contentItem.y, width: surface.width, height: surface.height },
+            chat: chat ? { x: chat.contentItem.x, y: chat.contentItem.y, width: chat.width, height: chat.height } : null,
+            motion: { enabled: tokens.motionEnabled, settled: !entry.feedbackRunning, working_cue: entry.workingCueRunning },
+            state_text: entry.statusText, session_id: conversation.sessionId,
+            turn_id: conversation.turn ? conversation.turn.turn_id : null, full_desktop: !!dock }));
     }
     function test_scenes_data() {
         const rows = [];
@@ -97,9 +217,10 @@ TestCase {
             entryRect = { x: 1028, y: 486, width: 220, height: 250 };
         } else {
             const entry = mount("shell/assistant/AssistantSurface.qml", {
-                tokens: tokens, conversation: conversation, client: client, screen: output
+                tokens: tokens, conversation: conversation, client: client, screen: output,
+                entryStyle: "fab", symbolVariant: "ditto", labelExpanded: !preopen, expanded: !preopen
             });
-            entryRect = { x: 1280 - 32 - entry.implicitWidth, y: 800 - 32 - entry.implicitHeight,
+            entryRect = { x: entry.contentItem.x, y: entry.contentItem.y,
                 width: entry.implicitWidth, height: entry.implicitHeight };
             entryControl = entry.contentItem.children.find(item => typeof item.symbolVariant === "string");
         }
@@ -114,7 +235,7 @@ TestCase {
             mount("shell/chat/ApprovalWindow.qml", { tokens: tokens, client: client, x: 360, y: 240,
                 approval: { request_id: "fixture-request", request: { resource: "desktop.config" } } });
         }
-        if (entryControl) tryCompare(entryControl.children[0], "scale", 1);
+        if (entryControl) tryCompare(entryControl, "feedbackRunning", false);
         if (chat && scene !== "full") tryCompare(findChild(chat.contentItem, "chatPresentationContent"), "opacity", 1);
         waitForRendering(desktop);
         const path = outDir + "assistant-" + data.tag + ".png";

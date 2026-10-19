@@ -270,6 +270,14 @@
         <translation>Assistant</translation>
     </message>
     <message>
+        <source>對話已開啟</source>
+        <translation>Conversation open</translation>
+    </message>
+    <message>
+        <source>展開助理</source>
+        <translation>Expand assistant</translation>
+    </message>
+    <message>
         <source>待命中</source>
         <translation>Idle</translation>
     </message>
@@ -2328,12 +2336,20 @@
         <translation>Composition center</translation>
     </message>
     <message>
+        <source>網路不可用</source>
+        <translation>Network unavailable</translation>
+    </message>
+    <message>
         <source>網路已連線</source>
         <translation>Network connected</translation>
     </message>
     <message>
         <source>網路未連線</source>
         <translation>Network disconnected</translation>
+    </message>
+    <message>
+        <source>網路狀態未知</source>
+        <translation>Network status unknown</translation>
     </message>
     <message>
         <source>變更紀錄</source>
@@ -2366,14 +2382,6 @@
     <message>
         <source>（目前）</source>
         <translation> (current)</translation>
-    </message>
-    <message>
-        <source>網路不可用</source>
-        <translation>Network unavailable</translation>
-    </message>
-    <message>
-        <source>網路狀態未知</source>
-        <translation>Network status unknown</translation>
     </message>
 </context>
 <context>
