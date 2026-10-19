@@ -181,7 +181,7 @@ TestCase {
             motion: { enabled: sceneTokens.motionEnabled, settled: true, dock_reveal: dock.reveal },
             fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null,
                        system_status: statusFixture ? { muted: fixtureAudio.muted, volume: fixtureAudio.volume,
-                           network_connectivity: Networking.connectivity } : null },
+                           network_connectivity: Networking.connectivity, network_devices: Networking.devices } : null },
             panel_presentation: panel.soft ? "light" : "legacy",
             panel_icons: panel.soft ? ["panelNetwork", "panelVolume"].map(name => {
                 const button = findChild(layer, name);
@@ -253,7 +253,7 @@ TestCase {
         fixtureAudio.muted = true;
         Networking.backend = NetworkBackendType.NetworkManager;
         Networking.connectivity = NetworkConnectivity.Full;
-        Networking.devices = { values: [{ connected: true }] };
+        Networking.devices = { values: [{ type: DeviceType.Wifi, connected: true }] };
         render("panel-muted-connected", light(), [], null);
         fixtureAudio.muted = false;
         for (const level of [{ value: 0, name: "low" }, { value: 0.4, name: "medium" }, { value: 1, name: "high" }]) {
@@ -265,7 +265,14 @@ TestCase {
         Networking.devices = { values: [] };
         render("panel-unknown", light(), [], null);
         Networking.connectivity = NetworkConnectivity.None;
+        Networking.devices = { values: [{ type: DeviceType.Wifi, connected: false }] };
         render("panel-offline", light(), [], null);
+        // #102 B2: wired devices have their own glyphs.
+        Networking.devices = { values: [{ type: DeviceType.Wired, connected: false }] };
+        render("panel-wired-disconnected", light(), [], null);
+        Networking.connectivity = NetworkConnectivity.Full;
+        Networking.devices = { values: [{ type: DeviceType.Wired, connected: true }] };
+        render("panel-wired-connected", light(), [], null);
         statusFixture = false;
         Pipewire.ready = false; Pipewire.defaultAudioSink = null;
         Networking.backend = NetworkBackendType.None;

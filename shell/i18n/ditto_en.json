@@ -32,6 +32,7 @@
   "Ditto 需要你的確認": "Ditto needs your confirmation",
   "Ditto：": "Ditto: ",
   "G1 只接受內建來源的可信套件。安裝只放進套件庫，不會改變目前的組合。": "G1 accepts only trusted built-in packages. Installing only adds a package to the store; the composition in use does not change.",
+  "M月d日 ddd HH:mm": "ddd MMM d HH:mm",
   "、": ", ",
   "「%1」%2": "“%1” %2",
   "「%1」的版本": "Versions of “%1”",

@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls as Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
@@ -37,6 +36,23 @@ Scope {
     readonly property Item statusRegion: statusRow
     property bool ready: false
     property bool menuOpen: false
+    /// The Ditto language ("zh-TW" or "en"), from the Shell's translator.
+    readonly property string language: client && client.tr && client.tr.language === "en" ? "en" : "zh-TW"
+    /// The control whose tooltip is wanted (hover or keyboard focus).
+    property FeedbackButton tooltipOwner: null
+    property bool tooltipShown: false
+
+    function wantTooltip(owner, wanted) {
+        if (wanted) {
+            tooltipOwner = owner;
+            tooltipShown = false;
+            tooltipDelay.restart();
+        } else if (tooltipOwner === owner) {
+            tooltipDelay.stop();
+            tooltipShown = false;
+            tooltipOwner = null;
+        }
+    }
 
     function healthy() {
         return ready && client !== null && tokens !== null;
@@ -45,6 +61,9 @@ Scope {
     function release() {
         menuOpen = false;
         shown = false;
+        tooltipDelay.stop();
+        tooltipShown = false;
+        tooltipOwner = null;
     }
 
     function t(source) {
@@ -75,6 +94,12 @@ Scope {
         id: clock
         enabled: provider.shown
         precision: SystemClock.Minutes
+    }
+
+    Timer {
+        id: tooltipDelay
+        interval: 600
+        onTriggered: provider.tooltipShown = provider.tooltipOwner !== null
     }
 
     PanelWindow {
@@ -323,18 +348,60 @@ Scope {
             readonly property real workspaceCell: Math.max(31, ...(provider.client ? provider.client.workspaces : [])
                 .map(workspace => workspaceMetrics.advanceWidth(workspace.name) + 16))
             readonly property int workspaceCount: provider.client ? provider.client.workspaces.length : 0
-            readonly property real workspaceNatural: Math.max(1, workspaceCount) * workspaceCell + Math.max(0, workspaceCount - 1) * 4 + 8
-            readonly property real statusNatural: lightNetwork.width + lightVolume.width + lightClock.implicitWidth + 40
-                + (statusRow.implicitWidth > 0 ? statusRow.implicitWidth + 12 : 0)
-            readonly property real statusMinimum: Math.max(lightNetwork.width, lightVolume.width, lightClock.implicitWidth, statusRow.implicitWidth) + 16
-            readonly property real statusPreferred: Math.max(242, statusNatural)
+            // Widths of the status grid's laid-out members, in order. The
+            // status-item host takes part only while it holds members, like
+            // the Grid (an empty host would otherwise leave a spacing gap).
+            readonly property var statusMembers: [lightNetwork.width, lightVolume.width]
+                .concat(lightStatusHost.visible ? [statusRow.implicitWidth] : [])
+                .concat([lightClock.implicitWidth])
             readonly property real leftMinimum: lightMenu.width + 12
-            readonly property real leftWidth: Math.min(360, Math.max(leftMinimum, usableWidth - workspaceNatural - statusPreferred))
-            readonly property real remainingWidth: usableWidth - leftWidth
-            readonly property real statusWidth: Math.max(statusMinimum, Math.min(statusPreferred, remainingWidth - workspaceNatural))
-            readonly property real workspaceWidth: Math.min(workspaceNatural, Math.max(workspaceCell + 8, remainingWidth - statusWidth))
-            readonly property int workspaceColumns: Math.max(1, Math.min(workspaceCount, Math.floor((workspaceWidth - 8 + 4) / (workspaceCell + 4))))
-            readonly property bool statusWrap: statusWidth + 0.1 < statusNatural
+            function workspaceExtent(rows) {
+                const columns = Math.ceil(Math.max(1, workspaceCount) / rows);
+                return columns * workspaceCell + (columns - 1) * 4 + 8;
+            }
+            function statusExtent(columns) {
+                const used = Math.min(columns, statusMembers.length);
+                let total = 0;
+                for (let column = 0; column < used; ++column) {
+                    let widest = 0;
+                    for (let index = column; index < statusMembers.length; index += used)
+                        widest = Math.max(widest, statusMembers[index]);
+                    total += widest;
+                }
+                return total + Math.max(0, used - 1) * 12 + 16;
+            }
+            // Narrow screens (#105 C1): the fewest rows that fit beside the
+            // shortest left capsule. At equal height the status capsule keeps
+            // more columns and the workspaces fewer rows, so the workspaces
+            // wrap first, then the status capsule takes two columns, one last.
+            readonly property var arrangement: {
+                const room = usableWidth - leftMinimum;
+                const rowsMax = Math.max(1, workspaceCount);
+                let best = null;
+                for (let rows = 1; rows <= rowsMax; ++rows) {
+                    for (const columns of [4, 2, 1]) {
+                        const workspaces = workspaceExtent(rows), status = statusExtent(columns);
+                        if (workspaces + status > room) continue;
+                        const height = Math.max(rows, Math.ceil(statusMembers.length / Math.min(columns, statusMembers.length)));
+                        const key = [height, -columns, rows];
+                        if (best === null || key[0] < best.key[0] || (key[0] === best.key[0]
+                                && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2]))))
+                            best = { key: key, rows: rows, columns: columns, workspaces: workspaces, status: status };
+                    }
+                }
+                return best !== null ? best
+                    : { rows: rowsMax, columns: 1, workspaces: workspaceExtent(rowsMax), status: statusExtent(1) };
+            }
+            // A single-row status capsule keeps the 242 px reference width when
+            // there is room; a wrapped one is exactly as wide as its content.
+            readonly property real statusPreferred: arrangement.columns === 4 ? Math.max(242, arrangement.status) : arrangement.status
+            readonly property real workspaceWidth: arrangement.workspaces
+            readonly property real leftWidth: Math.min(360, Math.max(leftMinimum, usableWidth - workspaceWidth - statusPreferred))
+            readonly property real statusWidth: Math.max(arrangement.status, Math.min(statusPreferred, usableWidth - leftWidth - workspaceWidth))
+            readonly property int workspaceColumns: Math.ceil(Math.max(1, workspaceCount) / arrangement.rows)
+            // Never more grid columns than members: an empty column still
+            // gets spacing and would push the content off centre (#105 C3).
+            readonly property int statusColumns: Math.max(1, Math.min(arrangement.columns, statusMembers.length))
 
             SoftCapsule {
                 id: leftCapsule
@@ -404,6 +471,7 @@ Scope {
                 height: Math.max(lightPanel.capsuleHeight, workspaceStrip.implicitHeight + 6)
                 Grid {
                     id: workspaceStrip
+                    objectName: "panelWorkspaceStrip"
                     anchors.centerIn: parent
                     columns: lightPanel.workspaceColumns
                     spacing: 4
@@ -444,8 +512,9 @@ Scope {
                 height: Math.max(lightPanel.capsuleHeight, statusStrip.implicitHeight + 4)
                 Grid {
                     id: statusStrip
+                    objectName: "panelStatusStrip"
                     anchors.centerIn: parent
-                    columns: lightPanel.statusWrap ? 1 : 4
+                    columns: lightPanel.statusColumns
                     columnSpacing: 12
                     rowSpacing: 4
                     verticalItemAlignment: Grid.AlignVCenter
@@ -454,16 +523,28 @@ Scope {
                         objectName: "panelNetwork"
                         height: lightPanel.capsuleHeight - 4
                         readonly property bool available: Networking.backend !== NetworkBackendType.None
-                        readonly property bool connected: {
-                            const devices = Networking.devices ? Networking.devices.values : [];
-                            return devices.some(device => device.connected);
-                        }
+                        readonly property var devices: Networking.devices ? Networking.devices.values : []
+                        readonly property bool connected: devices.some(device => device.connected)
                         readonly property bool unknown: available && !connected && Networking.connectivity === NetworkConnectivity.Unknown
+                        // The device the icon describes: a connected one (wired
+                        // first), else a Wi-Fi adapter, else a wired one.
+                        readonly property var device: {
+                            const live = devices.filter(item => item.connected);
+                            return live.find(item => item.type === DeviceType.Wired) || live.find(item => item.type === DeviceType.Wifi)
+                                || live[0] || devices.find(item => item.type === DeviceType.Wifi)
+                                || devices.find(item => item.type === DeviceType.Wired) || null;
+                        }
+                        readonly property string kind: device && device.type === DeviceType.Wired ? "wired"
+                            : device && device.type === DeviceType.Wifi ? "wireless" : "other"
                         accessibleLabel: !available ? provider.t(qsTr("網路不可用"))
                             : unknown ? provider.t(qsTr("網路狀態未知"))
                             : connected ? provider.t(qsTr("網路已連線")) : provider.t(qsTr("網路未連線"))
-                        iconName: !available ? "network-error-symbolic" : unknown ? "network-idle-symbolic"
-                            : connected ? "network-wireless-signal-excellent-symbolic" : "network-wireless-offline-symbolic"
+                        // Connected, disconnected, unknown per device type (#102 B2).
+                        iconName: !available ? "network-error-symbolic" : ({
+                            wired: ["network-wired-symbolic", "network-wired-disconnected-symbolic", "network-wired-acquiring-symbolic"],
+                            wireless: ["network-wireless-signal-excellent-symbolic", "network-wireless-offline-symbolic", "network-wireless-acquiring-symbolic"],
+                            other: ["network-transmit-receive-symbolic", "network-offline-symbolic", "network-idle-symbolic"]
+                        })[kind][connected ? 0 : unknown ? 2 : 1]
                         // A mark still distinguishes unknown/unavailable if a theme aliases icons.
                         marker: !available ? "!" : unknown ? "?" : ""
                         onActivated: if (provider.client) provider.client.launchApp("nm-connection-editor")
@@ -478,14 +559,20 @@ Scope {
                             : sink.audio.muted ? provider.t(qsTr("音量 靜音"))
                             : provider.t(qsTr("音量 %1%")).arg(Math.round(sink.audio.volume * 100))
                         iconName: !known ? "audio-card-symbolic" : sink.audio.muted ? "audio-volume-muted-symbolic"
-                            : sink.audio.volume === 0 ? "audio-volume-low-symbolic"
-                            : sink.audio.volume < 0.67 ? "audio-volume-medium-symbolic" : "audio-volume-high-symbolic"
+                            : sink.audio.volume < 1 / 3 ? "audio-volume-low-symbolic"
+                            : sink.audio.volume < 2 / 3 ? "audio-volume-medium-symbolic" : "audio-volume-high-symbolic"
                         marker: !known ? "!" : sink.audio.muted ? "∕" : ""
+                        // Space and the toggle action mute; Enter, the press
+                        // action and right click open details (#102 B1).
+                        spaceToggles: known
+                        Accessible.checkable: known
+                        Accessible.checked: known && sink.audio.muted
+                        Accessible.onToggleAction: if (known) toggled()
+                        onToggled: if (known) sink.audio.muted = !sink.audio.muted
                         onActivated: button => {
-                            // Keyboard and right click open details; left click toggles mute.
-                            if (button !== Qt.LeftButton) {
-                                if (provider.client) provider.client.launchApp("pavucontrol");
-                            } else if (known) sink.audio.muted = !sink.audio.muted;
+                            // Left click toggles mute; other paths open details.
+                            if (button === Qt.LeftButton) toggled();
+                            else if (provider.client) provider.client.launchApp("pavucontrol");
                         }
                         onScrolled: delta => {
                             if (known) sink.audio.volume = Math.max(0, Math.min(1.5, sink.audio.volume + (delta > 0 ? 0.05 : -0.05)));
@@ -493,6 +580,8 @@ Scope {
                     }
                     Item {
                         id: lightStatusHost
+                        // Out of the grid while empty: no gap, content stays centred.
+                        visible: statusRow.children.length > 0
                         width: statusRow.implicitWidth
                         height: statusRow.implicitHeight
                     }
@@ -503,7 +592,10 @@ Scope {
                         verticalAlignment: Text.AlignVCenter
                         color: provider.tokens.foreground
                         font.pixelSize: provider.tokens.fontSmall
-                        text: Qt.formatDateTime(clock.date, "MM/dd HH:mm")
+                        // Ditto language with the weekday (#102 B3); 24-hour, no seconds.
+                        //: Top bar clock: a Qt date pattern (ddd is the short weekday name).
+                        text: clock.date.toLocaleString(Qt.locale(provider.language === "en" ? "en_US" : "zh_TW"),
+                                                        provider.t(qsTr("M月d日 ddd HH:mm")))
                         Accessible.role: Accessible.StaticText
                         Accessible.name: text
                     }
@@ -537,6 +629,8 @@ Scope {
         property string accessibleLabel: ""
         property bool interactive: true
         property string tooltipText: ""
+        /// Space emits toggled() instead of activated() (volume: mute).
+        property bool spaceToggles: false
         enabled: interactive
         property int pointerButtons: Qt.LeftButton
         readonly property real feedbackTarget: !interactive || !visible || !provider.shown ? 1
@@ -546,17 +640,21 @@ Scope {
         readonly property bool motionActive: interactive && visible && provider.shown && provider.tokens.motionEnabled
         default property alias content: visual.data
         signal activated(int button)
+        signal toggled()
         signal scrolled(real delta)
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: accessibleLabel
         Accessible.description: tooltipText
-        Controls.ToolTip.visible: provider.shown && button.visible && tooltipText !== "" && interactive && (area.containsMouse || activeFocus)
-        Controls.ToolTip.text: tooltipText
-        Controls.ToolTip.delay: 600
+        // The tooltip is the provider's own popup surface (#105 C2).
+        readonly property bool wantsTooltip: provider.shown && visible && tooltipText !== "" && interactive
+            && (area.containsMouse || activeFocus)
+        onWantsTooltipChanged: provider.wantTooltip(button, wantsTooltip)
+        Component.onDestruction: provider.wantTooltip(button, false)
         Accessible.onPressAction: if (interactive) activated(Qt.NoButton)
         Keys.onReturnPressed: if (interactive) activated(Qt.NoButton)
-        Keys.onSpacePressed: if (interactive) activated(Qt.NoButton)
+        Keys.onEnterPressed: if (interactive) activated(Qt.NoButton)
+        Keys.onSpacePressed: if (interactive) { if (spaceToggles) toggled(); else activated(Qt.NoButton); }
         function retarget() {
             feedback.stop();
             if (!motionActive) { feedbackScale = feedbackTarget; return; }
@@ -615,10 +713,14 @@ Scope {
         }
         Text {
             objectName: statusButton.objectName + "Marker"
-            anchors.right: parent.right; anchors.top: parent.top
+            // One pixel further out and a knock-out ring in the capsule's own
+            // colour, so the mark never reads as part of the glyph (#105 C3).
+            anchors.right: parent.right; anchors.top: parent.top; anchors.rightMargin: -1
             visible: statusIcon.status === Image.Ready && statusButton.marker !== ""
             text: statusButton.marker
             color: provider.tokens.foreground
+            style: Text.Outline
+            styleColor: Qt.rgba(provider.tokens.surface.r, provider.tokens.surface.g, provider.tokens.surface.b, 1)
             font.pixelSize: provider.tokens.fontSmall
             font.bold: true
         }
@@ -633,11 +735,16 @@ Scope {
         }
     }
 
-    // Paint only when source/colour/size changes (18×18 at the default
-    // recipe). This CPU alpha mask also works without shaders. Symbolic SVGs
-    // encode levels in their alpha, so retain it (including antialiasing).
-    // Neutral shapes use foreground; red error accents use the semantic
-    // danger colour instead of losing their secondary colour cue.
+    // Paint only when source/colour/size/device ratio changes (18×18 at the
+    // default recipe). This CPU alpha mask also works without shaders. The
+    // SVG is rasterised at the device size and recoloured pixel for pixel in
+    // device pixels, so a 2× output stays as sharp as the theme draws it
+    // (#105 C3). Symbolic SVGs encode levels in their alpha, so retain it
+    // (including antialiasing) — except for a glyph with no opaque part at
+    // all (a whole icon drawn dimmed, e.g. Yaru's offline Wi-Fi at 50 %):
+    // that one is raised to full strength so its thin lines stay legible
+    // (#105 O1). Neutral shapes use foreground; red error accents use the
+    // semantic danger colour instead of losing their secondary colour cue.
     component SymbolicIcon: Item {
         id: glyph
         property alias source: sourceImage.source
@@ -646,11 +753,19 @@ Scope {
         readonly property int status: sourceImage.status !== Image.Ready ? sourceImage.status
             : paint.loaded && painted ? Image.Ready : Image.Loading
         property bool painted: false
+        readonly property real ratio: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
+        readonly property int deviceWidth: Math.max(1, Math.round(width * ratio))
+        readonly property int deviceHeight: Math.max(1, Math.round(height * ratio))
+        /// The source's highest alpha (0–1) and whether it was raised.
+        property real peakAlpha: 0
+        property bool normalized: false
         function loadSource() {
             painted = false;
             paint.loaded = false;
-            if (String(source) !== "") {
-                paint.loadImage(source);
+            if (paint.requested !== "") paint.unloadImage(paint.requested);
+            paint.requested = String(source);
+            if (paint.requested !== "") {
+                paint.loadImage(source, Qt.size(deviceWidth, deviceHeight));
                 // Cached Canvas images may already be ready without emitting
                 // another imageLoaded signal for this URL.
                 paint.loaded = paint.isImageLoaded(source);
@@ -658,6 +773,8 @@ Scope {
             }
         }
         onSourceChanged: loadSource()
+        onDeviceWidthChanged: loadSource()
+        onDeviceHeightChanged: loadSource()
         Component.onCompleted: loadSource()
         onColorChanged: paint.requestPaint()
         onErrorColorChanged: paint.requestPaint()
@@ -666,29 +783,37 @@ Scope {
             id: paint
             anchors.fill: parent
             property bool loaded: false
+            property string requested: ""
             onImageLoaded: { loaded = isImageLoaded(glyph.source); requestPaint(); }
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
             onPaint: {
                 if (!loaded || width <= 0 || height <= 0) return;
+                const w = glyph.deviceWidth, h = glyph.deviceHeight;
                 const ctx = getContext("2d");
                 ctx.clearRect(0, 0, width, height);
-                ctx.drawImage(glyph.source, 0, 0, width, height);
-                const pixels = ctx.getImageData(0, 0, width, height);
-                ctx.clearRect(0, 0, width, height);
-                for (let y = 0; y < height; ++y) {
-                    for (let x = 0; x < width; ++x) {
-                        const offset = (y * width + x) * 4;
+                ctx.save();
+                ctx.scale(1 / glyph.ratio, 1 / glyph.ratio); // device pixels from here
+                ctx.drawImage(glyph.source, 0, 0, w, h);
+                const pixels = ctx.getImageData(0, 0, w, h);
+                ctx.clearRect(0, 0, w, h);
+                let peak = 0;
+                for (let offset = 3; offset < pixels.data.length; offset += 4) peak = Math.max(peak, pixels.data[offset]);
+                const gain = peak > 0 && peak < 192 ? 255 / peak : 1;
+                for (let y = 0; y < h; ++y) {
+                    for (let x = 0; x < w; ++x) {
+                        const offset = (y * w + x) * 4;
                         const alpha = pixels.data[offset + 3];
                         if (alpha === 0) continue;
                         const red = pixels.data[offset];
                         const isError = red > pixels.data[offset + 1] * 1.5 && red > pixels.data[offset + 2] * 1.25;
                         ctx.fillStyle = isError ? glyph.errorColor : glyph.color;
-                        ctx.globalAlpha = alpha / 255;
+                        ctx.globalAlpha = Math.min(1, alpha * gain / 255);
                         ctx.fillRect(x, y, 1, 1);
                     }
                 }
+                ctx.restore();
                 ctx.globalAlpha = 1;
+                glyph.peakAlpha = peak / 255;
+                glyph.normalized = gain !== 1;
                 glyph.painted = true;
             }
         }
@@ -700,7 +825,9 @@ Scope {
         visible: provider.shown && provider.menuOpen
         anchor.window: panel
         anchor.rect.x: provider.soft ? leftCapsule.x : 8
-        anchor.rect.y: panel.height
+        // Light: just below the Ditto capsule, even when wrapped pills make
+        // the bar taller (#105 C1); legacy: below the bar.
+        anchor.rect.y: provider.soft ? leftCapsule.y + leftCapsule.height + 4 : panel.height
         implicitWidth: 220
         implicitHeight: menuColumn.implicitHeight + provider.tokens.space * 2
         color: "transparent"
@@ -800,6 +927,49 @@ Scope {
                         onClicked: parent.activate()
                     }
                 }
+            }
+        }
+    }
+
+    /// Tooltip: a popup surface of its own, so it is never clipped by the
+    /// panel window's 36 px; themed like the menu, under its control,
+    /// clamped to the screen, and pointer input passes through it.
+    PopupWindow {
+        id: tooltip
+        objectName: "panelTooltipWindow"
+        readonly property FeedbackButton owner: provider.tooltipOwner
+        readonly property point spot: {
+            if (!owner || !provider.tooltipShown) return Qt.point(0, 0);
+            const bottom = owner.mapToItem(lightPanel, owner.width / 2, owner.height);
+            return Qt.point(bottom.x, bottom.y);
+        }
+        visible: provider.shown && provider.soft && provider.tooltipShown && owner !== null
+        anchor.window: panel
+        anchor.rect.x: Math.round(Math.max(8, Math.min(panel.width - width - 8, spot.x - width / 2)))
+        anchor.rect.y: Math.round(spot.y + 8)
+        implicitWidth: Math.ceil(tooltipBox.width)
+        implicitHeight: Math.ceil(tooltipBox.height)
+        color: "transparent"
+        mask: Region {}
+
+        Rectangle {
+            id: tooltipBox
+            objectName: "panelTooltip"
+            width: Math.min(360, tooltipLabel.implicitWidth + 16)
+            height: tooltipLabel.height + 10
+            radius: provider.tokens.radiusSmall
+            color: provider.tokens.surfaceStrong
+            border.color: provider.tokens.border
+            border.width: 1
+            Text {
+                id: tooltipLabel
+                objectName: "panelTooltipText"
+                x: 8; y: 5
+                width: parent.width - 16
+                wrapMode: Text.Wrap
+                text: tooltip.owner ? tooltip.owner.tooltipText : ""
+                color: provider.tokens.foreground
+                font.pixelSize: provider.tokens.fontSmall
             }
         }
     }

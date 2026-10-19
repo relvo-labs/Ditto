@@ -15,8 +15,8 @@
 | --- | --- | --- | --- |
 | Canvas／桌布 | 全幅。淺薰衣草，左側偏飽和（≈`#ccc8fa`），右側偏亮（≈`#e6e1fb`）；右側大型 Ditto 約 x 690–1215、y 145–570，帶泡泡、反光與水面 | `shell/jelly/Backdrop.qml`（由 `shell.qml` 的背景 PanelWindow 掛載） | 漸層 canvas **已實作**；桌布 Image 接點**已實作，待素材**（#51）與 Profile 欄位（§5 H2） |
 | 左上標題／副標 | x≈25、y≈8–38；`01 — SOFT JELLY`、`A softer desktop for brighter days` | 無 | **待 owner**：是 caption、桌布字樣還是 widget 尚未決定；本 slice 不畫、不裁切 |
-| 頂部工作區 | 置中浮動膠囊，x≈570–715、y≈4–32（≈145×28），作用中 `1` 為紫色小膠囊 | `shell/providers/panel_top/qml/PanelTop.qml` | **淺色已實作**：四工作區 capture 為 `(568,4) 144×28`，中心 x=640；與目測寬差約 1 px。作用中 accent 小膠囊，非四個工作區時依清單伸縮，不硬編數目（§4 D3） |
-| 頂部狀態 | 右側 x≈1020–1262：Wi-Fi、音量、電池圖示、日期時間、搜尋 | 同上 | **淺色已實作**：`(1020,4) 242×28`，靠右 18 px；主題 symbolic 網路／音量圖示＋Accessible 文字、真實日期時間、原 `statusRegion`。不可用加 `!`、未知加 `?`，缺圖退現行文字並隨內容加寬。電池／搜尋沒有資料或命令，不畫（D3／D6） |
+| 頂部工作區 | 置中浮動膠囊，x≈570–715、y≈4–32（≈145×28），作用中 `1` 為紫色小膠囊 | `shell/providers/panel_top/qml/PanelTop.qml` | **淺色已實作**：四工作區 capture 為 `(568,4) 144×28`，中心 x=640；與目測寬差約 1 px。作用中 accent 小膠囊，非四個工作區時依清單伸縮，不硬編數目；窄寬先換成兩列（§4 D3、§6.5） |
+| 頂部狀態 | 右側 x≈1020–1262：Wi-Fi、音量、電池圖示、日期時間、搜尋 | 同上 | **淺色已實作**：`(1020,4) 242×28`，靠右 18 px；主題 symbolic 網路／音量圖示＋Accessible 文字、依 Ditto 語系含星期的日期時間、原 `statusRegion`。網路圖示依有線／無線／其他裝置類型；不可用加 `!`、未知加 `?`、靜音加 `∕`，缺圖退現行文字並隨內容加寬。tooltip 為獨立 popup surface。完整狀態表見 §6.5。電池／搜尋沒有資料或命令，不畫（D3／D6） |
 | 天氣／手寫字 | 右上 x≈1180–1255、y≈52–102；右側手寫字兩處 | 無 | **待 owner**：桌布還是 widget 未定；不做假天氣 |
 | 後方視窗（Files） | x≈37、y≈63、643×455；圓角≈14–16；標題列≈36；側欄≈120 寬 | 第三方應用。Ditto 只提供材質樣本 `shell/jelly/Material.qml` 供自有表面使用 | **待 owner**：實際應用與首次登入是否開啟；不重繪第三方 app |
 | 前方視窗（Notes） | x≈77、y≈465、535×230 | 同上 | 同上 |
@@ -128,7 +128,7 @@
 - **H3 Dock 綁定（#45）**：R3 依 D-48 已把新「預設」文件改綁已安裝的 `ditto.dock.pill`，缺套件時保留原供應者；agent 依 #71 交接實作，owner 可反悔。釘選清單沿用已註冊供應者設定（不捏造應用）；既有 store 與「簡報」不變。
 - **H4 內建套件版本（#50）**：`ditto.dock.pill` 內容改了，但版本仍是 `1.1.0`。G1／G2 測試與語意任務集逐字引用 `1.1.0`。已有 store 的機器在 seed 時會記 `boot.builtin_refused`（同版本不同內容），保留舊內容，只有新 store 會拿到新 Dock。升版與升級路徑屬內建套件升版工作。
 - **H5 `on_accent` 既有缺陷**：`Tokens.qml` 的 `onAccent` 屬性名稱以 `on`＋大寫開頭，被 QML 當成訊號處理器名稱，綁定沒有生效。實際值一律是 `#000000`，Profile 的 `on_accent` 覆寫也無效；`main` 上同樣如此。黑字在兩種 accent 上都達 AA。修正需要改名或另設 token，會影響所有呼叫端，本 PR 不動。
-- **H6 頂部 slice（本次交付）**：沿用 `ditto.panel.top`，由 `tokens.lightRecipe === true` 選浮動呈現，其他主題不變；不需要新 token、供應者或預設綁定。工作區的滑鼠／Enter／Space／Accessible action 共用既有 capability 判斷；音量靜音／滾輪／右鍵設定、網路設定、選單四中心與電源、標題、時鐘和 `statusRegion` 均保留。輸入區為三個圓角膠囊的 Region 聯集，陰影／透明間隙不攔截；預設高度 28＋上下各 4 px，`exclusiveZone=36`；大字及窄寬度換行時，以最高膠囊＋8 px 更新保留高度（Repair 1，§6.3）。hover／focus 0.96、press 0.90，120 ms OutCubic；命中與焦點框不縮放，reduced-motion／low-power／隱藏立即 settle。`ditto.panel.top` manifest 仍為 `1.1.0`；升版與已有 store 的同版不同內容處理交 #50（同 H4），本次沒有改版本。
+- **H6 頂部 slice（本次交付）**：沿用 `ditto.panel.top`，由 `tokens.lightRecipe === true` 選浮動呈現，其他主題不變；不需要新 token、供應者或預設綁定。工作區的滑鼠／Enter／Space／Accessible action 共用既有 capability 判斷；音量靜音／滾輪／右鍵設定、網路設定、選單四中心與電源、標題、時鐘和 `statusRegion` 均保留。輸入區為三個圓角膠囊的 Region 聯集，陰影／透明間隙不攔截；預設高度 28＋上下各 4 px，`exclusiveZone=36`；大字及窄寬度換行時，以最高膠囊＋8 px 更新保留高度（Repair 1，§6.3；分階與兩列上限見 §6.5）。hover／focus 0.96、press 0.90，120 ms OutCubic；命中與焦點框不縮放，reduced-motion／low-power／隱藏立即 settle。`ditto.panel.top` manifest 仍為 `1.1.0`；升版與已有 store 的同版不同內容處理交 #50（同 H4），本次沒有改版本。
 - **H7 一致性**：管理中心、對話、試看列、通知、啟動器改用 `Material` 或同一組亮邊與陰影，需要逐一確認焦點與可讀性（#47）。
 - **H8 硬體驗證（#52／#53／R4）**：`effect` 路徑的畫面、幀時（NFR-05），以及正常／降低透明度／低效能三種模式的 A/B，都要在實體參考機量測。本機只有 software renderer，未執行。
 - **H9 圖示解析**：產品端用 `Quickshell.iconPath(name, true)`。harness 用 `capture/prepare.py` 模擬主題查找；實機選到的檔案可能不同，參考機要重驗。
@@ -204,6 +204,57 @@ Quickshell 在本機無法執行（缺 `libcpptrace`、`libOpenGL`），offscree
 不透明核心／標記仍超過 4.5:1；來源半透明形狀保留層次，按圖形門檻 ≥3:1 驗證。測試使用實際像素，沒有用 tint 屬性代替回讀。新增 low／medium／high 的明確服務 fixture capture，原 normal／legacy 場景仍用各次真實時間；1280 預設工作區 `(568,4) 144×28`、右側 `(1020,4) 242×28`、保留高度 36 px 不變。
 
 **N3 a11y**：只將 StatusButton 的 `Accessible.description` 設空，避免重複讀取 name；tooltip 與 name 保留相同的狀態文字。Ditto 選單的補充視窗標題／數量 description 繼續保留。`red/panel.log`、`red/volume-levels.log`、最終 `visual/unit-tests.log`、capture 對照及 source／HEAD／gate 結果由 `repair2/manifest.json` 索引。全部仍為 offscreen development 證據；沒有新增實機或 NFR 宣稱。`ditto.panel.top` manifest 維持 `1.1.0`，升版交 #50。
+
+## 6.5 頂部列 follow-up（#102／#105）
+
+基底 `de8d6176690b472cc0cd101af9bf6d1a6a3b51e8`（#101 合併後）；分支 `hermes/g4-102-105-topbar-followup`。證據在 repo 外 `/data/hermes/ditto-runs/g4-impl/topbar-fu/evidence/`，由 `manifest.json` 綁定 commit、source hashes、指令與結果。全部是開發機 Qt 6.10.2 offscreen software 證據；Wayfire、Orca、實體 2× 螢幕與參考機**未執行**。`ditto.panel.top` manifest 維持 `1.1.0`，升版交 #50。Legacy 呈現（含 `HH:mm` 時鐘）不變，仍以既有逐像素測試對照。
+
+**#102**
+
+- **音量鍵盤靜音**：焦點在音量時，空白鍵切換靜音，Enter（含數字鍵盤）開音量設定（pavucontrol）；Accessible 的 toggle action 對應空白鍵、press action 對應 Enter。可靜音時以 `Accessible.checkable`／`checked` 公開靜音狀態，名稱仍為「音量 靜音」／「音量 N%」；description 維持空白（不重複名稱，N3）。音訊不可用時沒有可靜音的對象：空白鍵照舊開設定，toggle 不動作。滑鼠左鍵靜音、右鍵設定、滾輪調整不變。
+- **網路圖示依裝置類型**：以 `Networking.devices` 的 `type` 決定。已連線的裝置優先（有線先於無線），都沒連線時先看無線網卡、再看有線。文字名稱不變；目前主題找不到圖示時沿用原本的文字 fallback，不改用其他類型的圖示。
+
+  | 類型 | 已連線 | 未連線 | 狀態未知（加 `?`） |
+  | --- | --- | --- | --- |
+  | 有線 | `network-wired-symbolic` | `network-wired-disconnected-symbolic` | `network-wired-acquiring-symbolic` |
+  | 無線 | `network-wireless-signal-excellent-symbolic` | `network-wireless-offline-symbolic` | `network-wireless-acquiring-symbolic` |
+  | 其他／無裝置 | `network-transmit-receive-symbolic` | `network-offline-symbolic` | `network-idle-symbolic` |
+
+  網路服務不可用時沒有裝置資訊，三種類型都用 `network-error-symbolic`＋`!`。狀態未知不用主題的 `*-no-route-*`：Yaru 與 Adwaita 都在圖形裡畫了 `?`，再加文字標記會出現兩個問號。
+- **時鐘**：格式字串走翻譯目錄（`M月d日 ddd HH:mm`；en `ddd MMM d HH:mm`），星期與月份名稱用同一語系的 Qt locale：zh-TW「10月19日 週一 14:05」、en「Mon Oct 19 14:05」，語系即時切換。24 小時制、不顯示秒，沒有新增偏好設定。加寬後的時鐘一樣計入佈局寬度與狀態膠囊 Region；1280、有圖示時兩種語系都維持 `(1020,4) 242×28`。
+
+**#105**
+
+- **C1 窄版分階**：從最少列數開始找放得下的組合；同樣高度時狀態膠囊保留較多欄、工作區用較少列。結果是工作區先換成兩列，狀態膠囊再改兩欄，最後才一欄。換行後的狀態膠囊與內容同寬，不保留 242 px 留白。淺色選單開在 Ditto 膠囊下方 4 px，不再開在最高膠囊下方。1280 預設幾何、選單 y=36 不變。常見情況（寬 ≥800、字級 ≤1.5×，含 9／10 工作區、文字 fallback、0／2 狀態項）的最高膠囊都不超過兩列：審查記錄的最壞例（800、1×、10 工作區、文字 fallback、2 個狀態項）從 114 降到 62 px；800／1.5× 為 66 px，1024／1.5× 為 64 px。640 或 2× 字級等極端組合仍可能超過兩列，但不重疊、不溢出（原 144 組矩陣）。選單打開時會蓋住第二列工作區的一部分，這是暫時性的下拉選單，關閉後恢復。
+- **C2 tooltip**：不再用 Qt Controls 的預設 ToolTip（畫在 36 px 面板視窗內，可能被裁切），改為 provider 自己的 `PopupWindow`。它是獨立 surface，主題沿用選單（`surface_strong` 底、`border` 框、`foreground` 字，13.44:1），放在所屬控制項下方 8 px，水平夾在螢幕內，寬度上限 360 px，超過就換行。`mask` 是空 Region，不攔截指標；不搶焦點（`grabFocus=false`）。hover 或鍵盤焦點 600 ms 後出現，離開、失焦或 release 時立即消失，沒有動畫。替身測試證明它的幾何完全在面板視窗之外且文字完整；實際 Quickshell／Wayfire 的 popup 定位**未執行**。
+- **C3 置中與標記**：Qt Grid 會為空欄保留間距，所以沒有狀態項時隱藏它的容器，欄數也不超過實際成員數。修正前內容中心偏左 6 px（114.98 vs 121），修正後置中，音量與時鐘間距回到 12 px。所有狀態標記都外移 1 px，並加上與膠囊同色的 1 px 描邊。靜音 `∕` 的不透明核心與喇叭圖形距離從 2 px 增為 3 px，中間至少留 2 px 空白。
+- **C3 2× 銳利度**：SymbolicIcon 以裝置像素大小載入 SVG（`loadImage(url, 寬×dpr)`），在裝置像素座標內逐點重新著色。修正前 2× 時讀到的只是左上四分之一、再放大兩倍；1× 也是 16 px 圖放大到 18 px。`run.sh` 會在 `QT_SCALE_FACTOR=2` 下再擷取一次狀態膠囊，`capture/check_hidpi.py` 逐裝置像素把覆蓋率和 Qt 直接點陣化的同一 SVG 比對。修正前 2× 平均誤差 0.47–0.70、1× 為 0.09–0.26；修正後 1×／2× 都在 0.001–0.005，實心像素數一致（例如 2× 有線 316／316）。這是 offscreen 替身縮放，實體 2× 螢幕**未執行**。
+- **C4 symbolic 重新著色規則**：中性形狀用 `foreground`，紅色錯誤部分用 `danger`，保留來源 alpha（N1：音量等級的半透明聲波）。新增一條：整個圖形都沒有不透明部分（來源最高 alpha <0.75，例如 Yaru 整個 50% 的離線 Wi‑Fi、靜音、`network-idle`，Adwaita 的 0.35）時，依比例拉到最高 alpha 為 1，讓細線也清楚。有不透明部分的圖示（音量等級、錯誤徽章、有線未連線的 `×`）不受影響。
+
+**完整狀態表**（真實 Yaru SVG，1× offscreen，`unit/tst_panel.qml` `test_status_state_table`，原始資料 `status-states.jsonl`）。像素數取整個 28 px 按鈕（圖示＋標記），對比為相對膠囊底色的 WCAG 值；墨水像素是對比 >1.1 的像素。測試要求每個狀態至少 24 個像素 ≥3:1，且至少 8 個像素 ≥4.5:1，代表有不透明部分或標記承載狀態。
+
+| 狀態 | 圖示 | 標記 | 名稱 | 來源最高 alpha | 拉高 | 墨水 | ≥3:1 | ≥4.5:1 | 中位數 | 最高 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 音量不可用 | `audio-card-symbolic` | `!` | 音量不可用 | 1 | 否 | 165 | 86 | 76 | 3.80 | 15.63 |
+| 音量 0% | `audio-volume-low-symbolic` | — | 音量 0% | 1 | 否 | 124 | 67 | 66 | 8.99 | 15.63 |
+| 音量低（<1/3） | `audio-volume-low-symbolic` | — | 音量 20% | 1 | 否 | 124 | 67 | 66 | 8.99 | 15.63 |
+| 音量中（<2/3） | `audio-volume-medium-symbolic` | — | 音量 50% | 1 | 否 | 124 | 76 | 72 | 10.33 | 15.63 |
+| 音量高 | `audio-volume-high-symbolic` | — | 音量 100% | 1 | 否 | 125 | 89 | 83 | 11.30 | 15.63 |
+| 靜音 | `audio-volume-muted-symbolic` | `∕` | 音量 靜音 | 0.50 | 是 | 175 | 119 | 109 | 6.79 | 15.63 |
+| 網路不可用 | `network-error-symbolic` | `!` | 網路不可用 | 1 | 否 | 159 | 72 | 45 | 2.71 | 15.63 |
+| 有線已連線 | `network-wired-symbolic` | — | 網路已連線 | 1 | 否 | 126 | 98 | 90 | 10.62 | 15.63 |
+| 有線未連線 | `network-wired-disconnected-symbolic` | — | 網路未連線 | 0.97 | 否 | 115 | 28 | 11 | 1.96 | 14.35 |
+| 有線狀態未知 | `network-wired-acquiring-symbolic` | `?` | 網路狀態未知 | 1 | 否 | 153 | 45 | 40 | 2.17 | 15.63 |
+| 無線已連線 | `network-wireless-signal-excellent-symbolic` | — | 網路已連線 | 1 | 否 | 154 | 134 | 126 | 15.63 | 15.63 |
+| 無線未連線 | `network-wireless-offline-symbolic` | — | 網路未連線 | 0.50 | 是 | 86 | 51 | 39 | 3.66 | 15.63 |
+| 無線狀態未知 | `network-wireless-acquiring-symbolic` | `?` | 網路狀態未知 | 1 | 否 | 129 | 44 | 40 | 2.15 | 15.63 |
+| 其他已連線 | `network-transmit-receive-symbolic` | — | 網路已連線 | 1 | 否 | 94 | 56 | 44 | 3.80 | 15.63 |
+| 其他未連線 | `network-offline-symbolic` | — | 網路未連線 | 0.50 | 是 | 119 | 75 | 59 | 4.48 | 15.63 |
+| 其他狀態未知 | `network-idle-symbolic` | `?` | 網路狀態未知 | 0.50 | 是 | 117 | 73 | 61 | 4.62 | 15.63 |
+
+O1 的無線未連線在修正前（同一測試，`red/panel.log`）只有 8 個像素 ≥3:1、0 個 ≥4.5:1，最高 3.04；修正後為 51／39，最高 15.63。中位數低於 3:1 的列（網路不可用、有線未連線／未知、無線未知）都是主題刻意畫成 50% 的次要部分，搭配不透明的徽章、`×`、進度點或文字標記，狀態不是只靠淡化的部分表達。0% 與低音量共用圖示，以名稱區分。低／中的界線從「只有 0% 算低、<0.67 算中」改為 1/3、2/3，讓低音量真的用低音量圖示。表中數字是 Yaru 的結果；Adwaita 等其他主題只套用同一規則，沒有逐一量測。
+
+`red/panel.log`、`red/hidpi/` 保存修正前的失敗輸出；review 場景（窄版、選單、tooltip）由 `capture/tst_panel_scenes.qml` 產生 `panel-scene-*.png`，中間的虛線是 harness 標出的面板視窗底邊，不是產品內容。
 
 ## 7. R3 助理呈現與開發證據（#67）
 

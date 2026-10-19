@@ -266,16 +266,16 @@
 <context>
     <name>AssistantEntry</name>
     <message>
+        <source>助理</source>
+        <translation>助理</translation>
+    </message>
+    <message>
         <source>對話已開啟</source>
         <translation>對話已開啟</translation>
     </message>
     <message>
         <source>展開助理</source>
         <translation>展開助理</translation>
-    </message>
-    <message>
-        <source>助理</source>
-        <translation>助理</translation>
     </message>
     <message>
         <source>待命中</source>
@@ -2300,6 +2300,10 @@
         <translation>Ditto 選單</translation>
     </message>
     <message>
+        <source>M月d日 ddd HH:mm</source>
+        <translation>M月d日 ddd HH:mm</translation>
+    </message>
+    <message>
         <source>個人化設定</source>
         <translation>個人化設定</translation>
     </message>
@@ -2332,12 +2336,20 @@
         <translation>組合中心</translation>
     </message>
     <message>
+        <source>網路不可用</source>
+        <translation>網路不可用</translation>
+    </message>
+    <message>
         <source>網路已連線</source>
         <translation>網路已連線</translation>
     </message>
     <message>
         <source>網路未連線</source>
         <translation>網路未連線</translation>
+    </message>
+    <message>
+        <source>網路狀態未知</source>
+        <translation>網路狀態未知</translation>
     </message>
     <message>
         <source>變更紀錄</source>
@@ -2370,14 +2382,6 @@
     <message>
         <source>（目前）</source>
         <translation>（目前）</translation>
-    </message>
-    <message>
-        <source>網路不可用</source>
-        <translation>網路不可用</translation>
-    </message>
-    <message>
-        <source>網路狀態未知</source>
-        <translation>網路狀態未知</translation>
     </message>
 </context>
 <context>
