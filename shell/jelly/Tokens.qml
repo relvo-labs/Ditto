@@ -116,6 +116,10 @@ QtObject {
     readonly property color canvasTop: background
     readonly property color canvasBottom: lightRecipe ? Qt.tint(background, Qt.rgba(1, 1, 1, 0.12)) : background
     readonly property color canvasGlow: lightRecipe ? Qt.rgba(1, 1, 1, 0.42) : "transparent"
+    /// The default wallpaper of the light recipe (owner-chosen 2026-10-19,
+    /// shell/wallpapers/SOURCES.md). The dark recipe and older Profiles keep
+    /// the plain canvas. A per-Profile wallpaper field is still Core's (H2).
+    readonly property url wallpaper: lightRecipe ? Qt.resolvedUrl("../wallpapers/soft-jelly-default.jpg") : ""
 
     // ---- material --------------------------------------------------------------
     /// Blur is requested only where the compositor offers a background effect;
