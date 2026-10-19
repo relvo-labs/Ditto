@@ -172,9 +172,7 @@ TestCase {
             surface.entryScale = scale;
             compare(surface.implicitWidth, 56 * scale);
             compare(surface.implicitHeight, 56 * scale);
-            verify(!surface.mask.contains(1, 1));
-            verify(!surface.mask.contains(surface.implicitWidth - 1, 1));
-            verify(surface.mask.contains(surface.implicitWidth / 2, surface.implicitHeight / 2));
+            checkFabRegion(surface);
         }
         surface.entryScale = 1;
         const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
@@ -197,6 +195,14 @@ TestCase {
         keyClick(Qt.Key_Space);
         compare(compact, null); // E1 first expands the label, without reads/writes.
         compare(surface.labelExpanded, true);
+        for (const scale of [0.5, 1, 2]) {
+            surface.entryScale = scale;
+            compare(surface.implicitWidth, Math.round(entry.implicitWidth * scale));
+            compare(surface.implicitHeight, 56 * scale);
+            verify(surface.implicitWidth > surface.implicitHeight);
+            checkFabRegion(surface);
+        }
+        surface.entryScale = 1;
         keyClick(Qt.Key_Enter);
         verify(compact !== null);
         compare(compact.conversation, conversation);
@@ -209,6 +215,17 @@ TestCase {
         compare(conversation.streamText, "fab stream");
         compare(conversation.events.length, 1);
         compare(client.writes, 0);
+    }
+    function checkFabRegion(surface) {
+        compare(surface.mask.item.width, surface.implicitWidth);
+        compare(surface.mask.item.height, surface.implicitHeight);
+        const w = surface.implicitWidth, h = surface.implicitHeight;
+        verify(!surface.mask.contains(1, 1));
+        verify(!surface.mask.contains(w - 1, 1));
+        verify(!surface.mask.contains(1, h - 1));
+        verify(!surface.mask.contains(w - 1, h - 1));
+        verify(surface.mask.contains(w / 2, h / 2));
+        verify(!surface.mask.contains(w, h / 2));
     }
     function test_switch_keeps_draft_stream_history_approval_and_escape() {
         conversation.draft = "unsent fixture";

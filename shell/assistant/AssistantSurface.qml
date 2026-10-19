@@ -15,11 +15,21 @@ PanelWindow {
     property bool shown: true
     property string entryStyle: "capsule"
     property string symbolVariant: "neutral"
+    property var dockMount: null
     readonly property int fabSize: 56
-    // DockPill light geometry: edgeGap 12 + (tileSize 52 + 2*padding 8)/2.
-    // Compare against the actual provider in tst_assistant_repair.qml. This
-    // aligns only the chosen FAB, without defining #46 movement/placement.
-    readonly property int defaultDockCentreInset: 46
+    // Read only the mounted bottom DockPill's existing presentation geometry.
+    // Other providers do not promise these dimensions; use the fixed margin.
+    readonly property var dock: dockMount ? dockMount.object : null
+    readonly property real dockCentreInset: entryStyle === "fab" && tokens.lightRecipe
+        && corner.indexOf("bottom") === 0 && dockMount
+        && dockMount.binding.package === "ditto.dock.pill" && dock && dock.shown
+        && dock.reservedEdge === "bottom" && dock.screen && screen
+        && dock.screen.name === screen.name
+        ? dock.edgeGap + dock.pillThickness / 2 : -1
+    // If the scaled FAB cannot fit at the Dock centre, fall back completely.
+    // Clamping to zero would put it between alignment and the fixed margin.
+    readonly property real bottomMargin: dockCentreInset >= implicitHeight / 2
+        ? dockCentreInset - implicitHeight / 2 : 32
     property alias labelExpanded: entry.labelExpanded
     property bool expanded: false
     property bool animations: true
@@ -35,8 +45,7 @@ PanelWindow {
     // Quickshell 0.3.1 omits the grouped margins type from qmllint metadata.
     // Covered by the same layer-shell stub geometry assertions as ChatPanel.
     // qmllint disable unqualified unresolved-type missing-property
-    margins { top: 64; bottom: surface.entryStyle === "fab" && surface.tokens.lightRecipe
-        ? Math.max(0, surface.defaultDockCentreInset - surface.implicitHeight / 2) : 32; left: 32; right: 32 }
+    margins { top: 64; bottom: surface.bottomMargin; left: 32; right: 32 }
     // qmllint enable unqualified unresolved-type missing-property
     implicitWidth: Math.min(Math.round(entry.implicitWidth * entryScale), screen ? screen.width - 64 : 300)
     implicitHeight: Math.round(entry.implicitHeight * entryScale)
