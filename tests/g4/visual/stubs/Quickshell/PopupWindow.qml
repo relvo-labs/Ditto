@@ -2,7 +2,9 @@ import QtQuick
 import DittoStub
 
 /// Test double for a popup: placed at its anchor rectangle on the window's
-/// position.
+/// position. A real PopupWindow is its own surface, so its content is not
+/// clipped by the parent window; here it is a sibling on the desktop layer.
+/// `mask` and `grabFocus` are recorded, not enforced.
 QtObject {
     id: popup
 
@@ -10,6 +12,8 @@ QtObject {
     property real implicitWidth: 0
     property real implicitHeight: 0
     property color color: "transparent"
+    property var mask: null
+    property bool grabFocus: false
     property PopupAnchor anchor: PopupAnchor {}
     readonly property real width: content.width
     readonly property real height: content.height
