@@ -40,3 +40,15 @@ Core 持有 optional typed `avatar.presentation`；absent＝legacy 且省略序�
 相容政策：schema version 1 與 RPC 版本不變（新增選用欄位）。新版讀舊文件不遷移，digest 不變。舊版 deny_unknown_fields 會拒絕含 presentation 的文件，**不具前向相容**；匯入先驗證，未知欄位不可忽略後執行。沒有自動降版或靜默刪欄位；降版前由新版明確移除呈現意圖、保存及匯出，以舊 schema 驗證，保留原始匯出／store 備份。禁止舊程式直接開含新文件的 store；Core／Shell 同版配送，混版不支援。測試以基底 schema 證明拒絕與明確降版後可讀。
 
 PRD 只更新 §11.1／AVA-03，其他需求、NFR 與出口不變。此為新決策，未覆寫 milestones 既有待決策項。
+
+## 2026-10-19 追加：助理符號與 FAB 已由 owner 選定
+
+| 欄位 | 內容 |
+| --- | --- |
+| 日期／狀態 | 2026-10-19；已選定，取代上文「暫用中性符號；待 owner 決定」的符號暫定選擇 |
+| 決策者／依據 | owner Neil 於 Telegram 確認候選表 **D1／56／E1**；指示由 PR #106 repair 1 接續，追蹤 [#67](https://github.com/relvo-labs/Ditto/issues/67) |
+| 結論 | 新預設助理採既有 body.png＋QML 臉的小 Ditto，56 px 圓形 FAB；E1 第一次啟動展開約195×56標籤膠囊，第二次開既有compact對話。click／Enter／Space與Escape語意不變；hover／focus只給回饋 |
+| 未採用 | 未選的向量符號、較小尺寸與直接開聊天的候選移除；保留原先capsule／neutral／portrait接點供既有消費者使用 |
+| 影響／邊界 | 僅Shell的AssistantSurface instance選用；固定尺寸與E1由元件實作，不新增Profile欄位或遷移。Core、已保存文件、開發／簡報、legacy avatar、同一會話與安全契約不變。#46移動仍待決；D1素材授權仍**未釐清** |
+
+前後開發證據與重跑入口見 [助理驗證](../../../tests/g4/visual/README-assistant.md)及 `fab/evidence/repair1/repair1.md`。本追加記錄owner對符號／尺寸／展開方式的選擇，不以offscreen證據宣告Wayfire、IME／Orca、NFR或最終視覺接受；原始D-48結論不改寫。
