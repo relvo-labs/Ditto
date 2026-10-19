@@ -100,6 +100,15 @@ end = '\n    /// The shell\'s control path:'
 assert base_shell[base_shell.index(start):base_shell.index(end)] == current_shell[current_shell.index(start):current_shell.index(end)]
 assert subprocess.check_output(['git', 'show', f'{MOTION_BASE}:shell/avatar/Avatar.qml'], cwd=ROOT).decode() == source('shell/avatar/Avatar.qml')
 assert source('shell/chat/ApprovalWindow.qml', True) == source('shell/chat/ApprovalWindow.qml')
+# Owner adoption may change only the AssistantSurface instance in shell.qml.
+pre_choice = subprocess.check_output(['git', 'show', '366f1743e3b165df0c210f89e7b9e671176e25a8:shell/shell.qml'], cwd=ROOT).decode()
+pattern = r'        AssistantSurface \{.*?\n        \}'
+selected = re.search(pattern, current_shell, re.S).group(0)
+previous = re.search(pattern, pre_choice, re.S).group(0)
+assert 'entryStyle: "fab"' in selected and 'symbolVariant: "ditto"' in selected
+assert current_shell.replace(selected, previous, 1) == pre_choice
+report.append({'oracle': 'shell.qml changes only AssistantSurface properties; fixed 56/E1 lives in the component, legacy mounting unchanged'})
+
 report.append({'oracle': 'legacy avatar surface and ApprovalWindow.qml match 25c0b72; Avatar.qml matches f99b4ea byte for byte (merged statusForeground correction)'})
 (OUT / 'staging.json').write_text(json.dumps(report, indent=2) + '\n')
 print('assistant staged; legacy structure and approval match 25c0b72')

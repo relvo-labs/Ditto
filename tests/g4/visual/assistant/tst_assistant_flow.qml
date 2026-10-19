@@ -72,12 +72,12 @@ TestCase {
         tokens.appearance = { theme: data.theme, tokens: {}, reduced_motion: true };
         const props = { tokens: tokens, client: client, conversation: conversation, width: 218, height: 54 };
         const base = mount("baseline/shell/assistant/AssistantEntry.qml", props);
-        waitForPolish(base);
-        const before = grabImage(base);
+        verify(waitForRendering(base));
+        const before = grabImage(layer);
         base.destroy(); mounted = []; wait(1);
         const current = mount("shell/assistant/AssistantEntry.qml", props);
-        waitForPolish(current);
-        verify(before.equals(grabImage(current)), "default button pixels match de8d617");
+        verify(waitForRendering(current));
+        verify(before.equals(grabImage(layer)), "legacy capsule pixels match de8d617");
         compare(current.entryStyle, "capsule");
         compare(current.symbolVariant, "neutral");
     }

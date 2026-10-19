@@ -69,12 +69,19 @@ TestCase {
         return (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
     }
     function test_symbol_edge_contrast_data() {
-        return [{ tag: "light", theme: "soft-jelly-light" }, { tag: "legacy", theme: "soft-jelly" }];
+        return [{ tag: "light", theme: "soft-jelly-light", working: false },
+            { tag: "working", theme: "soft-jelly-light", working: true },
+            { tag: "legacy", theme: "soft-jelly", working: false }];
     }
     function test_symbol_edge_contrast(data) {
         tokens.appearance = { theme: data.theme, tokens: {}, reduced_motion: true };
         const s = surface(), entry = control(s), symbol = entry.children[0];
         tryCompare(findChild(entry, "dittoBodyImage"), "status", Image.Ready);
+        if (data.working) {
+            entry.animations = false;
+            conversation.turn = { turn_id: "fixture-working", state: "running" };
+            entry.workLevel = 0.65; // darkest pulse phase must retain the edge.
+        }
         verify(waitForRendering(entry));
         const pixels = grabImage(desktop);
         const origin = entry.mapToItem(desktop, 0, 0);
@@ -82,7 +89,7 @@ TestCase {
         const edge = pixels.pixel(Math.ceil(origin.x + symbol.x + 1), y);
         const fill = pixels.pixel(Math.floor(origin.x + symbol.x - 4), y);
         const ratio = contrast(edge, fill);
-        console.log("REPAIR_MEASURE " + JSON.stringify({ defect: "a", theme: data.theme, edge: String(edge), fill: String(fill), contrast: ratio }));
+        console.log("REPAIR_MEASURE " + JSON.stringify({ defect: "a", theme: data.theme, working: data.working, edge: String(edge), fill: String(fill), contrast: ratio }));
         verify(ratio >= 3, "symbol edge against capsule fill >= 3:1");
     }
     function test_dock_alignment_data() { return [{ tag: "collapsed", expanded: false }, { tag: "label", expanded: true }]; }
