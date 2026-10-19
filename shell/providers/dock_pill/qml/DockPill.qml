@@ -42,6 +42,25 @@ Scope {
 
     /// The light recipe's presentation; false keeps the earlier one.
     readonly property bool soft: tokens !== null && tokens.lightRecipe === true
+    /// #116 candidate style (DITTO_UI_STYLE) on top of the light recipe: a
+    /// themed squircle for an application without an icon and one indicator
+    /// shape for running and in-use windows. Off: the light recipe as before.
+    readonly property bool jelly: soft && tokens.uiCandidate === true
+    /// Squircle fills (top, bottom) in the lavender family; white initials
+    /// stay ≥4.5:1 at the tile's centre.
+    readonly property var fallbackFills: [["#7c66e4", "#5c46cc"], ["#9468d8", "#7046bc"], ["#6878e0", "#4a5ac4"],
+                                          ["#a865aa", "#86438c"], ["#4f80c2", "#365e9e"]]
+    function fallbackFill(appId) {
+        let hash = 0;
+        const text = String(appId);
+        for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) % 100003;
+        return fallbackFills[hash % fallbackFills.length];
+    }
+    /// The first letter (or CJK character) of the application's name.
+    function initial(appId) {
+        const name = String(appName(appId)).trim();
+        return name.length > 0 ? name.charAt(0).toUpperCase() : "?";
+    }
     readonly property bool motionEnabled: soft && tokens.motionEnabled && shown
     property real reveal: 1
     property NumberAnimation revealAnimation: NumberAnimation {
@@ -497,13 +516,14 @@ Scope {
 
                     // ---- light recipe: the application's icon -------------
                     /// Plate behind the window in use, and under the pointer.
+                    /// Candidate: only under the pointer; "in use" is the indicator.
                     Rectangle {
                         anchors.fill: parent
                         radius: provider.tokens.radiusMedium
-                        visible: provider.soft && (tile.current || area.containsMouse)
+                        visible: provider.soft && ((tile.current && !provider.jelly) || area.containsMouse)
                         color: provider.tokens.surfaceStrong
                         border.color: provider.tokens.border
-                        border.width: tile.current ? 1 : 0
+                        border.width: tile.current && !provider.jelly ? 1 : 0
                     }
 
                     Image {
@@ -522,6 +542,48 @@ Scope {
                         visible: provider.soft && status === Image.Ready
                     }
 
+                    /// Candidate fallback: a jelly squircle with the initial.
+                    Item {
+                        id: squircle
+                        objectName: "dockIconSquircle"
+                        scale: tile.feedbackScale * tile.confirmedScale * provider.reveal
+                        anchors.centerIn: parent
+                        width: provider.iconSize
+                        height: provider.iconSize
+                        visible: provider.jelly && icon.status !== Image.Ready
+                        readonly property var fill: provider.fallbackFill(tile.modelData.appId)
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Math.round(width * 0.3)
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: squircle.fill[0] }
+                                GradientStop { position: 1.0; color: squircle.fill[1] }
+                            }
+                            border.color: Qt.rgba(1, 1, 1, provider.tokens.reducedTransparency ? 0 : 0.45)
+                            border.width: 1
+                        }
+                        /// Convex sheen (not with reduced transparency / low power).
+                        Rectangle {
+                            visible: provider.tokens.uiGloss === true
+                            x: 3; y: 2
+                            width: parent.width - 6
+                            height: parent.height * 0.42
+                            radius: Math.round(parent.width * 0.26)
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.42) }
+                                GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
+                            }
+                        }
+                        Text {
+                            anchors.centerIn: parent
+                            text: provider.initial(tile.modelData.appId)
+                            color: "#ffffff"
+                            font.pixelSize: 19
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
                     /// Fallback: a lettered tile with the application's name.
                     Rectangle {
                         objectName: "dockIconFallback"
@@ -530,7 +592,7 @@ Scope {
                         width: provider.iconSize
                         height: provider.iconSize
                         radius: provider.tokens.radiusMedium
-                        visible: provider.soft && icon.status !== Image.Ready
+                        visible: provider.soft && !provider.jelly && icon.status !== Image.Ready
                         color: provider.tokens.surfaceStrong
                         border.color: provider.tokens.border
                         border.width: 1
@@ -549,11 +611,14 @@ Scope {
                     Rectangle {
                         objectName: "dockIndicator"
                         visible: provider.soft && tile.running
-                        readonly property int length: tile.current ? 16 : 5
+                        // Candidate: one pill shape for both, longer and in the
+                        // selection colour for the window in use.
+                        readonly property int length: tile.current ? (provider.jelly ? 18 : 16) : (provider.jelly ? 6 : 5)
                         width: dock.vertical ? 4 : length
                         height: dock.vertical ? length : 4
                         radius: 2
-                        color: tile.current ? provider.tokens.focus : provider.tokens.foregroundMuted
+                        color: provider.jelly ? (tile.current ? provider.tokens.uiSelectDot : provider.tokens.uiInkMuted)
+                            : tile.current ? provider.tokens.focus : provider.tokens.foregroundMuted
                         anchors.horizontalCenter: dock.vertical ? undefined : parent.horizontalCenter
                         anchors.bottom: dock.vertical ? undefined : parent.bottom
                         anchors.bottomMargin: 1
