@@ -68,18 +68,22 @@ function safeCode(value: unknown): value is number | string {
 /** Group within this process without exposing a public hash of private text. */
 export function errorDiagnostic(error: unknown): ErrorDiagnostic {
   const candidate = error as { name?: unknown; code?: unknown; errorName?: unknown; message?: unknown; fingerprint?: unknown } | null
+  // Read each property once: an accessor must not pass a check and then return other text.
+  const candidateName = candidate?.name, candidateCode = candidate?.code
+  const candidateFingerprint = candidate?.fingerprint, errorName = candidate?.errorName
   // Idempotent: stderrSink also guards callers that do not use HostLog.
-  if (candidate && typeof candidate === 'object' && typeof candidate.name === 'string'
-    && errorNames.has(candidate.name) && typeof candidate.fingerprint === 'string'
-    && /^hmac-sha256:[a-f0-9]{64}$/.test(candidate.fingerprint)
-    && (candidate.code === undefined || safeCode(candidate.code))) {
-    return { name: candidate.name, ...(candidate.code !== undefined ? { code: candidate.code } : {}), fingerprint: candidate.fingerprint }
+  if (candidate && typeof candidate === 'object' && typeof candidateName === 'string'
+    && errorNames.has(candidateName) && typeof candidateFingerprint === 'string'
+    && /^hmac-sha256:[a-f0-9]{64}$/.test(candidateFingerprint)
+    && (candidateCode === undefined || safeCode(candidateCode))) {
+    return { name: candidateName, ...(candidateCode !== undefined ? { code: candidateCode } : {}), fingerprint: candidateFingerprint }
   }
-  const closed = typeof candidate?.errorName === 'string' && Object.hasOwn(errorCodes, candidate.errorName)
-    ? candidate.errorName as keyof typeof errorCodes : undefined
-  const name = closed ? 'DittoError' : error instanceof Error && errorNames.has(error.name) ? error.name : error instanceof Error ? 'Error' : 'NonError'
+  const closed = typeof errorName === 'string' && Object.hasOwn(errorCodes, errorName)
+    ? errorName as keyof typeof errorCodes : undefined
+  const name = closed ? 'DittoError' : error instanceof Error && typeof candidateName === 'string' && errorNames.has(candidateName)
+    ? candidateName : error instanceof Error ? 'Error' : 'NonError'
   const reason = typeof error === 'string' ? error.split(':', 1)[0] : undefined
-  const code = closed ? errorCodes[closed] : safeCode(candidate?.code) ? candidate.code
+  const code = closed ? errorCodes[closed] : safeCode(candidateCode) ? candidateCode
     : reason && reasonCodes.has(reason) ? reason : undefined
   let detail: string
   try { detail = error instanceof Error ? error.message : typeof error === 'string' ? error : JSON.stringify(error) ?? String(typeof error) }
@@ -110,7 +114,7 @@ function redact(key: string, value: unknown): unknown {
   if (Array.isArray(value) && (key === 'items' || stringFields.has(key))) return value.map(item => redact(key, item))
   if (value && typeof value === 'object') {
     if (key !== 'items') return '[redacted]'
-    return Object.fromEntries(Object.entries(value).map(([child, item]) => [child, redact(child, item)]))
+    return redactFields(value)
   }
   if (typeof value === 'number' && numberFields.has(key)) return value
   if (typeof value === 'boolean' && booleanFields.has(key)) return value
@@ -119,11 +123,27 @@ function redact(key: string, value: unknown): unknown {
   return '[redacted]'
 }
 
+// An undefined field carries no value: omit it rather than imply a hidden one.
+function redactFields(value: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)
+    .map(([key, item]) => [key, redact(key, item)]))
+}
+
+const logLevels = new Set<unknown>(['error', 'warn', 'info', 'debug'] satisfies LogLevel[])
+// Exactly Date#toISOString(); a direct sink call cannot smuggle text in ts.
+const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
 function redactedRecord(record: LogRecord): LogRecord {
-  const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, redact(key, value)]))
-  return { ...fields, ts: record.ts, level: record.level,
-    msg: hostMessages.has(record.msg) ? record.msg : 'host.message',
-    ...(!hostMessages.has(record.msg) ? { message_fingerprint: errorDiagnostic(record.msg).fingerprint } : {}) }
+  // Snapshot once: validation and output must see the same value, even for accessors.
+  const snapshot: Record<string, unknown> = Object.fromEntries(Object.entries(record))
+  const fields = redactFields(snapshot)
+  const { ts: rawTs, level: rawLevel, msg } = snapshot
+  const ts = typeof rawTs === 'string' && isoTimestamp.test(rawTs) ? rawTs : '[redacted]'
+  const level = (logLevels.has(rawLevel) ? rawLevel : '[redacted]') as LogLevel
+  const known = typeof msg === 'string' && hostMessages.has(msg)
+  return { ...fields, ts, level,
+    msg: known ? msg : 'host.message',
+    ...(!known ? { message_fingerprint: errorDiagnostic(msg).fingerprint } : {}) }
 }
 
 /** journald collects stderr; redact before serialising even a direct sink call. */

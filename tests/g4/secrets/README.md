@@ -31,11 +31,11 @@ timeout 120 python3 tests/g4/secrets/run.py --scratch "$TMPDIR" --inject-leak --
 
 假服務的方法集合來自 `rg` 核對 `crates/ditto-system/src/secrets.rs`：Service.OpenSession(`sv`→`vo`)、SearchItems(`a{ss}`→`aoao`)、Collection.CreateItem(`a{sv}(oayays)b`→`oo`)、Item.GetSecret(`o`→`(oayays)`)、Delete(``→`o`)，以及 Properties.Get／GetAll 的 Collection.Locked。僅提供 unlocked/plain/no-prompt 路徑；未模擬鎖定、加密 session 或 Prompt.Dismiss。這不是完整 Secret Service 實作。
 
-隔離使用專用 `dbus-daemon --nofork --config-file=<scratch>/bus.conf`，設定只監聽 `unix:path=<scratch>/bus`，不載入使用者設定或 service activation 目錄。runner、假服務及 driver 都核對 `DBUS_SESSION_BUS_ADDRESS`；拒絕使用者 bus、分號備援地址或非預期路徑。`DBUS_STARTER_ADDRESS` 同步覆寫。socket 路徑置於 `--scratch` 下的短目錄，程序皆在 finally 終止，runtime 一般檔案保留，socket 本身無持久 bytes。禁止改成指向真實 keyring 的環境。
+隔離使用專用 `dbus-daemon --nofork --config-file=<scratch>/bus.conf`，設定只監聽 `unix:path=<scratch>/bus`，不載入使用者設定或 service activation 目錄。runner、假服務及 driver 都核對 `DBUS_SESSION_BUS_ADDRESS`；拒絕使用者 bus、分號備援地址或非預期路徑。`DBUS_STARTER_ADDRESS` 同步覆寫；被測程序的 `XDG_RUNTIME_DIR` 也指向同一個 scratch runtime 目錄，作為不落到使用者 runtime 的第二道防線。socket 路徑置於 `--scratch` 下的短目錄，程序皆在 finally 終止，runtime 一般檔案保留，socket 本身無持久 bytes。禁止改成指向真實 keyring 的環境。
 
 `flow.not_run` 固定揭露尚未涵蓋真網路模型／Codex app-server、隔離 native validation／preview、Wayfire／Quickshell 真 crash 與密碼解鎖錄影。流程未完成時另加 `complete private-keyring / Agent / hostd / store / export flow (not completed)`；不能因 fixture 已寫好就宣稱整合成功。runner 與假服務關閉自己的 coredump，不改產品 crash 政策。
 
-`scan.py` 可接受 manifest 重掃 retained 產物。讀取一般檔案 bytes（含 SQLite WAL／舊頁）、SQLite 邏輯內容（含 UTF-16）及 `.dittopkg` 解壓成員。完整哨兵保留 literal、JSON escaping、URL encoding，新增 hex 大小寫與 Base64 offset 0／1／2；共用 `nonce` 也獨立搜尋這些形式。Base64 只比對完全位於哨兵／nonce 內的 sextet，避開前後位元干擾，涵蓋 standard／URL-safe 與有／無 padding。manifest 的 nonce 至少 16 bytes，產品 runner 每次產生 32 字元 UUID nonce；其 ASCII 字元經 hex 編碼後全由數字組成，因此產品 hex 負例的大小寫結果相同（命中可標為 `hex-lower`）。大小寫差異由含 Unicode／非 UUID 字元的單元測試覆蓋。Base64 fixture 使用 `0xff`、`0x00` 與固定種子的隨機前綴；`run.py`／`control.py` 的 offset-1 負例使用 `0xff`，避免與 scanner 內部的 `x` 前綴相同而掩蓋錯誤邊界。去前綴或截斷仍保留 nonce 的外洩可命中；**只留下 nonce 的短片段、任意轉換、雜湊、加密或未支援壓縮格式仍不在保證範圍**。這是已知哨兵偵測，不是任意秘密辨識或磁碟鑑識。符號連結、讀取失敗、壞 SQLite、不存在的範圍均失敗。
+`scan.py` 可接受 manifest 重掃 retained 產物。讀取一般檔案 bytes（含 SQLite WAL／舊頁）、SQLite 邏輯內容（含 UTF-16）及 `.dittopkg` 解壓成員。完整哨兵保留 literal、JSON escaping、URL encoding，新增 hex 大小寫與 Base64 offset 0／1／2；共用 `nonce` 也獨立搜尋這些形式。Base64 只比對完全位於哨兵／nonce 內的 sextet，避開前後位元干擾，涵蓋 standard／URL-safe 與有／無 padding。manifest 的每個哨兵與 nonce 都至少 16 bytes（UTF-8），過短時掃描直接以 `sentinel <label> must contain at least 16 bytes` 失敗：2 bytes 的哨兵在每個 Base64 offset 只剩 2 個完整字元，會大量命中無關內容，16 bytes 在每個 offset 仍保留至少 20 個字元；產品 runner 每次產生 32 字元 UUID nonce；其 ASCII 字元經 hex 編碼後全由數字組成，因此產品 hex 負例的大小寫結果相同（命中可標為 `hex-lower`）。大小寫差異由含 Unicode／非 UUID 字元的單元測試覆蓋。Base64 fixture 使用 `0xff`、`0x00` 與固定種子的隨機前綴；`run.py`／`control.py` 的 offset-1 負例使用 `0xff`，避免與 scanner 內部的 `x` 前綴相同而掩蓋錯誤邊界。去前綴或截斷仍保留 nonce 的外洩可命中；**只留下 nonce 的短片段、任意轉換、雜湊、加密或未支援壓縮格式仍不在保證範圍**。這是已知哨兵偵測，不是任意秘密辨識或磁碟鑑識。符號連結、讀取失敗、壞 SQLite、不存在的範圍均失敗。
 
 ## 不依賴 IPC 的掃描器控制
 
@@ -52,7 +52,7 @@ python3 tests/g4/secrets/control.py --inject-leak --leak-form base64-offset-1 --
 
 控制預期依序 exit 0、0、0、1、1、1；三個負例的 `hit_count` 都必須大於 0（scanner `ok=false`）。`run.py --inject-leak` 成功負例控制仍 exit 0，但要求真實 flow 完成、唯一命中來源為 `intentional-leak.log`；流程失敗不算負例成功。`test_scan.py` 也對 runner 三種負例的退出政策執行 fixture 回歸；不冒充產品證據。
 
-`test_keyring.py` 驗證記憶體 create／replace／search／get／delete、拒絕真實 bus／備援地址，並以已安裝的 distro Python 執行 `keyring_wire_check.py`，直接核對實際 dbus-python decorator 簽章與資料形狀。這些單元不建立 socket。sandbox 內實跑 `run.py` 仍因私有 bus bind 被 `Operation not permitted` 拒絕，**BLOCKED（sandbox socket）**；coordinator 已在 sandbox 外於候選 `a9795cce8fa56e4132e0fd4d7ad4a2133ac1fe8d` 執行通過：正例 `flow.ok=true`、54 檔、0 hits，literal／hex／Base64 負例皆 `negative_control_passed=true`。原始證據為 `/data/hermes/ditto-runs/g4-impl/fix74-79/evidence/external-{positive,negative,hex,base64}/result.json`，審查核對見 `/data/hermes/ditto-runs/g4-impl/fix74-79/review1/verdict.txt`。這證明本假服務的成功路徑，不代表真 Secret Service 相容性；本輪修補後仍須使用上方產品入口指令，在新的輸出目錄重跑。
+`test_keyring.py` 驗證記憶體 create／replace／search／get／delete、拒絕真實 bus／備援地址，並以已安裝的 distro Python 執行 `keyring_wire_check.py`，直接核對實際 dbus-python decorator 簽章與資料形狀。這些單元不建立 socket。sandbox 內實跑 `run.py` 仍因私有 bus bind 被 `Operation not permitted` 拒絕，**BLOCKED（sandbox socket）**；coordinator 最後一次在 sandbox 外執行通過的是候選 `b71216e7998ddcaa13fb4d02289bb225ed69a6ef`：正例 `flow.ok=true`、54 檔、0 hits，literal／hex／Base64 負例皆 `negative_control_passed=true`。原始證據為 `/data/hermes/ditto-runs/g4-impl/fix74-79/evidence/repair1/external-{positive,literal,hex,base64}/result.json`，審查核對見 `/data/hermes/ditto-runs/g4-impl/fix74-79/review2/verdict.txt`。這證明本假服務的成功路徑，不代表真 Secret Service 相容性；本輪修補後仍須使用上方產品入口指令，在新的輸出目錄重跑。
 
 ## 崩潰／診斷路徑盤點與缺口
 
@@ -74,7 +74,7 @@ node --experimental-transform-types tests/g4/secrets/crash-audit.mjs "$QA04_EVID
 
 ## repair1：driver 契約核對
 
-coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id` 而停止，`flow.ok=false`，不得計入正向／負向證據。driver 現在兩次匯出均使用 `desktop.profiles.get` 回讀的 `profile.profile_id`。sandbox 內仍 **BLOCKED（socket）**；coordinator 已於 `a9795cc` 在 sandbox 外跑通私有 keyring 正例與三種負例，證據位置及本輪重跑指令見「不依賴 IPC 的掃描器控制」末段。
+coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id` 而停止，`flow.ok=false`，不得計入正向／負向證據。driver 現在兩次匯出均使用 `desktop.profiles.get` 回讀的 `profile.profile_id`。sandbox 內仍 **BLOCKED（socket）**；coordinator 已於 `b71216e` 在 sandbox 外跑通私有 keyring 正例與三種負例，證據位置及本輪重跑指令見「不依賴 IPC 的掃描器控制」末段。
 
 `node tests/g4/secrets/driver.test.mjs` 實際執行同一個 `runFlow`（三次成功憑證／回合），逐次以 `schema/catalog.json` 的 input_schema 驗證所有 17 個能力，並以 `{}` 重現舊 export 參數被拒。測試僅實作這些 schema 用到的 vocabulary，遇到新關鍵字就失敗；不是通用 schema 驗證器，也不模擬產品成功證據。
 
@@ -101,7 +101,7 @@ coordinator 在 `163e782` 的兩次產品流程都因 export 缺少 `profile_id`
 
 能力參數由共用 client 加入 `_meta.protocol_version=0.3.0,deadline_ms=15000`；這是 Core 剝除的傳輸 metadata，不屬於 input_schema 的領域參數。實際單元請求表可由 `DITTO_QA04_CONTRACT_REPORT=<path>` 保存。
 
-#73 新增 proposal → ChangeSet 回讀，私人哨兵 `QA04_PRIVATE_PROPOSAL_CONTENT` 只允許保留在明確保存的 readback／store，不得進一般日誌、匯出與診斷。`run.py` 的隱私掃描已加入此哨兵。subject 是 Core 綁定的呼叫身分，不能當 RPC 參數；logger 的任意私人 subject 測試與全部欄位結論見 [Core 日誌盤點](core-log-audit.md)。產品掃描在 sandbox 內 BLOCKED（socket）；coordinator 已於 `a9795cc` 在 sandbox 外執行通過，原始結果見上述 `external-*` 證據。本輪變更後仍需依上方指令重跑，不將舊候選的通過算作本輪驗證。
+#73 新增 proposal → ChangeSet 回讀，私人哨兵 `QA04_PRIVATE_PROPOSAL_CONTENT` 只允許保留在明確保存的 readback／store，不得進一般日誌、匯出與診斷。`run.py` 的隱私掃描已加入此哨兵。subject 是 Core 綁定的呼叫身分，不能當 RPC 參數；logger 的任意私人 subject 測試與全部欄位結論見 [Core 日誌盤點](core-log-audit.md)。產品掃描在 sandbox 內 BLOCKED（socket）；coordinator 已於 `b71216e` 在 sandbox 外執行通過，原始結果見上述 `repair1/external-*` 證據。本輪變更後仍需依上方指令重跑，不將舊候選的通過算作本輪驗證。
 
 ## repair1：hostd 日誌路徑盤點
 
@@ -140,7 +140,7 @@ node --experimental-transform-types tests/g4/secrets/crash-audit.mjs "$QA04_EVID
 
 ## #74：hostd 欄位 allow-list 盤點
 
-`log.ts` 先以內容鍵 deny-first 規則遮蔽所有型別（含 number／boolean／null／Error），再用 `safeLogStringFields`、`safeLogNumberFields`、`safeLogBooleanFields` 放行各自型別的欄位；固定集合由 `log.test.ts` 鎖定並逐鍵驗證。數值只放行 `pid,bytes,timeout_ms,hit,host_generation,min_semi_space_mib,max_semi_space_mib`，布林只放行 `fixed,reclaim`；只有兩個 semi-space 欄位額外保留代表未指定的 null。其他 scalar、錯誤型別與未知容器均變成 `[redacted]`，未知容器內即使使用安全鍵也無法繞過；只有 `items` 允許遞迴的交易結果物件，lease 陣列沿用其安全欄位鍵。HOME→`~/…` 保留。Error／reason 使用原有閉合診斷 schema；`name/code/fingerprint` 不經一般欄位放行。
+`log.ts` 先以內容鍵 deny-first 規則遮蔽所有型別（含 number／boolean／null／Error），再用 `safeLogStringFields`、`safeLogNumberFields`、`safeLogBooleanFields` 放行各自型別的欄位；固定集合由 `log.test.ts` 鎖定並逐鍵驗證。數值只放行 `pid,bytes,timeout_ms,hit,host_generation,min_semi_space_mib,max_semi_space_mib`，布林只放行 `fixed,reclaim`；只有兩個 semi-space 欄位額外保留代表未指定的 null。其他 scalar、錯誤型別與未知容器均變成 `[redacted]`；值為 `undefined` 的欄位直接省略（#103），同鍵的其他值照舊遮蔽，未知容器內即使使用安全鍵也無法繞過；只有 `items` 允許遞迴的交易結果物件，lease 陣列沿用其安全欄位鍵。HOME→`~/…` 保留。Error／reason 使用原有閉合診斷 schema；`name/code/fingerprint` 不經一般欄位放行。
 
 以下列出現有 production log 呼叫的全部鍵（含 child、spread 與巢狀結果），以 `rg 'log\.(error|warn|info|debug|child)|new HostLog' packages/host-runtime/src` 逐一核對：
 
@@ -154,7 +154,7 @@ node --experimental-transform-types tests/g4/secrets/crash-audit.mjs "$QA04_EVID
 | `loader/transaction.ts` | `entry_id` | `error` | `bytes,timeout_ms` |
 | `fault-enabled.ts`（僅測試 build） | `component,part,point,action` | — | `hit` |
 | `log.ts` Cordis exporter | `source,entry_id,plugin_id` | `error`；不保存 logger 名稱或載荷 | — |
-| 自動欄位 | `ts,level,msg` 由 logger 產生／固定事件集合 | 未知 msg 改 `host.message`，`message_fingerprint` 僅接受 HMAC 格式 | — |
+| 自動欄位 | `ts,level,msg` 由 logger 產生／固定事件集合；直接呼叫 `stderrSink` 時，非 ISO 時間的 `ts` 或四個等級以外的 `level` 改為 `[redacted]` | 未知 msg 改 `host.message`，`message_fingerprint` 僅接受 HMAC 格式 | — |
 
 逐一 `rg` 與 log 呼叫核對後，`operation_id,session_id,path` 均無 production 日誌呼叫端，已移出 allow-list 並由測試固定為遮蔽；HOME 替換改以仍允許的 `capability_id` 驗證。`items[].missing` 是交易層提供的依賴名稱陣列，可能含私人插件名稱；保留整欄遮蔽，日誌形狀從原先的名稱陣列改為字串 `[redacted]`。失敗類別仍保留在 `reason` 的閉合診斷中，正式 RPC 回應的 missing 陣列不變。既有測試用 `title,summary,body,clipboard,text,content,window_title,message,stack,payload,config,args,logger,name,topics` 仍全部遮蔽。識別字／安全欄位仍依賴呼叫端遵守內容契約；把秘密故意塞進 allow-list 的 ID 仍非通用偵測器。Core 日誌由 #79 lane 處理，本輪不改 `crates/**`；既有 Core 結論見 [盤點](core-log-audit.md)。
 
@@ -168,7 +168,7 @@ cargo test --locked --no-run -p ditto-core --features fault-injection --test lif
 
 L-06 的 `msg` matcher 使用 `host.fault`，保留 `point`／`hit`；無 socket 測試直接比對真實 fault producer 與 Rust matcher。指紋測試重載兩個獨立 host log 模組，驗證各啟動密鑰內穩定、跨密鑰不同；不聲稱兩個完整 hostd 的 IPC 啟動。scanner 單元測試模擬 flow 產生 fixture，驗證實際 runner 的退出政策，不計為產品流程證據。RED 使用 `46cea3b` 的原始 production 檔案，GREEN 使用本輪修正。
 
-完整 lifecycle 在 sandbox 內需 socket，**BLOCKED**；coordinator 已於 `a9795cc` 在外部跑過 6／6，本輪修改後的外部重跑入口如下：
+完整 lifecycle 在 sandbox 內需 socket，**BLOCKED**；coordinator 已於 `b71216e` 在外部跑過 6／6（`/data/hermes/ditto-runs/g4-impl/fix74-79/coord-gates-repair1/lifecycle.log`），本輪修改後的外部重跑入口如下：
 
 ```sh
 bash tests/g1/lifecycle/run.sh

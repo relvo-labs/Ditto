@@ -2,7 +2,7 @@ import type { Context, Exporter } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DittoError } from '../../src/errors.ts'
 import { faultPoint, resetFaultHits } from '../../src/fault-enabled.ts'
-import { errorDiagnostic, safeLogStringFields, safeLogNumberFields, safeLogBooleanFields, HostLog, installCordisExporter, type LogRecord, stderrSink } from '../../src/log.ts'
+import { errorDiagnostic, safeLogStringFields, safeLogNumberFields, safeLogBooleanFields, HostLog, installCordisExporter, type LogLevel, type LogRecord, stderrSink } from '../../src/log.ts'
 
 const markers = ['QA04_WINDOW_TITLE', 'QA04_DOCUMENT_CONTENT', 'QA04_CLIPBOARD_CONTENT', 'QA04_CONVERSATION_CONTENT']
 const privateText = markers.join(' ')
@@ -146,7 +146,8 @@ it('pins the reviewed string allow-list and preserves each field including lease
 it('redacts content keys for every value type before diagnostic or scalar handling', () => {
   const keys = ['title', 'summary', 'body', 'clipboard', 'text', 'content', 'window_title',
     'message', 'stack', 'payload', 'data', 'config', 'args', 'logger', 'name', 'topics']
-  const values = [4111111111111111, true, null, undefined, privateText, [privateText],
+  // undefined carries no value and is omitted instead; see the dedicated test below.
+  const values = [4111111111111111, true, null, privateText, [privateText],
     {entry_id: privateText}, new Error(privateText)]
   for (const value of values) {
     const content = Object.fromEntries(keys.map(key => [key, value]))
@@ -172,7 +173,7 @@ it('redacts content keys for every value type before diagnostic or scalar handli
 })
 
 it('redacts unknown scalars at every depth and wrong scalar types under known keys', () => {
-  for (const value of [12345, false, null, undefined]) {
+  for (const value of [12345, false, null]) {
     const records: LogRecord[] = []
     new HostLog(record => records.push(record)).child({unknown: value}).info('connected', {
       items: [{key: 'entry', unknown: value}],
@@ -210,4 +211,119 @@ it('redacts unused string fields and missing dependencies while retaining safe r
   })
   expect(records[0]).toMatchObject({path: '[redacted]', operation_id: '[redacted]', session_id: '[redacted]',
     items: [{key: 'entry', status: 'failed', missing: '[redacted]'}]})
+})
+
+// One key of every redaction path: content, unknown, unused string, allowed string/number/boolean,
+// closed diagnostics, fingerprint and the nullable semi-space field.
+const undefinedKeys = ['title', 'message', 'unknown', 'operation_id', 'entry_id', 'pid', 'fixed',
+  'error', 'reason', 'message_fingerprint', 'min_semi_space_mib']
+
+it('omits undefined fields instead of reporting them as redacted, in HostLog, items and a direct sink', () => {
+  const fields = Object.fromEntries(undefinedKeys.map(key => [key, undefined]))
+  const records: LogRecord[] = []
+  new HostLog(record => records.push(record)).child(fields).info('participant.result', {
+    items: [{key: 'entry', status: 'failed', ...fields}],
+  })
+  const item = (records[0]!['items'] as Record<string, unknown>[])[0]!
+  for (const key of undefinedKeys) {
+    expect(Object.hasOwn(records[0]!, key), `top-level ${key}`).toBe(false)
+    expect(Object.hasOwn(item, key), `items[].${key}`).toBe(false)
+  }
+  expect(item).toEqual({key: 'entry', status: 'failed'})
+  const chunks: string[] = []
+  vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
+  stderrSink({ts: new Date().toISOString(), level: 'info', msg: 'participant.result', ...fields, items: [fields]})
+  const written = JSON.parse(chunks.join(''))
+  for (const key of undefinedKeys) {
+    expect(Object.hasOwn(written, key), `sink ${key}`).toBe(false)
+    expect(Object.hasOwn(written.items[0], key), `sink items[].${key}`).toBe(false)
+  }
+  expect(JSON.stringify(records) + chunks.join('')).not.toContain('[redacted]')
+})
+
+it('still redacts a defined value under each key whose undefined value is omitted', () => {
+  const fields = Object.fromEntries(undefinedKeys.map(key => [key, {entry_id: privateText}]))
+  const records: LogRecord[] = []
+  new HostLog(record => records.push(record)).child(fields).info('participant.result', {
+    items: [{key: 'entry', ...fields}],
+  })
+  const chunks: string[] = []
+  vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
+  stderrSink({ts: new Date().toISOString(), level: 'info', msg: 'participant.result', ...fields, items: [fields]})
+  const written = JSON.parse(chunks.join(''))
+  for (const record of [records[0]!, written]) {
+    const item = (record['items'] as Record<string, unknown>[])[0]!
+    for (const target of [record, item]) {
+      for (const key of undefinedKeys) {
+        if (key === 'error' || key === 'reason') {
+          expect(target[key]).toEqual({name: 'NonError', fingerprint: expect.stringMatching(/^hmac-sha256:[a-f0-9]{64}$/)})
+        } else {
+          expect(target[key], key).toBe('[redacted]')
+        }
+      }
+    }
+  }
+  expect(JSON.stringify(records) + chunks.join('')).not.toContain('QA04_')
+})
+
+it('a direct sink call cannot pass private text through ts or level; valid values stay unchanged', () => {
+  const chunks: string[] = []
+  vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
+  for (const [ts, level] of [[privateText, privateText], [4111111111111111, {text: privateText}],
+    ['2026-10-19T00:00:00.000Z ' + privateText, 'info ' + privateText]]) {
+    chunks.length = 0
+    stderrSink({ts, level, msg: 'connected'} as unknown as LogRecord)
+    expect(JSON.parse(chunks.join(''))).toMatchObject({ts: '[redacted]', level: '[redacted]', msg: 'connected'})
+    expect(chunks.join('')).not.toContain('QA04_')
+  }
+  const ts = new Date().toISOString()
+  for (const level of ['error', 'warn', 'info', 'debug'] as LogLevel[]) {
+    chunks.length = 0
+    stderrSink({ts, level, msg: 'connected'})
+    expect(JSON.parse(chunks.join(''))).toEqual({ts, level, msg: 'connected'})
+  }
+  // HostLog output passes the same check unchanged.
+  const records: LogRecord[] = []
+  new HostLog(record => records.push(record)).warn('connected')
+  expect(records[0]).toMatchObject({level: 'warn', ts: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)})
+  chunks.length = 0
+  stderrSink(records[0]!)
+  expect(JSON.parse(chunks.join(''))).toEqual(records[0])
+})
+
+// A getter that is safe for the first `safeReads` reads and private afterwards.
+function flipping(safe: unknown, safeReads: number): () => unknown {
+  let reads = 0
+  return () => ++reads <= safeReads ? safe : privateText
+}
+
+it('a direct sink reads each field once: accessors cannot pass validation and then emit private text', () => {
+  const chunks: string[] = []
+  vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { chunks.push(String(chunk)); return true })
+  const fingerprint = 'hmac-sha256:' + 'a'.repeat(64)
+  const cases: [string, (safeReads: number) => object][] = [
+    ['ts', n => Object.defineProperty({level: 'info', msg: 'connected'}, 'ts',
+      {get: flipping('2026-10-19T00:00:00.000Z', n), enumerable: true})],
+    ['level', n => Object.defineProperty({ts: '2026-10-19T00:00:00.000Z', msg: 'connected'}, 'level',
+      {get: flipping('info', n), enumerable: true})],
+    ['msg', n => Object.defineProperty({ts: '2026-10-19T00:00:00.000Z', level: 'info'}, 'msg',
+      {get: flipping('connected', n), enumerable: true})],
+    ['error.code', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty(new Error('x'), 'code', {get: flipping('ENOENT', n)})})],
+    ['Error.name', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty(new Error('x'), 'name', {get: flipping('TypeError', n)})})],
+    ['error.name (summary)', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty({fingerprint}, 'name', {get: flipping('Error', n)})})],
+    ['error.fingerprint (summary)', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty({name: 'Error'}, 'fingerprint', {get: flipping(fingerprint, n)})})],
+    ['error.code (summary)', n => ({ts: '2026-10-19T00:00:00.000Z', level: 'info', msg: 'connected',
+      error: Object.defineProperty({name: 'Error', fingerprint}, 'code', {get: flipping('ENOENT', n)})})],
+  ]
+  for (const [name, make] of cases) {
+    for (let safeReads = 1; safeReads <= 6; safeReads++) {
+      chunks.length = 0
+      stderrSink(make(safeReads) as LogRecord)
+      expect.soft(chunks.join(''), `${name}, safe for ${safeReads} read(s)`).not.toContain('QA04_')
+    }
+  }
 })

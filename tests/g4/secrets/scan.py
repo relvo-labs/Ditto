@@ -9,6 +9,10 @@ import sqlite3
 import subprocess
 import urllib.parse
 
+# Shorter values leave only a few Base64 characters fully inside the value and
+# hit ordinary text; 16 bytes keep >= 20 characters (120 bits) at every offset.
+MIN_SENTINEL_BYTES = 16
+
 
 def encoded_forms(value):
     raw = value.encode()
@@ -36,13 +40,16 @@ def scan(roots, sentinels, nonce=None):
         result["errors"].append("no injection sentinels configured")
     values = list(sentinels.items())
     if nonce is not None:
-        if not isinstance(nonce, str) or len(nonce.encode()) < 16:
-            result["errors"].append("nonce must contain at least 16 bytes")
+        if not isinstance(nonce, str) or len(nonce.encode()) < MIN_SENTINEL_BYTES:
+            result["errors"].append(f"nonce must contain at least {MIN_SENTINEL_BYTES} bytes")
         else:
             values.append(("nonce", nonce))
     for label, value in values:
         if not isinstance(value, str) or not value:
             result["errors"].append(f"invalid sentinel: {label}")
+            continue
+        if len(value.encode()) < MIN_SENTINEL_BYTES:
+            result["errors"].append(f"sentinel {label} must contain at least {MIN_SENTINEL_BYTES} bytes")
             continue
         variants = set()
         for encoding, needle in encoded_forms(value):
