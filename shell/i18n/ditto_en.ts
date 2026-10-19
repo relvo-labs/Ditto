@@ -215,6 +215,10 @@
         <translation>Refuse</translation>
     </message>
     <message>
+        <source>拒絕並關閉</source>
+        <translation>Refuse and close</translation>
+    </message>
+    <message>
         <source>新增或完成待辦事項</source>
         <translation>Add or complete tasks</translation>
     </message>
@@ -312,12 +316,28 @@
         <translation>Plugin center</translation>
     </message>
     <message>
+        <source>放大視窗</source>
+        <translation>Maximize window</translation>
+    </message>
+    <message>
         <source>組合中心</source>
         <translation>Composition center</translation>
     </message>
     <message>
+        <source>縮小視窗</source>
+        <translation>Minimize window</translation>
+    </message>
+    <message>
         <source>變更紀錄</source>
         <translation>Change history</translation>
+    </message>
+    <message>
+        <source>還原視窗大小</source>
+        <translation>Restore window size</translation>
+    </message>
+    <message>
+        <source>關閉 Ditto 設定</source>
+        <translation>Close Ditto Settings</translation>
     </message>
 </context>
 <context>
@@ -637,6 +657,10 @@
         <translation>%1: %2</translation>
     </message>
     <message>
+        <source>AI 對話目前關閉</source>
+        <translation>AI chat is off</translation>
+    </message>
+    <message>
         <source>AI 對話目前關閉。開啟後才會連接模型。</source>
         <translation>AI chat is off. The model is connected only after you turn it on.</translation>
     </message>
@@ -655,6 +679,10 @@
     <message>
         <source>Ditto：</source>
         <translation>Ditto: </translation>
+    </message>
+    <message>
+        <source>「%1」</source>
+        <translation>“%1”</translation>
     </message>
     <message>
         <source>你：</source>
@@ -703,6 +731,10 @@
     <message>
         <source>對話內容</source>
         <translation>Conversation</translation>
+    </message>
+    <message>
+        <source>對話檢視</source>
+        <translation>Chat view</translation>
     </message>
     <message>
         <source>尚無配額資料</source>
@@ -777,6 +809,10 @@
         <translation>Sign-in code</translation>
     </message>
     <message>
+        <source>登入模型後才能輸入。</source>
+        <translation>Sign in to a model to type here.</translation>
+    </message>
+    <message>
         <source>目前無法建立組合</source>
         <translation>compositions cannot be created right now</translation>
     </message>
@@ -829,6 +865,18 @@
         <translation>Turn on AI chat</translation>
     </message>
     <message>
+        <source>開啟 AI 對話後才能輸入。</source>
+        <translation>Turn on AI chat to type here.</translation>
+    </message>
+    <message>
+        <source>開啟後可以這樣說：</source>
+        <translation>Once it is on, you could say:</translation>
+    </message>
+    <message>
+        <source>關閉時不連接模型；桌面、設定中心與救援照常使用。</source>
+        <translation>When off, no model is connected; the desktop, settings and rescue work as usual.</translation>
+    </message>
+    <message>
         <source>附加內容</source>
         <translation>Attached</translation>
     </message>
@@ -867,12 +915,32 @@
         <source>Ditto 對話</source>
         <translation>Ditto chat</translation>
     </message>
+    <message>
+        <source>放大視窗</source>
+        <translation>Maximize window</translation>
+    </message>
+    <message>
+        <source>縮小視窗</source>
+        <translation>Minimize window</translation>
+    </message>
+    <message>
+        <source>還原視窗大小</source>
+        <translation>Restore window size</translation>
+    </message>
+    <message>
+        <source>關閉對話視窗（對話會繼續）</source>
+        <translation>Close the chat window (the chat keeps going)</translation>
+    </message>
 </context>
 <context>
     <name>CompositionCenter</name>
     <message>
         <source>「%1」的版本</source>
         <translation>Versions of “%1”</translation>
+    </message>
+    <message>
+        <source>下方顯示這個組合的版本</source>
+        <translation>Its versions are shown below</translation>
     </message>
     <message>
         <source>不能匯入，原因如下。</source>
@@ -943,6 +1011,10 @@
         <translation>Can be imported.</translation>
     </message>
     <message>
+        <source>唯一可用</source>
+        <translation>Only option</translation>
+    </message>
+    <message>
         <source>套用</source>
         <translation>Apply</translation>
     </message>
@@ -1003,6 +1075,10 @@
         <translation>Name of the new composition</translation>
     </message>
     <message>
+        <source>更多動作：%1</source>
+        <translation>More actions: %1</translation>
+    </message>
+    <message>
         <source>最後修改 %1</source>
         <translation>Last changed %1</translation>
     </message>
@@ -1055,6 +1131,10 @@
         <translation>Waiting to be kept</translation>
     </message>
     <message>
+        <source>終點</source>
+        <translation>To</translation>
+    </message>
+    <message>
         <source>終點 ✓</source>
         <translation>To ✓</translation>
     </message>
@@ -1103,8 +1183,16 @@
         <translation>Enter a name first</translation>
     </message>
     <message>
+        <source>起點</source>
+        <translation>From</translation>
+    </message>
+    <message>
         <source>起點 ✓</source>
         <translation>From ✓</translation>
+    </message>
+    <message>
+        <source>這就是目前使用的組合</source>
+        <translation>This is the composition in use</translation>
     </message>
     <message>
         <source>選兩個版本（起點、終點）比較差異。每個版本都標示它是怎麼來的。</source>

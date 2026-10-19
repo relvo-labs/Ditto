@@ -13,10 +13,12 @@ Flickable {
 
     required property var client
     required property var tokens
+    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing page.
+    readonly property bool jelly: tokens.uiCandidate === true
     property var providers: null
 
     contentWidth: width
-    contentHeight: column.implicitHeight + tokens.spaceSection * 2
+    contentHeight: column.implicitHeight + tokens.appPagePad * 2
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
@@ -180,15 +182,15 @@ Flickable {
 
     Column {
         id: column
-        x: page.tokens.spaceSection
-        y: page.tokens.spaceSection
-        width: page.width - page.tokens.spaceSection * 2
+        x: page.tokens.appPagePad
+        y: page.tokens.appPagePad
+        width: page.width - page.tokens.appPagePad * 2
         spacing: page.tokens.spaceSection
 
         Text {
             text: page.t(qsTr("個人化設定"))
-            color: page.tokens.foreground
-            font.pixelSize: page.tokens.fontHeading
+            color: page.tokens.appInk
+            font.pixelSize: page.tokens.appFontHeading
             font.bold: true
             Accessible.role: Accessible.Heading
             Accessible.name: text
@@ -199,8 +201,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.notice
-            color: page.tokens.warning
-            font.pixelSize: page.tokens.fontBody
+            color: page.tokens.appWarning
+            font.pixelSize: page.tokens.appFontBody
             Accessible.role: Accessible.AlertMessage
             Accessible.name: text
         }
@@ -230,8 +232,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("強調色"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Repeater {
                     model: page.accents
@@ -252,10 +254,21 @@ Flickable {
                         Keys.onReturnPressed: page.setAppearance({ tokens: { accent: modelData } })
                         Text {
                             anchors.centerIn: parent
-                            visible: parent.selected
+                            visible: parent.selected && !page.jelly
                             text: "✓"
                             color: "#1a1626"
                             font.bold: true
+                        }
+                        // Candidate: the chosen colour is a bubble ring (white
+                        // inner ring inside a thick ink ring), not a ✓ character.
+                        Rectangle {
+                            visible: parent.selected && page.jelly
+                            anchors.fill: parent
+                            anchors.margins: 3
+                            radius: width / 2
+                            color: "transparent"
+                            border.color: "#ffffff"
+                            border.width: 3
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -272,8 +285,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("圓角"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -291,8 +304,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("文字大小"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -318,8 +331,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("關閉「降低透明度」後會出現倒數，按「保留」才會留下，避免看不清楚時無法改回。"))
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
 
             Toggle {
@@ -353,8 +366,8 @@ Flickable {
                 text: page.tokens.systemReducedMotion
                     ? page.t(qsTr("系統已設定減少動畫，這裡關閉也不會恢復動畫。系統設定在桌面啟動時讀取。"))
                     : page.t(qsTr("系統的減少動畫設定在桌面啟動時讀取，兩者任一開啟都會減少動畫。"))
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
         }
 
@@ -387,16 +400,16 @@ Flickable {
                         width: 140
                         anchors.verticalCenter: parent.verticalCenter
                         text: modelData.chord
-                        color: page.tokens.foreground
-                        font.pixelSize: page.tokens.fontBody
+                        color: page.tokens.appInk
+                        font.pixelSize: page.tokens.appFontBody
                         font.family: "monospace"
                     }
                     Text {
                         width: 200
                         anchors.verticalCenter: parent.verticalCenter
                         text: page.commandTitle(modelData.command)
-                        color: page.tokens.foreground
-                        font.pixelSize: page.tokens.fontBody
+                        color: page.tokens.appInk
+                        font.pixelSize: page.tokens.appFontBody
                     }
                     Badge {
                         anchors.verticalCenter: parent.verticalCenter
@@ -479,8 +492,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("大小"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -498,8 +511,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("螢幕"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -518,8 +531,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("位置"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -536,8 +549,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.placementText()
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
             }
@@ -546,8 +559,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。"))
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
         }
 
@@ -559,8 +572,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("鍵盤焦點一律以外框標示，所有操作都可以只用 Tab、Enter、空白鍵與方向鍵完成。每個按鈕與欄位都有螢幕閱讀器可以讀出的名稱；狀態同時以文字表示，不只靠顏色或動畫。"))
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
             }
         }
     }

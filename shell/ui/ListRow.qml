@@ -19,6 +19,9 @@ Item {
     property real labelWidth: Math.min(200, width * 0.36)
 
     readonly property bool firstInGroup: !parent || !parent.visibleChildren || parent.visibleChildren[0] === row
+    /// Draw the line above; by default every row but the group's first.
+    /// A row wrapped in its own delegate sets this from its index.
+    property bool separated: !firstInGroup
     readonly property bool stacked: trail.childrenRect.width > width - labelWidth - tokens.uiGap * 2
 
     width: parent ? parent.width : 400
@@ -29,7 +32,7 @@ Item {
 
     Rectangle {
         objectName: "listRowSeparator"
-        visible: !row.firstInGroup
+        visible: row.separated
         anchors.left: parent.left
         anchors.right: parent.right
         y: -Math.round(row.tokens.uiGap * 0.75)

@@ -17,6 +17,12 @@ FloatingWindow {
     property string page: "composition"
     signal closeRequested()
 
+    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing window.
+    readonly property bool jelly: !!tokens && tokens.uiCandidate === true
+    /// The screen's height when known: a candidate window stays clear of the
+    /// top bar and the Dock (about 36 + 96 px) instead of running under them.
+    readonly property real screenHeight: screen && screen.height ? screen.height : 0
+
     function t(source) {
         return client ? client.t(source) : source;
     }
@@ -31,9 +37,9 @@ FloatingWindow {
 
     title: t(qsTr("Ditto 設定"))
     implicitWidth: 1080
-    implicitHeight: 740
+    implicitHeight: jelly && screenHeight > 0 ? Math.max(520, Math.min(740, screenHeight - 148)) : 740
     minimumSize: Qt.size(760, 520)
-    color: tokens ? tokens.background : "#12121a"
+    color: jelly ? "transparent" : tokens ? tokens.background : "#12121a"
     visible: true
     onClosed: window.closeRequested()
 
@@ -76,19 +82,57 @@ FloatingWindow {
         focus: true
         Keys.onEscapePressed: window.closeRequested()
 
+        // ---- #116 candidate frame: the window's one title and its controls ----
+        Loader {
+            anchors.fill: parent
+            active: window.jelly
+            sourceComponent: JellySurface {
+                objectName: "centersFrame"
+                tokens: window.tokens
+                radius: window.tokens.uiRadiusWindow
+                fill: window.tokens.uiCanvas
+                fillTop: window.tokens.uiGloss ? Qt.lighter(window.tokens.uiCanvas, 1.03) : window.tokens.uiCanvas
+                raised: false
+                iris: window.tokens.uiJ3
+            }
+        }
+        Loader {
+            id: header
+            active: window.jelly
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            sourceComponent: WindowHeader {
+                tokens: window.tokens
+                hostWindow: window
+                title: window.title
+                minimizeText: window.t(qsTr("縮小視窗"))
+                maximizeText: window.t(qsTr("放大視窗"))
+                restoreText: window.t(qsTr("還原視窗大小"))
+                closeText: window.t(qsTr("關閉 Ditto 設定"))
+                onCloseRequested: window.closeRequested()
+            }
+        }
+
         Rectangle {
             id: sidebar
-            width: 200
-            anchors.top: parent.top
+            width: window.jelly ? 216 : 200
+            anchors.top: window.jelly ? header.bottom : parent.top
             anchors.bottom: parent.bottom
-            color: window.tokens.surfaceStrong
+            anchors.bottomMargin: window.jelly ? window.tokens.uiGap : 0
+            anchors.left: parent.left
+            anchors.leftMargin: window.jelly ? window.tokens.uiGap : 0
+            radius: window.jelly ? window.tokens.uiRadiusCard : 0
+            color: window.jelly ? window.tokens.uiSidebar : window.tokens.surfaceStrong
 
             Column {
                 anchors.fill: parent
                 anchors.margins: window.tokens.spaceWide
                 spacing: window.tokens.spaceTight
 
+                // The candidate shows the title once, in the header.
                 Text {
+                    visible: !window.jelly
                     text: "Ditto"
                     color: window.tokens.foreground
                     font.pixelSize: window.tokens.fontHeading
@@ -103,9 +147,10 @@ FloatingWindow {
                         required property var modelData
                         readonly property bool current: window.page === modelData.id
                         width: parent.width
-                        height: window.tokens.controlHeight + 4
-                        radius: window.tokens.radiusSmall
-                        color: current ? window.tokens.accent : (tabArea.containsMouse ? window.tokens.surface : "transparent")
+                        height: window.jelly ? window.tokens.uiControlHeight + 8 : window.tokens.controlHeight + 4
+                        radius: window.jelly ? (window.tokens.uiJ1 ? window.tokens.uiRadiusControl : height / 2) : window.tokens.radiusSmall
+                        color: window.jelly ? (tabArea.containsMouse && !current ? window.tokens.uiGhostHover : "transparent")
+                            : current ? window.tokens.accent : (tabArea.containsMouse ? window.tokens.surface : "transparent")
                         activeFocusOnTab: true
                         Accessible.role: Accessible.PageTab
                         Accessible.name: tabText.text
@@ -113,21 +158,50 @@ FloatingWindow {
                         Keys.onReturnPressed: window.page = modelData.id
                         Keys.onSpacePressed: window.page = modelData.id
 
+                        // Candidate: the selected page is a raised bubble with
+                        // a filled marker; never the primary-action fill.
+                        Loader {
+                            anchors.fill: parent
+                            active: window.jelly && parent.current
+                            sourceComponent: JellySurface {
+                                objectName: "centersTabBubble"
+                                tokens: window.tokens
+                                radius: window.tokens.uiJ1 ? window.tokens.uiRadiusControl : height / 2
+                                fill: window.tokens.uiBead
+                                edge: window.tokens.uiBeadEdge
+                                lift: 0.5
+                                iris: window.tokens.uiJ3
+                            }
+                        }
+                        Rectangle {
+                            visible: window.jelly
+                            width: parent.current ? 8 : 6
+                            height: width
+                            radius: width / 2
+                            x: window.tokens.uiPadCard - 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: parent.current ? window.tokens.uiSelectDot : "transparent"
+                            border.color: parent.current ? window.tokens.uiSelectDot : window.tokens.uiCardBorder
+                            border.width: 1.5
+                        }
+
                         Text {
                             id: tabText
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
-                            anchors.leftMargin: window.tokens.space
+                            anchors.leftMargin: window.jelly ? window.tokens.uiPadCard + 14 : window.tokens.space
                             text: window.t(modelData.label)
-                            color: parent.current ? window.tokens.accentForeground : window.tokens.foreground
-                            font.pixelSize: window.tokens.fontBody
+                            color: window.jelly ? window.tokens.uiInk
+                                : parent.current ? window.tokens.accentForeground : window.tokens.foreground
+                            font.pixelSize: window.jelly ? window.tokens.uiFontLabel : window.tokens.fontBody
+                            font.weight: window.jelly && parent.current ? Font.DemiBold : Font.Normal
                         }
 
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
                             color: "transparent"
-                            border.color: window.tokens.focus
+                            border.color: window.jelly ? window.tokens.uiFocus : window.tokens.focus
                             border.width: parent.activeFocus ? 2 : 0
                         }
 
@@ -146,8 +220,9 @@ FloatingWindow {
                     width: parent.width
                     wrapMode: Text.WordWrap
                     text: window.client ? window.client.status : ""
-                    color: window.client && window.client.online ? window.tokens.foregroundMuted : window.tokens.warning
-                    font.pixelSize: window.tokens.fontSmall
+                    color: window.client && window.client.online ? window.tokens.appInkMuted : window.tokens.appWarning
+                    font.pixelSize: window.tokens.appFontCaption
+                    leftPadding: window.jelly ? window.tokens.uiGap : 0
                 }
             }
         }
@@ -156,8 +231,9 @@ FloatingWindow {
             id: content
             anchors.left: sidebar.right
             anchors.right: parent.right
-            anchors.top: parent.top
+            anchors.top: window.jelly ? header.bottom : parent.top
             anchors.bottom: parent.bottom
+            anchors.bottomMargin: window.jelly ? window.tokens.uiGap : 0
             sourceComponent: window.page === "plugins" ? pluginsPage
                 : window.page === "history" ? historyPage
                 : window.page === "personalization" ? personalizationPage

@@ -20,6 +20,8 @@ Item {
     property var items: []
     property string accessibleName: ""
     property bool open: false
+    /// The focus ring is drawn when the menu was opened from the keyboard.
+    property bool keyboardOpened: false
     readonly property alias popupItem: popup
     signal triggered(string id)
 
@@ -42,7 +44,8 @@ Item {
             }
         }
     }
-    function openMenu() {
+    function openMenu(fromKeyboard) {
+        keyboardOpened = fromKeyboard !== false;
         const window = menu.Window.window;
         overlay.parent = window && window.contentItem ? window.contentItem : menu;
         overlay.visible = true;
@@ -115,7 +118,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: menu.open ? menu.closeMenu(true) : menu.openMenu()
+            onClicked: menu.open ? menu.closeMenu(true) : menu.openMenu(false)
         }
     }
 
@@ -178,8 +181,8 @@ Item {
                         Keys.onReturnPressed: menu.choose(modelData)
                         Keys.onEnterPressed: menu.choose(modelData)
                         Keys.onSpacePressed: menu.choose(modelData)
-                        Keys.onDownPressed: menu.focusStep(index, 1)
-                        Keys.onUpPressed: menu.focusStep(index, -1)
+                        Keys.onDownPressed: { menu.keyboardOpened = true; menu.focusStep(index, 1); }
+                        Keys.onUpPressed: { menu.keyboardOpened = true; menu.focusStep(index, -1); }
                         Keys.onEscapePressed: menu.closeMenu(true)
                         Keys.onTabPressed: menu.closeMenu(true)
                         Keys.onBacktabPressed: menu.closeMenu(true)
@@ -208,7 +211,7 @@ Item {
                             color: entry.activeFocus || (hover.containsMouse && entry.usable)
                                 ? (entry.modelData.danger ? menu.tokens.uiDangerFill : menu.tokens.uiTonal) : "transparent"
                             border.color: menu.tokens.uiFocus
-                            border.width: entry.activeFocus ? 2 : 0
+                            border.width: entry.activeFocus && menu.keyboardOpened ? 2 : 0
 
                             Column {
                                 id: column

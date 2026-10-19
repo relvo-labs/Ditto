@@ -15,6 +15,11 @@ QtObject {
     property var calls: []
     property var pendingConfirmations: []
     property var windows: []
+    property var workspaces: [
+        { id: "1", name: "1", active: true }, { id: "2", name: "2", active: false },
+        { id: "3", name: "3", active: false }, { id: "4", name: "4", active: false }
+    ]
+    function activateWorkspace(id) {}
     property var apps: []
     property var packages: [
         { package_id: "ditto.dock.pill" }, { package_id: "ditto.panel.top" }

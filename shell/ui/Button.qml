@@ -17,11 +17,14 @@ Rectangle {
     /// primary | secondary | subtle | danger (| dangerQuiet with a candidate style)
     property string kind: "secondary"
     property string accessibleName: text
+    /// Candidate style only: a pick that stays chosen (e.g. a diff's start)
+    /// is drawn as a selected bead with a marker, never as a primary action.
+    property bool checked: false
     signal clicked()
 
     readonly property bool jelly: tokens.uiCandidate === true
 
-    implicitWidth: jelly ? Math.max(tokens.uiControlHeight, jellyLabel.implicitWidth + tokens.uiPadCard * 2)
+    implicitWidth: jelly ? Math.max(tokens.uiControlHeight, jellyLabel.implicitWidth + tokens.uiPadCard * 2 + (checked ? 14 : 0))
         : label.implicitWidth + tokens.spaceWide * 2
     implicitHeight: jelly ? tokens.uiControlHeight : tokens.controlHeight
     radius: tokens.radiusSmall
@@ -36,6 +39,8 @@ Rectangle {
     activeFocusOnTab: enabled
     Accessible.role: Accessible.Button
     Accessible.name: accessibleName
+    Accessible.checkable: jelly && checked
+    Accessible.checked: jelly && checked
     Accessible.onPressAction: if (enabled) clicked()
 
     Keys.onReturnPressed: if (enabled) clicked()
@@ -75,17 +80,19 @@ Rectangle {
         visible: button.jelly
         anchors.fill: parent
 
-        readonly property bool solid: button.kind === "primary" || button.kind === "danger"
+        readonly property bool picked: button.checked
+        readonly property bool solid: !picked && (button.kind === "primary" || button.kind === "danger")
         readonly property bool ghost: button.kind === "subtle"
         readonly property real faceRadius: button.tokens.uiJ1 ? button.tokens.uiRadiusControl : height / 2
-        readonly property color fillColor: !button.enabled
-            ? (ghost ? "transparent" : button.tokens.uiTrack)
+        readonly property color fillColor: picked ? button.tokens.uiBead
+            : !button.enabled ? (ghost ? "transparent" : button.tokens.uiTrack)
             : button.kind === "primary" ? button.tokens.uiAccent
             : button.kind === "danger" ? button.tokens.uiDangerSolid
             : button.kind === "dangerQuiet" ? button.tokens.uiDangerFill
             : ghost ? (area.containsMouse ? button.tokens.uiGhostHover : "transparent")
             : (area.containsMouse ? button.tokens.uiTonalHover : button.tokens.uiTonal)
         readonly property color inkColor: !button.enabled ? button.tokens.uiInkDisabled
+            : picked ? button.tokens.uiInk
             : solid ? button.tokens.uiOnAccent
             : button.kind === "dangerQuiet" ? button.tokens.uiDanger
             : ghost ? button.tokens.uiAccentInk : button.tokens.uiInk
@@ -147,9 +154,10 @@ Rectangle {
                 fill: face.fillColor
                 fillTop: button.enabled && button.kind === "primary" ? button.tokens.uiAccentTop
                     : button.enabled && button.kind === "danger" ? Qt.lighter(button.tokens.uiDangerSolid, 1.12) : face.fillColor
-                edge: face.ghost || !button.enabled ? "transparent"
+                edge: face.picked ? button.tokens.uiBeadEdge
+                    : face.ghost || !button.enabled ? "transparent"
                     : face.solid ? Qt.darker(face.fillColor, 1.08) : button.tokens.uiCardBorder
-                raised: button.enabled && !face.ghost && (face.solid || button.tokens.uiJ2)
+                raised: button.enabled && (face.picked || !face.ghost && (face.solid || button.tokens.uiJ2))
                 lift: area.pressed ? 0.35 : (face.solid ? 0.8 : 0.5)
                 sheen: button.enabled && !face.ghost
                 }
@@ -172,13 +180,22 @@ Rectangle {
                 color: Qt.rgba(1, 1, 1, 0.14)
             }
 
+            Rectangle {
+                visible: face.picked
+                width: 7; height: 7; radius: 3.5
+                x: button.tokens.uiPadCard - 4
+                anchors.verticalCenter: parent.verticalCenter
+                color: button.tokens.uiSelectDot
+            }
+
             Text {
                 id: jellyLabel
                 anchors.centerIn: parent
+                anchors.horizontalCenterOffset: face.picked ? 7 : 0
                 text: button.text
                 color: face.inkColor
                 font.pixelSize: button.tokens.uiFontBody
-                font.weight: face.solid ? Font.DemiBold : Font.Medium
+                font.weight: face.solid || face.picked ? Font.DemiBold : Font.Medium
                 Binding on font.family {
                     when: button.tokens.fontFamily.length > 0
                     value: button.tokens.fontFamily

@@ -14,9 +14,11 @@ Flickable {
 
     required property var client
     required property var tokens
+    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing page.
+    readonly property bool jelly: tokens.uiCandidate === true
 
     contentWidth: width
-    contentHeight: column.implicitHeight + tokens.spaceSection * 2
+    contentHeight: column.implicitHeight + tokens.appPagePad * 2
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
@@ -105,15 +107,15 @@ Flickable {
 
     Column {
         id: column
-        x: page.tokens.spaceSection
-        y: page.tokens.spaceSection
-        width: page.width - page.tokens.spaceSection * 2
+        x: page.tokens.appPagePad
+        y: page.tokens.appPagePad
+        width: page.width - page.tokens.appPagePad * 2
         spacing: page.tokens.space
 
         Text {
             text: page.t(qsTr("變更紀錄"))
-            color: page.tokens.foreground
-            font.pixelSize: page.tokens.fontHeading
+            color: page.tokens.appInk
+            font.pixelSize: page.tokens.appFontHeading
             font.bold: true
             Accessible.role: Accessible.Heading
             Accessible.name: text
@@ -123,8 +125,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.t(qsTr("每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。"))
-            color: page.tokens.foregroundMuted
-            font.pixelSize: page.tokens.fontSmall
+            color: page.tokens.appInkMuted
+            font.pixelSize: page.tokens.appFontCaption
         }
 
         Text {
@@ -132,8 +134,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.notice
-            color: page.tokens.warning
-            font.pixelSize: page.tokens.fontBody
+            color: page.tokens.appWarning
+            font.pixelSize: page.tokens.appFontBody
             Accessible.role: Accessible.AlertMessage
             Accessible.name: text
         }
@@ -154,9 +156,9 @@ Flickable {
                 readonly property var record: page.expanded[modelData.change_id] || null
                 width: column.width
                 height: changeColumn.implicitHeight + page.tokens.space * 2
-                radius: page.tokens.radiusSmall
-                color: page.tokens.surface
-                border.color: page.tokens.border
+                radius: page.tokens.appPlateRadius
+                color: page.tokens.appPlate
+                border.color: page.tokens.appPlateBorder
                 border.width: 1
 
                 Column {
@@ -184,8 +186,8 @@ Flickable {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: 120
                                 text: words.dateTime(changeRow.modelData.created_at)
-                                color: page.tokens.foregroundMuted
-                                font.pixelSize: page.tokens.fontSmall
+                                color: page.tokens.appInkMuted
+                                font.pixelSize: page.tokens.appFontCaption
                             }
                             Badge {
                                 id: stateBadge
@@ -198,21 +200,21 @@ Flickable {
                                 id: titleText
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: page.client.key(changeRow.modelData.title_key, {})
-                                color: page.tokens.foreground
-                                font.pixelSize: page.tokens.fontBody
+                                color: page.tokens.appInk
+                                font.pixelSize: page.tokens.appFontBody
                                 font.bold: true
                             }
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: words.originLabel(changeRow.modelData.origin)
-                                color: page.tokens.foregroundMuted
-                                font.pixelSize: page.tokens.fontSmall
+                                color: page.tokens.appInkMuted
+                                font.pixelSize: page.tokens.appFontCaption
                             }
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: changeRow.record ? "▾" : "▸"
-                                color: page.tokens.foregroundMuted
-                                font.pixelSize: page.tokens.fontSmall
+                                color: page.tokens.appInkMuted
+                                font.pixelSize: page.tokens.appFontCaption
                             }
                         }
 
@@ -284,8 +286,8 @@ Flickable {
         Text {
             visible: page.changes.length === 0
             text: page.t(qsTr("還沒有任何變更。"))
-            color: page.tokens.foregroundMuted
-            font.pixelSize: page.tokens.fontBody
+            color: page.tokens.appInkMuted
+            font.pixelSize: page.tokens.appFontBody
         }
     }
 }

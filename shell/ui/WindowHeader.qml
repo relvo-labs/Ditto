@@ -4,7 +4,7 @@ import QtQuick
 /// window's one visible title on the left, optional `tools` in the middle,
 /// and WindowControls on the right. Dragging the row moves the window and a
 /// double click maximizes or restores it, through the window's own
-/// `startSystemMove()` / `maximized` / `minimized` when it has them (a
+/// `startSystemMove()` / `maximized` / `minimized` (of `hostWindow`) when it has them (a
 /// Quickshell FloatingWindow does; an offscreen double does not, and then the
 /// row is only drawn).
 ///
@@ -17,8 +17,9 @@ Item {
 
     required property var tokens
     property string title: ""
-    /// The FloatingWindow this header belongs to (or null).
-    property var window: null
+    /// The FloatingWindow this header belongs to (or null). Not named
+    /// `window`: a caller's `window: window` would bind to this property.
+    property var hostWindow: null
     property bool showMinimize: true
     property bool showMaximize: true
     property bool frameless: true
@@ -29,8 +30,8 @@ Item {
     default property alias tools: toolRow.data
     signal closeRequested()
 
-    readonly property bool canMove: !!window && typeof window.startSystemMove === "function"
-    readonly property bool maximized: !!window && window.maximized === true
+    readonly property bool canMove: !!hostWindow && typeof hostWindow.startSystemMove === "function"
+    readonly property bool maximized: !!hostWindow && hostWindow.maximized === true
 
     implicitHeight: tokens.uiHeaderHeight
     height: implicitHeight
@@ -49,8 +50,8 @@ Item {
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
-        onPressed: if (header.canMove) header.window.startSystemMove()
-        onDoubleClicked: if (header.canMove && header.showMaximize) header.window.maximized = !header.window.maximized
+        onPressed: if (header.canMove) header.hostWindow.startSystemMove()
+        onDoubleClicked: if (header.canMove && header.showMaximize) header.hostWindow.maximized = !header.hostWindow.maximized
     }
 
     Text {
@@ -89,8 +90,8 @@ Item {
         maximizeText: header.maximizeText
         restoreText: header.restoreText
         closeText: header.closeText
-        onMinimizeRequested: if (header.window) header.window.minimized = true
-        onMaximizeRequested: if (header.window) header.window.maximized = !header.window.maximized
+        onMinimizeRequested: if (header.hostWindow) header.hostWindow.minimized = true
+        onMaximizeRequested: if (header.hostWindow) header.hostWindow.maximized = !header.hostWindow.maximized
         onCloseRequested: header.closeRequested()
     }
 

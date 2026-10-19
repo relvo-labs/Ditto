@@ -34,7 +34,7 @@ Item {
     readonly property int tabIndex: selectedIndex >= 0 ? selectedIndex : 0
 
     implicitWidth: sole ? soleChip.implicitWidth : track.width
-    implicitHeight: sole ? soleChip.implicitHeight : track.height
+    implicitHeight: sole ? tokens.uiControlHeight : track.height
     Accessible.role: Accessible.Grouping
     Accessible.name: accessibleName
 
@@ -53,33 +53,35 @@ Item {
         id: soleChip
         objectName: "segmentSoleChip"
         visible: control.sole
+        height: control.tokens.uiControlHeight
         spacing: control.tokens.uiGap
         Accessible.role: Accessible.StaticText
         Accessible.name: control.sole ? control.options[0].label + (control.soleNote.length > 0 ? " · " + control.soleNote : "") : ""
 
-        Rectangle {
-            height: control.tokens.uiControlHeight
-            width: soleLabel.implicitWidth + control.tokens.uiPadCard * 2
-            radius: control.tokens.uiJ1 ? control.tokens.uiRadiusControl : height / 2
-            color: control.tokens.uiInfoFill
-            border.color: "transparent"
-
-            Text {
-                id: soleLabel
-                objectName: "segmentSoleLabel"
-                anchors.centerIn: parent
-                text: control.sole ? control.options[0].label : ""
-                color: control.tokens.uiInk
-                font.pixelSize: control.tokens.uiFontBody
-                font.weight: Font.Medium
-            }
-        }
+        // A value, not a control: plain ink text, no fill or border.
         Text {
+            id: soleLabel
+            objectName: "segmentSoleLabel"
+            anchors.verticalCenter: parent.verticalCenter
+            text: control.sole ? control.options[0].label : ""
+            color: control.tokens.uiInk
+            font.pixelSize: control.tokens.uiFontBody
+            font.weight: Font.Medium
+        }
+        Rectangle {
             visible: control.soleNote.length > 0
             anchors.verticalCenter: parent.verticalCenter
-            text: control.soleNote
-            color: control.tokens.uiInkMuted
-            font.pixelSize: control.tokens.uiFontCaption
+            width: soleNote.implicitWidth + control.tokens.uiGap * 2
+            height: soleNote.implicitHeight + 4
+            radius: height / 2
+            color: control.tokens.uiTrack
+            Text {
+                id: soleNote
+                anchors.centerIn: parent
+                text: control.soleNote
+                color: control.tokens.uiInkMuted
+                font.pixelSize: control.tokens.uiFontCaption
+            }
         }
     }
 

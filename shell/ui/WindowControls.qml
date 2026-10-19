@@ -27,13 +27,18 @@ Row {
 
     HoverHandler { id: groupHover }
 
+    // An inline component does not see this file's ids: everything it
+    // needs comes in through properties.
     component Bead: Item {
         id: bead
+        required property var tokens
+        property bool maximized: false
+        property bool groupHovered: false
         property string kind: "close"
-        property color shade: controls.tokens.uiBeadClose
+        property color shade: tokens.uiBeadClose
         property string name: ""
         signal pressed()
-        readonly property bool reveal: groupHover.hovered || bead.activeFocus
+        readonly property bool reveal: groupHovered || bead.activeFocus
         readonly property bool hot: kind === "close" && (beadArea.containsMouse || bead.activeFocus)
         width: 28
         height: 28
@@ -51,17 +56,17 @@ Row {
             anchors.centerIn: parent
             width: 16
             height: 16
-            tokens: controls.tokens
+            tokens: bead.tokens
             radius: 8
-            fill: bead.hot ? controls.tokens.uiBeadCloseHot : bead.shade
+            fill: bead.hot ? bead.tokens.uiBeadCloseHot : bead.shade
             fillTop: Qt.lighter(fill, 1.12)
             edge: Qt.darker(fill, 1.12)
             lift: beadArea.pressed ? 0.2 : 0.5
             sheen: true
             transform: Scale {
                 origin.x: 8; origin.y: 16
-                xScale: beadArea.pressed && controls.tokens.motionEnabled === true ? controls.tokens.uiPressScaleX : 1
-                yScale: beadArea.pressed && controls.tokens.motionEnabled ? controls.tokens.uiPressScaleY : 1
+                xScale: beadArea.pressed && bead.tokens.motionEnabled === true ? bead.tokens.uiPressScaleX : 1
+                yScale: beadArea.pressed && bead.tokens.motionEnabled ? bead.tokens.uiPressScaleY : 1
             }
         }
 
@@ -77,26 +82,26 @@ Row {
                 visible: bead.kind === "minimize"
                 anchors.centerIn: parent
                 width: 8; height: 1.6; radius: 0.8
-                color: controls.tokens.uiBeadGlyph
+                color: bead.tokens.uiBeadGlyph
             }
             // maximize: a ring; restore: two overlapping rings
             Rectangle {
                 visible: bead.kind === "maximize"
-                x: controls.maximized ? 2 : 0.5
-                y: controls.maximized ? 0 : 0.5
-                width: controls.maximized ? 6 : 7
+                x: bead.maximized ? 2 : 0.5
+                y: bead.maximized ? 0 : 0.5
+                width: bead.maximized ? 6 : 7
                 height: width
                 radius: 1.5
                 color: "transparent"
-                border.color: controls.tokens.uiBeadGlyph
+                border.color: bead.tokens.uiBeadGlyph
                 border.width: 1.4
             }
             Rectangle {
-                visible: bead.kind === "maximize" && controls.maximized
+                visible: bead.kind === "maximize" && bead.maximized
                 x: 0; y: 2
                 width: 6; height: 6; radius: 1.5
                 color: bead.shade
-                border.color: controls.tokens.uiBeadGlyph
+                border.color: bead.tokens.uiBeadGlyph
                 border.width: 1.4
             }
             // close: a cross
@@ -107,7 +112,7 @@ Row {
                     anchors.centerIn: parent
                     width: 9; height: 1.6; radius: 0.8
                     rotation: modelData
-                    color: controls.tokens.uiBeadGlyph
+                    color: bead.tokens.uiBeadGlyph
                 }
             }
         }
@@ -118,7 +123,7 @@ Row {
             height: 22
             radius: 11
             color: "transparent"
-            border.color: controls.tokens.uiFocus
+            border.color: bead.tokens.uiFocus
             border.width: bead.activeFocus ? 2 : 0
         }
 
@@ -132,6 +137,9 @@ Row {
 
     Bead {
         objectName: "windowMinimize"
+        tokens: controls.tokens
+        maximized: controls.maximized
+        groupHovered: groupHover.hovered
         visible: controls.showMinimize
         kind: "minimize"
         shade: controls.tokens.uiBeadMinimize
@@ -140,6 +148,9 @@ Row {
     }
     Bead {
         objectName: "windowMaximize"
+        tokens: controls.tokens
+        maximized: controls.maximized
+        groupHovered: groupHover.hovered
         visible: controls.showMaximize
         kind: "maximize"
         shade: controls.tokens.uiBeadMaximize
@@ -148,6 +159,9 @@ Row {
     }
     Bead {
         objectName: "windowClose"
+        tokens: controls.tokens
+        maximized: controls.maximized
+        groupHovered: groupHover.hovered
         kind: "close"
         shade: controls.tokens.uiBeadClose
         name: controls.closeText
