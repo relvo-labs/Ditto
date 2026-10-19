@@ -9,12 +9,13 @@ Rectangle {
     property alias text: edit.text
     property bool readOnly: false
     property string accessibleName: ""
+    readonly property bool jelly: tokens.uiCandidate === true
 
     implicitWidth: 400
     implicitHeight: 160
-    radius: tokens.radiusSmall
-    color: tokens.surface
-    border.color: edit.activeFocus ? tokens.focus : tokens.border
+    radius: jelly ? tokens.uiRadiusControl : tokens.radiusSmall
+    color: jelly ? tokens.uiFill("#ffffff", 0.92) : tokens.surface
+    border.color: edit.activeFocus ? (jelly ? tokens.uiFocus : tokens.focus) : (jelly ? tokens.uiCardBorder : tokens.border)
     border.width: edit.activeFocus ? 2 : 1
     clip: true
 
@@ -30,8 +31,8 @@ Rectangle {
             id: edit
             width: flick.width
             wrapMode: TextEdit.WrapAnywhere
-            color: area.tokens.foreground
-            font.pixelSize: area.tokens.fontSmall
+            color: area.jelly ? area.tokens.uiInk : area.tokens.foreground
+            font.pixelSize: area.jelly ? area.tokens.uiFontCaption : area.tokens.fontSmall
             font.family: "monospace"
             selectByMouse: true
             readOnly: area.readOnly

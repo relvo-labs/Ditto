@@ -170,6 +170,127 @@ QtObject {
     readonly property int easingEnter: Easing.OutCubic
     readonly property int easingExit: Easing.InCubic
 
+    // ---- #116 Soft Jelly application candidates (opt-in) -------------------------
+    /// Which application-surface candidate the Shell's own windows (centers,
+    /// chat, approval) and the pill Dock draw: "" (unset, the existing
+    /// presentation), "j1" jelly glass, "j2" gummy, "j3" bubble. Development
+    /// switch only (`DITTO_UI_STYLE`, set by tools/ui-candidates/apply.sh);
+    /// no Profile token, no Core schema, nothing persisted. Unknown values
+    /// count as unset. Candidates are proposals for the owner to choose from
+    /// (docs/design/default-desktop/component-sheet.md, #116).
+    property string uiStyle: uiStyleFrom(Quickshell.env("DITTO_UI_STYLE"))
+    function uiStyleFrom(value) {
+        return value === "j1" || value === "j2" || value === "j3" ? value : "";
+    }
+    readonly property bool uiCandidate: uiStyle !== ""
+    readonly property bool uiJ1: uiStyle === "j1"
+    readonly property bool uiJ2: uiStyle === "j2"
+    readonly property bool uiJ3: uiStyle === "j3"
+    /// Gloss (top sheen, iridescent rim) and soft shadows: plain gradients
+    /// and stacked rectangles, no shader. Reduced transparency drops the
+    /// gloss and makes every fill opaque; the low-power style drops both.
+    readonly property bool uiGloss: uiCandidate && !reducedTransparency && !lowPower
+    readonly property bool uiShadows: uiCandidate && !lowPower
+    function uiFill(value, alpha) {
+        return reducedTransparency ? Qt.color(value) : withAlpha(value, alpha);
+    }
+
+    // Colour. Every text/fill pair is checked in tests/g4/visual/unit/
+    // tst_ui_style.qml and, over the real wallpaper, by capture/ui_contrast.py.
+    readonly property color uiInk: uiJ2 ? "#241a3e" : uiJ3 ? "#221f3c" : "#231d3b"
+    readonly property color uiInkMuted: reducedTransparency ? "#423c5e" : uiJ2 ? "#564c72" : uiJ3 ? "#524f6f" : "#544e70"
+    /// Disabled labels: still legible (about 3:1), never mistaken for a
+    /// sole option, which keeps full ink.
+    readonly property color uiInkDisabled: "#7d7896"
+    /// The window behind the content.
+    readonly property color uiCanvas: uiJ2 ? uiFill("#f3ecfc", 0.97) : uiJ3 ? uiFill("#f6f6ff", 0.86) : uiFill("#f4f2fd", 0.88)
+    /// J3's water tint at the bottom of a window (gloss only).
+    readonly property color uiCanvasLow: uiJ3 ? uiFill("#eef5fb", 0.86) : uiCanvas
+    readonly property color uiSidebar: uiJ2 ? uiFill("#e9dffb", 1.0) : uiJ3 ? "transparent" : uiFill("#e9e5fb", 0.72)
+    readonly property color uiCard: uiJ2 ? uiFill("#fffcff", 1.0) : uiJ3 ? uiFill("#ffffff", 0.66) : uiFill("#ffffff", 0.74)
+    readonly property color uiCardBorder: reducedTransparency ? "#8f86bf"
+        : uiJ2 ? "#e0d5fa" : uiJ3 ? Qt.rgba(0.75, 0.72, 0.95, 0.55) : Qt.rgba(0.79, 0.75, 0.94, 0.6)
+    /// Bright inner edge of a jelly surface (none with reduced transparency).
+    readonly property color uiCardHighlight: uiGloss ? Qt.rgba(1, 1, 1, uiJ2 ? 0.9 : 0.8) : "transparent"
+    readonly property color uiShadow: uiJ2 ? Qt.rgba(0.42, 0.30, 0.78, 0.30) : Qt.rgba(0.27, 0.22, 0.55, 0.16)
+    /// The recessed track of a segmented control and the selected bead in it.
+    readonly property color uiTrack: uiJ2 ? uiFill("#e7defa", 1.0) : uiJ3 ? uiFill("#eceafc", 0.6) : uiFill("#e4dff8", 0.9)
+    readonly property color uiBead: "#ffffff"
+    readonly property color uiBeadEdge: uiJ3 && !reducedTransparency ? "#c8bdf6" : uiJ2 ? "#cdbdf6" : "#d3cbf4"
+    /// Selection marker: the small filled bead in front of a selected item.
+    readonly property color uiSelectDot: uiJ2 ? "#7a52ea" : uiJ3 ? "#6f8fe0" : "#7262dc"
+    /// Primary action fill (white text). J2 adds a jelly gradient.
+    readonly property color uiAccent: uiJ2 ? "#6c45dc" : uiJ3 ? "#5f57cf" : "#6552d6"
+    readonly property color uiAccentTop: uiJ2 ? "#7a58e6" : uiJ3 ? "#6b63d6" : "#7262dc"
+    readonly property color uiOnAccent: "#ffffff"
+    /// Accent-coloured text (links, a selected label's tint): darker than
+    /// the fill so it reads on the translucent canvas.
+    readonly property color uiAccentInk: "#4a3cb5"
+    readonly property color uiTonal: uiJ2 ? "#e6dcfb" : uiJ3 ? uiFill("#eeecfd", 0.9) : uiFill("#ebe7fb", 0.92)
+    readonly property color uiTonalHover: uiJ2 ? "#ddd0fa" : "#e2dcfa"
+    readonly property color uiGhostHover: Qt.rgba(0.42, 0.33, 0.84, 0.08)
+    readonly property color uiFocus: "#4c3fb5"
+    readonly property color uiSeparator: reducedTransparency ? "#b9b1df" : Qt.rgba(0.48, 0.42, 0.80, 0.22)
+    readonly property color uiSuccess: "#256446"
+    readonly property color uiSuccessFill: "#dcf2e6"
+    readonly property color uiWarning: "#7a4a05"
+    readonly property color uiWarningFill: "#fcebc9"
+    readonly property color uiDanger: "#a02c4a"
+    readonly property color uiDangerFill: "#fae1e8"
+    readonly property color uiDangerSolid: "#b23a59"
+    readonly property color uiInfo: "#4a3eab"
+    readonly property color uiInfoFill: "#e7e3fb"
+    /// The iridescent rim (pink → lavender → aqua) of J3, softer in J1.
+    readonly property var uiIris: ["#f6c9e8", "#cbbef8", "#b5e9f1"]
+    /// Window control beads: three lavender shades; close turns soft red
+    /// on hover or keyboard focus.
+    readonly property color uiBeadMinimize: uiJ2 ? "#d9cbfb" : "#ddd6fa"
+    readonly property color uiBeadMaximize: uiJ2 ? "#b9a2f5" : "#c2b6f3"
+    readonly property color uiBeadClose: uiJ2 ? "#9476ec" : "#a596ea"
+    readonly property color uiBeadCloseHot: "#e26d84"
+    readonly property color uiBeadGlyph: "#2b2350"
+
+    // Shape, type and spacing (8 pt grid). Profile radius/font/space scales apply.
+    readonly property int uiRadiusWindow: Math.round((uiJ1 ? 18 : 22) * radiusScale)
+    readonly property int uiRadiusCard: Math.round((uiJ2 ? 20 : uiJ3 ? 24 : 16) * radiusScale)
+    readonly property int uiRadiusControl: Math.round((uiJ1 ? 10 : 16) * radiusScale)
+    readonly property int uiFontPage: Math.round(24 * fontScale)
+    readonly property int uiFontGroup: Math.round(13 * fontScale)
+    readonly property int uiFontLabel: Math.round(14 * fontScale)
+    readonly property int uiFontBody: Math.round(14 * fontScale)
+    readonly property int uiFontCaption: Math.round(12 * fontScale)
+    readonly property int uiFontCardTitle: Math.round(16 * fontScale)
+    readonly property int uiGap: Math.round(8 * spaceScale)
+    readonly property int uiPadCard: Math.round(16 * spaceScale)
+    readonly property int uiPadPage: Math.round(32 * spaceScale)
+    readonly property int uiGapGroup: Math.round(24 * spaceScale)
+    readonly property int uiControlHeight: Math.round(32 * fontScale)
+    readonly property int uiRowHeight: Math.round(48 * fontScale)
+    readonly property int uiHeaderHeight: Math.round(52 * fontScale)
+
+    // Motion: press squashes the control's face (J2 the most), 120 ms OutCubic;
+    // hit targets never scale. Off with reduced motion or the low-power style.
+    readonly property real uiPressScaleX: uiJ2 ? 1.03 : uiJ3 ? 0.95 : 0.97
+    readonly property real uiPressScaleY: uiJ2 ? 0.90 : uiJ3 ? 0.95 : 0.97
+
+    // What the centers and chat pages draw raw text and their own plates with.
+    // Unset style: exactly the existing token (the legacy test compares pixels);
+    // a candidate: its ink, caption size and card.
+    readonly property color appInk: uiCandidate ? uiInk : foreground
+    readonly property color appInkMuted: uiCandidate ? uiInkMuted : foregroundMuted
+    readonly property color appWarning: uiCandidate ? uiWarning : warning
+    readonly property color appDanger: uiCandidate ? uiDanger : danger
+    readonly property color appSuccess: uiCandidate ? uiSuccess : success
+    readonly property int appFontCaption: uiCandidate ? uiFontCaption : fontSmall
+    readonly property int appFontBody: uiCandidate ? uiFontBody : fontBody
+    readonly property int appFontTitle: uiCandidate ? uiFontCardTitle : fontTitle
+    readonly property int appFontHeading: uiCandidate ? uiFontPage : fontHeading
+    readonly property int appPagePad: uiCandidate ? uiPadPage : spaceSection
+    readonly property color appPlate: uiCandidate ? uiCard : surface
+    readonly property color appPlateStrong: uiCandidate ? uiTrack : surfaceStrong
+    readonly property color appPlateBorder: uiCandidate ? uiCardBorder : border
+    readonly property int appPlateRadius: uiCandidate ? uiRadiusControl : radiusSmall
+
     /// One read of the desktop preference at startup. It is not watched:
     /// a later change applies at the next Shell start, which is stated in
     /// the personalization center.

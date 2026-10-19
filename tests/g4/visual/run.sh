@@ -28,6 +28,9 @@ cp "$here/.staged/staging.json" "$evidence/staging.json"
 # QML sources on a clean checkout, without relying on another runner's cache.
 python3 "$here/stage-assistant.py" > "$evidence/assistant-staging.log"
 cp "$here/.staged/assistant/staging.json" "$evidence/assistant-staging.json"
+# #116: base (87a2462) and current application surfaces for tst_ui_style_off.qml.
+node "$here/stage-ui116.mjs" > "$evidence/ui116-staging.log"
+cp "$here/.staged/ui116/staging.json" "$evidence/ui116-staging.json"
 
 # Unit regressions also consume the real Yaru lookup; prepare it before the
 # first QML import so clean checkouts never depend on old capture data.

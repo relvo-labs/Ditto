@@ -9,14 +9,15 @@ Column {
     property string title: "Diagnostics"
     property string text: ""
     property bool expanded: false
+    readonly property bool jelly: tokens.uiCandidate === true
 
     spacing: tokens.spaceTight
     visible: text.length > 0
 
     Text {
         text: (diagnostics.expanded ? "▾ " : "▸ ") + diagnostics.title
-        color: diagnostics.tokens.foregroundMuted
-        font.pixelSize: diagnostics.tokens.fontSmall
+        color: diagnostics.jelly ? diagnostics.tokens.uiInkMuted : diagnostics.tokens.foregroundMuted
+        font.pixelSize: diagnostics.jelly ? diagnostics.tokens.uiFontCaption : diagnostics.tokens.fontSmall
         activeFocusOnTab: true
         Accessible.role: Accessible.Button
         Accessible.name: diagnostics.title
@@ -27,7 +28,7 @@ Column {
             anchors.fill: parent
             anchors.margins: -2
             color: "transparent"
-            border.color: diagnostics.tokens.focus
+            border.color: diagnostics.jelly ? diagnostics.tokens.uiFocus : diagnostics.tokens.focus
             border.width: parent.activeFocus ? 1 : 0
         }
 
@@ -44,8 +45,8 @@ Column {
         selectByMouse: true
         wrapMode: TextEdit.WrapAnywhere
         text: diagnostics.text
-        color: diagnostics.tokens.foregroundMuted
-        font.pixelSize: diagnostics.tokens.fontSmall
+        color: diagnostics.jelly ? diagnostics.tokens.uiInkMuted : diagnostics.tokens.foregroundMuted
+        font.pixelSize: diagnostics.jelly ? diagnostics.tokens.uiFontCaption : diagnostics.tokens.fontSmall
         font.family: "monospace"
     }
 }

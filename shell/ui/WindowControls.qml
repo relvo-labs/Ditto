@@ -1,0 +1,156 @@
+pragma ComponentBehavior: Bound
+import QtQuick
+
+/// #116: Ditto's own window buttons, drawn by the Shell for its own windows
+/// (centers, chat, approval). Three jelly beads in three lavender shades —
+/// minimize, maximize/restore, close, in that order on the right. Their
+/// symbols appear while the pointer is over the group or a bead has keyboard
+/// focus; close turns soft red then. Each bead is a real button: a text
+/// accessible name, Tab to reach, Enter/Space to press, a 28 px hit target.
+/// The caller gives the (translated) names and decides what each does.
+Row {
+    id: controls
+
+    required property var tokens
+    property bool showMinimize: true
+    property bool showMaximize: true
+    property bool maximized: false
+    property string minimizeText: ""
+    property string maximizeText: ""
+    property string restoreText: ""
+    property string closeText: ""
+    signal minimizeRequested()
+    signal maximizeRequested()
+    signal closeRequested()
+
+    spacing: 2
+
+    HoverHandler { id: groupHover }
+
+    component Bead: Item {
+        id: bead
+        property string kind: "close"
+        property color shade: controls.tokens.uiBeadClose
+        property string name: ""
+        signal pressed()
+        readonly property bool reveal: groupHover.hovered || bead.activeFocus
+        readonly property bool hot: kind === "close" && (beadArea.containsMouse || bead.activeFocus)
+        width: 28
+        height: 28
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: name
+        Accessible.onPressAction: bead.pressed()
+        Keys.onReturnPressed: bead.pressed()
+        Keys.onEnterPressed: bead.pressed()
+        Keys.onSpacePressed: bead.pressed()
+
+        JellySurface {
+            id: face
+            objectName: "beadFace"
+            anchors.centerIn: parent
+            width: 16
+            height: 16
+            tokens: controls.tokens
+            radius: 8
+            fill: bead.hot ? controls.tokens.uiBeadCloseHot : bead.shade
+            fillTop: Qt.lighter(fill, 1.12)
+            edge: Qt.darker(fill, 1.12)
+            lift: beadArea.pressed ? 0.2 : 0.5
+            sheen: true
+            transform: Scale {
+                origin.x: 8; origin.y: 16
+                xScale: beadArea.pressed && controls.tokens.motionEnabled === true ? controls.tokens.uiPressScaleX : 1
+                yScale: beadArea.pressed && controls.tokens.motionEnabled ? controls.tokens.uiPressScaleY : 1
+            }
+        }
+
+        Item {
+            objectName: "beadGlyph"
+            visible: bead.reveal
+            anchors.centerIn: face
+            width: 8
+            height: 8
+
+            // minimize: a bar
+            Rectangle {
+                visible: bead.kind === "minimize"
+                anchors.centerIn: parent
+                width: 8; height: 1.6; radius: 0.8
+                color: controls.tokens.uiBeadGlyph
+            }
+            // maximize: a ring; restore: two overlapping rings
+            Rectangle {
+                visible: bead.kind === "maximize"
+                x: controls.maximized ? 2 : 0.5
+                y: controls.maximized ? 0 : 0.5
+                width: controls.maximized ? 6 : 7
+                height: width
+                radius: 1.5
+                color: "transparent"
+                border.color: controls.tokens.uiBeadGlyph
+                border.width: 1.4
+            }
+            Rectangle {
+                visible: bead.kind === "maximize" && controls.maximized
+                x: 0; y: 2
+                width: 6; height: 6; radius: 1.5
+                color: bead.shade
+                border.color: controls.tokens.uiBeadGlyph
+                border.width: 1.4
+            }
+            // close: a cross
+            Repeater {
+                model: bead.kind === "close" ? [45, -45] : []
+                Rectangle {
+                    required property real modelData
+                    anchors.centerIn: parent
+                    width: 9; height: 1.6; radius: 0.8
+                    rotation: modelData
+                    color: controls.tokens.uiBeadGlyph
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.centerIn: face
+            width: 22
+            height: 22
+            radius: 11
+            color: "transparent"
+            border.color: controls.tokens.uiFocus
+            border.width: bead.activeFocus ? 2 : 0
+        }
+
+        MouseArea {
+            id: beadArea
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: bead.pressed()
+        }
+    }
+
+    Bead {
+        objectName: "windowMinimize"
+        visible: controls.showMinimize
+        kind: "minimize"
+        shade: controls.tokens.uiBeadMinimize
+        name: controls.minimizeText
+        onPressed: controls.minimizeRequested()
+    }
+    Bead {
+        objectName: "windowMaximize"
+        visible: controls.showMaximize
+        kind: "maximize"
+        shade: controls.tokens.uiBeadMaximize
+        name: controls.maximized ? controls.restoreText : controls.maximizeText
+        onPressed: controls.maximizeRequested()
+    }
+    Bead {
+        objectName: "windowClose"
+        kind: "close"
+        shade: controls.tokens.uiBeadClose
+        name: controls.closeText
+        onPressed: controls.closeRequested()
+    }
+}

@@ -1,8 +1,13 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 
 /// A segmented choice: one of a few options, each a button. `options` is a
 /// list of { value, label }. With `maxWidth` set, the options wrap onto more
 /// lines instead of running past the edge.
+///
+/// With a #116 candidate style the same choice is a SegmentedControl (one
+/// Tab stop, arrow keys, a bead and marker for the selection, a static chip
+/// for a sole option); without one nothing here changes.
 Item {
     id: choice
 
@@ -11,20 +16,25 @@ Item {
     property var value: null
     property string accessibleName: ""
     property real maxWidth: 0
+    /// Candidate style only: shown after a sole option.
+    property string soleNote: ""
     signal chosen(var value)
 
-    implicitWidth: flow.childrenRect.width
-    implicitHeight: flow.childrenRect.height
+    readonly property bool jelly: tokens.uiCandidate === true
+
+    implicitWidth: jelly && segmented.item ? segmented.item.implicitWidth : flow.childrenRect.width
+    implicitHeight: jelly && segmented.item ? segmented.item.implicitHeight : flow.childrenRect.height
     Accessible.role: Accessible.Grouping
     Accessible.name: accessibleName
 
     Flow {
         id: flow
+        visible: !choice.jelly
         width: choice.maxWidth > 0 ? choice.maxWidth : 100000
         spacing: 4
 
         Repeater {
-            model: choice.options
+            model: choice.jelly ? [] : choice.options
 
             Rectangle {
                 required property var modelData
@@ -56,6 +66,22 @@ Item {
                     onClicked: choice.chosen(modelData.value)
                 }
             }
+        }
+    }
+
+    Loader {
+        id: segmented
+        active: choice.jelly
+        sourceComponent: SegmentedControl {
+            objectName: "choiceSegmented"
+            tokens: choice.tokens
+            options: choice.options
+            value: choice.value
+            accessibleName: choice.accessibleName
+            maxWidth: choice.maxWidth
+            soleNote: choice.soleNote
+            enabled: choice.enabled
+            onChosen: value => choice.chosen(value)
         }
     }
 }
