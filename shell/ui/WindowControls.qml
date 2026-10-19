@@ -58,9 +58,12 @@ Row {
             height: 16
             tokens: bead.tokens
             radius: 8
-            fill: bead.hot ? bead.tokens.uiBeadCloseHot : bead.shade
+            // J3: a bubble (translucent, coloured rim); J1/J2: a filled bead.
+            readonly property bool bubble: bead.tokens.uiJ3 === true && !bead.hot && !bead.reveal
+            fill: bead.hot ? bead.tokens.uiBeadCloseHot : bubble ? bead.tokens.uiFill("#ffffff", 0.35) : bead.shade
             fillTop: Qt.lighter(fill, 1.12)
-            edge: Qt.darker(fill, 1.12)
+            edge: bubble ? Qt.darker(bead.shade, 1.15) : Qt.darker(fill, 1.12)
+            edgeWidth: bubble ? 2 : 1
             lift: beadArea.pressed ? 0.2 : 0.5
             sheen: true
             transform: Scale {

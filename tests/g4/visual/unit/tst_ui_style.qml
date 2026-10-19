@@ -368,7 +368,8 @@ TestCase {
         // Beads are three different lavender shades; none is red, yellow or green at rest.
         mouseMove(desktop, 10, 590);
         tryVerify(() => !Qt.colorEqual(find(close, "beadFace").fill, tokens.uiBeadCloseHot));
-        const fills = [min, max, close].map(b => Qt.color(find(b, "beadFace").fill));
+        // Each bead's own shade (J3 draws it as a bubble's rim at rest).
+        const fills = [min, max, close].map(b => Qt.color(b.shade));
         verify(!Qt.colorEqual(fills[0], fills[1]) && !Qt.colorEqual(fills[1], fills[2]));
         for (const fill of fills) verify(fill.hslHue > 0.66 && fill.hslHue < 0.80, "lavender hue " + fill.hslHue);
         controls.showMinimize = false;

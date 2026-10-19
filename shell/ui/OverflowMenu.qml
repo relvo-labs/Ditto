@@ -148,7 +148,7 @@ Item {
             JellySurface {
                 anchors.fill: parent
                 tokens: menu.tokens
-                fill: menu.tokens.uiFill("#ffffff", 0.97)
+                fill: "#ffffff"
                 radius: menu.tokens.uiRadiusCard > 16 ? 18 : 14
                 lift: 1.2
                 iris: menu.tokens.uiJ3 === true

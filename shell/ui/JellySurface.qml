@@ -22,6 +22,11 @@ Item {
     property real lift: 1
     property bool sheen: true
     property bool iris: false
+    /// J2's gummy lip: a solid edge under a raised surface (not blurred).
+    property bool lip: raised && tokens.uiJ2 === true
+    property color lipColor: tokens.uiLip
+    /// J3: a few faint bubbles in the surface's lower corner (window frames).
+    property bool bubbles: false
 
     readonly property bool gloss: tokens.uiGloss === true
 
@@ -42,6 +47,16 @@ Item {
             color: surface.tokens.uiShadow
             opacity: modelData * Math.min(1, surface.lift)
         }
+    }
+
+    Rectangle {
+        objectName: "jellyLip"
+        visible: surface.lip && surface.lift > 0 && surface.tokens.uiShadows === true
+        anchors.fill: parent
+        anchors.topMargin: 3
+        anchors.bottomMargin: -3
+        radius: surface.radius
+        color: surface.lipColor
     }
 
     Rectangle {
@@ -92,10 +107,71 @@ Item {
         border.width: 1
     }
 
-    /// Iridescent film along the top edge, inside the corner curve.
+    /// J3: the bubble film all round — four thin gradient edges inside the
+    /// corner curves (pink → lavender → aqua), no shader.
+    Item {
+        objectName: "jellyRim"
+        visible: surface.gloss && surface.iris && surface.tokens.uiJ3 === true
+        anchors.fill: parent
+        // Edges start where the corner curve ends; pill ends have no sides.
+        readonly property real inset: Math.min(surface.radius * 0.9, surface.width / 2, surface.height / 2)
+        readonly property bool sides: surface.height - inset * 2 >= 6
+        Rectangle {
+            x: parent.inset; y: 0; width: parent.width - parent.inset * 2; height: 1.5; radius: 0.75
+            gradient: Gradient { orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: surface.tokens.uiIris[0] }
+                GradientStop { position: 0.5; color: surface.tokens.uiIris[1] }
+                GradientStop { position: 1.0; color: surface.tokens.uiIris[2] } }
+        }
+        Rectangle {
+            x: parent.inset; y: parent.height - 1.5; width: parent.width - parent.inset * 2; height: 1.5; radius: 0.75
+            gradient: Gradient { orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: surface.tokens.uiIris[2] }
+                GradientStop { position: 0.5; color: surface.tokens.uiIris[1] }
+                GradientStop { position: 1.0; color: surface.tokens.uiIris[0] } }
+        }
+        Rectangle {
+            visible: parent.sides
+            x: 0; y: parent.inset; width: 1.5; height: parent.height - parent.inset * 2; radius: 0.75
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: surface.tokens.uiIris[0] }
+                GradientStop { position: 1.0; color: surface.tokens.uiIris[2] } }
+        }
+        Rectangle {
+            visible: parent.sides
+            x: parent.width - 1.5; y: parent.inset; width: 1.5; height: parent.height - parent.inset * 2; radius: 0.75
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: surface.tokens.uiIris[2] }
+                GradientStop { position: 1.0; color: surface.tokens.uiIris[0] } }
+        }
+    }
+
+    /// J3 frames: faint bubbles resting in the lower corner.
+    Repeater {
+        model: surface.bubbles && surface.gloss && surface.tokens.uiJ3 === true && surface.width > 300
+            ? [[0.045, 0.93, 22], [0.085, 0.875, 11], [0.06, 0.83, 7]] : []
+        Rectangle {
+            required property var modelData
+            x: surface.width * modelData[0] - modelData[2] / 2
+            y: surface.height * modelData[1] - modelData[2] / 2
+            width: modelData[2]
+            height: width
+            radius: width / 2
+            color: Qt.rgba(1, 1, 1, 0.16)
+            border.color: Qt.rgba(0.72, 0.86, 0.96, 0.55)
+            border.width: 1
+            Rectangle {
+                x: parent.width * 0.22; y: parent.height * 0.18
+                width: Math.max(2, parent.width * 0.22); height: width; radius: width / 2
+                color: Qt.rgba(1, 1, 1, 0.7)
+            }
+        }
+    }
+
+    /// Iridescent film along the top edge, inside the corner curve (J1/J2).
     Rectangle {
         objectName: "jellyIris"
-        visible: surface.gloss && surface.iris
+        visible: surface.gloss && surface.iris && surface.tokens.uiJ3 !== true
         x: Math.min(surface.width / 2, surface.radius * 0.8)
         width: Math.max(0, surface.width - x * 2)
         y: 1

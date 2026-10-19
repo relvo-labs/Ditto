@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "../ui"
@@ -90,10 +91,11 @@ FloatingWindow {
                 objectName: "centersFrame"
                 tokens: window.tokens
                 radius: window.tokens.uiRadiusWindow
-                fill: window.tokens.uiCanvas
+                fill: window.tokens.uiJ3 && window.tokens.uiGloss ? window.tokens.uiCanvasLow : window.tokens.uiCanvas
                 fillTop: window.tokens.uiGloss ? Qt.lighter(window.tokens.uiCanvas, 1.03) : window.tokens.uiCanvas
                 raised: false
                 iris: window.tokens.uiJ3
+                bubbles: true
             }
         }
         Loader {
@@ -167,7 +169,7 @@ FloatingWindow {
                                 objectName: "centersTabBubble"
                                 tokens: window.tokens
                                 radius: window.tokens.uiJ1 ? window.tokens.uiRadiusControl : height / 2
-                                fill: window.tokens.uiBead
+                                fill: window.tokens.uiJ3 ? window.tokens.uiFill("#ffffff", 0.85) : window.tokens.uiSelectFill
                                 edge: window.tokens.uiBeadEdge
                                 lift: 0.5
                                 iris: window.tokens.uiJ3

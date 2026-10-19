@@ -84,7 +84,7 @@ Rectangle {
         readonly property bool solid: !picked && (button.kind === "primary" || button.kind === "danger")
         readonly property bool ghost: button.kind === "subtle"
         readonly property real faceRadius: button.tokens.uiJ1 ? button.tokens.uiRadiusControl : height / 2
-        readonly property color fillColor: picked ? button.tokens.uiBead
+        readonly property color fillColor: picked ? button.tokens.uiSelectFill
             : !button.enabled ? (ghost ? "transparent" : button.tokens.uiTrack)
             : button.kind === "primary" ? button.tokens.uiAccent
             : button.kind === "danger" ? button.tokens.uiDangerSolid
@@ -160,6 +160,10 @@ Rectangle {
                 raised: button.enabled && (face.picked || !face.ghost && (face.solid || button.tokens.uiJ2))
                 lift: area.pressed ? 0.35 : (face.solid ? 0.8 : 0.5)
                 sheen: button.enabled && !face.ghost
+                lipColor: button.kind === "primary" ? button.tokens.uiAccentLip
+                    : button.kind === "danger" ? Qt.darker(button.tokens.uiDangerSolid, 1.3) : button.tokens.uiLip
+                lip: !area.pressed && button.enabled && !face.ghost && button.tokens.uiJ2 === true
+                iris: button.tokens.uiJ3 === true && !face.solid && !face.ghost
                 }
             }
 

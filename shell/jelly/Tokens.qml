@@ -197,37 +197,42 @@ QtObject {
 
     // Colour. Every text/fill pair is checked in tests/g4/visual/unit/
     // tst_ui_style.qml and, over the real wallpaper, by capture/ui_contrast.py.
-    readonly property color uiInk: uiJ2 ? "#241a3e" : uiJ3 ? "#221f3c" : "#231d3b"
+    readonly property color uiInk: uiJ2 ? "#2a1a40" : uiJ3 ? "#221f3c" : "#231d3b"
     readonly property color uiInkMuted: reducedTransparency ? "#423c5e" : uiJ2 ? "#564c72" : uiJ3 ? "#524f6f" : "#544e70"
     /// Disabled labels: still legible (about 3:1), never mistaken for a
     /// sole option, which keeps full ink.
     readonly property color uiInkDisabled: "#7d7896"
     /// The window behind the content.
-    readonly property color uiCanvas: uiJ2 ? uiFill("#f3ecfc", 0.97) : uiJ3 ? uiFill("#f6f6ff", 0.86) : uiFill("#f4f2fd", 0.88)
+    readonly property color uiCanvas: uiJ2 ? uiFill("#f5ebfb", 0.98) : uiJ3 ? uiFill("#f6f7ff", 0.86) : uiFill("#f4f2fd", 0.88)
     /// J3's water tint at the bottom of a window (gloss only).
     readonly property color uiCanvasLow: uiJ3 ? uiFill("#eef5fb", 0.86) : uiCanvas
-    readonly property color uiSidebar: uiJ2 ? uiFill("#e9dffb", 1.0) : uiJ3 ? "transparent" : uiFill("#e9e5fb", 0.72)
-    readonly property color uiCard: uiJ2 ? uiFill("#fffcff", 1.0) : uiJ3 ? uiFill("#ffffff", 0.66) : uiFill("#ffffff", 0.74)
+    readonly property color uiSidebar: uiJ2 ? uiFill("#ecdcf9", 1.0) : uiJ3 ? "transparent" : uiFill("#e9e5fb", 0.72)
+    readonly property color uiCard: uiJ2 ? uiFill("#fffbff", 1.0) : uiJ3 ? uiFill("#ffffff", 0.6) : uiFill("#ffffff", 0.74)
     readonly property color uiCardBorder: reducedTransparency ? "#8f86bf"
-        : uiJ2 ? "#e0d5fa" : uiJ3 ? Qt.rgba(0.75, 0.72, 0.95, 0.55) : Qt.rgba(0.79, 0.75, 0.94, 0.6)
+        : uiJ2 ? "#e6d6f8" : uiJ3 ? Qt.rgba(0.80, 0.78, 0.97, 0.7) : Qt.rgba(0.79, 0.75, 0.94, 0.6)
     /// Bright inner edge of a jelly surface (none with reduced transparency).
     readonly property color uiCardHighlight: uiGloss ? Qt.rgba(1, 1, 1, uiJ2 ? 0.9 : 0.8) : "transparent"
-    readonly property color uiShadow: uiJ2 ? Qt.rgba(0.42, 0.30, 0.78, 0.30) : Qt.rgba(0.27, 0.22, 0.55, 0.16)
+    readonly property color uiShadow: uiJ2 ? Qt.rgba(0.48, 0.30, 0.72, 0.26) : uiJ3 ? Qt.rgba(0.30, 0.45, 0.65, 0.12) : Qt.rgba(0.27, 0.22, 0.55, 0.16)
+    /// J2's gummy lip: a solid, unblurred edge under raised surfaces.
+    readonly property color uiLip: "#dcc6f5"
+    readonly property color uiAccentLip: "#4c2ab0"
+    /// J2 selects with a filled lilac gummy (ink text) instead of a white bead.
+    readonly property color uiSelectFill: uiJ2 ? "#e2cdfb" : "#ffffff"
     /// The recessed track of a segmented control and the selected bead in it.
-    readonly property color uiTrack: uiJ2 ? uiFill("#e7defa", 1.0) : uiJ3 ? uiFill("#eceafc", 0.6) : uiFill("#e4dff8", 0.9)
+    readonly property color uiTrack: uiJ2 ? uiFill("#eadcfa", 1.0) : uiJ3 ? uiFill("#eef0fd", 0.55) : uiFill("#e4dff8", 0.9)
     readonly property color uiBead: "#ffffff"
     readonly property color uiBeadEdge: uiJ3 && !reducedTransparency ? "#c8bdf6" : uiJ2 ? "#cdbdf6" : "#d3cbf4"
     /// Selection marker: the small filled bead in front of a selected item.
-    readonly property color uiSelectDot: uiJ2 ? "#7a52ea" : uiJ3 ? "#6f8fe0" : "#7262dc"
+    readonly property color uiSelectDot: uiJ2 ? "#7a3fd8" : uiJ3 ? "#5f86d6" : "#7262dc"
     /// Primary action fill (white text). J2 adds a jelly gradient.
-    readonly property color uiAccent: uiJ2 ? "#6c45dc" : uiJ3 ? "#5f57cf" : "#6552d6"
+    readonly property color uiAccent: uiJ2 ? "#6a3ad6" : uiJ3 ? "#5f57cf" : "#6552d6"
     readonly property color uiAccentTop: uiJ2 ? "#7a58e6" : uiJ3 ? "#6b63d6" : "#7262dc"
     readonly property color uiOnAccent: "#ffffff"
     /// Accent-coloured text (links, a selected label's tint): darker than
     /// the fill so it reads on the translucent canvas.
     readonly property color uiAccentInk: "#4a3cb5"
-    readonly property color uiTonal: uiJ2 ? "#e6dcfb" : uiJ3 ? uiFill("#eeecfd", 0.9) : uiFill("#ebe7fb", 0.92)
-    readonly property color uiTonalHover: uiJ2 ? "#ddd0fa" : "#e2dcfa"
+    readonly property color uiTonal: uiJ2 ? "#efe2fc" : uiJ3 ? uiFill("#ffffff", 0.7) : uiFill("#ebe7fb", 0.92)
+    readonly property color uiTonalHover: uiJ2 ? "#e6d4fb" : uiJ3 ? uiFill("#ffffff", 0.9) : "#e2dcfa"
     readonly property color uiGhostHover: Qt.rgba(0.42, 0.33, 0.84, 0.08)
     readonly property color uiFocus: "#4c3fb5"
     readonly property color uiSeparator: reducedTransparency ? "#b9b1df" : Qt.rgba(0.48, 0.42, 0.80, 0.22)
@@ -252,20 +257,20 @@ QtObject {
 
     // Shape, type and spacing (8 pt grid). Profile radius/font/space scales apply.
     readonly property int uiRadiusWindow: Math.round((uiJ1 ? 18 : 22) * radiusScale)
-    readonly property int uiRadiusCard: Math.round((uiJ2 ? 20 : uiJ3 ? 24 : 16) * radiusScale)
+    readonly property int uiRadiusCard: Math.round((uiJ2 ? 20 : uiJ3 ? 26 : 16) * radiusScale)
     readonly property int uiRadiusControl: Math.round((uiJ1 ? 10 : 16) * radiusScale)
-    readonly property int uiFontPage: Math.round(24 * fontScale)
+    readonly property int uiFontPage: Math.round((uiJ2 ? 26 : 24) * fontScale)
     readonly property int uiFontGroup: Math.round(13 * fontScale)
     readonly property int uiFontLabel: Math.round(14 * fontScale)
     readonly property int uiFontBody: Math.round(14 * fontScale)
     readonly property int uiFontCaption: Math.round(12 * fontScale)
     readonly property int uiFontCardTitle: Math.round(16 * fontScale)
     readonly property int uiGap: Math.round(8 * spaceScale)
-    readonly property int uiPadCard: Math.round(16 * spaceScale)
+    readonly property int uiPadCard: Math.round((uiJ3 ? 24 : 16) * spaceScale)
     readonly property int uiPadPage: Math.round(32 * spaceScale)
     readonly property int uiGapGroup: Math.round(24 * spaceScale)
     readonly property int uiControlHeight: Math.round(32 * fontScale)
-    readonly property int uiRowHeight: Math.round(48 * fontScale)
+    readonly property int uiRowHeight: Math.round((uiJ3 ? 56 : 48) * fontScale)
     readonly property int uiHeaderHeight: Math.round(52 * fontScale)
 
     // Motion: press squashes the control's face (J2 the most), 120 ms OutCubic;

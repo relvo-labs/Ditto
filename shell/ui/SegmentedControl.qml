@@ -146,7 +146,7 @@ Item {
                         anchors.fill: parent
                         tokens: control.tokens
                         radius: control.tokens.uiJ1 ? control.tokens.uiRadiusControl : height / 2
-                        fill: control.tokens.uiBead
+                        fill: control.tokens.uiJ3 ? control.tokens.uiFill("#ffffff", 0.88) : control.tokens.uiSelectFill
                         edge: control.tokens.uiBeadEdge
                         raised: control.enabled
                         lift: control.tokens.uiJ2 ? 0.7 : 0.45
