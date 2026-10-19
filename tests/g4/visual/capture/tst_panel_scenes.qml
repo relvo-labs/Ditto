@@ -6,6 +6,7 @@ import Quickshell.Networking
 import DittoStub
 import "../../../../shell/jelly" as Jelly
 import "../.staged/capture-data.js" as Data
+import "../.staged/providers" as Staged
 
 // #105 C1/C2 scenes of the light top bar, for review: narrow widths with the
 // reviewer's worst cases, the menu opened from a wrapped bar, and a tooltip.
@@ -21,6 +22,7 @@ TestCase {
     visible: true
     when: windowShown
 
+    property Staged.PanelTop scenePanel: null
     readonly property string outDir: Qt.resolvedUrl("../.staged/out/").toString().replace("file://", "")
 
     Item {
@@ -75,14 +77,15 @@ TestCase {
         Quickshell.iconMap = icons ? Data.yaruIconMap : {};
         const component = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/PanelTop.qml"));
         verify(component.status === Component.Ready, component.errorString());
-        const panel = component.createObject(testCase, { client: client, tokens: sceneTokens, shown: true });
+        scenePanel = component.createObject(testCase, { client: client, tokens: sceneTokens, shown: true });
+        const panel = scenePanel;
         for (let i = 0; i < members; ++i)
             Qt.createQmlObject('import QtQuick; Rectangle { width: ' + (40 * scale) + '; height: 18; radius: 9; color: "#9d8cf0" }',
                                panel.statusRegion);
         if (icons)
             tryVerify(() => ["panelNetworkIcon", "panelVolumeIcon"].every(name => findChild(layer, name).painted), 5000);
         wait(50);
-        const window = panel.data.find(x => x.exclusiveZone !== undefined);
+        const window = panel.children.find(x => x.exclusiveZone !== undefined);
         windowEdge.y = window.height;
         let extra = {};
         if (action === "menu") {
@@ -102,7 +105,7 @@ TestCase {
         const path = outDir + "panel-scene-" + tag + ".png";
         grabImage(screen).save(path);
         const capsules = ["panelLeft", "panelWorkspaces", "panelStatus"].map(name => rect(findChild(layer, name)));
-        const menu = panel.data.find(x => x.anchor !== undefined && x.objectName !== "panelTooltipWindow");
+        const menu = panel.children.find(x => x.anchor !== undefined && x.objectName !== "panelTooltipWindow");
         console.log("SCENE_META " + JSON.stringify(Object.assign({
             scene: tag, file: "panel-scene-" + tag + ".png", screen_width: width, font_scale: scale, workspaces: count,
             icons: icons ? "yaru" : "text-fallback", status_items: members, panel_window_height: window.height,
@@ -113,16 +116,23 @@ TestCase {
         mouseMove(screen, 5, 250);
         panel.release();
         panel.destroy();
+        scenePanel = null;
         wait(50);
     }
 
     // Unavailable services, as on this machine: the scenes are about layout.
     function initTestCase() {
+        // qmllint disable read-only-property
+        // False positive: the harness runs with `-import tests/g4/visual/stubs`,
+        // whose service doubles have writable fixture properties; qmllint
+        // resolves the installed Quickshell module, where they are read-only
+        // (with the stubs first, `qmllint --bare`, the warning does not occur).
         Pipewire.ready = false;
         Pipewire.defaultAudioSink = null;
         Networking.backend = NetworkBackendType.None;
         Networking.connectivity = NetworkConnectivity.Unknown;
         Networking.devices = null;
+        // qmllint enable read-only-property
     }
 
     function cleanupTestCase() {

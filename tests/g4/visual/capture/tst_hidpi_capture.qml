@@ -7,6 +7,7 @@ import Quickshell.Networking
 import DittoStub
 import "../../../../shell/jelly" as Jelly
 import "../.staged/capture-data.js" as Data
+import "../.staged/providers" as Staged
 
 // #105 C3: the light status capsule grabbed at the window's device pixel
 // ratio, next to a plain Image raster of the same real Yaru SVGs on the same
@@ -24,6 +25,7 @@ TestCase {
 
     readonly property string outDir: Qt.resolvedUrl("../.staged/out/").toString().replace("file://", "")
     readonly property real ratio: Screen.devicePixelRatio
+    property Staged.PanelTop scenePanel: null
 
     Item { id: layer; width: 1280; height: 60 }
     Rectangle {
@@ -63,6 +65,21 @@ TestCase {
         function launchApp(id) {}
     }
 
+    // Labelled service fixtures (test doubles; see the note inside).
+    function services(audio, backend, connectivity, devices) {
+        // qmllint disable read-only-property
+        // False positive: the harness runs with `-import tests/g4/visual/stubs`,
+        // whose service doubles have writable fixture properties; qmllint
+        // resolves the installed Quickshell module, where they are read-only
+        // (with the stubs first, `qmllint --bare`, the warning does not occur).
+        Pipewire.ready = audio;
+        Pipewire.defaultAudioSink = audio ? fixtureSink : null;
+        Networking.backend = backend;
+        Networking.connectivity = connectivity;
+        Networking.devices = devices;
+        // qmllint enable read-only-property
+    }
+
     function rect(item, root) {
         const p = item.mapToItem(root, 0, 0);
         return { x: p.x, y: p.y, width: item.width, height: item.height };
@@ -75,12 +92,12 @@ TestCase {
         verify(result.saveToFile(path), path);
     }
 
-    function scene(tag, muted, devices) {
+    function scene(tag, muted, connectivity, devices) {
         fixtureAudio.muted = muted;
-        Networking.devices = { values: devices };
+        services(true, NetworkBackendType.NetworkManager, connectivity, { values: devices });
         const component = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/PanelTop.qml"));
         verify(component.status === Component.Ready, component.errorString());
-        const panel = component.createObject(testCase, { client: client, tokens: sceneTokens, shown: true });
+        scenePanel = component.createObject(testCase, { client: client, tokens: sceneTokens, shown: true });
         const capsule = findChild(layer, "panelStatus");
         const icons = ["panelNetwork", "panelVolume"].map(name => findChild(layer, name + "Icon"));
         tryVerify(() => icons.every(icon => icon.status === Image.Ready && icon.painted), 5000, "icons painted");
@@ -106,8 +123,9 @@ TestCase {
                 raised: icon.normalized, source_peak_alpha: icon.peakAlpha,
                 device_size: [icon.deviceWidth, icon.deviceHeight] }))
         }));
-        panel.release();
-        panel.destroy();
+        scenePanel.release();
+        scenePanel.destroy();
+        scenePanel = null;
         wait(50);
     }
 
@@ -116,30 +134,20 @@ TestCase {
         StubDesktop.screenWidth = 1280;
         StubDesktop.screenHeight = 800;
         Quickshell.iconMap = Data.yaruIconMap;
-        Pipewire.ready = true;
-        Pipewire.defaultAudioSink = fixtureSink;
-        Networking.backend = NetworkBackendType.NetworkManager;
-        Networking.connectivity = NetworkConnectivity.Full;
     }
 
     function cleanupTestCase() {
-        Pipewire.ready = false;
-        Pipewire.defaultAudioSink = null;
-        Networking.backend = NetworkBackendType.None;
-        Networking.connectivity = NetworkConnectivity.Unknown;
-        Networking.devices = null;
+        services(false, NetworkBackendType.None, NetworkConnectivity.Unknown, null);
         Quickshell.iconMap = Data.iconMap;
     }
 
     // Opaque glyphs: the sharpness oracle.
     function test_1_wired_high() {
-        scene("wired-high", false, [{ type: DeviceType.Wired, connected: true }]);
+        scene("wired-high", false, NetworkConnectivity.Full, [{ type: DeviceType.Wired, connected: true }]);
     }
 
     // Dim-only Yaru glyphs raised by the minimum-alpha rule, and the marker.
     function test_2_offline_muted() {
-        Networking.connectivity = NetworkConnectivity.None;
-        scene("offline-muted", true, [{ type: DeviceType.Wifi, connected: false }]);
-        Networking.connectivity = NetworkConnectivity.Full;
+        scene("offline-muted", true, NetworkConnectivity.None, [{ type: DeviceType.Wifi, connected: false }]);
     }
 }
