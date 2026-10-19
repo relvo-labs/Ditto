@@ -13,9 +13,15 @@ PanelWindow {
     property string corner: "bottom_right"
     property real entryScale: 1
     property bool shown: true
+    property string entryStyle: "capsule"
+    property string symbolVariant: "neutral"
+    property int fabSize: 48
+    property string expansionMode: "label"
+    property alias labelExpanded: entry.labelExpanded
     property bool expanded: false
     property bool animations: true
     signal activated()
+    signal collapseRequested()
     visible: shown
     anchors {
         top: corner.indexOf("top") === 0
@@ -57,8 +63,13 @@ PanelWindow {
         tokens: surface.tokens
         conversation: surface.conversation
         client: surface.client
+        entryStyle: surface.entryStyle
+        symbolVariant: surface.symbolVariant
+        fabSize: surface.fabSize
+        expansionMode: surface.expansionMode
         expanded: surface.expanded
         animations: surface.animations
         onActivated: surface.activated()
+        onCollapseRequested: surface.collapseRequested()
     }
 }

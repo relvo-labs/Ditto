@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as Controls
 import "../jelly" as Jelly
 
 /// A labelled button, never a pretend input field. State is a projection of
@@ -9,6 +10,12 @@ Rectangle {
     required property var conversation
     required property var client
     property string symbolVariant: "neutral"
+    // Opt-in visual candidates only. Shell/Profile defaults remain capsule.
+    property string entryStyle: "capsule"
+    property int fabSize: 48
+    property string expansionMode: "label"
+    property bool labelExpanded: false
+    readonly property bool labelled: entryStyle !== "fab" || (expansionMode === "label" && labelExpanded)
     property bool expanded: false
     property bool animations: true
     readonly property bool motionEnabled: visible && animations && tokens.motionEnabled
@@ -24,24 +31,47 @@ Rectangle {
         : !conversation.wanted || (conversation.aiStatus === "pending" && !conversation.settings)
             ? client.t(qsTr("待命中")) : conversation.stateText
     signal activated()
-    implicitWidth: Math.max(218, label.implicitWidth + 84)
-    implicitHeight: Math.max(54, label.implicitHeight + status.implicitHeight + 12)
+    signal collapseRequested()
+    function activate() {
+        if (entryStyle === "fab" && expansionMode === "label" && !labelExpanded)
+            labelExpanded = true;
+        else
+            activated();
+    }
+    function collapse() {
+        if (entryStyle !== "fab") return;
+        labelExpanded = false;
+        collapseRequested();
+    }
+    implicitWidth: !labelled ? fabSize : entryStyle === "fab" ? Math.max(195, label.implicitWidth + 84) : Math.max(218, label.implicitWidth + 84)
+    implicitHeight: !labelled ? fabSize : Math.max(entryStyle === "fab" ? fabSize : 54, label.implicitHeight + status.implicitHeight + 12)
     radius: height / 2
     color: area.containsMouse ? tokens.surfaceStrong : tokens.surface
     border.color: activeFocus ? tokens.focus : tokens.border
     border.width: activeFocus ? 2 : 1
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
-    Accessible.name: client.t(qsTr("開啟助理對話"))
+    Accessible.name: !labelled && expansionMode === "label" ? client.t(qsTr("展開助理")) : client.t(qsTr("開啟助理對話"))
     Accessible.description: status.text
-    Accessible.onPressAction: entry.activated()
-    Keys.onReturnPressed: entry.activated()
-    Keys.onEnterPressed: entry.activated()
-    Keys.onSpacePressed: entry.activated()
+    Accessible.onPressAction: entry.activate()
+    Keys.onReturnPressed: entry.activate()
+    Keys.onEnterPressed: entry.activate()
+    Keys.onSpacePressed: entry.activate()
+    Keys.onEscapePressed: event => {
+        if (entry.entryStyle === "fab") {
+            entry.collapse();
+            event.accepted = true;
+        } else event.accepted = false;
+    }
+    Controls.ToolTip.visible: entry.entryStyle === "fab" && !entry.labelled && (area.containsMouse || entry.activeFocus)
+    Controls.ToolTip.text: entry.statusText
+    Controls.ToolTip.delay: 0
 
     AssistantSymbol {
         id: symbol
-        x: 12
+        x: entry.entryStyle === "fab" ? (entry.labelled ? (entry.height - width) / 2 : (entry.width - width) / 2) : 12
+        width: entry.entryStyle === "fab" ? 35 : 32
+        height: width
         anchors.verticalCenter: parent.verticalCenter
         tokens: entry.tokens
         variant: entry.symbolVariant
@@ -78,7 +108,8 @@ Rectangle {
         presentation.settle();
     }
     Column {
-        x: 54
+        visible: entry.labelled
+        x: entry.entryStyle === "fab" ? entry.height : 54
         anchors.verticalCenter: parent.verticalCenter
         width: parent.width - x - 16
         Text {
@@ -110,6 +141,6 @@ Rectangle {
                 return Math.pow(point.x - x, 2) + Math.pow(point.y - r, 2) <= r * r;
             }
         }
-        onClicked: entry.activated()
+        onClicked: entry.activate()
     }
 }

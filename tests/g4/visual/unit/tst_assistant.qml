@@ -47,6 +47,13 @@ TestCase {
     SignalSpy { id: activated; target: entry; signalName: "activated" }
     SignalSpy { id: accepted; target: input; signalName: "accepted" }
     function init() {
+        if (typeof entry.entryStyle === "string") {
+            entry.entryStyle = "capsule";
+            entry.labelExpanded = false;
+        }
+        entry.symbolVariant = "neutral";
+        entry.expanded = false;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
         input.focusInput();
         activated.clear(); accepted.clear();
         conversation.wanted = false;
@@ -62,6 +69,69 @@ TestCase {
         conversation.wanted = true;
         conversation.settings = { enabled: true };
         conversation.provider = { available: true, authenticated: true };
+    }
+    function test_default_presentation_unchanged() {
+        compare(entry.entryStyle, "capsule");
+        compare(entry.symbolVariant, "neutral");
+        compare(entry.implicitWidth, 218);
+        compare(entry.implicitHeight, 54);
+        compare(entry.Accessible.name, "開啟助理對話");
+    }
+    function test_fab_sizes_and_round_hit_data() {
+        return [{ tag: "48", size: 48 }, { tag: "56", size: 56 }];
+    }
+    function test_fab_sizes_and_round_hit(data) {
+        entry.entryStyle = "fab";
+        entry.fabSize = data.size;
+        entry.expansionMode = "chat";
+        compare(entry.width, data.size);
+        compare(entry.height, data.size);
+        mouseClick(entry, 1, 1);
+        compare(activated.count, 0);
+        mouseClick(entry, data.size / 2, data.size / 2);
+        compare(activated.count, 1);
+    }
+    function test_fab_label_keyboard_and_preserved_state() {
+        readback();
+        conversation.draft = "keep draft";
+        conversation.streamText = "keep stream";
+        conversation.turn = { turn_id: "pending", state: "awaiting_approval" };
+        const turn = conversation.turn;
+        entry.entryStyle = "fab";
+        entry.expansionMode = "label";
+        entry.forceActiveFocus();
+        compare(entry.Accessible.name, "展開助理");
+        keyClick(Qt.Key_Return);
+        compare(entry.labelExpanded, true);
+        compare(activated.count, 0);
+        verify(entry.width >= 195);
+        compare(entry.Accessible.name, "開啟助理對話");
+        compare(entry.Accessible.description, conversation.stateText);
+        keyClick(Qt.Key_Space);
+        compare(activated.count, 1);
+        keyClick(Qt.Key_Escape);
+        compare(entry.labelExpanded, false);
+        compare(conversation.turn, turn);
+        compare(conversation.draft, "keep draft");
+        compare(conversation.streamText, "keep stream");
+        compare(client.writes, 0);
+    }
+    function test_fab_hover_focus_and_reduced_motion() {
+        entry.entryStyle = "fab";
+        entry.symbolVariant = "ditto-vector";
+        entry.expansionMode = "chat";
+        entry.forceActiveFocus();
+        tryVerify(() => entry.feedbackRunning);
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {}, reduced_motion: true };
+        compare(entry.feedbackRunning, false);
+        compare(entry.children[0].scale, 0.96);
+        mouseMove(entry, entry.width / 2, entry.height / 2);
+        compare(entry.labelExpanded, false);
+        compare(activated.count, 0);
+        compare(client.reads, 0);
+        compare(entry.Accessible.description, "待命中");
+        keyClick(Qt.Key_Enter);
+        compare(activated.count, 1);
     }
     function test_unknown_settings_after_open() {
         conversation.wanted = true;
