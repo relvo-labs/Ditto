@@ -164,18 +164,14 @@ TestCase {
             compare(entry.visible, false);
         }
     }
-    function test_fab_region_and_e2_same_compact_data() {
-        return [{ tag: "48", size: 48 }, { tag: "56", size: 56 }];
-    }
-    function test_fab_region_and_e2_same_compact(data) {
+    function test_fab_region_and_e1_same_compact() {
         const output = { name: "fixture", width: 1280, height: 800 };
         const surface = mount("shell/assistant/AssistantSurface.qml", { tokens: tokens, client: client,
-            conversation: conversation, screen: output, entryStyle: "fab", fabSize: data.size,
-            symbolVariant: "ditto", expansionMode: "chat" });
+            conversation: conversation, screen: output, entryStyle: "fab", symbolVariant: "ditto" });
         for (const scale of [0.5, 1, 2]) {
             surface.entryScale = scale;
-            compare(surface.implicitWidth, data.size * scale);
-            compare(surface.implicitHeight, data.size * scale);
+            compare(surface.implicitWidth, 56 * scale);
+            compare(surface.implicitHeight, 56 * scale);
             verify(!surface.mask.contains(1, 1));
             verify(!surface.mask.contains(surface.implicitWidth - 1, 1));
             verify(surface.mask.contains(surface.implicitWidth / 2, surface.implicitHeight / 2));
@@ -184,7 +180,7 @@ TestCase {
         const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
         const bodyImage = findChild(entry, "dittoBodyImage");
         tryCompare(bodyImage, "status", Image.Ready);
-        compare(bodyImage.sourceSize.width, 70);
+        compare(bodyImage.sourceSize.width, Math.ceil(35 * 3 * bodyImage.Screen.devicePixelRatio));
         conversation.draft = "fab draft";
         conversation.streamText = "fab stream";
         conversation.events = [{ type: "assistant/message", data: { text: "fab history" } }];
@@ -199,6 +195,9 @@ TestCase {
         });
         entry.forceActiveFocus();
         keyClick(Qt.Key_Space);
+        compare(compact, null); // E1 first expands the label, without reads/writes.
+        compare(surface.labelExpanded, true);
+        keyClick(Qt.Key_Enter);
         verify(compact !== null);
         compare(compact.conversation, conversation);
         compare(compact.contentItem.y + compact.height + 8, surface.contentItem.y);

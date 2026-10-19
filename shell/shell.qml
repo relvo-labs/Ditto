@@ -554,6 +554,9 @@ ShellRoot {
         id: assistantLoader
         active: root.avatarEnabled && root.assistantPresentation
         AssistantSurface {
+            // Owner 2026-10-19: D1 / fixed 56 px / E1 (label, then chat).
+            entryStyle: "fab"
+            symbolVariant: "ditto"
             tokens: root.shellTokens
             client: root.shellClient
             conversation: root.shellConversation

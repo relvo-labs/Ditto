@@ -1,14 +1,15 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Shapes
+import QtQuick.Window
 
-/// D1 (ditto) reuses the existing body asset; D2 (ditto-vector) is QML only.
-/// Both are opt-in candidates, pending owner choice. See SOURCES.md.
+/// Owner-selected D1 reuses the existing body asset. See SOURCES.md.
 Item {
     id: symbol
     required property var tokens
     property string variant: "neutral"
-    readonly property bool isDitto: variant === "ditto" || variant === "ditto-vector"
+    readonly property bool isDitto: variant === "ditto"
+    property real activityOpacity: 1
     implicitWidth: 32
     implicitHeight: 32
 
@@ -41,35 +42,27 @@ Item {
         anchors.fill: parent
         radius: width / 2
         gradient: Gradient {
-            GradientStop { position: 0; color: "#f6f0ff" }
-            GradientStop { position: 1; color: "#ddd1f8" }
+            GradientStop { position: 0; color: "#ccb5ef" }
+            GradientStop { position: 1; color: "#b49bdc" }
         }
         Image {
             objectName: "dittoBodyImage"
             visible: symbol.variant === "ditto"
             anchors.fill: parent
             source: visible ? Qt.resolvedUrl("../avatar/layers/body.png") : ""
-            sourceSize: Qt.size(Math.ceil(width * 2), Math.ceil(height * 2))
+            sourceSize: Qt.size(Math.ceil(width * 3 * Screen.devicePixelRatio), Math.ceil(height * 3 * Screen.devicePixelRatio))
+            opacity: 0.84 * symbol.activityOpacity
             smooth: true
             mipmap: true
             fillMode: Image.PreserveAspectFit
         }
-        Shape {
-            visible: symbol.variant === "ditto-vector"
+        Rectangle {
+            objectName: "dittoEdgeRing"
             anchors.fill: parent
-            // Coordinates are local vector units; no new raster asset.
-            ShapePath {
-                scale: Qt.size(symbol.width / 100, symbol.height / 100)
-                strokeWidth: 0.7
-                strokeColor: "#af95d9"
-                fillGradient: LinearGradient {
-                    x1: 25; y1: 20; x2: 70; y2: 90
-                    GradientStop { position: 0; color: "#ede1ff" }
-                    GradientStop { position: 0.55; color: "#c5acee" }
-                    GradientStop { position: 1; color: "#b89be5" }
-                }
-                PathSvg { path: "M 13 54 C 22 52 23 49 28 35 C 35 10 62 10 71 35 C 75 48 77 52 88 54 C 103 57 99 72 87 74 C 93 87 76 91 66 84 C 54 94 43 88 36 84 C 22 91 9 86 15 75 C 0 74 1 58 13 54 Z" }
-            }
+            radius: width / 2
+            color: "transparent"
+            border.color: symbol.tokens.foregroundMuted
+            border.width: 2.5
         }
         Repeater {
             model: [-1, 1]

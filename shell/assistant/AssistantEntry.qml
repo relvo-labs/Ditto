@@ -10,12 +10,11 @@ Rectangle {
     required property var conversation
     required property var client
     property string symbolVariant: "neutral"
-    // Opt-in visual candidates only. Shell/Profile defaults remain capsule.
+    // Capsule remains available to existing consumers; the Shell selects D1 FAB.
     property string entryStyle: "capsule"
-    property int fabSize: 48
-    property string expansionMode: "label"
+    readonly property int fabSize: 56
     property bool labelExpanded: false
-    readonly property bool labelled: entryStyle !== "fab" || (expansionMode === "label" && labelExpanded)
+    readonly property bool labelled: entryStyle !== "fab" || labelExpanded
     property bool expanded: false
     property bool animations: true
     readonly property bool motionEnabled: visible && animations && tokens.motionEnabled
@@ -33,7 +32,7 @@ Rectangle {
     signal activated()
     signal collapseRequested()
     function activate() {
-        if (entryStyle === "fab" && expansionMode === "label" && !labelExpanded)
+        if (entryStyle === "fab" && !labelExpanded)
             labelExpanded = true;
         else
             activated();
@@ -51,8 +50,8 @@ Rectangle {
     border.width: activeFocus ? 2 : 1
     activeFocusOnTab: true
     Accessible.role: Accessible.Button
-    Accessible.name: !labelled && expansionMode === "label" ? client.t(qsTr("展開助理")) : client.t(qsTr("開啟助理對話"))
-    Accessible.description: status.text
+    Accessible.name: !labelled ? client.t(qsTr("展開助理")) : client.t(qsTr("開啟助理對話"))
+    Accessible.description: expanded ? client.t(qsTr("對話已開啟")) + " · " + status.text : status.text
     Accessible.onPressAction: entry.activate()
     Keys.onReturnPressed: entry.activate()
     Keys.onEnterPressed: entry.activate()
@@ -73,7 +72,8 @@ Rectangle {
         tokens: entry.tokens
         variant: entry.symbolVariant
         scale: feedback.value * presentation.value
-        opacity: entry.working ? entry.workLevel : 1
+        opacity: entry.working && entry.symbolVariant !== "ditto" ? entry.workLevel : 1
+        activityOpacity: entry.working ? entry.workLevel : 1
     }
     Jelly.MotionValue {
         id: presentation
@@ -103,6 +103,18 @@ Rectangle {
     function settleMotion() {
         feedback.settle();
         presentation.settle();
+    }
+    // A second outline changes shape as well as colour. It is immediate,
+    // independent of focus and motion, and stays inside the input region.
+    Rectangle {
+        objectName: "assistantOpenRing"
+        anchors.fill: parent
+        anchors.margins: 4
+        radius: height / 2
+        color: "transparent"
+        border.color: entry.tokens.focus
+        border.width: 2
+        visible: entry.expanded
     }
     Column {
         visible: entry.labelled

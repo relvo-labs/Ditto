@@ -92,21 +92,11 @@ TestCase {
         object.shown = true;
         return object;
     }
-    function test_candidates_data() {
-        const rows = [];
-        for (const symbol of ["D1", "D2"]) {
-            for (const size of [48, 56]) {
-                for (const expansion of ["E1", "E2"]) {
-                    for (const scene of ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "reduced-motion", "legacy-theme", "desktop"]) {
-                        rows.push({ tag: symbol + "-" + size + "-" + expansion + "-" + scene,
-                            symbol: symbol, size: size, expansion: expansion, scene: scene });
-                    }
-                }
-            }
-        }
-        return rows;
+    function test_selected_data() {
+        return ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"]
+            .map(scene => ({ tag: "D1-56-E1-" + scene, scene: scene }));
     }
-    function test_candidates(data) {
+    function test_selected(data) {
         StubDesktop.layer = layer;
         StubDesktop.screenWidth = 1280; StubDesktop.screenHeight = 800;
         Quickshell.iconMap = Data.iconMap;
@@ -129,8 +119,7 @@ TestCase {
         const output = { name: "fixture-output", width: 1280, height: 800 };
         const surface = mount("shell/assistant/AssistantSurface.qml", {
             tokens: tokens, conversation: conversation, client: client, screen: output,
-            entryStyle: "fab", fabSize: data.size, expansionMode: data.expansion === "E1" ? "label" : "chat",
-            symbolVariant: data.symbol === "D1" ? "ditto" : "ditto-vector"
+            entryStyle: "fab", symbolVariant: "ditto"
         });
         const entry = surface.contentItem.children.find(item => typeof item.symbolVariant === "string");
         let chat = null;
@@ -142,8 +131,11 @@ TestCase {
             chat.closeRequested.connect(() => { chat.visible = false; surface.expanded = false; });
             surface.expanded = true;
         });
-        if (["expanded", "working", "reduced-motion", "legacy-theme", "desktop"].indexOf(scene) >= 0)
+        if (["expanded", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"].indexOf(scene) >= 0)
             mouseClick(entry, entry.width / 2, entry.height / 2);
+        if (["open", "open-collapsed", "reduced-motion", "legacy-theme"].indexOf(scene) >= 0)
+            entry.activate(); // E1 second activation: same compact, no new chat.
+        if (scene === "open-collapsed") surface.labelExpanded = false;
         if (isWorking) conversation.wanted = true;
         if (scene === "hover") mouseMove(entry, entry.width / 2, entry.height / 2);
         else mouseMove(desktop, 640, 400);
@@ -160,22 +152,22 @@ TestCase {
             tryVerify(() => dock.entries.every(item => !findChild(layer, "dockTile_" + item.appId).motionRunning));
             tryVerify(() => ["panelNetworkIcon", "panelVolumeIcon"].every(name => findChild(layer, name).status !== Image.Loading));
         }
-        candidateCaption = data.symbol + " · " + data.size + " px · " + data.expansion + " · " + scene
+        candidateCaption = "D1 · 56 px · E1 · " + scene
             + "\n點擊 / Enter / Space 展開；hover / focus 僅回饋；Escape 收合"
-            + "\n候選待 owner · 無新增快捷動作 · 無桌布素材";
-        if (data.symbol === "D1") tryCompare(findChild(entry, "dittoBodyImage"), "status", Image.Ready);
+            + "\nowner 選定（2026-10-19）· 無新增快捷動作 · 無桌布素材";
+        tryCompare(findChild(entry, "dittoBodyImage"), "status", Image.Ready);
         tryCompare(entry, "feedbackRunning", false);
         if (chat) tryCompare(findChild(chat.contentItem, "chatPresentationContent"), "opacity", 1);
         // grabImage renders synchronously; wait for layout and the actual
         // finite motion above, rather than waiting for an unrelated swap.
         waitForPolish(desktop);
-        const path = outDir + "assistant-candidate-" + data.tag + ".png";
+        const path = outDir + "assistant-" + data.tag + ".png";
         const capture = grabImage(desktop);
         compare(capture.width, 1280); compare(capture.height, 800);
         capture.save(path);
         console.log("ASSISTANT_CAPTURE " + JSON.stringify({ scene: data.tag, file: path,
-            evidence_class: "development", fixture: true, candidate: data.symbol + "-" + data.size + "-" + data.expansion,
-            symbol: surface.symbolVariant, fab_size: data.size, expansion: surface.expansionMode,
+            evidence_class: "development", fixture: true, presentation: "D1-56-E1",
+            symbol: surface.symbolVariant, fab_size: 56, expansion: "E1",
             trigger: "click/Enter/Space; hover/focus feedback only; Escape collapse",
             viewport: [1280,800], scale: 1, compositor: "stub", profile_hash: null,
             renderer: desktop.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "graphics-api-" + desktop.GraphicsInfo.api,
@@ -225,9 +217,10 @@ TestCase {
             entryRect = { x: 1028, y: 486, width: 220, height: 250 };
         } else {
             const entry = mount("shell/assistant/AssistantSurface.qml", {
-                tokens: tokens, conversation: conversation, client: client, screen: output
+                tokens: tokens, conversation: conversation, client: client, screen: output,
+                entryStyle: "fab", symbolVariant: "ditto", labelExpanded: !preopen, expanded: !preopen
             });
-            entryRect = { x: 1280 - 32 - entry.implicitWidth, y: 800 - 32 - entry.implicitHeight,
+            entryRect = { x: entry.contentItem.x, y: entry.contentItem.y,
                 width: entry.implicitWidth, height: entry.implicitHeight };
             entryControl = entry.contentItem.children.find(item => typeof item.symbolVariant === "string");
         }
@@ -242,7 +235,7 @@ TestCase {
             mount("shell/chat/ApprovalWindow.qml", { tokens: tokens, client: client, x: 360, y: 240,
                 approval: { request_id: "fixture-request", request: { resource: "desktop.config" } } });
         }
-        if (entryControl) tryCompare(entryControl.children[0], "scale", 1);
+        if (entryControl) tryCompare(entryControl, "feedbackRunning", false);
         if (chat && scene !== "full") tryCompare(findChild(chat.contentItem, "chatPresentationContent"), "opacity", 1);
         waitForRendering(desktop);
         const path = outDir + "assistant-" + data.tag + ".png";

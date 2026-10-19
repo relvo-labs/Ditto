@@ -77,18 +77,16 @@ TestCase {
         compare(entry.implicitHeight, 54);
         compare(entry.Accessible.name, "開啟助理對話");
     }
-    function test_fab_sizes_and_round_hit_data() {
-        return [{ tag: "48", size: 48 }, { tag: "56", size: 56 }];
-    }
-    function test_fab_sizes_and_round_hit(data) {
+    function test_fab_round_hit() {
         entry.entryStyle = "fab";
-        entry.fabSize = data.size;
-        entry.expansionMode = "chat";
-        compare(entry.width, data.size);
-        compare(entry.height, data.size);
+        compare(entry.width, 56);
+        compare(entry.height, 56);
         mouseClick(entry, 1, 1);
+        compare(entry.labelExpanded, false);
+        mouseClick(entry, 28, 28);
+        compare(entry.labelExpanded, true);
         compare(activated.count, 0);
-        mouseClick(entry, data.size / 2, data.size / 2);
+        mouseClick(entry, entry.width / 2, entry.height / 2);
         compare(activated.count, 1);
     }
     function test_fab_label_keyboard_and_preserved_state() {
@@ -98,7 +96,6 @@ TestCase {
         conversation.turn = { turn_id: "pending", state: "awaiting_approval" };
         const turn = conversation.turn;
         entry.entryStyle = "fab";
-        entry.expansionMode = "label";
         entry.forceActiveFocus();
         compare(entry.Accessible.name, "展開助理");
         keyClick(Qt.Key_Return);
@@ -118,8 +115,7 @@ TestCase {
     }
     function test_fab_hover_focus_and_reduced_motion() {
         entry.entryStyle = "fab";
-        entry.symbolVariant = "ditto-vector";
-        entry.expansionMode = "chat";
+        entry.symbolVariant = "ditto";
         entry.forceActiveFocus();
         tryVerify(() => entry.feedbackRunning);
         tokens.appearance = { theme: "soft-jelly-light", tokens: {}, reduced_motion: true };
@@ -131,6 +127,9 @@ TestCase {
         compare(client.reads, 0);
         compare(entry.Accessible.description, "待命中");
         keyClick(Qt.Key_Enter);
+        compare(entry.labelExpanded, true);
+        compare(activated.count, 0);
+        keyClick(Qt.Key_Space);
         compare(activated.count, 1);
     }
     function test_fab_working_reduced_motion_and_terminal() {

@@ -22,6 +22,8 @@ Item {
     required property var conversation
     /// The panel beside the character: fewer controls, same content.
     property bool compact: false
+    /// Bound assistant suggestions to the existing compact content padding.
+    property bool boundedSuggestions: false
     signal closeRequested()
     signal expandRequested()
     signal collapseRequested()
@@ -301,7 +303,28 @@ Item {
                     tokens: window.tokens
                     kind: "subtle"
                     enabled: modelData.ok
-                    text: modelData.ok ? modelData.text : window.t(qsTr("%1（%2）")).arg(modelData.text).arg(modelData.why)
+                    readonly property string suggestionText: modelData.ok ? modelData.text : window.t(qsTr("%1（%2）")).arg(modelData.text).arg(modelData.why)
+                    // Compact suggestions keep the same content and action,
+                    // bounded by the existing content padding. The full
+                    // window retains the original one-line button layout.
+                    width: window.boundedSuggestions ? examples.width : implicitWidth
+                    implicitHeight: window.boundedSuggestions ? Math.max(window.tokens.controlHeight,
+                        compactLabel.implicitHeight + window.tokens.space * 2) : window.tokens.controlHeight
+                    text: window.boundedSuggestions ? "" : suggestionText
+                    accessibleName: suggestionText
+                    Text {
+                        id: compactLabel
+                        visible: window.boundedSuggestions
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: window.tokens.spaceWide
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: parent.suggestionText
+                        wrapMode: Text.WordWrap
+                        color: window.tokens.foreground
+                        font.pixelSize: window.tokens.fontBody
+                        font.family: window.tokens.fontFamily.length > 0 ? window.tokens.fontFamily : Qt.application.font.family
+                    }
                     onClicked: {
                         window.conversation.draft = modelData.text;
                         window.conversation.send();

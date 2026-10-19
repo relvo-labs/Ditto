@@ -34,24 +34,23 @@ for row in rows:
 (out/'assistant-captures.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2)+'\n')
 print(f'{len(rows)} assistant fixture captures; development evidence only')
 scenes = {
- 'collapsed': '收合，圓形命中區', 'hover': '游標 hover（0.96，僅回饋與狀態提示）',
- 'focus': '鍵盤 focus（0.96、焦點環與狀態提示）', 'expanded': '點擊展開',
- 'working-collapsed': '收合且 working；Core 狀態 fixture', 'working': '展開且 working；顯示真實投影文字',
- 'reduced-motion': '展開＋減少動畫，立即 settle', 'legacy-theme': '僅在明確 opt-in 下套舊主題；不改 legacy 預設',
- 'desktop': '全桌面原生元件合成，含頂部列與 Dock；無乾淨桌布素材',
+ 'collapsed': '收合', 'hover': 'hover：0.96，僅回饋', 'focus': 'focus：0.96、焦點環',
+ 'expanded': 'E1 第一次啟動：標籤膠囊', 'working-collapsed': 'working 收合', 'working': 'working 標籤膠囊',
+ 'open': 'E1 第二次啟動：compact 與 active 雙輪廓', 'open-collapsed': '對話開啟時的圓形 FAB',
+ 'reduced-motion': '減少動畫下的 open 狀態', 'legacy-theme': 'legacy 主題下的 open 狀態',
+ 'desktop': '全桌面合成：頂部列、Dock、E1 標籤膠囊',
 }
-lines = ['# 小 Ditto＋FAB 候選（#67）', '',
- '候選待 owner，沒有改 Core／Profile、shell.qml 或預設呈現。development：Qt offscreen、software renderer、layer-shell／視窗替身；不是 Wayfire／真模型／實體輸入／NFR 或視覺接受證據。', '',
- 'D1：既有 body.png，35 px／70 px（2×）解碼＋QML 臉，授權**未釐清**（shell/avatar/layers/SOURCES.md）；D2：純 QML 向量，未新增點陣素材，角色／名稱權利仍待確認。詳 shell/assistant/SOURCES.md。', '',
- '48 px 是緊湊提案；56 px 的 E1 展開約 195×56，搭配 35 px 小 Ditto，最接近參考圖約 195×54／35 px 頭像比例。入口沿現行 32 px 邊距，沒有自行定案原圖位置或 #46 移動方式。', '',
- 'E1：點擊／Enter／Space 先展開標籤膠囊，再啟動才開既有對話；Escape 收合。E2：點擊／Enter／Space 直接開同一 compact ChatPanel；Escape 走既有 composing guard 收合。hover／focus 僅回饋，不開 editor、不啟動 Agent。沒有新增快捷動作。收合不取消 turn 或 approval。', '',
- '待 owner：D1／D2？48／56？E1 兩段展開／E2 直開對話？目前明示 click／鍵盤，是否另提 hover／focus 自動展開標籤（不自動開 editor）？建議先比較 D1-56-E1 與 D2-56-E2。', '',
- '| 候選 ID | 場景／差異 | 實測入口尺寸 | 截圖（1280×800） |', '| --- | --- | --- | --- |']
+lines = ['# D1／56／E1（owner 2026-10-19 選定）', '',
+ '新預設助理採小 Ditto、固定56 px、E1兩段啟動；既有 capsule／neutral／portrait 接點保留。', '',
+ 'D1 body.png 授權仍**未釐清**，不代表可散布。35 px 顯示、依 device pixel ratio 的3×解碼、較深淡紫圓底與固定外環；開啟加雙輪廓和 Accessible 文字。', '',
+ 'click／Enter／Space：先展開標籤、再開既有compact；hover／focus僅回饋，Escape收合不取消turn或approval。', '',
+ 'development：Qt offscreen/software；Core／模型／layer-shell與視窗為fixture／替身。無桌布素材、未執行Wayfire／IME／Orca／NFR，不宣稱owner視覺接受或忠實還原。', '',
+ '| 場景 | 實測入口尺寸 | 截圖（1280×800） |', '| --- | --- | --- |']
 for row in rows:
- if 'candidate' not in row: continue
- scene = row['scene'][len(row['candidate'])+1:]
+ if row.get('presentation') != 'D1-56-E1': continue
+ scene = row['scene'][len('D1-56-E1-'):]
  image_name = Path(row['file']).name
- lines.append(f"| {row['candidate']} | {scenes[scene]} | {row['entry']['width']}×{row['entry']['height']} | [{image_name}]({image_name}) |")
-lines += ['', '既有 normal／legacy 六場景各一張亦保留（assistant-normal-*／assistant-legacy-*），用於檢視預設與舊角色呈現；逐像素／幾何與行為 oracle 見 assistant-flow.log。來源、fixture、PNG SHA-256 與 commit 見 assistant-captures.json／assistant-source-hashes.json。']
-(out/'candidates.md').write_text('\n'.join(lines)+'\n')
+ lines.append(f"| {scenes[scene]} | {row['entry']['width']}×{row['entry']['height']} | [{image_name}]({image_name}) |")
+lines += ['', '另保留normal／legacy各六場景。來源／commit／PNG hashes見assistant-captures.json及assistant-source-hashes.json；量測與前後裁圖見repair1/repair1.md。']
+(out/'assistant-captures.md').write_text('\n'.join(lines)+'\n')
 PY

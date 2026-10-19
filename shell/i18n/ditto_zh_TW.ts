@@ -266,6 +266,10 @@
 <context>
     <name>AssistantEntry</name>
     <message>
+        <source>對話已開啟</source>
+        <translation>對話已開啟</translation>
+    </message>
+    <message>
         <source>展開助理</source>
         <translation>展開助理</translation>
     </message>

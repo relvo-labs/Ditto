@@ -15,8 +15,11 @@ PanelWindow {
     property bool shown: true
     property string entryStyle: "capsule"
     property string symbolVariant: "neutral"
-    property int fabSize: 48
-    property string expansionMode: "label"
+    readonly property int fabSize: 56
+    // DockPill light geometry: edgeGap 12 + (tileSize 52 + 2*padding 8)/2.
+    // Compare against the actual provider in tst_assistant_repair.qml. This
+    // aligns only the chosen FAB, without defining #46 movement/placement.
+    readonly property int defaultDockCentreInset: 46
     property alias labelExpanded: entry.labelExpanded
     property bool expanded: false
     property bool animations: true
@@ -32,7 +35,8 @@ PanelWindow {
     // Quickshell 0.3.1 omits the grouped margins type from qmllint metadata.
     // Covered by the same layer-shell stub geometry assertions as ChatPanel.
     // qmllint disable unqualified unresolved-type missing-property
-    margins { top: 64; bottom: 32; left: 32; right: 32 }
+    margins { top: 64; bottom: surface.entryStyle === "fab" && surface.tokens.lightRecipe
+        ? Math.max(0, surface.defaultDockCentreInset - surface.implicitHeight / 2) : 32; left: 32; right: 32 }
     // qmllint enable unqualified unresolved-type missing-property
     implicitWidth: Math.min(Math.round(entry.implicitWidth * entryScale), screen ? screen.width - 64 : 300)
     implicitHeight: Math.round(entry.implicitHeight * entryScale)
@@ -65,8 +69,6 @@ PanelWindow {
         client: surface.client
         entryStyle: surface.entryStyle
         symbolVariant: surface.symbolVariant
-        fabSize: surface.fabSize
-        expansionMode: surface.expansionMode
         expanded: surface.expanded
         animations: surface.animations
         onActivated: surface.activated()
