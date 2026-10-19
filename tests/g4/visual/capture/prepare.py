@@ -147,6 +147,9 @@ def main():
         "audio-card-symbolic", "audio-volume-muted-symbolic", "audio-volume-low-symbolic",
         "audio-volume-medium-symbolic", "audio-volume-high-symbolic", "network-error-symbolic",
         "network-idle-symbolic", "network-wireless-offline-symbolic", "network-wireless-signal-excellent-symbolic",
+        # #102 per device type: wired, wireless and an unknown device type.
+        "network-wired-symbolic", "network-wired-disconnected-symbolic", "network-wired-acquiring-symbolic",
+        "network-wireless-acquiring-symbolic", "network-transmit-receive-symbolic", "network-offline-symbolic",
     ]
     status_sources = []
     for name in status_names:
