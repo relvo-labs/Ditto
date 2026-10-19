@@ -41,6 +41,8 @@ for category in ("home", "logs", "exports", "diagnostics", "conversations", "gen
 runtime = Path(tempfile.mkdtemp(prefix="qa04-", dir=args.scratch.resolve()))
 env = {**os.environ, "HOME": str(product / "home"), "DITTO_SYSTEM": "none",
        "DITTO_RUNTIME_DIR": str(runtime), "DITTO_DATA_DIR": str(product / "store"),
+       # Second line of defence: nothing falls back to the user's real runtime dir.
+       "XDG_RUNTIME_DIR": str(runtime),
        "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "bus"),
        "DBUS_STARTER_ADDRESS": "unix:path=" + str(runtime / "bus"), "DBUS_STARTER_BUS_TYPE": "session",
        "DITTO_QA04_SCRATCH": str(runtime),
