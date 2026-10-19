@@ -1,6 +1,6 @@
 # R3 助理驗證（#67）
 
-Owner Neil 於2026-10-19選定 **D1／56／E1**。Shell的AssistantSurface instance僅在既有assistant presentation路徑選用 `entryStyle: "fab"`、`symbolVariant: "ditto"`；元件固定56 px與E1兩段啟動，沒有未選尺寸／展開方式的開關。`capsule`、`neutral`、`portrait`接點與其測試保留。Core／Profile、已儲存文件、開發／簡報、legacy avatar與會話安全契約不變。決策歷史見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。本次追加已備於 `fab/evidence/repair1/d48-addendum.patch`，sandbox的.agents為唯讀，待coordinator套用；原結論不改寫。D1授權仍**未釐清**，來源與修改見 [SOURCES](../../../shell/assistant/SOURCES.md)。
+Owner Neil 於2026-10-19選定 **D1／56／E1**。Shell的AssistantSurface instance僅在既有assistant presentation路徑選用 `entryStyle: "fab"`、`symbolVariant: "ditto"`；元件固定56 px與E1兩段啟動，沒有未選尺寸／展開方式的開關。`capsule`、`neutral`、`portrait`接點與其測試保留。Core／Profile、已儲存文件、開發／簡報、legacy avatar與會話安全契約不變。決策歷史見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。2026-10-19追加已收錄於D-48（commit `f6062a6`）；原結論不改寫。FAB與Dock中心對齊只對預設底部 `ditto.dock.pill`、scale 1 有測試保證：對齊用固定46 px中心離底常數，不讀取實際Dock provider、隱藏狀態或位置；其他provider／scale（例如2×會被底邊距夾成56 px）不保證對齊，見 #67 follow-up。D1授權仍**未釐清**，來源與修改見 [SOURCES](../../../shell/assistant/SOURCES.md)。
 
 E1第一次click／Enter／Space展開「助理＋真實狀態」標籤膠囊（約195×56），第二次才經原activated路徑開同一compact ChatPanel。Escape收合不取消turn／approval；ChatBody保留IME composing guard。hover／focus僅0.96回饋，press 0.90，120 ms OutCubic；reduced-motion／隱藏會settle。沒有新增快捷動作或聊天權威。
 
