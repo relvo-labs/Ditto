@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Headless Core ingress → Agent records → generation → retained disk scan."""
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -13,10 +14,14 @@ import time
 import uuid
 
 from scan import scan
+from private_bus import PrivateBus
+from fake_secret_service import private_address
 
 WORKSPACE = Path(__file__).resolve().parents[3]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", type=Path, required=True, help="new evidence directory")
+parser.add_argument("--scratch", type=Path, required=True, help="private socket parent directory")
+parser.add_argument("--leak-form", choices=("literal", "hex", "base64-offset-1"), default="literal")
 parser.add_argument("--inject-leak", action="store_true", help="exit 0 only for a completed flow with exactly the expected leak source")
 args = parser.parse_args()
 root = args.output.resolve()
@@ -26,17 +31,19 @@ sentinels = {"api_key": "sk-ditto-qa04-" + nonce,
              "token": "ghp_ditto_qa04_" + nonce,
              "password": "qa04-password:" + nonce + "!"}
 # Inputs are intentionally outside the scanned product output, explicitly listed.
-manifest = {"sentinels": sentinels, "roots": {category: str(root / "product" / category)
+manifest = {"sentinels": sentinels, "nonce": nonce, "roots": {category: str(root / "product" / category)
             for category in ("logs", "exports", "diagnostics", "conversations", "generated", "store", "home", "runtime")}}
 (root / "manifest.json").write_text(json.dumps(manifest, indent=2))
 product = root / "product"
 for category in ("home", "logs", "exports", "diagnostics", "conversations", "generated"):
     (product / category).mkdir(parents=True)
 # Short Unix socket paths even when evidence lives in a deep worktree.
-runtime = Path(tempfile.mkdtemp(prefix="qa04-"))
+runtime = Path(tempfile.mkdtemp(prefix="qa04-", dir=args.scratch.resolve()))
 env = {**os.environ, "HOME": str(product / "home"), "DITTO_SYSTEM": "none",
        "DITTO_RUNTIME_DIR": str(runtime), "DITTO_DATA_DIR": str(product / "store"),
-       "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "absent-bus"),
+       "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(runtime / "bus"),
+       "DBUS_STARTER_ADDRESS": "unix:path=" + str(runtime / "bus"), "DBUS_STARTER_BUS_TYPE": "session",
+       "DITTO_QA04_SCRATCH": str(runtime),
        "DITTO_QA04_ROOT": str(root), "DITTO_QA04_SENTINELS": json.dumps(sentinels)}
 for key in ("DITTO_DEV_TOKEN", "DITTO_LAUNCH_SCOPE_PREFIX", "DITTO_REQUIRE_QUOTA",
             "WAYFIRE_SOCKET", "SWAYSOCK", "DITTO_CORE_SOCKET", "DITTO_CORE_TOKEN_FD"):
@@ -48,14 +55,21 @@ command = [str(WORKSPACE / "target/debug/ditto-core"), "serve", "--compositor", 
            "--launch", f"dittoctl 0.3.0 {shutil.which('node')} {Path(__file__).with_name('driver.mjs')}"]
 status = {"ok": False, "evidence_class": "development-host", "checks": [],
           "not_run": ["Wayfire / Quickshell crash capture and password-unlock recording",
-                      "successful keyring resolution and network model turn (network disabled)",
+                      "real network model / Codex app-server turn (scripted loopback provider only)",
                       "native isolated generation validation / preview (create and readback only)"]}
 child = None
+bus = None
+bus_log = None
 try:
+    # The bus/keyring children also inherit the no-dump policy.
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    private_address(runtime, env['DBUS_SESSION_BUS_ADDRESS'])
+    bus_log = (product / 'logs/private-bus.log').open('w')
+    bus = PrivateBus(runtime, runtime / 'keyring.json', bus_log)
+    if bus.start() != env['DBUS_SESSION_BUS_ADDRESS']:
+        raise RuntimeError('private bus address mismatch')
     if not list((WORKSPACE / "target/ditto-packages").glob("*.dittopkg")):
         raise RuntimeError("build built-in packages first: bash scripts/build-builtin-packages.sh target/ditto-packages")
-    # Avoid host-level memory dumps of synthetic secrets from this fixture.
-    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     with (product / "logs/core-agent.log").open("w") as log:
         child = subprocess.Popen(command, cwd=WORKSPACE, env=env, stdout=log, stderr=log,
                                  start_new_session=True)
@@ -67,7 +81,12 @@ try:
                 raise RuntimeError("driver timeout")
             time.sleep(.1)
         status.update(json.loads((root / "driver.json").read_text()))
+        keyring = json.loads((runtime / 'keyring.json').read_text())
+        status['keyring'] = keyring
+        if keyring.get('calls', {}).get('CreateItem', 0) < 3 or keyring.get('calls', {}).get('GetSecret', 0) < 3:
+            raise RuntimeError('all three sentinels must be stored and resolved by the private keyring')
 except (OSError, RuntimeError, ValueError) as error:
+    status["ok"] = False
     status["error"] = str(error)
 finally:
     if child:
@@ -81,18 +100,28 @@ finally:
         except ProcessLookupError:
             pass
         child.wait(timeout=5)
+    if bus:
+        bus.stop()
+    if bus_log:
+        bus_log.close()
     # Retain runtime files as part of the scan after processes stop.
     shutil.copytree(runtime, product / "runtime", ignore=lambda p, names: [
         n for n in names if (Path(p) / n).is_socket()])
     shutil.rmtree(runtime)
+if not status['ok']:
+    status['not_run'].append('complete private-keyring / Agent / hostd / store / export flow (not completed)')
+    if 'Operation not permitted' in (product / 'logs/private-bus.log').read_text():
+        status['blocked'] = 'sandbox socket'
 if args.inject_leak:
-    (product / "logs/intentional-leak.log").write_text(sentinels["token"])
-report = scan(manifest["roots"], sentinels)
+    leak = {"literal": sentinels["token"].encode(), "hex": nonce.encode().hex().upper().encode(),
+            "base64-offset-1": base64.b64encode(b'\xff' + nonce.encode() + b'!').rstrip(b'=')}[args.leak_form]
+    (product / "logs/intentional-leak.log").write_bytes(leak)
+report = scan(manifest["roots"], sentinels, nonce=nonce)
 privacy = scan({category: manifest["roots"][category] for category in ("logs", "exports", "diagnostics")},
                {"conversation_content": "QA04_PRIVATE_CONVERSATION_CONTENT",
                 "proposal_content": "QA04_PRIVATE_PROPOSAL_CONTENT"})
 report.update({"flow": status, "injection_manifest": str(root / "manifest.json"),
-               "negative_control": args.inject_leak, "default_privacy_scan": privacy})
+               "negative_control": args.inject_leak, "leak_form": args.leak_form, "default_privacy_scan": privacy})
 coverage = all(report["scope"][category]["file_count"] > 0 for category in
                ("logs", "exports", "diagnostics", "conversations", "generated", "store"))
 report["ok"] = report["ok"] and status["ok"] and privacy["ok"] and coverage and bool(report["sqlite_databases"])

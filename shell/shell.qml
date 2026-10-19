@@ -247,17 +247,19 @@ ShellRoot {
     /// the shared conversation state. Read-only; nothing is sent to Core.
     function chatReport() {
         const last = conversation.events.filter(event => event.type === "assistant/message").slice(-1)[0];
+        // Not read or failed to read is null (with ai_status), never idle.
+        const status = conversation.chatStatus();
         return {
             open: chat.open,
             mode: chat.mode,
             streaming: conversation.streamText.length,
             sessions: conversation.sessions.length,
             draft: conversation.draft,
-            state: conversation.taskState === "offline" && !conversation.offlineReason
-                ? "idle" : conversation.taskState,
-            text: conversation.stateText,
-            enabled: conversation.settings ? conversation.enabled : null,
-            connected: conversation.connected,
+            state: status.state,
+            ai_status: status.ai_status,
+            text: status.text,
+            enabled: status.enabled,
+            connected: status.connected,
             session_id: conversation.sessionId,
             turn_state: conversation.turn ? conversation.turn.state : null,
             events: conversation.events.map(event => event.type),

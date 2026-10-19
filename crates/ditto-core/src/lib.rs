@@ -236,7 +236,7 @@ fn handshake(
         crate::log::event(
             "connection.identity_rejected",
             &[
-                ("kind", &input.client.kind),
+                ("kind", crate::log::connection_kind(&input.client.kind)),
                 ("pid", &peer.pid.to_string()),
                 (
                     "reason_code",
