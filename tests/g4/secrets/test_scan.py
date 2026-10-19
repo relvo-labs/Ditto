@@ -3,11 +3,13 @@ from contextlib import closing, redirect_stdout
 import io
 import json
 from pathlib import Path
+import random
 import runpy
 import sqlite3
 import subprocess
 import tempfile
 import unittest
+import urllib.parse
 from unittest.mock import patch
 
 from scan import scan
@@ -34,7 +36,7 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(report["hits"][0]["source"], str(log))
 
     def test_utf16_sqlite_content_is_decoded(self):
-        with sqlite3.connect(self.root / "store.sqlite") as db:
+        with closing(sqlite3.connect(self.root / "store.sqlite")) as db, db:
             db.execute("PRAGMA encoding='UTF-16'")
             db.execute("CREATE TABLE secrets (value TEXT)")
             db.execute("INSERT INTO secrets VALUES (?)", [self.sentinels["key"]])
@@ -85,7 +87,10 @@ class ScannerTests(unittest.TestCase):
                  ("unexpected-leak", True, True, True, 1),
                  ("clean-positive", True, False, False, 0),
                  ("leaking-positive", True, True, False, 1),
-                 ("private-proposal-leak", True, "proposal", False, 1)]
+                 ("private-proposal-leak", True, "proposal", False, 1),
+                 ("hex", True, False, True, 0),
+                 ("base64-offset-1", True, False, True, 0),
+                 ("unresolved-keyring", True, False, False, 1)]
         for name, flow_ok, unexpected, inject, expected in cases:
             with self.subTest(name=name):
                 output = self.root / name
@@ -107,6 +112,8 @@ class ScannerTests(unittest.TestCase):
                             sentinel = ("QA04_PRIVATE_PROPOSAL_CONTENT" if unexpected == "proposal"
                                         else json.loads(env["DITTO_QA04_SENTINELS"])["token"])
                             (product / "logs/unexpected.log").write_text(sentinel)
+                        (Path(env['DITTO_RUNTIME_DIR']) / 'keyring.json').write_text(json.dumps({
+                            'calls': {'CreateItem': 3, 'GetSecret': 0 if name == 'unresolved-keyring' else 3}}))
                         (output / "driver.json").write_text(json.dumps({"ok": flow_ok, "checks": ["simulated flow only"]}))
 
                     def poll(self):
@@ -115,14 +122,24 @@ class ScannerTests(unittest.TestCase):
                     def wait(self, timeout):
                         return 0
 
-                argv = [str(runner), "--output", str(output)] + (["--inject-leak"] if inject else [])
-                with patch("sys.argv", argv), patch.object(Path, "glob", builtin_glob), \
+                class BusFixture:
+                    def __init__(self, scratch, *_args):
+                        self.address = 'unix:path=' + str(scratch) + '/bus'
+                    def start(self):
+                        return self.address
+                    def stop(self):
+                        pass
+
+                argv = [str(runner), "--output", str(output), '--scratch', str(self.root)] + (["--inject-leak"] if inject else [])
+                if name in ('hex', 'base64-offset-1'):
+                    argv += ['--leak-form', name]
+                with patch('private_bus.PrivateBus', BusFixture), patch("sys.argv", argv), patch.object(Path, "glob", builtin_glob), \
                      patch("subprocess.Popen", FlowFixture), patch("os.killpg"), \
                      patch("resource.setrlimit"), redirect_stdout(io.StringIO()):
                     with self.assertRaises(SystemExit) as exited:
                         runpy.run_path(str(runner), run_name="__main__")
                 report = json.loads((output / "result.json").read_text())
-                self.assertEqual(report["flow"]["ok"], flow_ok)
+                self.assertEqual(report["flow"]["ok"], flow_ok and name != "unresolved-keyring")
                 self.assertEqual(exited.exception.code, expected)
                 if unexpected == "proposal":
                     self.assertEqual(report["hit_count"], 0)
@@ -133,6 +150,57 @@ class ScannerTests(unittest.TestCase):
                     self.assertGreater(report["hit_count"], 0)
                     self.assertTrue(all(hit["source"] == str(output / "product/logs/intentional-leak.log")
                                         for hit in report["hits"]))
+
+
+class NonceFormsTests(unittest.TestCase):
+    def test_invalid_nonce_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / 'clean').write_text('safe reference')
+            for nonce in ('', 'too-short', 42):
+                self.assertFalse(scan({'fixture': directory}, {'key': 'long-synthetic-sentinel'}, nonce=nonce)['ok'])
+
+    def test_full_sentinel_forms_and_unrelated_content(self):
+        sentinel = 'sk-QA04-測試-"/synthetic-only!'
+        forms = [lambda value: value.encode(), lambda value: json.dumps(value)[1:-1].encode(),
+                 lambda value: urllib.parse.quote(value, safe='').encode()]
+        with tempfile.TemporaryDirectory() as directory:
+            for index, encode in enumerate(forms):
+                for value, hit in ((sentinel, True), ('completely-unrelated-content', False)):
+                    with self.subTest(form=index, hit=hit):
+                        (Path(directory) / 'log').write_bytes(encode(value))
+                        result = scan({'fixture': directory}, {'key': sentinel})
+                        self.assertEqual(bool(result['hits']), hit)
+                        self.assertEqual(result['ok'], not hit)
+
+    def test_nonce_forms_and_unrelated_content(self):
+        # Unicode makes standard and URL-safe alphabets differ at every offset.
+        nonce = 'a9f03b7e測試🿿' * 3
+        unrelated = 'b8e12c6d獨立🿾' * 3
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'leak'
+            forms = [('literal', lambda value: value.encode()),
+                     ('hex-lower', lambda value: value.encode().hex().encode()),
+                     ('hex-upper', lambda value: value.encode().hex().upper().encode())]
+            rng = random.Random(74099)  # Reproducible random prefixes; independent of scanner construction.
+            for offset in range(3):
+                prefixes = [('empty', b'')] if offset == 0 else [
+                    ('ff', b'\xff' * offset), ('zero', b'\x00' * offset), ('random', rng.randbytes(offset))]
+                for prefix_name, prefix in prefixes:
+                    for urlsafe in (False, True):
+                        for padding in (False, True):
+                            def encode(value, prefix=prefix, urlsafe=urlsafe, padding=padding):
+                                fn = base64.urlsafe_b64encode if urlsafe else base64.b64encode
+                                result = fn(prefix + value.encode() + b'!suffix')
+                                return result if padding else result.rstrip(b'=')
+                            forms.append((f'base64-{offset}-{prefix_name}-{urlsafe}-{padding}', encode))
+            for name, encode in forms:
+                for value, expected in ((nonce, False), (unrelated, True)):
+                    with self.subTest(form=name, leaked=value == nonce):
+                        path.write_bytes(encode(value))
+                        result = scan({'fixture': directory}, {'key': 'sk-prefix-' + nonce + '-suffix'}, nonce=nonce)
+                        self.assertEqual(result['ok'], expected)
+                        self.assertEqual(bool(result['hits']), not expected)
+                        self.assertNotIn(nonce, json.dumps(result['hits']))
 
 
 if __name__ == "__main__":

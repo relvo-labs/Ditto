@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {readFileSync, writeFileSync} from 'node:fs'
 import {test} from 'node:test'
-import {runFlow} from './driver.mjs'
+import {runFlow, scriptedReply} from './driver.mjs'
 
 const readSchema = name => JSON.parse(readFileSync(new URL(`../../../schema/${name}.json`, import.meta.url)))
 const catalog = readSchema('catalog').capabilities
@@ -63,14 +63,15 @@ test('the production driver completes with every actual request schema-checked, 
   const preferences = {revision: 1, enabled: false, provider: 'codex-app-server', max_tool_calls: 20,
     turn_timeout_ms: 120000, retain_conversations: true, approval_mode: 'ask'}
   const responses = {
-    'desktop.profiles.get': {profile: {profile_id: 'profile-active-from-readback', head_revision: 'revision-from-readback'}},
+    'desktop.profiles.get': {profile: {profile_id: 'profile-active-from-readback', head_revision: 'revision-from-readback', entries: [{package: 'ditto.svc.notification-policy', entry_id: 'notification-entry', config: {rules: {focus: {enabled: true}}}}]}},
     'desktop.plugins.diagnostics': {host: {process: {pid: 123}}},
     'desktop.changes.propose': {change_id: 'change-test'},
     'desktop.changes.get': {change_id: 'change-test', idempotency_key: 'QA04_PRIVATE_PROPOSAL_CONTENT'},
+    'agent.credentials.create': {available: true, credential_ref: 'cred-from-keyring'},
     'agent.sessions.create': {session_id: 'session-test'},
     'agent.settings.describe': preferences,
     'agent.turns.submit': {turn_id: 'turn-test'},
-    'agent.turns.get': {state: 'failed', error_reason: 'provider_unavailable'},
+    'agent.turns.get': {state: 'succeeded'},
     'agent.sessions.read': {events: [{type: 'user/message'}]},
     'desktop.plugins.development.create': {artifact_id: 'artifact-test', source_files: {'description.json': '{}'}},
   }
@@ -81,14 +82,21 @@ test('the production driver completes with every actual request schema-checked, 
   }
   const core = {must, call: async (method, params) => {
     const result = await must(method, params)
-    return method === 'agent.credentials.create' ? {error: {name: 'unavailable', message: 'keyring_unavailable'}} : {result}
+    return {result}
   }}
   await runFlow(core, {
+    endpoint: 'http://127.0.0.1:9123/v1',
     sentinels: {key: 'sk-synthetic', token: 'ghp_synthetic', password: 'synthetic-password'},
     verify: (name, value) => assert.ok(value, name),
     save: path => saved.push(path),
     eventually: async fn => { const result = await fn(); assert.ok(result); return result },
   })
+  const turns = requests.filter(item => item.method === 'agent.turns.submit')
+  assert.equal(turns.length, 3)
+  for (const request of requests.filter(item => item.method === 'agent.settings.patch')) {
+    assert.equal(request.params.settings.auth.credential_ref, 'cred-from-keyring')
+    assert.equal(request.params.settings.endpoint, 'http://127.0.0.1:9123/v1')
+  }
   assert.equal(new Set(requests.map(item => item.method)).size, 17)
   const proposals = requests.filter(item => item.method === 'desktop.changes.propose')
   assert.equal(proposals.length, 1)
@@ -115,4 +123,22 @@ test('the original empty export params and missing params on every required meth
   assert.throws(() => validate(input('desktop.rescue.status'), {profile_id: 'unexpected'}))
   assert.throws(() => validate(input('desktop.changes.propose'), {base_revision: 'revision-test', ops: [], subject: 'private'}), /unexpected subject/)
   assert.throws(() => validate(input('desktop.changes.propose'), {base_revision: 'revision-test', ops: {}}), /expected array/)
+})
+
+test('scripted model exercises an actual hostd config transaction and rejects a failed commit', () => {
+  assert.equal(scriptedReply({input: []})[0].name, 'desktop__profiles__get')
+  const profile = {profile: {head_revision: 'read-revision', entries: [{package: 'ditto.svc.notification-policy',
+    entry_id: 'notification-entry', config: {rules: {focus: {enabled: false}}}}]}}
+  const modelInput = [{type: 'function_call_output', call_id: 'read-profile', output: JSON.stringify(profile)}]
+  const reply = scriptedReply({input: modelInput})[0]
+  assert.equal(reply.name, 'desktop__changes__propose')
+  const params = JSON.parse(reply.arguments)
+  validate(input('desktop.changes.propose'), params)
+  assert.equal(params.base_revision, 'read-revision')
+  assert.equal(params.ops[0].entry_id, 'notification-entry')
+  assert.equal(params.ops[0].after.rules.focus.enabled, true)
+  modelInput.push({type: 'function_call_output', call_id: 'propose', output: '{"state":"failed"}'})
+  assert.throws(() => scriptedReply({input: modelInput}), /must commit/)
+  modelInput[1].output = '{"state":"committed"}'
+  assert.equal(scriptedReply({input: modelInput})[0].type, 'message')
 })
