@@ -31,6 +31,7 @@ const providers = [
 const LEGACY_BASE = 'f58242612d43506984cdfde8f303b73045a57617';
 const legacy = [
   { path: 'shell/providers/dock_pill/qml/DockPill.qml', stage: true },
+  { path: 'shell/providers/panel_top/qml/PanelTop.qml', stage: true, base: 'b434c93b7b739c053aabe70352aef211e7a4c268' },
   { path: 'shell/jelly/Material.qml', stage: false },
   { path: 'shell/jelly/Tokens.qml', stage: false },
 ];
@@ -45,12 +46,12 @@ const strip = (source, path, removed) => source.split('\n').filter((line, index)
   return true;
 }).join('\n');
 for (const item of legacy) {
-  const source = execFileSync('git', ['-C', root, 'show', `${LEGACY_BASE}:${item.path}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const source = execFileSync('git', ['-C', root, 'show', `${item.base || LEGACY_BASE}:${item.path}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   const removed = [];
   const staged = item.stage ? strip(source, item.path, removed) : source;
   const name = item.path.split('/').pop();
   writeFileSync(join(here, '.staged', 'base', name), staged);
-  report.push({ source: `${LEGACY_BASE}:${item.path}`, source_sha256: sha(source), staged: `.staged/base/${name}`, staged_sha256: sha(staged), removed });
+  report.push({ source: `${item.base || LEGACY_BASE}:${item.path}`, source_sha256: sha(source), staged: `.staged/base/${name}`, staged_sha256: sha(staged), removed });
 }
 for (const path of providers) {
   const source = readFileSync(join(root, path), 'utf8');

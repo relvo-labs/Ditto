@@ -1,6 +1,8 @@
 import QtQuick
 import QtTest
 import Quickshell
+import Quickshell.Services.Pipewire
+import Quickshell.Networking
 import DittoStub
 import "../../../../shell/jelly" as Jelly
 import "../.staged/capture-data.js" as Data
@@ -79,6 +81,9 @@ TestCase {
         id: sceneTokens
         appearance: ({ theme: "soft-jelly-light", tokens: {}, locale: "zh-TW" })
     }
+    QtObject { id: fixtureAudio; property bool muted: false; property real volume: 0.5 }
+    QtObject { id: fixtureSink; property var audio: fixtureAudio }
+    property bool statusFixture: false
 
     QtObject {
         id: client
@@ -148,6 +153,10 @@ TestCase {
             }
             return true;
         }, 5000, "icons settled");
+        if (panel.soft) {
+            tryVerify(() => ["panelNetworkIcon", "panelVolumeIcon"].every(name =>
+                findChild(layer, name).status !== Image.Loading), 5000, "status icons settled");
+        }
         if (focusApp) {
             findChild(layer, "dockTile_" + focusApp).forceActiveFocus();
         }
@@ -170,11 +179,25 @@ TestCase {
             renderer: screen.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "hardware(" + screen.GraphicsInfo.api + ")",
             appearance: appearance, material_shadow_path: findChild(screen, "materialSample_back").children[0].shadowPath,
             motion: { enabled: sceneTokens.motionEnabled, settled: true, dock_reveal: dock.reveal },
-            fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null },
-            geometry: { dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
+            fixture: { workspaces: client.workspaces.length, windows: windows, pinned: Data.pinned, focus_tile: focusApp || null,
+                       system_status: statusFixture ? { muted: fixtureAudio.muted, volume: fixtureAudio.volume,
+                           network_connectivity: Networking.connectivity } : null },
+            panel_presentation: panel.soft ? "light" : "legacy",
+            panel_icons: panel.soft ? ["panelNetwork", "panelVolume"].map(name => {
+                const button = findChild(layer, name);
+                const icon = findChild(layer, name + "Icon");
+                return { name: button.iconName, text: button.Accessible.name, source: String(icon.source),
+                         tint: String(icon.color), error_tint: String(icon.errorColor), marker: button.marker, glyph: rect(icon),
+                         marker_glyph: button.marker ? rect(findChild(layer, name + "Marker")) : null,
+                         status: icon.status === Image.Ready ? "ready" : "text-fallback" };
+            }) : [],
+            geometry: Object.assign({ dock_capsule: rect(capsule), dock_window: rect(capsule.parent),
                         panel_window: rect(layer.children.find(item => item.objectName === "stubPanelWindow" && item.visible
                                                                   && item !== capsule.parent && item.y === 0)),
                         sample_back: rect(findChild(screen, "materialSample_back")), sample_front: rect(findChild(screen, "materialSample_front")) },
+                        panel.soft ? { workspace_capsule: rect(findChild(layer, "panelWorkspaces")),
+                                       status_capsule: rect(findChild(layer, "panelStatus")),
+                                       menu_title_capsule: rect(findChild(layer, "panelLeft")) } : {}),
             dock_icons: icons, wallpaper_shown: backdrop.wallpaperShown,
             dock_presentation: dock.soft ? "light" : "legacy",
             dock_input_region: { item: rect(region.item), radius: region.radius,
@@ -220,6 +243,34 @@ TestCase {
     function test_6_no_theme() {
         render("legacy-no-theme", { tokens: {}, locale: "zh-TW" },
                [{ id: "fixture-legacy", app_id: Data.pinned[0], title: "fixture", focused: true }], null);
+    }
+
+    // Explicit service fixtures for contrast/state inspection; the six
+    // original scenes above continue to reflect unavailable local services.
+    function test_7_panel_statuses() {
+        statusFixture = true;
+        Pipewire.ready = true; Pipewire.defaultAudioSink = fixtureSink;
+        fixtureAudio.muted = true;
+        Networking.backend = NetworkBackendType.NetworkManager;
+        Networking.connectivity = NetworkConnectivity.Full;
+        Networking.devices = { values: [{ connected: true }] };
+        render("panel-muted-connected", light(), [], null);
+        fixtureAudio.muted = false;
+        for (const level of [{ value: 0, name: "low" }, { value: 0.4, name: "medium" }, { value: 1, name: "high" }]) {
+            fixtureAudio.volume = level.value;
+            render("panel-volume-" + level.name, light(), [], null);
+        }
+        fixtureAudio.volume = 0.5;
+        Networking.connectivity = NetworkConnectivity.Unknown;
+        Networking.devices = { values: [] };
+        render("panel-unknown", light(), [], null);
+        Networking.connectivity = NetworkConnectivity.None;
+        render("panel-offline", light(), [], null);
+        statusFixture = false;
+        Pipewire.ready = false; Pipewire.defaultAudioSink = null;
+        Networking.backend = NetworkBackendType.None;
+        Networking.connectivity = NetworkConnectivity.Unknown;
+        Networking.devices = null;
     }
 
     function initTestCase() {

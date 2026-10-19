@@ -22,6 +22,16 @@ export QT_QPA_PLATFORM=offscreen
 cd "$root"
 node "$here/stage-providers.mjs"
 cp "$here/.staged/staging.json" "$evidence/staging.json"
+# The capture directory also includes the assistant scene. Prepare its real
+# QML sources on a clean checkout, without relying on another runner's cache.
+python3 "$here/stage-assistant.py" > "$evidence/assistant-staging.log"
+cp "$here/.staged/assistant/staging.json" "$evidence/assistant-staging.json"
+
+# Unit regressions also consume the real Yaru lookup; prepare it before the
+# first QML import so clean checkouts never depend on old capture data.
+echo "== system icon/app lookup"
+"$python" "$here/capture/prepare.py"
+cp "$here/.staged/capture-sources.json" "$evidence/capture-sources.json"
 
 echo "== unit tests"
 "$runner" -import "$here/stubs" -input "$here/unit" 2>&1 | tee "$evidence/unit-tests.log"
@@ -30,8 +40,6 @@ status=${PIPESTATUS[0]}
 grep 'CONTRAST ' "$evidence/unit-tests.log" | sed 's/.*CONTRAST //' > "$evidence/contrast.txt"
 
 echo "== capture"
-"$python" "$here/capture/prepare.py"
-cp "$here/.staged/capture-sources.json" "$evidence/capture-sources.json"
 rm -f "$here/.staged/out/"*.png
 "$runner" -import "$here/stubs" -input "$here/capture" 2>&1 | tee "$evidence/capture.log"
 status=${PIPESTATUS[0]}

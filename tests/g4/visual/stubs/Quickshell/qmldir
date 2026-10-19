@@ -11,3 +11,4 @@ SystemClock 1.0 SystemClock.qml
 Region 1.0 Region.qml
 FloatingWindow 1.0 FloatingWindow.qml
 ExclusionMode 1.0 ExclusionMode.qml
+Intersection 1.0 Intersection.qml
