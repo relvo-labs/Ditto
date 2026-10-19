@@ -1,0 +1,3 @@
+ditto-shell started
+ditto-shell hit mask rectangles=24
+ditto-frame 1000 16

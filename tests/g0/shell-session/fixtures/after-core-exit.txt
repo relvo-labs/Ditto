@@ -1,0 +1,8 @@
+ditto-shell started
+ditto-shell hit mask rectangles=24
+ditto-frame 1000 16
+ditto-shell hit mask rectangles=24
+ditto-frame 2000 16
+ditto-frame 3000 16
+ditto-frame 5000 16
+ditto-frame 5016 16
