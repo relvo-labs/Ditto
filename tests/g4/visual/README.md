@@ -27,3 +27,7 @@ Repair round 1b 已獲協調者授權，只修改 Avatar awaiting 問號的前�
 `<theme>` 為 `no-theme`、`soft-jelly`、`soft-jelly-light`。後四類使用標明的 fixture 資料；管理中心的 Core 呼叫回報不可用，沒有實際寫入。FloatingWindow 替身只呈現內容；不驗證原生視窗行為。原始 PNG 在 `.staged/out/`，擷取後可複製到證據目錄；PanelTop 的時鐘是擷取當下時間，比較時須另辨識時鐘差異。
 
 狀態元件的控制項圖與 TasksPanel 圖另外擷取 `-reduced-transparency`、`-low-power` 兩種後綴，覆蓋全部三種主題。
+
+## #116 Soft Jelly 應用候選
+
+`run.sh` 另外執行：`stage-ui116.mjs`（把 `87a2462` 與目前的 `shell/ui`、`jelly`、`centers`、`chat`、`change`、`assistant`、`avatar`、`dock_pill` 並排放到 `.staged/ui116/`，只移除 layer-shell 行）、`unit/tst_ui_style.qml`（開關、新元件的鍵盤／名稱／角色、減少動畫、降低透明度、對比）、`unit/tst_ui_style_off.qml`（未設定 `DITTO_UI_STYLE` 時與基底逐像素相同）、`unit/tst_ui_style_pages.qml`（卡片動作、AI 關閉空狀態、確認視窗預設拒絕）、`unit/tst_ui_style_dock.qml`、`capture/ui_contrast.py`（候選文字疊在桌布每個像素與黑色上的最小對比），以及 `capture/tst_apps_candidates.qml`：現行與 J1／J2／J3 各九張 1280×800（組合中心一般／降低透明度／低效能／`⋯` 選單、個人化、AI 設定、對話 AI 關閉、對話進行中＋確認、Dock 缺圖示），複製到 `<證據目錄>/candidates/`，由 `capture/compose_candidates.py` 產生 2×2 與手機直式比較板和 `candidates.json`。資料都是 `fixtures/AppFixtureClient.qml`、`ConversationFixture.qml` 的標明 fixture；offscreen 沒有 Qt／Wayfire 的視窗標題列與陰影。

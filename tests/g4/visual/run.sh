@@ -46,9 +46,16 @@ grep 'CONTRAST ' "$evidence/unit-tests.log" | sed 's/.*CONTRAST //' > "$evidence
 # #105 C4 state table (real Yaru, pixels at 3:1 and 4.5:1) and C1 narrow steps.
 grep 'STATUS_STATE ' "$evidence/unit-tests.log" | sed 's/.*STATUS_STATE //' > "$evidence/status-states.jsonl"
 grep 'NARROW ' "$evidence/unit-tests.log" | sed 's/.*NARROW //' > "$evidence/narrow-layout.jsonl"
+# #116 candidate text colours over every wallpaper pixel (and black).
+"$python" "$here/capture/ui_contrast.py" "$evidence/unit-tests.log" "$root/shell/wallpapers/soft-jelly-default.jpg" \
+  "$evidence/ui-contrast.json" | tee "$evidence/ui-contrast.log"
+status=${PIPESTATUS[0]}
+[[ $status -eq 0 ]] || { echo "ui contrast failed ($status)"; exit "$status"; }
 
 echo "== capture"
 rm -f "$here/.staged/out/"*.png
+rm -rf "$here/.staged/out/candidates"
+mkdir -p "$here/.staged/out/candidates"
 "$runner" -import "$here/stubs" -input "$here/capture" 2>&1 | tee "$evidence/capture.log"
 status=${PIPESTATUS[0]}
 [[ $status -eq 0 ]] || { echo "capture failed ($status)"; exit "$status"; }
@@ -70,6 +77,10 @@ grep 'SCENE_META ' "$evidence/capture.log" | sed 's/.*SCENE_META //' > "$evidenc
 
 echo "== compose"
 "$python" "$here/capture/compose.py" "$evidence" "$evidence/capture.log"
+# #116 candidate screens (capture/tst_apps_candidates.qml) and comparison sheets.
+mkdir -p "$evidence/candidates"
+cp "$here/.staged/out/candidates/"*.png "$evidence/candidates/"
+"$python" "$here/capture/compose_candidates.py" "$evidence/candidates" "$evidence/capture.log"
 {
   echo "commit $(git -C "$root" rev-parse HEAD)"
   echo "dirty $(git -C "$root" status --porcelain -- shell tests/g4 | wc -l)"

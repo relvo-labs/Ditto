@@ -271,3 +271,61 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 | A1 鍵盤／IME | 真實 Enter／Space／Escape、composing policy、approval Escape 拒絕；四角定位、縮放與隱藏 | QtTest、legacy 逐像素／結構比對 | 未注入真正 QInputMethodEvent；實體 IME、回焦、Orca、大字、多屏熱插拔未執行，交 #47／#49 |
 
 執行入口與完整 gate 限制見 `tests/g4/visual/README-assistant.md`。證據目錄為 `/data/hermes/ditto-runs/g4-impl/r3-assistant/evidence/`。沒有 Quickshell／Wayfire／實體座位；PNG 是 Qt 6.10.2 offscreen software 與 layer-shell／FloatingWindow 替身的 **development** 證據。沒有乾淨桌布素材，不宣稱忠實還原或 G4／NFR 通過。
+
+## 8. #116 Soft Jelly 應用候選（待 owner 選擇）
+
+**狀態：三個候選，opt-in，尚未選定；預設呈現不變。** owner 2026-10-20 要求改善內建應用，並更正方向：主題回到 soft jelly、要原創，macOS 只當品質標準（層級、成組設定、節奏、一致的控制項），不複製紅黃綠視窗鈕、系統藍、SF Symbols 或系統設定版面。基底 `87a2462`（PR #115）；分支 `hermes/g4-116-apps-macos`。證據在 repo 外 `/data/hermes/ditto-runs/g4-impl/b10/l116/evidence/`，全部是 Qt 6.10.2 offscreen software＋Quickshell 替身的開發證據。
+
+### 8.1 開關與界線
+
+- `DITTO_UI_STYLE=j1|j2|j3` → `Tokens.uiStyle`；未設定或其他值＝現行外觀。只是開發開關（`tools/ui-candidates/apply.sh` 設定），沒有 Profile token、Core schema 或持久化。選定後如何成為預設（主題、Profile 欄位或改預設值）另行決定。
+- 範圍：Shell 自有的組合中心、插件中心、變更紀錄、個人化、AI 設定、對話（完整視窗與 compact）、確認視窗、`dock_pill` 的備援圖示與指示。資訊架構、Core 呼叫、確認的預設拒絕與 Escape＝拒絕都不變。`shell/change/`（變更卡、試看列）、頂部列、啟動器、通知、助理 FAB 不在本輪，仍用原樣式。
+- 未設定時與基底逐像素相同：`tests/g4/visual/unit/tst_ui_style_off.qml` 把 `87a2462` 與目前檔案並排渲染（共用控制項、五個中心頁、對話完整／compact、確認視窗、Dock；淺色一般／降低透明度／低效能與無主題），50 項相等。
+
+### 8.2 三個候選（同結構，只變材質與性格）
+
+| | J1 果凍玻璃 | J2 軟糖 | J3 泡泡 |
+| --- | --- | --- | --- |
+| 視窗底 | 近白薰衣草，α0.88 磨砂 | 偏粉暖的薰衣草，幾乎不透明 | 冷白帶水色漸層，α0.86；角落淡泡泡 |
+| 卡片 | 白 α0.74、亮內緣、淡柔影，圓角 16 | 不透明、底部實心「軟糖唇」＋柔影，圓角 20 | 白 α0.60、四邊虹彩細邊（粉→紫→水藍），圓角 26，留白多（內距 24、列高 56） |
+| 選取 | 白色凸珠＋實心小珠標記 | 淡紫軟糖填色＋唇＋實心標記 | 半透明泡泡＋虹彩邊＋空心泡泡環標記 |
+| 按鈕 | 圓角矩形（10） | 膠囊、主要動作有深紫唇，按下壓扁最多（x1.03／y0.90） | 膠囊、tonal 帶虹彩邊 |
+| 視窗鈕 | 三顆不同深淺的薰衣草果凍珠 | 同左，較飽和 | 透明泡泡、彩色邊；hover／focus 才填色 |
+| 頁標題 | 24 | 26 | 24 |
+
+共通：頁標題 24–26 semibold、群組標題 13 semibold、列標籤 14、說明 12；8 pt 間距；列高 ≥48；卡片內距 ≥16。選取（凸珠＋標記）與主要動作（實心紫＋白字）不同樣式；唯一選項是靜態值＋「唯一可用」小籤，停用是灰字；不用 ✓。危險動作有獨立樣式且在 `⋯` 選單中以分隔線隔開。按下時只壓扁外觀，命中區不縮放；減少動畫／低效能不壓扁，改為按下色。降低透明度：全部不透明、邊線加深、無光澤；低效能：無陰影與光澤。語意色（成功／警告／危險／資訊）是柔和底＋可讀深色字，不染成紫色。
+
+文字對比：`tst_ui_style.qml` 檢查不透明配對（≥4.5，焦點與停用 ≥3）；`capture/ui_contrast.py` 把各候選的半透明層疊在**桌布每個像素與黑色**上計算最小值，198 組全部 ≥ 門檻，最低 J3 視窗底上的危險色 4.82（`ui-contrast.json`）。
+
+### 8.3 元件與頁面
+
+| 元件（`shell/ui/`） | 用途 | 鍵盤／無障礙 |
+| --- | --- | --- |
+| `JellySurface` | 果凍面：填色、亮內緣、頂部光澤、J2 唇、J3 虹彩邊與泡泡、柔影；無 shader | 不接收輸入 |
+| `SegmentedControl` | 互斥選項；`Choice` 在候選下改用它 | 一個 Tab 停點，方向鍵／Home／End 移動，Enter／Space 選；移動焦點不等於選擇；RadioButton＋checked |
+| `GroupedList`／`ListRow` | 成組設定列，水面般的分隔線，放不下時控制項換到下一行 | Grouping＋列名 |
+| `OverflowMenu` | 卡片的 `⋯`，最多兩個主要動作以外的動作 | Enter／Space／↓ 開啟，↑↓ 循環並略過不可用項，Escape／Tab 關閉並回到按鈕；Escape 不會再關掉外層視窗；不可用項說明原因 |
+| `WindowControls`／`WindowHeader` | 自有視窗的單一標題列與三顆果凍珠；拖曳移動、雙擊放大 | 每顆都是有文字名稱的 Button，Tab／Enter／Space，命中區 28 px |
+| `EmptyState` | 單一空狀態：角色、標題、說明、主要動作、範例 | 範例是靜態引述，不是按鈕 |
+
+既有 `Button`（primary／secondary＝tonal／subtle＝ghost／danger／`dangerQuiet`，另加 `checked`）、`Badge`、`Section`、`Toggle`、`TextField`、`TextArea`、`Diagnostics`、`ChatInput` 只在候選下換外觀。頁面：組合中心的元件列改成成組清單；每張組合卡最多「試看」「使用這個組合」，其餘（版本與差異、比較、複製、重新命名、匯出、刪除）在固定位置的 `⋯`；使用中的卡刪除項停用並說明；版本的起點／終點以已選凸珠表示。側欄不再重複「Ditto」，選中頁是泡泡。視窗高度在已知螢幕高度時避開頂部列與 Dock（≤螢幕高 −148）。對話：完整視窗只有一個標題；「對話／歷史」是分頁，「新對話／AI 設定／收合」是工具鈕；AI 關閉且沒有訊息時是一個空狀態（D1 小 Ditto、說明、「開啟 AI 對話」走同一個 `setEnabled`、三則範例），狀態徽章不再重複；輸入框停用時說明原因。確認視窗只換外觀，唯一的視窗鈕是「拒絕並關閉」。`tst_ui_style_pages.qml` 在基底上 10／12 失敗、目前 12／12 通過。
+
+### 8.4 視窗裝飾、foot 與 Dock
+
+- **誰畫標題列**：owner VM 截圖中「Ditto 設定／Ditto 對話」的淺灰標題列與黑色 `_ □ ✕` 是 Qt 自己的 client-side 裝飾（Wayfire `core/preferred_decoration_mode` 預設 `client`）；foot 的深灰標題列與三個灰圓鈕才是 Wayfire `decoration` 外掛（server-side）。這是依 frozen 前綴的 metadata 與預設值推斷，VM 上待確認。
+- **Ditto 自有視窗**：候選下由 `WindowHeader` 畫唯一標題與果凍珠，並在真實視窗上要求 Qt `FramelessWindowHint`（不畫 Qt 標題列）。這兩件事在 Wayfire 上是否如預期（無雙標題列、拖曳移動、最小化）**未驗證**；無邊框時邊緣拖曳調整大小會消失（Wayfire 的 Super＋右鍵調整仍在）。
+- **Wayfire 0.11 `decoration`**：只能設 font、font_color、font_scale、title_height、border_size、button_order／scale／padding、active／inactive_color、ignore／forced_views；沒有圓角、陰影或按鈕顏色。按鈕 hover 的紅／綠／黃是編譯在 `libdecoration.so` 內的常數（在 frozen 前綴的二進位中找到 242/255、80/255、57/255、234/255、250/255、198/255 等 double），設定檔改不掉；`font_scale` 與字級的換算未在原始碼確認。候選檔：`packaging/reference-image/session/candidates/<j1|j2|j3>/wayfire-decoration.ini`。
+- **foot**：`candidates/<j1|j2|j3>/foot.ini`（foot 1.16 鍵名）：Noto Sans Mono CJK TC 11.5 pt、內距 14×12、淺色薰衣草色盤（16 色對背景都 ≥5:1）、beam 游標；`[csd] preferred=client` 讓 foot 自己畫標題列，三個按鈕是薰衣草色，因此不會出現 Wayfire 的紅綠黃 hover。由 `apply.sh` 放在 session 專用目錄並排在 `XDG_CONFIG_DIRS` 前面；使用者自己的 `~/.config/foot/foot.ini` 仍優先。Wayfire 的 Super＋Enter 啟動的 foot 沿用 Wayfire 的環境，看不到候選。
+- **apply.sh**：`tools/ui-candidates/apply.sh j1|j2|j3|off|status [--restart-core]`。即時以 IPC `wayfire/set-config-options` 設定 decoration（先讀回原值），在 `$XDG_RUNTIME_DIR/ditto/ui-candidate/` 放合併後的 wayfire.ini 副本與 foot.ini，在 `session.env` 加一段標記區塊（`DITTO_UI_STYLE`、`XDG_CONFIG_DIRS`），可選重啟 `ditto-core.service`；`off` 逐位元還原 `session.env`、設回原值並刪除狀態目錄。不寫 XDG_CONFIG_HOME、repo、/etc 或已安裝的工作階段。`selftest.sh` 以假 IPC 伺服器驗證 j1→j3→off；真 Wayfire 是否接受這些值與即時重繪**未執行**。
+- **Dock（`dock_pill`）**：候選下缺圖示的應用是薰衣草家族漸層的 squircle＋白色大寫首字（中心對比 ≥4.5），執行中與使用中共用一種膠囊指示（使用中較長、選取色，不另加底板）；無障礙名稱不變。`tst_ui_style_dock.qml` 基底 4／6 失敗、目前 6／6。
+
+### 8.5 待 owner 決定
+
+1. 三個候選選哪一個（或混合哪些軸）。
+2. Ditto 自有視窗改由 Shell 畫標題列（無邊框）是否接受；或保留 Qt／Wayfire 的標題列。
+3. foot 用自己的標題列（可配色）或 Wayfire 的 server-side 標題列（hover 會出現編譯內建的紅綠黃）。
+4. 空狀態使用 D1 小 Ditto（素材授權仍未釐清，同 D11）。
+5. 選定後如何成為預設（Profile 欄位或主題名稱、Core 預設），以及 `shell/change/`、頂部列、啟動器、通知是否一起套用。
+6. 是否同時處理新視窗不 cascade（Wayfire `place` 模式），本輪未改。
+
+未執行：VM／參考機實機截圖與操作、Wayfire 真實裝飾與 FramelessWindowHint、foot 1.16 實際 `--check-config`、Orca、繁中輸入法、2× 實體螢幕、NFR 量測。
