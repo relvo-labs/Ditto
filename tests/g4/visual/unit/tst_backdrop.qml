@@ -54,4 +54,19 @@ TestCase {
         verify(!findChild(view, "backdropWallpaper").visible);
         verify(findChild(view, "backdropCanvas").visible);
     }
+
+    function test_light_recipe_shows_the_default_wallpaper() {
+        const tokens = createTemporaryObject(tokensFactory, testCase, { appearance: { theme: "soft-jelly-light", tokens: {}, locale: "zh-TW" } });
+        verify(String(tokens.wallpaper).endsWith("/shell/wallpapers/soft-jelly-default.jpg"));
+        const view = createTemporaryObject(backdropFactory, testCase, { tokens: tokens, wallpaperSource: tokens.wallpaper });
+        tryCompare(view, "wallpaperShown", true, 3000);
+        verify(findChild(view, "backdropWallpaper").visible);
+    }
+
+    function test_dark_recipe_has_no_default_wallpaper() {
+        const tokens = createTemporaryObject(tokensFactory, testCase, { appearance: { theme: "soft-jelly", tokens: {}, locale: "zh-TW" } });
+        compare(String(tokens.wallpaper), "");
+        const legacy = createTemporaryObject(tokensFactory, testCase, { appearance: null });
+        compare(String(legacy.wallpaper), "");
+    }
 }

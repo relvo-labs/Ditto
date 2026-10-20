@@ -270,7 +270,12 @@ TestCase {
         entry.activate(); compare(chat, null); entry.activate(); verify(chat !== null);
         const body = findChild(chat.contentItem, "chatPresentationContent");
         const examples = body.children[0].children.find(o => o.items !== undefined && o.pill !== undefined);
-        const buttons = examples.children.filter(o => o.kind === "subtle");
+        // The light recipe draws an application style (#116, J1 by default):
+        // its suggestions are tonal buttons in a wrapping row; the legacy
+        // presentation's are subtle buttons. Either must keep the padding.
+        const buttons = [];
+        const walk = item => { for (const o of item.children) { if (o.kind !== undefined && o.visible) buttons.push(o); else walk(o); } };
+        walk(examples);
         compare(buttons.length, 3);
         const gutters = buttons.map(o => {
             const p = o.mapToItem(body, 0, 0);

@@ -28,6 +28,9 @@ cp "$here/.staged/staging.json" "$evidence/staging.json"
 # QML sources on a clean checkout, without relying on another runner's cache.
 python3 "$here/stage-assistant.py" > "$evidence/assistant-staging.log"
 cp "$here/.staged/assistant/staging.json" "$evidence/assistant-staging.json"
+# #116: base (87a2462) and current application surfaces for tst_ui_style_off.qml.
+node "$here/stage-ui116.mjs" > "$evidence/ui116-staging.log"
+cp "$here/.staged/ui116/staging.json" "$evidence/ui116-staging.json"
 
 # Unit regressions also consume the real Yaru lookup; prepare it before the
 # first QML import so clean checkouts never depend on old capture data.
@@ -43,9 +46,16 @@ grep 'CONTRAST ' "$evidence/unit-tests.log" | sed 's/.*CONTRAST //' > "$evidence
 # #105 C4 state table (real Yaru, pixels at 3:1 and 4.5:1) and C1 narrow steps.
 grep 'STATUS_STATE ' "$evidence/unit-tests.log" | sed 's/.*STATUS_STATE //' > "$evidence/status-states.jsonl"
 grep 'NARROW ' "$evidence/unit-tests.log" | sed 's/.*NARROW //' > "$evidence/narrow-layout.jsonl"
+# #116 candidate text colours over every wallpaper pixel (and black).
+"$python" "$here/capture/ui_contrast.py" "$evidence/unit-tests.log" "$root/shell/wallpapers/soft-jelly-default.jpg" \
+  "$evidence/ui-contrast.json" | tee "$evidence/ui-contrast.log"
+status=${PIPESTATUS[0]}
+[[ $status -eq 0 ]] || { echo "ui contrast failed ($status)"; exit "$status"; }
 
 echo "== capture"
 rm -f "$here/.staged/out/"*.png
+rm -rf "$here/.staged/out/candidates"
+mkdir -p "$here/.staged/out/candidates"
 "$runner" -import "$here/stubs" -input "$here/capture" 2>&1 | tee "$evidence/capture.log"
 status=${PIPESTATUS[0]}
 [[ $status -eq 0 ]] || { echo "capture failed ($status)"; exit "$status"; }
@@ -67,6 +77,10 @@ grep 'SCENE_META ' "$evidence/capture.log" | sed 's/.*SCENE_META //' > "$evidenc
 
 echo "== compose"
 "$python" "$here/capture/compose.py" "$evidence" "$evidence/capture.log"
+# #116 candidate screens (capture/tst_apps_candidates.qml) and comparison sheets.
+mkdir -p "$evidence/candidates"
+cp "$here/.staged/out/candidates/"*.png "$evidence/candidates/"
+"$python" "$here/capture/compose_candidates.py" "$evidence/candidates" "$evidence/capture.log"
 {
   echo "commit $(git -C "$root" rev-parse HEAD)"
   echo "dirty $(git -C "$root" status --porcelain -- shell tests/g4 | wc -l)"

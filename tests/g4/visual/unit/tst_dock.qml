@@ -25,7 +25,6 @@ TestCase {
         id: tokens
         appearance: ({ theme: "soft-jelly-light", tokens: {}, locale: "zh-TW" })
     }
-
     QtObject {
         id: client
         property var windows: []
@@ -101,18 +100,25 @@ TestCase {
         verify(provider.healthy());
     }
 
+    // The light recipe draws the application style the Profile chose, J1
+    // when it chose none (#116, owner 2026-10-20); the earlier lettered tile
+    // and 16/5 px indicators are no longer shown. tst_ui_style_dock.qml
+    // checks J1/J2/J3 in detail.
     function test_icons_and_readable_fallback() {
         dock();
+        compare(tokens.uiStyle, "j1");
         tryCompare(findChild(tile("org.example.Files"), "dockIcon"), "status", Image.Ready);
         verify(findChild(tile("org.example.Files"), "dockIcon").visible);
-        verify(!findChild(tile("org.example.Files"), "dockIconFallback").visible);
+        verify(!findChild(tile("org.example.Files"), "dockIconSquircle").visible);
         tryCompare(findChild(tile("org.example.Absolute"), "dockIcon"), "status", Image.Ready);
         for (const appId of ["org.example.Editor", "org.example.Missing", "unpinned.app"]) {
-            const fallback = findChild(tile(appId), "dockIconFallback");
-            verify(fallback.visible, appId + " shows the lettered tile");
+            const fallback = findChild(tile(appId), "dockIconSquircle");
+            verify(fallback.visible, appId + " shows the themed squircle");
             verify(!findChild(tile(appId), "dockIcon").visible);
+            verify(!findChild(tile(appId), "dockIconFallback").visible);
         }
-        compare(findChild(tile("org.example.Editor"), "dockIconFallback").children[0].text, "Ed");
+        const initial = findChild(tile("org.example.Editor"), "dockIconSquircle").children.find(child => child.text !== undefined);
+        compare(initial.text, "E");
     }
 
     function test_focused_and_running_are_told_apart() {
@@ -121,10 +127,9 @@ TestCase {
         const running = findChild(tile("org.example.Editor"), "dockIndicator");
         const idle = findChild(tile("org.example.Absolute"), "dockIndicator");
         verify(focused.visible && running.visible && !idle.visible);
-        compare(focused.width, 16);
-        compare(running.width, 5);
-        compare(String(focused.color), String(tokens.focus));
-        compare(String(running.color), String(tokens.foregroundMuted));
+        verify(focused.width > running.width, "in use is longer");
+        compare(focused.height, running.height, "one indicator shape");
+        verify(Qt.colorEqual(focused.color, tokens.uiSelectDot));
     }
 
     function test_accessible_names_say_the_state() {

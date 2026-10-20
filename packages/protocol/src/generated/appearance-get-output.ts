@@ -65,6 +65,11 @@ export interface AvatarSettings {
  */
 export interface AppearanceToken {
   /**
+   * The only values a text token takes, when it is a closed choice
+   * (`ui_style`). Absent for every other token.
+   */
+  choices?: string[] | null;
+  /**
    * What the Shell uses while the Profile sets no value.
    */
   default: string;

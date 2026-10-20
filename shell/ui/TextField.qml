@@ -16,12 +16,13 @@ Rectangle {
     /// its form is done (the form clears `text`).
     property bool secret: false
     signal accepted()
+    readonly property bool jelly: tokens.uiCandidate === true
 
     implicitWidth: 240
-    implicitHeight: tokens.controlHeight
-    radius: tokens.radiusSmall
-    color: tokens.surface
-    border.color: input.activeFocus ? tokens.focus : tokens.border
+    implicitHeight: jelly ? tokens.uiControlHeight + 4 : tokens.controlHeight
+    radius: jelly ? tokens.uiRadiusControl : tokens.radiusSmall
+    color: jelly ? (enabled ? tokens.uiFill("#ffffff", 0.92) : tokens.uiTrack) : tokens.surface
+    border.color: input.activeFocus ? (jelly ? tokens.uiFocus : tokens.focus) : (jelly ? tokens.uiCardBorder : tokens.border)
     border.width: input.activeFocus ? 2 : 1
 
     function focusInput() {
@@ -31,11 +32,11 @@ Rectangle {
     TextInput {
         id: input
         anchors.fill: parent
-        anchors.leftMargin: field.tokens.space
-        anchors.rightMargin: field.tokens.space
+        anchors.leftMargin: field.jelly ? field.tokens.uiPadCard - 4 : field.tokens.space
+        anchors.rightMargin: field.jelly ? field.tokens.uiPadCard - 4 : field.tokens.space
         verticalAlignment: TextInput.AlignVCenter
-        color: field.tokens.foreground
-        font.pixelSize: field.tokens.fontBody
+        color: field.jelly ? field.tokens.uiInk : field.tokens.foreground
+        font.pixelSize: field.jelly ? field.tokens.uiFontBody : field.tokens.fontBody
         Binding on font.family {
             when: field.tokens.fontFamily.length > 0
             value: field.tokens.fontFamily
@@ -52,9 +53,11 @@ Rectangle {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             visible: input.text.length === 0 && !input.activeFocus
+            width: field.jelly ? parent.width : implicitWidth
+            elide: field.jelly ? Text.ElideRight : Text.ElideNone
             text: field.placeholder
-            color: field.tokens.foregroundMuted
-            font.pixelSize: field.tokens.fontBody
+            color: field.jelly ? field.tokens.uiInkMuted : field.tokens.foregroundMuted
+            font.pixelSize: field.jelly ? field.tokens.uiFontBody : field.tokens.fontBody
         }
     }
 }

@@ -8,5 +8,8 @@ Rectangle {
     height: implicitHeight
     property string title: ""
     property size minimumSize: Qt.size(0, 0)
+    /// The real window's screen (null: not known); #116 caps a candidate
+    /// window's height by it.
+    property var screen: null
     signal closed()
 }
