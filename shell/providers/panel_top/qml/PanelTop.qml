@@ -8,7 +8,7 @@ import Quickshell.Networking
 /// `ui.panel_top` provider: workspaces, the focused window, volume, network,
 /// clock, the entrances to the four centers and the power menu. Nothing here
 /// polls; desktop values arrive with a snapshot or an event. Volume and
-/// network are UI reads of the system (PipeWire, NetworkManager) and are not
+/// network are UI reads of the system (PipeWire, NetworkManager/networkd) and are not
 /// Ditto configuration.
 ///
 /// Provider interface (plan/03/04 §2.1): the host sets client, tokens, config,
@@ -41,6 +41,28 @@ Scope {
     /// The control whose tooltip is wanted (hover or keyboard focus).
     property FeedbackButton tooltipOwner: null
     property bool tooltipShown: false
+
+    readonly property var networkDevices: Networking.devices ? Networking.devices.values : []
+    readonly property bool nmConnected: networkDevices.some(device => device.connected)
+    readonly property bool networkdConnected: networkdSource.status === Loader.Ready
+        && networkdSource.item !== null && networkdSource.item.connected
+    readonly property bool networkConnected: nmConnected || networkdConnected
+    readonly property string networkLabel: networkdConnected
+        ? provider.t(qsTr("網路已連線（網際網路狀態未知）"))
+        : Networking.backend === NetworkBackendType.None ? provider.t(qsTr("網路不可用"))
+        : !nmConnected && Networking.connectivity === NetworkConnectivity.Unknown ? provider.t(qsTr("網路狀態未知"))
+        : nmConnected ? provider.t(qsTr("網路已連線")) : provider.t(qsTr("網路未連線"))
+
+    // Optional, same-process Qt/D-Bus observer. NM remains the source for its
+    // connected devices, including limited/portal/unknown connectivity. No
+    // networkd observation or retained snapshot while hidden or NM is connected.
+    Loader {
+        id: networkdSource
+        objectName: "panelNetworkdSource"
+        active: provider.shown && !provider.nmConnected
+        visible: false
+        source: "network/NetworkdSource.qml"
+    }
 
     function wantTooltip(owner, wanted) {
         if (wanted) {
@@ -292,22 +314,15 @@ Scope {
                 }
             }
 
-            /// Network: NetworkManager's state, read only; details open the
-            /// connection editor.
+            /// Read-only link state. networkd cannot establish Internet access.
             Text {
                 id: network
-                readonly property bool connected: {
-                    const devices = Networking.devices ? Networking.devices.values : [];
-                    for (let index = 0; index < devices.length; index += 1) {
-                        if (devices[index].connected) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
+                objectName: "panelNetworkLegacy"
+                readonly property bool connected: provider.networkConnected
                 color: connected ? provider.tokens.foregroundMuted : provider.tokens.warning
                 font.pixelSize: provider.tokens.fontSmall
-                text: connected ? provider.t(qsTr("網路已連線")) : provider.t(qsTr("網路未連線"))
+                text: provider.networkdConnected ? provider.networkLabel
+                    : connected ? provider.t(qsTr("網路已連線")) : provider.t(qsTr("網路未連線"))
                 Accessible.role: Accessible.Button
                 Accessible.name: text
 
@@ -522,9 +537,9 @@ Scope {
                         id: lightNetwork
                         objectName: "panelNetwork"
                         height: lightPanel.capsuleHeight - 4
-                        readonly property bool available: Networking.backend !== NetworkBackendType.None
-                        readonly property var devices: Networking.devices ? Networking.devices.values : []
-                        readonly property bool connected: devices.some(device => device.connected)
+                        readonly property bool available: provider.networkdConnected || Networking.backend !== NetworkBackendType.None
+                        readonly property var devices: provider.networkDevices
+                        readonly property bool connected: provider.networkConnected
                         readonly property bool unknown: available && !connected && Networking.connectivity === NetworkConnectivity.Unknown
                         // The device the icon describes: a connected one (wired
                         // first), else a Wi-Fi adapter, else a wired one.
@@ -534,11 +549,10 @@ Scope {
                                 || live[0] || devices.find(item => item.type === DeviceType.Wifi)
                                 || devices.find(item => item.type === DeviceType.Wired) || null;
                         }
-                        readonly property string kind: device && device.type === DeviceType.Wired ? "wired"
+                        readonly property string kind: provider.networkdConnected ? networkdSource.item.kind
+                            : device && device.type === DeviceType.Wired ? "wired"
                             : device && device.type === DeviceType.Wifi ? "wireless" : "other"
-                        accessibleLabel: !available ? provider.t(qsTr("網路不可用"))
-                            : unknown ? provider.t(qsTr("網路狀態未知"))
-                            : connected ? provider.t(qsTr("網路已連線")) : provider.t(qsTr("網路未連線"))
+                        accessibleLabel: provider.networkLabel
                         // Connected, disconnected, unknown per device type (#102 B2).
                         iconName: !available ? "network-error-symbolic" : ({
                             wired: ["network-wired-symbolic", "network-wired-disconnected-symbolic", "network-wired-acquiring-symbolic"],
@@ -546,7 +560,7 @@ Scope {
                             other: ["network-transmit-receive-symbolic", "network-offline-symbolic", "network-idle-symbolic"]
                         })[kind][connected ? 0 : unknown ? 2 : 1]
                         // A mark still distinguishes unknown/unavailable if a theme aliases icons.
-                        marker: !available ? "!" : unknown ? "?" : ""
+                        marker: !available ? "!" : unknown || provider.networkdConnected ? "?" : ""
                         onActivated: if (provider.client) provider.client.launchApp("nm-connection-editor")
                     }
                     StatusButton {

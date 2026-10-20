@@ -21,6 +21,9 @@ rm -f "$out"/*.dittopkg
 
 pack_dir() {
   local directory="$1"
+  if [[ "$directory" == "$root/shell/providers/panel_top" ]]; then
+    bash "$directory/build-network.sh"
+  fi
   local id version
   id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$directory/manifest.json")"
   version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$directory/manifest.json")"
