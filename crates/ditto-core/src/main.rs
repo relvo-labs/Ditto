@@ -177,6 +177,7 @@ fn follow_compositor(
                     if session.reconnect(adapter).is_ok() {
                         source = events;
                         ditto_core::log::event("compositor.reconnected", &[]);
+                        core.compositor_reconnected();
                         // Layout and bindings set over IPC died with the old
                         // compositor; apply the committed Profile again.
                         core.compositor.forget();
