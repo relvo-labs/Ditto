@@ -37,6 +37,17 @@ Item {
     readonly property int gap: Math.max(8, tokens.uiGap * 1.5)
     readonly property int columns: width >= 3 * 168 + 2 * gap ? 3 : (width >= 2 * 168 + gap ? 2 : 1)
     readonly property real cardWidth: Math.floor((width - gap * (columns - 1)) / Math.max(1, columns))
+    /// Every card as tall as the tallest (a wrapped description), so the
+    /// three read as one set.
+    property real cardHeight: 0
+    function measure() {
+        let tallest = 0;
+        for (let i = 0; i < repeater.count; i++) {
+            const item = repeater.itemAt(i);
+            if (item) tallest = Math.max(tallest, item.contentHeight);
+        }
+        cardHeight = tallest;
+    }
 
     implicitWidth: 3 * 200 + 2 * gap
     implicitHeight: grid.height
@@ -68,8 +79,10 @@ Item {
                 required property int index
                 readonly property bool selected: index === picker.selectedIndex
                 objectName: "styleCard_" + modelData.value
+                readonly property real contentHeight: body.height
+                onContentHeightChanged: Qt.callLater(picker.measure)
                 width: picker.cardWidth
-                height: body.height
+                height: Math.max(body.height, picker.cardHeight)
                 activeFocusOnTab: picker.enabled && index === picker.tabIndex
                 Accessible.role: Accessible.RadioButton
                 Accessible.name: modelData.accessibleName || modelData.label

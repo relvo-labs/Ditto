@@ -198,6 +198,10 @@ Rectangle {
                 id: jellyLabel
                 anchors.centerIn: parent
                 anchors.horizontalCenterOffset: face.picked ? 7 : 0
+                // A button given less than its natural width (a bounded
+                // suggestion) elides; its accessible name stays whole.
+                width: Math.min(implicitWidth, Math.max(0, button.width - button.jellyPad * 2 - (face.picked ? 14 : 0)))
+                elide: Text.ElideRight
                 text: button.text
                 color: face.inkColor
                 font.pixelSize: button.tokens.uiFontBody

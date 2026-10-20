@@ -414,6 +414,8 @@ Item {
                         required property var modelData
                         tokens: window.tokens
                         enabled: modelData.ok
+                        // Never wider than the content (compact panel, large text).
+                        width: Math.min(implicitWidth, examples.width)
                         text: modelData.ok ? modelData.text : window.t(qsTr("%1（%2）")).arg(modelData.text).arg(modelData.why)
                         onClicked: {
                             window.conversation.draft = modelData.text;
