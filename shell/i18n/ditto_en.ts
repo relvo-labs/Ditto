@@ -1154,6 +1154,10 @@
         <translation>AI conversations did not stop normally. Sign in to the desktop again and retry. If the problem persists, check diagnostics. You can keep using the desktop.</translation>
     </message>
     <message>
+        <source>AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI chat is unavailable. Reopen AI settings to check the connection; if it is still unavailable, view diagnostics. The desktop still works as usual.</translation>
+    </message>
+    <message>
         <source>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>The AI connection could not start. Sign in to the desktop again and retry, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
@@ -1220,6 +1224,10 @@
     <message>
         <source>正在理解需求；可停止</source>
         <translation>Working out what you asked; you can stop it</translation>
+    </message>
+    <message>
+        <source>正在讀取模型連線狀態…</source>
+        <translation>Reading the model connection status…</translation>
     </message>
     <message>
         <source>正在重新連線；將查詢實際結果</source>

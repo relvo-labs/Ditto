@@ -1154,6 +1154,10 @@
         <translation>AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。</translation>
     </message>
     <message>
+        <source>AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。</translation>
+    </message>
+    <message>
         <source>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
@@ -1220,6 +1224,10 @@
     <message>
         <source>正在理解需求；可停止</source>
         <translation>正在理解需求；可停止</translation>
+    </message>
+    <message>
+        <source>正在讀取模型連線狀態…</source>
+        <translation>正在讀取模型連線狀態…</translation>
     </message>
     <message>
         <source>正在重新連線；將查詢實際結果</source>

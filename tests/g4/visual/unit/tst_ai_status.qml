@@ -84,7 +84,8 @@ TestCase {
     }
 
     function answer(table) {
-        client.replies = Object.assign({ "agent.sessions.list": { ok: { sessions: [] } } }, table);
+        client.replies = Object.assign({ "agent.sessions.list": { ok: { sessions: [] } },
+            "agent.runtime.get": { ok: { generation: 4, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null } } }, table);
     }
     function count(method) {
         return client.calls.filter(name => name === method).length;
@@ -349,10 +350,9 @@ TestCase {
         compare(report().connected, null);
     }
 
-    /// Reopening on the same live connection keeps what this connection
-    /// confirmed until the new read answers, so a running turn does not
-    /// flash offline (legacy avatar and entry unchanged). A failure clears it.
-    function test_reopen_keeps_confirmed_until_answer() {
+    /// A running turn still drives the avatar while status is reread. Its
+    /// earlier runtime cannot authorize a ready connection on this new read.
+    function test_reopen_revalidates_runtime_without_stopping_turn() {
         answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
         conversation.open();
         conversation.turn = { turn_id: "fixture-turn", state: "running" };
@@ -360,7 +360,8 @@ TestCase {
         answer({});
         reread("reopen");
         compare(conversation.taskState, "thinking");
-        compare(conversation.aiStatus, "ready");
+        compare(conversation.aiStatus, "pending");
+        compare(conversation.connected, false);
         readsOnly();
     }
 
@@ -391,7 +392,7 @@ TestCase {
             { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
         verify(chat !== null);
         verify(named(page, "aiProviderStatus").text.indexOf("無法使用 Codex 訂閱") >= 0);
-        verify(conversation.stateText.indexOf("Codex 訂閱無法使用") >= 0);
+        verify(conversation.stateText.indexOf(data.noApi ? "AI 對話" : "Codex 訂閱無法使用") >= 0, conversation.stateText);
         for (const surface of [page, chat]) {
             const signIn = find(surface, item => item.text === "使用 Codex 訂閱登入");
             verify(signIn && !signIn.visible, "missing backend still offers sign-in");
@@ -425,7 +426,8 @@ TestCase {
                 message: "private diagnostic", data: { reason: "system_unavailable", reason_code: "backend_unsupported" } } } });
         conversation.open();
         compare(conversation.aiStatus, "failed");
-        verify(conversation.errorText.indexOf("無法使用 Codex 訂閱") >= 0);
+        verify(conversation.errorText.indexOf("無法確認模型連線") >= 0);
+        verify(conversation.errorText.indexOf("安裝") < 0);
         verify(conversation.errorText.indexOf("private") < 0);
         verify(conversation.errorDiagnostic.indexOf("private") >= 0);
         wait(1800);
@@ -487,7 +489,7 @@ TestCase {
 
     function test_unsupported_model_does_not_suggest_installing_codex() {
         answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready },
-            "agent.runtime.get": { ok: { phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null } } });
+            "agent.runtime.get": { ok: { generation: 4, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null } } });
         conversation.open();
         verify(conversation.connected);
         conversation.turn = { turn_id: "fixture-turn", state: "failed", error_reason: "backend_unsupported" };
@@ -569,13 +571,13 @@ TestCase {
             { tag: "startup", reason: "startup_timeout", text: "AI 對話", noInstall: false, noApi: true },
             { tag: "exited", reason: "backend_exited", text: "已中斷", noInstall: true },
             { tag: "drain", reason: "drain_timeout", text: "正常停止", noInstall: true, noApi: true },
-            { tag: "unknown", reason: "future-unrecognised-code", text: "無法使用 Codex 訂閱", noInstall: false }
+            { tag: "unknown", reason: "future-unrecognised-code", text: "AI 對話目前無法使用", noInstall: true, noApi: true }
         ];
     }
     function test_runtime_failures_have_correct_next_steps(data) {
         const replies = { "agent.settings.describe": { ok: settingsOn },
             "agent.providers.status": { ok: data.stale ? ready : { provider: "codex-app-server", available: false, authenticated: false, models: [] } },
-            "agent.runtime.get": { ok: { phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: data.reason } } };
+            "agent.runtime.get": { ok: { generation: 4, phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: data.reason } } };
         if (data.unread) delete replies["agent.providers.status"];
         answer(replies);
         const page = settingsPage();
@@ -591,7 +593,7 @@ TestCase {
         verify(!conversation.canLogin);
         compare(conversation.aiStatus, "model_offline");
         compare(report().connected, false);
-        verify(conversation.stateText.indexOf("Codex 訂閱無法使用") >= 0);
+        verify(conversation.stateText.indexOf(data.noApi ? "AI 對話" : "Codex 訂閱無法使用") >= 0, conversation.stateText);
         for (const surface of [page, chat]) verify(!find(surface, item => item.text === "使用 Codex 訂閱登入").visible);
         if (data.tag === "isolation") {
             const appearance = tokens.appearance;

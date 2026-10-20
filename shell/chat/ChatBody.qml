@@ -192,7 +192,7 @@ Item {
             Column {
                 visible: window.conversation.enabled && !!window.conversation.settings
                     && window.conversation.settings.provider === "direct-model"
-                    && !!window.conversation.provider && !window.conversation.connected
+                    && !!window.conversation.provider && !window.conversation.provider.authenticated
                 width: parent.width
                 spacing: window.tokens.spaceTight
                 Text {
@@ -222,6 +222,7 @@ Item {
                     width: parent.width
                     wrapMode: Text.WordWrap
                     text: window.conversation.subscriptionUnavailable ? window.conversation.subscriptionUnavailableText
+                        : !window.conversation.canLogin ? window.conversation.runtimeStatusText
                         : window.conversation.login
                         ? window.t(qsTr("在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。"))
                         : window.t(qsTr("使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。"))

@@ -64,11 +64,16 @@ TestCase {
         conversation.provider = null;
         conversation.turn = null; conversation.events = []; conversation.runtime = null;
         conversation.reconnecting = false;
+        conversation.settingsReading = false;
+        conversation.providerReading = false;
+        conversation.runtimePending = false;
+        conversation.runtimeFailed = false;
     }
     function readback() {
         conversation.wanted = true;
-        conversation.settings = { enabled: true };
-        conversation.provider = { available: true, authenticated: true };
+        conversation.settings = { enabled: true, provider: "codex-app-server" };
+        conversation.provider = { available: true, authenticated: true, provider: "codex-app-server" };
+        conversation.runtime = {generation: 4, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null};
     }
     function test_default_presentation_unchanged() {
         compare(entry.entryStyle, "capsule");
@@ -214,7 +219,7 @@ TestCase {
     function test_readback_states(data) {
         readback();
         conversation.turn = data.turn ? { turn_id: "fixture-turn", state: data.turn } : null;
-        conversation.runtime = data.phase ? { phase: data.phase } : null;
+        if (data.phase) conversation.runtime = Object.assign({}, conversation.runtime, {phase: data.phase});
         compare(conversation.taskState, data.state);
         verify(conversation.stateText.length > 0);
         compare(client.writes, 0);
@@ -241,7 +246,7 @@ TestCase {
             reason = "AI 對話已關閉";
         } else {
             conversation.provider = { available: false, authenticated: false };
-            reason = "模型尚未連接";
+            reason = "Codex 訂閱無法使用";
         }
         compare(conversation.taskState, "offline");
         verify(conversation.stateText.indexOf(result) >= 0);

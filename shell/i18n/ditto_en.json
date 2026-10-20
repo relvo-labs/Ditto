@@ -16,6 +16,7 @@
   "AI 對話已關閉；桌面仍可照常操作": "AI chat is off; the desktop works as usual",
   "AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。": "AI conversations could not start. Sign in to the desktop again and retry. If the problem persists, rerun the Ditto installer or check diagnostics. You can keep using the desktop.",
   "AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。": "AI conversations did not stop normally. Sign in to the desktop again and retry. If the problem persists, check diagnostics. You can keep using the desktop.",
+  "AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。": "AI chat is unavailable. Reopen AI settings to check the connection; if it is still unavailable, view diagnostics. The desktop still works as usual.",
   "AI 對話目前關閉。開啟後才會連接模型。": "AI chat is off. The model is connected only after you turn it on.",
   "AI 設定": "AI settings",
   "AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。": "The AI connection could not start. Sign in to the desktop again and retry, or use an API key in AI settings. You can keep using the desktop.",
