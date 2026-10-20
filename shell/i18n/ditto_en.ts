@@ -1242,8 +1242,16 @@
         <translation>Stopped</translation>
     </message>
     <message>
+        <source>已取消這次登入。</source>
+        <translation>This sign-in was cancelled.</translation>
+    </message>
+    <message>
         <source>待命中</source>
         <translation>Idle</translation>
+    </message>
+    <message>
+        <source>授權已完成，仍待確認帳號連線。</source>
+        <translation>Authorization completed. The account connection still needs confirmation.</translation>
     </message>
     <message>
         <source>桌面服務未連線</source>
@@ -1298,12 +1306,24 @@
         <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
+        <source>登入未完成，請重新嘗試。</source>
+        <translation>Sign-in did not complete. Please try again.</translation>
+    </message>
+    <message>
+        <source>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</source>
+        <translation>This sign-in result is unknown. Account status still depends on the connection readback.</translation>
+    </message>
+    <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
         <translation>The result is not confirmed yet; do not send it again — see the change history</translation>
     </message>
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>Subscription quota used up; try again after it resets</translation>
+    </message>
+    <message>
+        <source>這次登入已逾期，請重新開始。</source>
+        <translation>This sign-in expired. Please start again.</translation>
     </message>
     <message>
         <source>需要你的確認</source>

@@ -1056,6 +1056,64 @@ fn a_legacy_builtin_upgrades_by_changeset_without_rewriting_its_revision() {
 }
 
 #[test]
+fn login_result_read_is_authorized_and_does_not_launch_a_missing_controller() {
+    let harness = harness("login-result-read");
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    let standin = TestPeer::connect(&harness.core, "agent", None);
+    let shell = TestPeer::connect(&harness.core, "quickshell", None);
+    let locked = TestPeer::connect(&harness.core, "lock", None);
+    let input = json!({"provider":"codex-app-server","login_id":"fixture-attempt","generation":0});
+    assert_eq!(
+        shell.result("agent.providers.login_result", input.clone())["state"],
+        "unknown"
+    );
+    assert_eq!(
+        locked.call("agent.providers.login_result", input.clone())["error"]["name"],
+        "permission_denied"
+    );
+    let result = cli.result("agent.providers.login_result", input.clone());
+    assert_eq!(result["login_id"], "fixture-attempt");
+    assert_eq!(result["generation"], 0);
+    assert_eq!(result["state"], "unknown");
+    assert_eq!(cli.result("agent.runtime.get", json!({}))["generation"], 0);
+    assert_eq!(
+        standin.call("agent.providers.login_result", input)["error"]["name"],
+        "permission_denied"
+    );
+}
+
+#[test]
+fn login_result_rejects_malformed_inputs_and_uses_existing_manage_scope() {
+    let harness = harness("login-result-negative");
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    let input = json!({"provider":"codex-app-server","login_id":"fixture-attempt","generation":0});
+    for bad in [
+        json!({"provider":"codex-app-server","login_id":"fixture","generation":-1}),
+        json!({"provider":"codex-app-server","login_id":"fixture","generation":"0"}),
+        json!({"provider":"codex-app-server","login_id":"fixture","generation":0,"error":"SENSITIVE-LOGIN-SENTINEL"}),
+        json!({"provider":"codex-app-server","login_id":"","generation":0}),
+    ] {
+        let result = cli.call("agent.providers.login_result", bad);
+        assert_eq!(result["error"]["name"], "invalid_params");
+        assert!(!result.to_string().contains("SENSITIVE-LOGIN-SENTINEL"));
+    }
+    let definition = catalog::contract("agent.providers.login_result").unwrap();
+    assert_eq!(
+        definition.scopes,
+        catalog::contract("agent.providers.status").unwrap().scopes
+    );
+    assert!(!definition.writes);
+    assert!(!definition.claimable);
+    let mut stale = input;
+    stale["generation"] = json!(1);
+    assert_eq!(
+        cli.result("agent.providers.login_result", stale)["state"],
+        "unknown"
+    );
+    assert_eq!(cli.result("agent.runtime.get", json!({}))["generation"], 0);
+}
+
+#[test]
 fn public_agent_state_and_internal_writers_have_distinct_authorization() {
     let harness = harness("agent-authority");
     let cli = TestPeer::connect(&harness.core, "dittoctl", None);
@@ -2770,6 +2828,11 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
         "tool-trace" => through::<ditto_protocol::agent::ToolTrace>(value),
         "context-reference" => through::<ditto_protocol::agent::ContextReference>(value),
         "credential-status" => through::<ditto_protocol::agent::CredentialStatus>(value),
+        "provider-login-result" => through::<ditto_protocol::agent::ProviderLoginResult>(value),
+        "provider-login-readback" => through::<ditto_protocol::agent::ProviderLoginReadback>(value),
+        "provider-login-result-input" => {
+            through::<ditto_protocol::agent::ProviderLoginResultInput>(value)
+        }
         "job" => through::<ditto_protocol::services::Job>(value),
         "generated-description" => through::<ditto_protocol::generation::Description>(value),
         "generation-validation" => {

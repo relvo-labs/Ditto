@@ -506,6 +506,40 @@ pub struct ProviderLoginOutput {
     pub user_code: String,
     pub expires_at_ms: u64,
 }
+/// Readback of one ephemeral authorization attempt, never account authority.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderLoginResultInput {
+    pub provider: String,
+    pub login_id: String,
+    /// Core's runtime generation observed by the caller when login started.
+    pub generation: u64,
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderLoginState {
+    Pending,
+    Succeeded,
+    Failed,
+    Cancelled,
+    Expired,
+    Unknown,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderLoginResult {
+    pub login_id: String,
+    pub generation: u64,
+    pub state: ProviderLoginState,
+}
+/// Controller-only envelope. Core rechecks the original absolute deadline
+/// after awaiting the controller; the public capability returns only `result`.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderLoginReadback {
+    pub result: ProviderLoginResult,
+    pub expires_at_ms: Option<u64>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ProviderActionOutput {

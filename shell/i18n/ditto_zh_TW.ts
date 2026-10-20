@@ -1242,8 +1242,16 @@
         <translation>已停止</translation>
     </message>
     <message>
+        <source>已取消這次登入。</source>
+        <translation>已取消這次登入。</translation>
+    </message>
+    <message>
         <source>待命中</source>
         <translation>待命中</translation>
+    </message>
+    <message>
+        <source>授權已完成，仍待確認帳號連線。</source>
+        <translation>授權已完成，仍待確認帳號連線。</translation>
     </message>
     <message>
         <source>桌面服務未連線</source>
@@ -1298,12 +1306,24 @@
         <translation>無法讀取 AI 設定；重新開啟會再讀取</translation>
     </message>
     <message>
+        <source>登入未完成，請重新嘗試。</source>
+        <translation>登入未完成，請重新嘗試。</translation>
+    </message>
+    <message>
+        <source>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</source>
+        <translation>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</translation>
+    </message>
+    <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
         <translation>結果尚未確認；不要重複送出，請查看變更紀錄</translation>
     </message>
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>訂閱額度已用完；等額度重設後再試</translation>
+    </message>
+    <message>
+        <source>這次登入已逾期，請重新開始。</source>
+        <translation>這次登入已逾期，請重新開始。</translation>
     </message>
     <message>
         <source>需要你的確認</source>

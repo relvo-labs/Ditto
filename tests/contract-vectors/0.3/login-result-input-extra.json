@@ -1,0 +1,11 @@
+{
+  "kind": "shape",
+  "type": "provider-login-result-input",
+  "valid": false,
+  "value": {
+    "provider": "codex-app-server",
+    "login_id": "synthetic-attempt",
+    "generation": 7,
+    "auth_url": "SENSITIVE-LOGIN-SENTINEL"
+  }
+}

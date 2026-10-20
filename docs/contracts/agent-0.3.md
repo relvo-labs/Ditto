@@ -25,7 +25,7 @@
 
 ## 3. Shell 對話（最小入口）
 
-`shell/chat/ConversationState.qml` 是唯一的對話投影：開啟聊天後才訂閱、才讓 Core 啟動 Agent。草稿只在記憶體；送出用固定 `client_message_id`，失敗時保留文字、重試不會被 Core 接受兩次。角色七態由 Core turn 狀態與工具紀錄導出，`starting` 是 Core 生命週期狀態。登入只把官方授權網址交給系統瀏覽器；Shell 從不接觸 token。登入等待期間每 3 秒讀一次 provider 狀態，直到完成或到期（沒有登入完成事件）。
+`shell/chat/ConversationState.qml` 是唯一的對話投影：開啟聊天後才訂閱、才讓 Core 啟動 Agent。草稿只在記憶體；送出用固定 `client_message_id`，失敗時保留文字、重試不會被 Core 接受兩次。角色七態由 Core turn 狀態與工具紀錄導出，`starting` 是 Core 生命週期狀態。登入只把官方授權網址交給系統瀏覽器；Shell 從不接觸 token。登入等待期間每 3 秒以單一 in-flight 讀取 provider 狀態與可用的登入結果，直到完成或到期；原生完成事件由 adapter 投影為第 6 節的唯讀結果。
 
 Shell 控制 socket 新增：`chat`（唯讀 JSON：狀態、事件種類、變更 id、最後回答）、`chat-send <text>`（等同在欄位輸入並按 Enter）。
 
@@ -46,3 +46,15 @@ Shell 控制 socket 新增：`chat`（唯讀 JSON：狀態、事件種類、變�
 G3 固定模板由 Shell **實際掛載物件的 config** 回報 artifact id。Core 只有在 id 與預期生成版本相同、元件已掛載可見時，才承認啟用成功。缺 id 或仍回報舊 id，會進入既有 readback 失敗與補償路徑。升版不能只憑不變的 entry id 判定成功。
 
 舊 Core 的 strict schema 不接受此新增欄位，故新增欄位只由配對的 G3 Core／Shell build 使用；混用舊 Core 會明確拒絕，不忽略欄位。新 Core 配舊 Shell 可以維持普通桌面；生成啟用因缺少版本證據而失敗，不宣告成功。此增補不新增事件、錯誤列舉或 approval 類型。三個共用向量涵蓋舊格式、新格式及錯誤型別拒絕。
+
+## 6. 登入結果回讀 v1.0.0（catalog revision 7）
+
+`agent.providers.login_result` 是獨立唯讀能力，沿用 `agent.settings.manage`（與 provider status 相同），不新增授予、事件或錯誤列舉。輸入 `{ provider, login_id, generation }`；輸出僅 `{ login_id, generation, state }`，state 封閉為 `pending/succeeded/failed/cancelled/expired/unknown`。既有 strict `ProviderStatus`、`ProviderLoginOutput` 不變。Shell 經目錄發現；CLI 為 generic consumer。
+
+Core 僅查詢已註冊 controller，不 ensure、不啟動授權、不續 resource lease。generation 不符、controller 遺失、舊 controller 不支援或讀取失敗回 unknown；malformed/錯 identity 回固定 closed error。內部 Rust `ProviderLoginReadback` envelope 攜帶原 attempt deadline，Core 在 await 後再檢查，公開回覆不帶 deadline 或 provider payload。原540秒上限與 Core 300秒資源政策不變。
+
+Adapter 只留一筆當前／最近 attempt 的 id、原 deadline、封閉 state；terminal、取消、到期清除 code，下一次 start 取代該筆，logout／child close 清除。到期查詢只回 expired，不保留 history/map/DB；controller 仍依既有資源政策退出。單一 in-flight start 可暫存一筆先於 ACK 的去敏 completion，僅與 ACK id 完全相符時採用，ACK 後清除；不關聯其他 attempt。原生 `success` boolean 和 `loginId` 是唯一 completion 證據，原始 error 與其他欄位不複製至回覆、UI 或紀錄。
+
+`succeeded` 只表示該 attempt 完成，當前登入仍須 provider 的 authoritative account readback。failed／pending／unknown 結果不抹除已確認帳號；cancelled 不是 logout，native notFound 是 unknown。期限在 completion、各 await 與 publication 前重驗；Shell 的 connection/settings/provider/runtime generation/request identity 使晚到 A 回覆不能更改 B 或已確認帳號。
+
+相容：舊 consumer 使用不變的 status/login/cancel；新 Shell 遇舊 Core 目錄不送新 method，顯示 unknown 並保留原 bounded account polling；新 Core 遇舊 controller 回 unknown。沒有匿名端點、auth storage 讀取或 production debug bypass。合成 pinned rust-v0.160.0 fixtures 證明本地回讀行為，並非真人登入／現場故障證據。

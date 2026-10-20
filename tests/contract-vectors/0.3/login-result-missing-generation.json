@@ -1,0 +1,9 @@
+{
+  "kind": "shape",
+  "type": "provider-login-result",
+  "valid": false,
+  "value": {
+    "login_id": "synthetic-attempt",
+    "state": "pending"
+  }
+}

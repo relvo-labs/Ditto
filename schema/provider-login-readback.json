@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "ProviderLoginResult": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "login_id": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ProviderLoginState"
+        }
+      },
+      "required": [
+        "login_id",
+        "generation",
+        "state"
+      ],
+      "type": "object"
+    },
+    "ProviderLoginState": {
+      "enum": [
+        "pending",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "expired",
+        "unknown"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Controller-only envelope. Core rechecks the original absolute deadline\nafter awaiting the controller; the public capability returns only `result`.",
+  "properties": {
+    "expires_at_ms": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "result": {
+      "$ref": "#/$defs/ProviderLoginResult"
+    }
+  },
+  "required": [
+    "result"
+  ],
+  "title": "ProviderLoginReadback",
+  "type": "object"
+}

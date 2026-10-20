@@ -462,6 +462,29 @@ TestCase {
         readsOnly();
     }
 
+    function test_login_result_surface_data() {
+        return [
+            { tag: "failed-existing-account", state: "failed", authenticated: true, visible: true, words: "登入未完成" },
+            { tag: "success-unconfirmed", state: "succeeded", authenticated: false, visible: true, words: "仍待確認" },
+            { tag: "success-confirmed", state: "succeeded", authenticated: true, visible: false, words: "" },
+            { tag: "unknown-existing-account", state: "unknown", authenticated: true, visible: true, words: "無法確認這次登入結果" }
+        ];
+    }
+    function test_login_result_surface(data) {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: Object.assign({}, ready, { authenticated: data.authenticated }) } });
+        const page = settingsPage();
+        conversation.loginResultState = data.state;
+        const result = named(page, "aiLoginResult");
+        verify(result !== null); compare(result.visible, data.visible);
+        if (data.visible) verify(result.text.indexOf(data.words) >= 0);
+        else compare(result.text, "");
+        verify(result.text.indexOf("SENSITIVE-LOGIN-SENTINEL") < 0);
+        compare(conversation.connected, data.authenticated);
+        if (data.authenticated) verify(named(page, "aiProviderStatus").text.indexOf("已登入") >= 0);
+        readsOnly();
+    }
+
     /// A known terminal result stays next to the read failure.
     function test_terminal_result_with_failed_read() {
         answer({ "agent.settings.describe": { ok: settingsOn },

@@ -112,7 +112,7 @@ pub struct CapabilitiesListOutput {
     pub capabilities: Vec<CapabilityDescriptor>,
 }
 
-pub const CATALOG_REVISION: u64 = 6;
+pub const CATALOG_REVISION: u64 = 7;
 
 // G0
 pub const CAPABILITIES_LIST: &str = "desktop.capabilities.list";
@@ -1199,6 +1199,14 @@ fn agent_definitions() -> Vec<Definition> {
             "agent.providers.status",
             schema::<ProviderLoginInput>,
             schema::<ProviderStatus>,
+            &[s::AGENT_MANAGE],
+        )
+        .cancellable()
+        .timeout(10_000, 30_000),
+        def(
+            "agent.providers.login_result",
+            schema::<ProviderLoginResultInput>,
+            schema::<ProviderLoginResult>,
             &[s::AGENT_MANAGE],
         )
         .cancellable()
