@@ -51,6 +51,7 @@ TestCase {
     }
     function init() {
         client.online = true;
+        tokens.appearance = {theme: "soft-jelly-light", tokens: {ui_style: "j1"}};
         client.pending = [];
         client.replies = {"agent.sessions.list": {sessions: []}, "agent.sessions.read": {events: []}};
         state = createTemporaryObject(stateComponent, suite, {client: client});
@@ -300,8 +301,10 @@ TestCase {
         verify(line.text.indexOf("已登入") < 0, line.text);
         if (data.reason) {
             compare(line.text, state.subscriptionUnavailableText);
+            compare(chat.composerReason, line.text, "styled composer consumes the same failure projection");
             verify(find(chat, item => item.visible && item.text === line.text));
         }
+        verify(chat.composerReason !== "登入模型後才能輸入。", chat.composerReason);
         compare(entry.Accessible.description, state.stateText);
         compare(find(chat, item => item.text === "使用 Codex 訂閱登入").visible, false);
         compare(find(chat, item => item.text === "送出").enabled, false);

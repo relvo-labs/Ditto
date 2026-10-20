@@ -40,6 +40,16 @@
       "additionalProperties": false,
       "description": "One appearance token the Shell reads (`shell/jelly/Tokens.qml`).",
       "properties": {
+        "choices": {
+          "description": "The only values a text token takes, when it is a closed choice\n(`ui_style`). Absent for every other token.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "default": {
           "description": "What the Shell uses while the Profile sets no value.",
           "type": "string"

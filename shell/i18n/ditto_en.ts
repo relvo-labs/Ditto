@@ -215,6 +215,10 @@
         <translation>Refuse</translation>
     </message>
     <message>
+        <source>拒絕並關閉</source>
+        <translation>Refuse and close</translation>
+    </message>
+    <message>
         <source>新增或完成待辦事項</source>
         <translation>Add or complete tasks</translation>
     </message>
@@ -312,12 +316,28 @@
         <translation>Plugin center</translation>
     </message>
     <message>
+        <source>放大視窗</source>
+        <translation>Maximize window</translation>
+    </message>
+    <message>
         <source>組合中心</source>
         <translation>Composition center</translation>
     </message>
     <message>
+        <source>縮小視窗</source>
+        <translation>Minimize window</translation>
+    </message>
+    <message>
         <source>變更紀錄</source>
         <translation>Change history</translation>
+    </message>
+    <message>
+        <source>還原視窗大小</source>
+        <translation>Restore window size</translation>
+    </message>
+    <message>
+        <source>關閉 Ditto 設定</source>
+        <translation>Close Ditto Settings</translation>
     </message>
 </context>
 <context>
@@ -637,6 +657,10 @@
         <translation>%1: %2</translation>
     </message>
     <message>
+        <source>AI 對話目前關閉</source>
+        <translation>AI chat is off</translation>
+    </message>
+    <message>
         <source>AI 對話目前關閉。開啟後才會連接模型。</source>
         <translation>AI chat is off. The model is connected only after you turn it on.</translation>
     </message>
@@ -659,6 +683,10 @@
     <message>
         <source>Ditto：</source>
         <translation>Ditto: </translation>
+    </message>
+    <message>
+        <source>「%1」</source>
+        <translation>“%1”</translation>
     </message>
     <message>
         <source>你：</source>
@@ -711,6 +739,10 @@
     <message>
         <source>對話內容</source>
         <translation>Conversation</translation>
+    </message>
+    <message>
+        <source>對話檢視</source>
+        <translation>Chat view</translation>
     </message>
     <message>
         <source>尚無配額資料</source>
@@ -785,6 +817,10 @@
         <translation>Sign-in code</translation>
     </message>
     <message>
+        <source>登入模型後才能輸入。</source>
+        <translation>Sign in to a model to type here.</translation>
+    </message>
+    <message>
         <source>目前無法建立組合</source>
         <translation>compositions cannot be created right now</translation>
     </message>
@@ -837,6 +873,18 @@
         <translation>Turn on AI chat</translation>
     </message>
     <message>
+        <source>開啟 AI 對話後才能輸入。</source>
+        <translation>Turn on AI chat to type here.</translation>
+    </message>
+    <message>
+        <source>開啟後可以這樣說：</source>
+        <translation>Once it is on, you could say:</translation>
+    </message>
+    <message>
+        <source>關閉時不連接模型；桌面、設定中心與救援照常使用。</source>
+        <translation>When off, no model is connected; the desktop, settings and rescue work as usual.</translation>
+    </message>
+    <message>
         <source>附加內容</source>
         <translation>Attached</translation>
     </message>
@@ -875,12 +923,32 @@
         <source>Ditto 對話</source>
         <translation>Ditto chat</translation>
     </message>
+    <message>
+        <source>放大視窗</source>
+        <translation>Maximize window</translation>
+    </message>
+    <message>
+        <source>縮小視窗</source>
+        <translation>Minimize window</translation>
+    </message>
+    <message>
+        <source>還原視窗大小</source>
+        <translation>Restore window size</translation>
+    </message>
+    <message>
+        <source>關閉對話視窗（對話會繼續）</source>
+        <translation>Close the chat window (the chat keeps going)</translation>
+    </message>
 </context>
 <context>
     <name>CompositionCenter</name>
     <message>
         <source>「%1」的版本</source>
         <translation>Versions of “%1”</translation>
+    </message>
+    <message>
+        <source>下方顯示這個組合的版本</source>
+        <translation>Its versions are shown below</translation>
     </message>
     <message>
         <source>不能匯入，原因如下。</source>
@@ -951,6 +1019,10 @@
         <translation>Can be imported.</translation>
     </message>
     <message>
+        <source>唯一可用</source>
+        <translation>Only option</translation>
+    </message>
+    <message>
         <source>套用</source>
         <translation>Apply</translation>
     </message>
@@ -1011,6 +1083,10 @@
         <translation>Name of the new composition</translation>
     </message>
     <message>
+        <source>更多動作：%1</source>
+        <translation>More actions: %1</translation>
+    </message>
+    <message>
         <source>最後修改 %1</source>
         <translation>Last changed %1</translation>
     </message>
@@ -1063,6 +1139,10 @@
         <translation>Waiting to be kept</translation>
     </message>
     <message>
+        <source>終點</source>
+        <translation>To</translation>
+    </message>
+    <message>
         <source>終點 ✓</source>
         <translation>To ✓</translation>
     </message>
@@ -1111,8 +1191,16 @@
         <translation>Enter a name first</translation>
     </message>
     <message>
+        <source>起點</source>
+        <translation>From</translation>
+    </message>
+    <message>
         <source>起點 ✓</source>
         <translation>From ✓</translation>
+    </message>
+    <message>
+        <source>這就是目前使用的組合</source>
+        <translation>This is the composition in use</translation>
     </message>
     <message>
         <source>選兩個版本（起點、終點）比較差異。每個版本都標示它是怎麼來的。</source>
@@ -1200,6 +1288,10 @@
     <message>
         <source>模型尚未連接；桌面仍可照常操作</source>
         <translation>No model connected yet; the desktop works as usual</translation>
+    </message>
+    <message>
+        <source>模型後端無法使用</source>
+        <translation>The model backend is unavailable</translation>
     </message>
     <message>
         <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
@@ -2447,6 +2539,26 @@
         <translation>%1 (not connected)</translation>
     </message>
     <message>
+        <source>J1 果凍玻璃</source>
+        <translation>J1 Jelly glass</translation>
+    </message>
+    <message>
+        <source>J1 果凍玻璃（預設）</source>
+        <translation>J1 Jelly glass (default)</translation>
+    </message>
+    <message>
+        <source>J2 軟糖</source>
+        <translation>J2 Gummy</translation>
+    </message>
+    <message>
+        <source>J3 泡泡</source>
+        <translation>J3 Bubble</translation>
+    </message>
+    <message>
+        <source>不透明的軟糖質感，按下會微微壓扁，色彩較暖。</source>
+        <translation>Opaque, gummy surfaces that squash a little when pressed; warmer colours.</translation>
+    </message>
+    <message>
         <source>主螢幕</source>
         <translation>Primary screen</translation>
     </message>
@@ -2479,6 +2591,10 @@
         <translation>Motion</translation>
     </message>
     <message>
+        <source>半透明磨砂與柔光邊，安靜、輕盈。</source>
+        <translation>Frosted, translucent surfaces with a soft bright edge; quiet and light.</translation>
+    </message>
+    <message>
         <source>右上</source>
         <translation>Top right</translation>
     </message>
@@ -2495,12 +2611,20 @@
         <translation>Appearance</translation>
     </message>
     <message>
+        <source>外觀風格</source>
+        <translation>Window style</translation>
+    </message>
+    <message>
         <source>大</source>
         <translation>Large</translation>
     </message>
     <message>
         <source>大小</source>
         <translation>Size</translation>
+    </message>
+    <message>
+        <source>套用到設定、對話、確認視窗與膠囊式 Dock。其他應用的標題列與終端機目前維持果凍玻璃樣式。</source>
+        <translation>Applies to settings, chat, confirmation windows and the pill Dock. Other applications’ title bars and the terminal keep the jelly glass style for now.</translation>
     </message>
     <message>
         <source>小</source>
@@ -2557,6 +2681,10 @@
     <message>
         <source>正在套用…</source>
         <translation>Applying…</translation>
+    </message>
+    <message>
+        <source>泡泡與虹彩細邊，留白最多。</source>
+        <translation>Bubbles and iridescent rims, with the most white space.</translation>
     </message>
     <message>
         <source>減少動畫</source>
@@ -2653,6 +2781,10 @@
     <message>
         <source>降低透明度</source>
         <translation>Reduce transparency</translation>
+    </message>
+    <message>
+        <source>預設</source>
+        <translation>Default</translation>
     </message>
     <message>
         <source>顯示 Ditto 角色</source>

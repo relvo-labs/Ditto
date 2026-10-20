@@ -14,9 +14,11 @@ Flickable {
 
     required property var client
     required property var tokens
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
+    readonly property bool jelly: tokens.uiCandidate === true
 
     contentWidth: width
-    contentHeight: column.implicitHeight + tokens.spaceSection * 2
+    contentHeight: column.implicitHeight + tokens.appPagePad * 2
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
@@ -291,15 +293,15 @@ Flickable {
 
     Column {
         id: column
-        x: page.tokens.spaceSection
-        y: page.tokens.spaceSection
-        width: page.width - page.tokens.spaceSection * 2
+        x: page.tokens.appPagePad
+        y: page.tokens.appPagePad
+        width: page.width - page.tokens.appPagePad * 2
         spacing: page.tokens.spaceSection
 
         Text {
             text: page.t(qsTr("插件中心"))
-            color: page.tokens.foreground
-            font.pixelSize: page.tokens.fontHeading
+            color: page.tokens.appInk
+            font.pixelSize: page.tokens.appFontHeading
             font.bold: true
             Accessible.role: Accessible.Heading
             Accessible.name: text
@@ -310,8 +312,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.notice
-            color: page.tokens.warning
-            font.pixelSize: page.tokens.fontBody
+            color: page.tokens.appWarning
+            font.pixelSize: page.tokens.appFontBody
         }
 
         Diagnostics {
@@ -350,9 +352,9 @@ Flickable {
                     readonly property var packageEntries: page.entriesOf(modelData.package_id)
                     width: parent.width
                     height: packageColumn.implicitHeight + page.tokens.space * 2
-                    radius: page.tokens.radiusSmall
-                    color: page.tokens.surface
-                    border.color: page.tokens.border
+                    radius: page.tokens.appPlateRadius
+                    color: page.tokens.appPlate
+                    border.color: page.tokens.appPlateBorder
                     border.width: 1
 
                     Column {
@@ -368,8 +370,8 @@ Flickable {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: page.client.tr.localized(packageRow.modelData.name) || packageRow.modelData.package_id
-                                color: page.tokens.foreground
-                                font.pixelSize: page.tokens.fontBody
+                                color: page.tokens.appInk
+                                font.pixelSize: page.tokens.appFontBody
                                 font.bold: true
                             }
                             Badge {
@@ -385,8 +387,8 @@ Flickable {
                             wrapMode: Text.WordWrap
                             visible: text.length > 0
                             text: packageRow.manifest ? page.client.tr.localized(packageRow.manifest.description) : ""
-                            color: page.tokens.foregroundMuted
-                            font.pixelSize: page.tokens.fontSmall
+                            color: page.tokens.appInkMuted
+                            font.pixelSize: page.tokens.appFontCaption
                         }
 
                         Grid {
@@ -409,8 +411,8 @@ Flickable {
                                 Text {
                                     required property var modelData
                                     text: page.t(qsTr("%1：%2")).arg(page.t(modelData[0])).arg(modelData[1])
-                                    color: page.tokens.foreground
-                                    font.pixelSize: page.tokens.fontSmall
+                                    color: page.tokens.appInk
+                                    font.pixelSize: page.tokens.appFontCaption
                                 }
                             }
                         }
@@ -435,15 +437,15 @@ Flickable {
                                     Text {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: entryColumn.modelData.slot ? page.t(qsTr("位置：%1")).arg(page.client.tr.slotName(entryColumn.modelData.slot)) : page.t(qsTr("未放在任何位置"))
-                                        color: page.tokens.foreground
-                                        font.pixelSize: page.tokens.fontSmall
+                                        color: page.tokens.appInk
+                                        font.pixelSize: page.tokens.appFontCaption
                                     }
                                     Text {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: page.t(qsTr("啟動原因：%1")).arg(page.client.tr.has("started." + entryColumn.modelData.started_reason)
                                             ? page.client.key("started." + entryColumn.modelData.started_reason, {}) : entryColumn.modelData.started_reason)
-                                        color: page.tokens.foregroundMuted
-                                        font.pixelSize: page.tokens.fontSmall
+                                        color: page.tokens.appInkMuted
+                                        font.pixelSize: page.tokens.appFontCaption
                                     }
                                 }
 
@@ -451,8 +453,8 @@ Flickable {
                                     width: parent.width
                                     wrapMode: Text.WordWrap
                                     text: page.client.key(entryColumn.modelData.trust_note_key, {}) + "  ·  " + page.resourceText(entryColumn.modelData)
-                                    color: page.tokens.foregroundMuted
-                                    font.pixelSize: page.tokens.fontSmall
+                                    color: page.tokens.appInkMuted
+                                    font.pixelSize: page.tokens.appFontCaption
                                 }
 
                                 Text {
@@ -460,8 +462,8 @@ Flickable {
                                     width: parent.width
                                     wrapMode: Text.WordWrap
                                     text: page.t(qsTr("這個服務連續失敗，已被自動停用，桌面其他部分不受影響。可以查看診斷後重新啟用。"))
-                                    color: page.tokens.warning
-                                    font.pixelSize: page.tokens.fontSmall
+                                    color: page.tokens.appWarning
+                                    font.pixelSize: page.tokens.appFontCaption
                                 }
 
                                 Row {
@@ -522,13 +524,14 @@ Flickable {
                                     && page.areaOf(packageRow.manifest).length === 0
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: page.t(qsTr("桌面元件在組合中心選擇要放的位置後啟用。"))
-                                color: page.tokens.foregroundMuted
-                                font.pixelSize: page.tokens.fontSmall
+                                color: page.tokens.appInkMuted
+                                font.pixelSize: page.tokens.appFontCaption
                             }
                             Button {
                                 visible: packageRow.modelData.referenced_by === 0 && packageRow.modelData.source !== "builtin"
                                 tokens: page.tokens
-                                kind: "subtle"
+                                // A destructive action: its own style in the candidate.
+                                kind: page.jelly ? "dangerQuiet" : "subtle"
                                 text: page.t(qsTr("移除套件"))
                                 onClicked: page.removePackage(packageRow.modelData)
                             }
@@ -542,8 +545,8 @@ Flickable {
 
                             Text {
                                 text: page.t(qsTr("請求的權限：%1")).arg(packageRow.manifest ? page.client.join(packageRow.manifest.permissions || []) : "")
-                                color: page.tokens.foreground
-                                font.pixelSize: page.tokens.fontSmall
+                                color: page.tokens.appInk
+                                font.pixelSize: page.tokens.appFontCaption
                             }
 
                             Repeater {
@@ -556,8 +559,8 @@ Flickable {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: page.t(qsTr("已授予：%1 %2")).arg(modelData.scope).arg(modelData.resource || "")
                                             + (modelData.revoked_at ? page.t(qsTr("（已撤銷）")) : "")
-                                        color: page.tokens.foreground
-                                        font.pixelSize: page.tokens.fontSmall
+                                        color: page.tokens.appInk
+                                        font.pixelSize: page.tokens.appFontCaption
                                     }
                                     Button {
                                         visible: !modelData.revoked_at
@@ -628,23 +631,23 @@ Flickable {
                     text: page.inspected && page.inspected.manifest
                         ? page.t(qsTr("「%1」%2")).arg(page.client.tr.localized(page.inspected.manifest.name)).arg(page.inspected.manifest.version)
                         : page.t(qsTr("無法讀取這個套件"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                     font.bold: true
                 }
                 Text {
                     visible: !!page.inspected && page.inspected.already_installed
                     text: page.t(qsTr("這個版本已經安裝。"))
-                    color: page.tokens.foregroundMuted
-                    font.pixelSize: page.tokens.fontSmall
+                    color: page.tokens.appInkMuted
+                    font.pixelSize: page.tokens.appFontCaption
                 }
                 Repeater {
                     model: page.inspected ? page.inspected.problems : []
                     Text {
                         required property var modelData
                         text: "• " + modelData
-                        color: page.tokens.warning
-                        font.pixelSize: page.tokens.fontSmall
+                        color: page.tokens.appWarning
+                        font.pixelSize: page.tokens.appFontCaption
                     }
                 }
                 Button {
@@ -664,8 +667,8 @@ Flickable {
                         : modelData.state === "failed" ? page.t(qsTr("失敗：%1")).arg(page.client.key(modelData.error_key || "install.failed", {}))
                         : modelData.state === "cancelled" ? page.t(qsTr("已取消"))
                         : modelData.progress !== null && modelData.progress !== undefined ? Math.round(modelData.progress * 100) + "%" : page.t(qsTr("進行中")))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontSmall
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontCaption
                 }
             }
         }
@@ -685,8 +688,8 @@ Flickable {
                     const pss = host.process && host.process.pss_kib ? page.t(qsTr("記憶體 %1 MiB（整個宿主程序）")).arg(Math.round(host.process.pss_kib / 1024)) : page.t(qsTr("記憶體未回報"));
                     return page.t(qsTr("狀態：%1；過去 10 分鐘重啟 %2 次；%3")).arg(host.state).arg(host.restarts_last_10_min).arg(pss);
                 }
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
             }
 
             Diagnostics {

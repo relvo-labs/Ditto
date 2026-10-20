@@ -12,10 +12,12 @@ Flickable {
 
     required property var client
     required property var tokens
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
+    readonly property bool jelly: tokens.uiCandidate === true
     required property var conversation
 
     contentWidth: width
-    contentHeight: column.implicitHeight + tokens.spaceSection * 2
+    contentHeight: column.implicitHeight + tokens.appPagePad * 2
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
@@ -32,15 +34,15 @@ Flickable {
 
     Column {
         id: column
-        x: page.tokens.spaceSection
-        y: page.tokens.spaceSection
-        width: page.width - page.tokens.spaceSection * 2
+        x: page.tokens.appPagePad
+        y: page.tokens.appPagePad
+        width: page.width - page.tokens.appPagePad * 2
         spacing: page.tokens.spaceSection
 
         Text {
             text: page.t(qsTr("AI 設定"))
-            color: page.tokens.foreground
-            font.pixelSize: page.tokens.fontHeading
+            color: page.tokens.appInk
+            font.pixelSize: page.tokens.appFontHeading
             font.bold: true
         }
 
@@ -74,8 +76,8 @@ Flickable {
                         : page.conversation.settingsFailed
                             ? page.t(qsTr("無法讀取 AI 設定，目前無法確認開或關。"))
                             : page.t(qsTr("正在讀取 AI 設定…"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                     Accessible.role: Accessible.StaticText
                     Accessible.name: text
                 }
@@ -129,8 +131,8 @@ Flickable {
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
                         : page.conversation.login ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg(page.conversation.login.auth_url).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
             }
             Text {
                 visible: !!page.provider && page.provider.authenticated
@@ -144,8 +146,8 @@ Flickable {
                     const reset = limits.primary.resets_at_ms ? new Date(limits.primary.resets_at_ms).toLocaleString(Qt.locale(), "M/d HH:mm") : page.t(qsTr("未知"));
                     return page.t(qsTr("額度已用 %1%，%2 重設")).arg(Math.round(limits.primary.used_percent)).arg(reset);
                 }
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
             Row {
                 spacing: page.tokens.space
@@ -180,8 +182,8 @@ Flickable {
             Text {
                 visible: models.options.length > 0
                 text: page.t(qsTr("模型"))
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
             }
             Choice {
                 id: models
@@ -223,8 +225,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.conversation.runtimeControllerUnavailable ? page.conversation.runtimeFailureText : page.conversation.runtimeStatusText
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
             }
 
             TextField {
@@ -269,8 +271,8 @@ Flickable {
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.keyNotice
-                    color: page.tokens.foregroundMuted
-                    font.pixelSize: page.tokens.fontSmall
+                    color: page.tokens.appInkMuted
+                    font.pixelSize: page.tokens.appFontCaption
                 }
             }
         }
@@ -296,8 +298,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.conversation.errorText
-            color: page.tokens.danger
-            font.pixelSize: page.tokens.fontSmall
+            color: page.tokens.appDanger
+            font.pixelSize: page.tokens.appFontCaption
         }
         Diagnostics {
             width: parent.width

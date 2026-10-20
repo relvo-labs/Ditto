@@ -58,7 +58,7 @@ python3 tests/g4/secrets/control.py --inject-leak --leak-form base64-offset-1 --
 
 | 路徑 | 本地可確認範圍 | 結論與待補證據 |
 | --- | --- | --- |
-| Quickshell 0.3.1／cpptrace | `packaging/systemd/user/ditto-core.service` 的 `--shell`／`--rescue-ui`／`--lock` 啟動規格；`docs/platform/dependency-inventory.md` 釘選 cpptrace | 本地沒有 Quickshell 執行檔、上游 handler source 或 crash 樣本。**未執行**；不能猜測 dump 實際位置或宣稱未包含記憶體內容。VM 須記錄該釘選版本實際產生的報告位置、內容及同意介面。 |
+| Quickshell 0.3.1／cpptrace 與 OS core dump | Core 的 `launcher.rs` 對 quickshell／lock／rescue-shell 設 `QS_DISABLE_CRASH_HANDLER=1`；獨立救援包裝腳本亦停用上游 handler | 不再由 Quickshell 產生 crash 目錄（含 log 尾端）；崩潰診斷改查 Core 日誌／journal。OS core dump 是否收集取決於 `core_pattern`（systemd-coredump／apport）；dump 為完整程序記憶體，可能含視窗標題或對話內容，不能視為遮蔽輸出。#59 驗收須讀回目標機的 `core_pattern`、收集設定、實際產物與內容。本地真 Quickshell／OS dump **未執行**；未新增蒐集機制。 |
 | Core panic | `crates/ditto-core/src/main.rs`、`lib.rs` 未安裝自訂 panic hook；一般日誌遮蔽在 `log.rs`，不涵蓋標準 Rust panic hook | 程序 stderr 由工作階段收集；panic payload 的內容安全尚無保證。OS dump 是另一層（本機 core_pattern 為 apport），不能當成 Core 的遮蔽輸出。實際 panic／OS dump **未執行**。 |
 | hostd | `src/main.ts` 的啟動／停止／斷線／unhandledRejection；`src/log.ts` 的 Cordis exporter → HostLog → stderrSink／journald | `163e782` 已重現 Error.message／stack 外洩。repair1 經擴大寫入授權修正預設日誌；保留類別、閉合錯誤碼、已知交易分類、插件識別及 SHA-256 指紋，丟棄原文。這不是實際 crash／OS dump 已驗證的宣稱。 |
 | Core 診斷回應 | `diagnostics.rs::plugins`／`rescue_status`，沒有獨立「診斷壓縮包」或 opt-in 上傳實作 | 回應含插件、依賴、註冊、狀態；`supervisor_note` 讀 audit `redacted_detail`，欄位名不是通用遮蔽器。現有生產 disable reason 為固定代碼（hosts.rs）；未實證此路徑缺口，因此沒有修改 diagnostics.rs。 |

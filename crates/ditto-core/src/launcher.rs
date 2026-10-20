@@ -199,6 +199,49 @@ pub fn launch_parsed(
     launch_with_channel(registry, parsed, socket, quota, environment, None)
 }
 
+/// Build the same command for direct and scoped launches, before passing any
+/// token. Keeping the environment here also makes the launch policy testable
+/// without opening the private identity channel.
+fn client_command(
+    parsed: &Specification,
+    executable: &Path,
+    socket: &Path,
+    quota: Option<&Quota>,
+    environment: &[(String, String)],
+) -> io::Result<Command> {
+    let mut command = scoped_command(&parsed.kind, executable, quota)?;
+    command.envs(environment.iter().map(|(key, value)| (key, value)));
+    if matches!(parsed.kind.as_str(), "quickshell" | "lock" | "rescue-shell") {
+        // Quickshell's handler re-execs the same PID with a spent token,
+        // bypassing Core's exit supervision. Core must own all UI restarts.
+        // This forgoes Quickshell's crash directory (including its log tail).
+        // Diagnose via Core logs and journal. OS core dump collection depends
+        // on core_pattern (systemd-coredump/apport); dumps contain full process
+        // memory and may include window titles or conversations. Read back the
+        // actual policy and artifacts during #59 acceptance; do not assume
+        // dumps are redacted or add collection here. Apply after extra env so
+        // callers cannot accidentally turn the upstream handler back on.
+        command.env("QS_DISABLE_CRASH_HANDLER", "1");
+    }
+
+    command
+        .args(&parsed.arguments)
+        .env_remove("DITTO_DEV_TOKEN")
+        // Core's own service-manager channel: a client that inherits it
+        // would send notifications systemd refuses (only Core is MainPID).
+        .env_remove("NOTIFY_SOCKET")
+        .env_remove("WATCHDOG_PID")
+        .env_remove("WATCHDOG_USEC")
+        // Scopes are Core's to create; a Core the client itself starts (a
+        // test fixture, say) must not reuse the session's scope names.
+        .env_remove("DITTO_LAUNCH_SCOPE_PREFIX")
+        .env(LAUNCHER_TOKEN_FD_ENV, TOKEN_FD.to_string())
+        .env(LAUNCHER_SOCKET_ENV, socket)
+        .env(LAUNCHER_KIND_ENV, &parsed.kind)
+        .env(LAUNCHER_VERSION_ENV, &parsed.version);
+    Ok(command)
+}
+
 /// The descriptor number a client finds its private backend channel on.
 pub const CHANNEL_FD: RawFd = TOKEN_FD + 1;
 
@@ -219,23 +262,7 @@ pub fn launch_with_channel(
     let client_fd: OwnedFd = client_end.into();
     let inherited = client_fd.as_raw_fd();
 
-    let mut command = scoped_command(&parsed.kind, &executable, quota)?;
-    command.envs(environment.iter().map(|(key, value)| (key, value)));
-    command
-        .args(&parsed.arguments)
-        .env_remove("DITTO_DEV_TOKEN")
-        // Core's own service-manager channel: a client that inherits it
-        // would send notifications systemd refuses (only Core is MainPID).
-        .env_remove("NOTIFY_SOCKET")
-        .env_remove("WATCHDOG_PID")
-        .env_remove("WATCHDOG_USEC")
-        // Scopes are Core's to create; a Core the client itself starts (a
-        // test fixture, say) must not reuse the session's scope names.
-        .env_remove("DITTO_LAUNCH_SCOPE_PREFIX")
-        .env(LAUNCHER_TOKEN_FD_ENV, TOKEN_FD.to_string())
-        .env(LAUNCHER_SOCKET_ENV, socket)
-        .env(LAUNCHER_KIND_ENV, &parsed.kind)
-        .env(LAUNCHER_VERSION_ENV, &parsed.version);
+    let mut command = client_command(&parsed, &executable, socket, quota, environment)?;
     // SAFETY: dup2 is async-signal-safe and does not block, so the parent's
     // spawn() is not held up waiting for the child.
     unsafe {
@@ -266,19 +293,38 @@ pub fn launch_with_channel(
     let child = command.spawn()?;
     drop(client_fd);
 
-    let token = fresh_token()?;
-    registry.bind_issued_token(
-        token.clone(),
-        ClientIdentity {
-            // SAFETY: getuid has no memory preconditions.
-            uid: unsafe { libc::getuid() },
-            pid: child.id(),
-            kind: parsed.kind,
-            version: parsed.version,
-            executable,
-        },
-    )?;
-    launcher_end.write_all(format!("{token}\n").as_bytes())?;
+    bind_and_handover(registry, parsed, executable, child, &mut launcher_end)
+}
+
+fn bind_and_handover(
+    registry: &IdentityRegistry,
+    parsed: Specification,
+    executable: PathBuf,
+    mut child: Child,
+    writer: &mut impl Write,
+) -> io::Result<Child> {
+    let handover = (|| {
+        let token = fresh_token()?;
+        registry.bind_issued_token(
+            token.clone(),
+            ClientIdentity {
+                // SAFETY: getuid has no memory preconditions.
+                uid: unsafe { libc::getuid() },
+                pid: child.id(),
+                kind: parsed.kind,
+                version: parsed.version,
+                executable,
+            },
+        )?;
+        writer.write_all(format!("{token}\n").as_bytes())
+    })();
+    if let Err(error) = handover {
+        // No caller will supervise a failed launch. Do not leave a client
+        // running with no identity (or holding an empty token descriptor).
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
+    }
     Ok(child)
 }
 
@@ -295,5 +341,147 @@ mod quota_tests {
         );
         // Not the hostd/controller service class reused (D-06b, D-44).
         assert_ne!(backend, Quota::service());
+    }
+}
+
+#[cfg(test)]
+mod crash_handler_tests {
+    use super::*;
+
+    #[test]
+    fn token_handover_failure_terminates_and_reaps_the_untracked_child() {
+        struct BrokenChannel;
+        impl Write for BrokenChannel {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let parsed = parse("lock 0.3.1 /bin/sleep 30").unwrap();
+        let child = Command::new(&parsed.executable).arg("30").spawn().unwrap();
+        let pid = child.id();
+        let result = bind_and_handover(
+            &IdentityRegistry::new(),
+            parsed.clone(),
+            parsed.executable.canonicalize().unwrap(),
+            child,
+            &mut BrokenChannel,
+        );
+        let gone = !PathBuf::from(format!("/proc/{pid}")).exists();
+        if !gone {
+            // Clean up the RED case too; the fixture is our own child.
+            // SAFETY: kill/waitpid have no memory preconditions for this PID.
+            unsafe {
+                libc::kill(pid as i32, libc::SIGKILL);
+                libc::waitpid(pid as i32, std::ptr::null_mut(), 0);
+            }
+        }
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+        assert!(gone, "failed handover left a live or unreaped child");
+    }
+
+    #[test]
+    fn quickshell_commands_disable_crash_handlers_without_affecting_other_kinds() {
+        for kind in [
+            "quickshell",
+            "lock",
+            "rescue-shell",
+            "hostd",
+            "agent",
+            "dittoctl",
+        ] {
+            let parsed = Specification {
+                kind: kind.into(),
+                version: "0.3.1".into(),
+                executable: "/bin/sh".into(),
+                arguments: vec![],
+            };
+            let command = client_command(
+                &parsed,
+                &parsed.executable,
+                Path::new("core.sock"),
+                None,
+                &[],
+            )
+            .unwrap();
+            let actual = command
+                .get_envs()
+                .find(|(key, _)| *key == "QS_DISABLE_CRASH_HANDLER")
+                .and_then(|(_, value)| value);
+            let expected = matches!(kind, "quickshell" | "lock" | "rescue-shell")
+                .then(|| std::ffi::OsStr::new("1"));
+            assert_eq!(actual, expected, "{kind}");
+        }
+    }
+
+    #[test]
+    fn extra_environment_cannot_reenable_quickshell_crash_handlers() {
+        for kind in ["quickshell", "lock", "rescue-shell"] {
+            let parsed = parse(&format!("{kind} 0.3.1 /bin/sh")).unwrap();
+            let command = client_command(
+                &parsed,
+                &parsed.executable,
+                Path::new("core.sock"),
+                None,
+                &[("QS_DISABLE_CRASH_HANDLER".into(), "0".into())],
+            )
+            .unwrap();
+            assert_eq!(
+                command
+                    .get_envs()
+                    .find(|(key, _)| *key == "QS_DISABLE_CRASH_HANDLER")
+                    .unwrap()
+                    .1,
+                Some(std::ffi::OsStr::new("1"))
+            );
+        }
+    }
+
+    #[test]
+    fn controlled_clients_disable_only_quickshell_crash_handlers() {
+        let directory =
+            std::env::temp_dir().join(format!("launcher-crash-{}", ditto_protocol::ids::ulid()));
+        std::fs::create_dir_all(&directory).unwrap();
+        for kind in [
+            "quickshell",
+            "lock",
+            "rescue-shell",
+            "hostd",
+            "agent",
+            "dittoctl",
+        ] {
+            let output = directory.join(kind);
+            let spec = Specification {
+                kind: kind.into(),
+                version: "0.3.1".into(),
+                executable: "/bin/sh".into(),
+                arguments: vec![
+                    "-c".into(),
+                    "read -r token <&3; printf '%s' \"${QS_DISABLE_CRASH_HANDLER-unset}\" > \"$1\""
+                        .into(),
+                    "fixture".into(),
+                    output.as_os_str().into(),
+                ],
+            };
+            let mut child = launch_parsed(
+                &Arc::new(IdentityRegistry::new()),
+                &spec,
+                &directory.join("core.sock"),
+                None,
+                &[],
+            )
+            .unwrap();
+            assert!(child.wait().unwrap().success());
+            let actual = std::fs::read_to_string(output).unwrap();
+            let expected = if matches!(kind, "quickshell" | "lock" | "rescue-shell") {
+                "1"
+            } else {
+                "unset"
+            };
+            assert_eq!(actual, expected, "{kind}");
+        }
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

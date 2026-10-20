@@ -99,16 +99,37 @@ start = '        PanelWindow {\n            id: avatarSurface'
 end = '\n    /// The shell\'s control path:'
 assert base_shell[base_shell.index(start):base_shell.index(end)] == current_shell[current_shell.index(start):current_shell.index(end)]
 assert subprocess.check_output(['git', 'show', f'{MOTION_BASE}:shell/avatar/Avatar.qml'], cwd=ROOT).decode() == source('shell/avatar/Avatar.qml')
-assert source('shell/chat/ApprovalWindow.qml', True) == source('shell/chat/ApprovalWindow.qml')
+# ApprovalWindow.qml: #116 adds candidate visuals (opt-in DITTO_UI_STYLE). The
+# decision semantics stay pinned to 25c0b72: every line that decides or moves
+# focus is still present verbatim, and an added decision may only refuse.
+# Unset-style pixels are compared with 87a2462 by unit/tst_ui_style_off.qml.
+approval_base = source('shell/chat/ApprovalWindow.qml', True).splitlines()
+approval_now = source('shell/chat/ApprovalWindow.qml').splitlines()
+decisive = lambda line: 'decided(' in line or 'forceActiveFocus' in line or 'onEscapePressed' in line
+for line in filter(decisive, approval_base):
+    assert line in approval_now, 'approval decision line changed: ' + line.strip()
+added = [line for line in filter(decisive, approval_now) if line not in approval_base]
+assert all('decided("rejected")' in line for line in added), added
+report.append({'oracle': 'ApprovalWindow decision/focus/Escape lines match 25c0b72 verbatim; added decisions only refuse',
+               'added': [line.strip() for line in added]})
 # Owner adoption may change only the AssistantSurface instance in shell.qml.
 pre_choice = subprocess.check_output(['git', 'show', '366f1743e3b165df0c210f89e7b9e671176e25a8:shell/shell.qml'], cwd=ROOT).decode()
 pattern = r'        AssistantSurface \{.*?\n        \}'
 selected = re.search(pattern, current_shell, re.S).group(0)
 previous = re.search(pattern, pre_choice, re.S).group(0)
 assert 'entryStyle: "fab"' in selected and 'symbolVariant: "ditto"' in selected
-assert current_shell.replace(selected, previous, 1) == pre_choice
+# PR #115 (87a2462, owner-chosen wallpaper) changed exactly one other hunk: the
+# background Backdrop's comment and `wallpaperSource`. Swap that block back,
+# after checking it differs only there, so the oracle still rejects any other
+# shell.qml change.
+backdrop = r'            /// The canvas.*?\n            Backdrop \{.*?\n            \}'
+backdrop_now = re.search(backdrop, current_shell, re.S).group(0)
+backdrop_before = re.search(backdrop, pre_choice, re.S).group(0)
+assert backdrop_now.splitlines()[3:] == [line.replace('wallpaperSource: ""', 'wallpaperSource: root.shellTokens.wallpaper')
+                                         for line in backdrop_before.splitlines()[3:]]
+assert current_shell.replace(selected, previous, 1).replace(backdrop_now, backdrop_before, 1) == pre_choice
 report.append({'oracle': 'shell.qml changes only AssistantSurface properties; fixed 56/E1 lives in the component, legacy mounting unchanged'})
 
-report.append({'oracle': 'legacy avatar surface and ApprovalWindow.qml match 25c0b72; Avatar.qml matches f99b4ea byte for byte (merged statusForeground correction)'})
+report.append({'oracle': 'legacy avatar surface matches 25c0b72; Avatar.qml matches f99b4ea byte for byte (merged statusForeground correction)'})
 (OUT / 'staging.json').write_text(json.dumps(report, indent=2) + '\n')
-print('assistant staged; legacy structure and approval match 25c0b72')
+print('assistant staged; legacy structure matches 25c0b72; approval decisions unchanged')

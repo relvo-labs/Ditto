@@ -45,11 +45,12 @@ class CodexAvailability(unittest.TestCase):
             result = subprocess.run(['bash', '-eu', '-c', script, 'fixture-installer'] + (['--development'] if development else []), env={**os.environ,
                 'workspace': directory, 'here': str(fixture_here), 'FIXTURE_PREFLIGHT': str(scratch / 'preflight-ran'),
                 'DITTO_CODEX_BINARY': str(codex), 'FIXTURE_LANDLOCK_ABI': str(abi),
-                'WAYFIRE_SOCKET': 'fixture', 'variant': '', 'session_env': str(scratch / 'session.env'), 'session_notice': str(scratch / 'notice')},
+                'WAYFIRE_SOCKET': 'fixture', 'XDG_CONFIG_DIRS': str(fixture_here / 'session/xdg') + ':/etc/xdg', 'variant': '', 'session_env': str(scratch / 'session.env'), 'session_notice': str(scratch / 'notice')},
                 text=True, capture_output=True, check=True)
             self.assertEqual((scratch / 'preflight-ran').exists(), not development)
             self.assertIn('DITTO_CODEX_STATUS=' + expected, (scratch / 'session.env').read_text())
             self.assertIn('DITTO_CODEX_LANDLOCK_ABI=' + str(abi), (scratch / 'session.env').read_text())
+            self.assertIn('XDG_CONFIG_DIRS=' + str(fixture_here / 'session/xdg') + ':/etc/xdg', (scratch / 'session.env').read_text())
             if abi < 6:
                 self.assertIn('WARNING', result.stderr)
                 self.assertIn('Landlock ABI', result.stderr)

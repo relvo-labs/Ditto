@@ -43,7 +43,7 @@ Rectangle {
         collapseRequested();
     }
     implicitWidth: !labelled ? fabSize : entryStyle === "fab" ? Math.max(195, label.implicitWidth + 84) : Math.max(218, label.implicitWidth + 84)
-    implicitHeight: !labelled ? fabSize : Math.max(entryStyle === "fab" ? fabSize : 54, label.implicitHeight + status.implicitHeight + 12)
+    implicitHeight: !labelled ? fabSize : Math.max(entryStyle === "fab" ? fabSize : 54, label.implicitHeight + statusMeasure.implicitHeight + 12)
     radius: height / 2
     color: area.containsMouse ? tokens.surfaceStrong : tokens.surface
     border.color: activeFocus ? tokens.focus : tokens.border
@@ -115,6 +115,14 @@ Rectangle {
         border.color: entry.tokens.focus
         border.width: 2
         visible: entry.expanded
+    }
+    // Measure natural text height without the displayed status's width. In FAB
+    // mode that width depends on entry.height through the Column's x offset.
+    Text {
+        id: statusMeasure
+        visible: false
+        text: status.text
+        font: status.font
     }
     Column {
         visible: entry.labelled
