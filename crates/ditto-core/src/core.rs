@@ -836,4 +836,70 @@ mod lock_supervision_tests {
         drop(client);
         std::fs::remove_dir_all(root).unwrap();
     }
+    #[test]
+    fn controlled_lock_restarts_after_backoff_and_reconnect_then_unlocks_on_zero() {
+        let spec = crate::launcher::parse("lock 0.3.1 /bin/sh -c unused").unwrap();
+        let spec = Specification {
+            arguments: vec![
+                "-c".into(),
+                "read -r token <&3; kill -STOP $$; exit 0".into(),
+            ],
+            ..spec
+        };
+        let (core, root) = fixture_with_spec(Some(spec));
+        assert!(core.lock_session(), "controlled lock launch failed");
+        let mut client = core.lock_client.lock().unwrap();
+        let mut now = Instant::now();
+        for failure in 1..=3 {
+            let child = client.child.as_mut().unwrap();
+            child.kill().unwrap();
+            child.wait().unwrap();
+            core.supervise_lock(&mut client, now);
+            assert!(core.session_locked());
+            assert!(client.child.is_none());
+            assert_eq!(client.failures.len(), failure);
+            if failure < 3 {
+                let deadline = client.retry_at.unwrap();
+                core.supervise_lock(&mut client, deadline - Duration::from_nanos(1));
+                assert!(client.child.is_none());
+                core.supervise_lock(&mut client, deadline);
+                assert!(client.child.is_some());
+                assert!(core.session_state().lock_client_running);
+                now = deadline;
+            }
+        }
+        assert!(client.stopped);
+        core.supervise_lock(&mut client, now + Duration::from_secs(3600));
+        assert!(client.child.is_none());
+        core.session.mark_offline("fixture_disconnect");
+        core.supervise_lock(&mut client, now + Duration::from_secs(3601));
+        assert!(client.child.is_none());
+        assert!(core.session_locked());
+        drop(client);
+        let (adapter, _) = ditto_compositor::fixture::FixtureCompositor::paired();
+        core.session.reconnect(Box::new(adapter)).unwrap();
+        core.compositor_reconnected();
+        let mut client = core.lock_client.lock().unwrap();
+        assert!(client.failures.is_empty());
+        assert!(!client.stopped);
+        assert!(core.session_locked());
+        let child = client.child.as_mut().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let stat = std::fs::read_to_string(format!("/proc/{}/stat", child.id())).unwrap();
+            if stat.rsplit_once(')').unwrap().1.split_whitespace().next() == Some("T") {
+                break;
+            }
+            assert!(Instant::now() < deadline, "lock fixture never stopped");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // SAFETY: this is our child, stopped after reading its launcher token.
+        assert_eq!(unsafe { libc::kill(child.id() as i32, libc::SIGCONT) }, 0);
+        assert!(child.wait().unwrap().success());
+        core.supervise_lock(&mut client, Instant::now());
+        assert!(!core.session_locked());
+        assert!(!core.session_state().lock_client_running);
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

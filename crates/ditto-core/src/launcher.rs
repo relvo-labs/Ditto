@@ -290,19 +290,38 @@ pub fn launch_with_channel(
     let child = command.spawn()?;
     drop(client_fd);
 
-    let token = fresh_token()?;
-    registry.bind_issued_token(
-        token.clone(),
-        ClientIdentity {
-            // SAFETY: getuid has no memory preconditions.
-            uid: unsafe { libc::getuid() },
-            pid: child.id(),
-            kind: parsed.kind,
-            version: parsed.version,
-            executable,
-        },
-    )?;
-    launcher_end.write_all(format!("{token}\n").as_bytes())?;
+    bind_and_handover(registry, parsed, executable, child, &mut launcher_end)
+}
+
+fn bind_and_handover(
+    registry: &IdentityRegistry,
+    parsed: Specification,
+    executable: PathBuf,
+    mut child: Child,
+    writer: &mut impl Write,
+) -> io::Result<Child> {
+    let handover = (|| {
+        let token = fresh_token()?;
+        registry.bind_issued_token(
+            token.clone(),
+            ClientIdentity {
+                // SAFETY: getuid has no memory preconditions.
+                uid: unsafe { libc::getuid() },
+                pid: child.id(),
+                kind: parsed.kind,
+                version: parsed.version,
+                executable,
+            },
+        )?;
+        writer.write_all(format!("{token}\n").as_bytes())
+    })();
+    if let Err(error) = handover {
+        // No caller will supervise a failed launch. Do not leave a client
+        // running with no identity (or holding an empty token descriptor).
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
+    }
     Ok(child)
 }
 
@@ -325,6 +344,40 @@ mod quota_tests {
 #[cfg(test)]
 mod crash_handler_tests {
     use super::*;
+
+    #[test]
+    fn token_handover_failure_terminates_and_reaps_the_untracked_child() {
+        struct BrokenChannel;
+        impl Write for BrokenChannel {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let parsed = parse("lock 0.3.1 /bin/sleep 30").unwrap();
+        let child = Command::new(&parsed.executable).arg("30").spawn().unwrap();
+        let pid = child.id();
+        let result = bind_and_handover(
+            &IdentityRegistry::new(),
+            parsed.clone(),
+            parsed.executable.canonicalize().unwrap(),
+            child,
+            &mut BrokenChannel,
+        );
+        let gone = !PathBuf::from(format!("/proc/{pid}")).exists();
+        if !gone {
+            // Clean up the RED case too; the fixture is our own child.
+            // SAFETY: kill/waitpid have no memory preconditions for this PID.
+            unsafe {
+                libc::kill(pid as i32, libc::SIGKILL);
+                libc::waitpid(pid as i32, std::ptr::null_mut(), 0);
+            }
+        }
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::BrokenPipe);
+        assert!(gone, "failed handover left a live or unreaped child");
+    }
 
     #[test]
     fn quickshell_commands_disable_crash_handlers_without_affecting_other_kinds() {

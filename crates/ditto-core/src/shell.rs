@@ -407,6 +407,10 @@ mod crash_tests {
             directory.join("core.sock"),
         );
         manager.launch();
+        assert!(
+            manager.inner.lock().unwrap().child.is_some(),
+            "controlled launch failed; see shell.start_failed"
+        );
         let mut previous_token = String::new();
         for failure in 1..=SHELL_FAILURE_LIMIT {
             let path = directory.join("quickshell");
