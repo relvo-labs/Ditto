@@ -67,7 +67,18 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
     error('/', 'schema_invalid', 'manifest must be a JSON object')
     return { ok: false, errors, warnings }
   }
-  const m = manifest
+  const declarative = manifest['plugin_kind'] === 'declarative_bundle' && manifest['host_kind'] === 'core_builtin'
+  const m = declarative ? { ...manifest } : manifest
+  if (declarative) {
+    // Manifest's serde defaults, for declarative bundles that execute neither Node nor QML.
+    // Default only absent fields in a local view; explicit null/malformed values still get checked.
+    const defaults: Obj = {
+      runtime: {}, platform: [], slots: [], provides: [], requires: [], optional: [], conflicts: [],
+      config_schema: { type: 'object' }, commands: [], shortcuts: [], events: [], permissions: [],
+      migrations: [], activation_events: [],
+    }
+    for (const [key, value] of Object.entries(defaults)) if (m[key] === undefined) m[key] = value
+  }
   const str = (key: string, required = true): string | undefined => {
     const value = m[key]
     if (value === undefined) { if (required) error(`/${key}`, 'schema_invalid', 'is required'); return undefined }
@@ -121,15 +132,21 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
 
   const runtime = m['runtime']
   if (!isObject(runtime)) error('/runtime', 'schema_invalid', 'is required: { "node": "<range>" } or { "qt": "<range>" }')
-  else if (host === 'cordis') {
-    const nodeRange = range('/runtime/node', runtime['node'])
-    if (nodeRange && !nodeRange(node)) error('/runtime/node', 'protocol_incompatible', `does not include the Ditto Node runtime ${node}`)
-  } else if (host === 'qml') {
-    range('/runtime/qt', runtime['qt'])
+  else {
+    if (host === 'cordis' || (declarative && runtime['node'] !== undefined && runtime['node'] !== null)) {
+      const nodeRange = range('/runtime/node', runtime['node'])
+      if (nodeRange && !nodeRange(node)) error('/runtime/node', 'protocol_incompatible', `does not include the Ditto Node runtime ${node}`)
+    }
+    if (host === 'qml' || (declarative && runtime['qt'] !== undefined && runtime['qt'] !== null)) {
+      range('/runtime/qt', runtime['qt'])
+    }
+    if (declarative) for (const key of Object.keys(runtime)) {
+      if (key !== 'node' && key !== 'qt') error(`/runtime/${key}`, 'schema_invalid', 'is not a runtime requirement field')
+    }
   }
   const platform = array('platform')
-  if (platform && (!platform.length || platform.some(item => typeof item !== 'string'))) error('/platform', 'schema_invalid', 'must be a non-empty list of platform ids')
-  else if (platform && !platform.includes('linux-x86_64')) warn('/platform', 'precondition_failed', 'does not list linux-x86_64, the only G1 platform')
+  if (platform && ((!declarative && !platform.length) || platform.some(item => typeof item !== 'string'))) error('/platform', 'schema_invalid', declarative ? 'must be a list of platform ids' : 'must be a non-empty list of platform ids')
+  else if (platform && platform.length > 0 && !platform.includes('linux-x86_64')) warn('/platform', 'precondition_failed', 'does not list linux-x86_64, the only G1 platform')
   const protocolRange = range('/required_protocol_version', m['required_protocol_version'])
   if (protocolRange && !protocolRange(protocol)) error('/required_protocol_version', 'protocol_incompatible', `does not accept protocol ${protocol}`)
 
@@ -242,10 +259,25 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
 
   const budget = m['resource_budget']
   if (budget !== undefined) {
-    if (!isObject(budget) || typeof budget['memory_mib'] !== 'number' || typeof budget['cpu_percent'] !== 'number') {
-      error('/resource_budget', 'schema_invalid', 'needs memory_mib and cpu_percent')
-    } else if (kind === 'service' && (budget['memory_mib'] > serviceBudget.memory_mib || budget['cpu_percent'] > serviceBudget.cpu_percent)) {
-      error('/resource_budget', 'budget_exceeded', `service plugins are capped at ${serviceBudget.memory_mib} MiB and ${serviceBudget.cpu_percent}%`)
+    if (!isObject(budget)) {
+      error('/resource_budget', 'schema_invalid', 'must be an object')
+    } else {
+      // Rust ResourceBudget is closed, with two defaulted Option<u32> fields.
+      // The generated schema's uint32 format is only an annotation, so check the domain here too.
+      for (const key of Object.keys(budget)) {
+        if (key !== 'memory_mib' && key !== 'cpu_percent') error(`/resource_budget/${key}`, 'schema_invalid', 'is not a resource budget field')
+      }
+      let exceedsServiceBudget = false
+      for (const key of ['memory_mib', 'cpu_percent'] as const) {
+        const value = budget[key]
+        if (value === undefined || value === null) continue
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 4_294_967_295) {
+          error(`/resource_budget/${key}`, 'schema_invalid', 'must be null or an unsigned 32-bit integer (0..4294967295)')
+        } else if (kind === 'service' && value > serviceBudget[key]) {
+          exceedsServiceBudget = true
+        }
+      }
+      if (exceedsServiceBudget) error('/resource_budget', 'budget_exceeded', `service plugins are capped at ${serviceBudget.memory_mib} MiB and ${serviceBudget.cpu_percent}%`)
     }
   }
   const rescue = m['rescue']
