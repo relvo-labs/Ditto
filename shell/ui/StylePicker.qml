@@ -38,15 +38,17 @@ Item {
     readonly property int columns: width >= 3 * 168 + 2 * gap ? 3 : (width >= 2 * 168 + gap ? 2 : 1)
     readonly property real cardWidth: Math.floor((width - gap * (columns - 1)) / Math.max(1, columns))
     /// Every card as tall as the tallest (a wrapped description), so the
-    /// three read as one set.
-    property real cardHeight: 0
-    function measure() {
+    /// three read as one set. Each card reports its own content height.
+    property var contentHeights: ({})
+    readonly property real cardHeight: {
         let tallest = 0;
-        for (let i = 0; i < repeater.count; i++) {
-            const item = repeater.itemAt(i);
-            if (item) tallest = Math.max(tallest, item.contentHeight);
-        }
-        cardHeight = tallest;
+        for (const key in contentHeights) tallest = Math.max(tallest, contentHeights[key]);
+        return tallest;
+    }
+    function noteHeight(index, value) {
+        const next = Object.assign({}, contentHeights);
+        next[index] = value;
+        contentHeights = next;
     }
 
     implicitWidth: 3 * 200 + 2 * gap
@@ -80,7 +82,8 @@ Item {
                 readonly property bool selected: index === picker.selectedIndex
                 objectName: "styleCard_" + modelData.value
                 readonly property real contentHeight: body.height
-                onContentHeightChanged: Qt.callLater(picker.measure)
+                onContentHeightChanged: picker.noteHeight(index, contentHeight)
+                Component.onCompleted: picker.noteHeight(index, contentHeight)
                 width: picker.cardWidth
                 height: Math.max(body.height, picker.cardHeight)
                 activeFocusOnTab: picker.enabled && index === picker.tabIndex

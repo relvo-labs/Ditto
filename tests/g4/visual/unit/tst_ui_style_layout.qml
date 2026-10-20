@@ -259,6 +259,9 @@ TestCase {
         compare(scene.picker.Accessible.name, "外觀風格");
         verify(shown(one(cards[0], "styleMarker")) && !shown(one(cards[1], "styleMarker")), "a marker, not a ✓");
         for (const card of cards) verify(one(card, "stylePreview").width > 100, "a preview");
+        compare(cards[1].height, cards[0].height, "one set: equal heights");
+        compare(cards[2].height, cards[0].height);
+        verify(cards[0].height < 400, "heights settle (no feedback): " + cards[0].height);
     }
 
     function test_style_picker_keyboard_moves_then_chooses() {
