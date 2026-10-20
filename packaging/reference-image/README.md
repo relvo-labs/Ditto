@@ -4,6 +4,26 @@
 
 G0 的主要參考機識別為 `ditto-ref-ws-rtx4060-01`。同一項三次重複量測不得混用不同機器；新增參考機時要給新的穩定識別並另存指紋，不能把不同硬體的數字合併。
 
+## Codex 訂閱連線
+
+Codex 是選用項目；沒有安裝時桌面仍可使用，也可在 AI 設定改用 API 金鑰。若要使用 Codex 訂閱，請先取得 [`tools/codex/pin.json`](../../tools/codex/pin.json) 指定的官方 standalone release：目前為 `0.160.0`、`x86_64-unknown-linux-musl`。檔案來源記錄在 `obtained_from`；官方安裝程式取得的這一版位於 `~/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex`。僅版本號相同還不夠，必須核對二進位的 SHA-256。
+
+從倉庫根目錄執行下列步驟；若下載檔案放在其他位置，先把 `codex_candidate` 改成該檔案的絕對路徑：
+
+```sh
+codex_candidate="$HOME/.codex/packages/standalone/releases/0.160.0-x86_64-unknown-linux-musl/bin/codex"
+printf '%s  %s\n' "$(jq -r .sha256 tools/codex/pin.json)" "$codex_candidate" | sha256sum --check -
+```
+
+只有核對通過後，才將這份檔案放到安裝程式的預設位置，並重跑 Ditto 安裝程式：
+
+```sh
+install -D -m 0755 "$codex_candidate" "$HOME/.local/bin/codex"
+bash packaging/reference-image/install-session.sh
+```
+
+也可以保留原檔案位置，改用 `DITTO_CODEX_BINARY="$codex_candidate" bash packaging/reference-image/install-session.sh`。開發 VM 沿用原本的 `--development` 選項。安裝完成後登出桌面，再選擇 Ditto 登入；只安裝 Codex 而沒有重跑 Ditto 安裝程式，不會更新原工作階段的連線設定。若 SHA-256 不符，請取得 pin 指定的檔案再試，不要跳過核對。
+
 ## 凍結內容
 
 - Ubuntu 24.04.2 LTS、kernel `6.17.0-40-generic`。

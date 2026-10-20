@@ -41,7 +41,10 @@ class CodexAvailability(unittest.TestCase):
                 with self.subTest(check='help-path'):
                     paths = re.findall(r'\S+README\.md', result.stderr)
                     self.assertEqual(len(paths), 1, result.stderr)
-                    self.assertTrue((ROOT / Path(paths[0]).relative_to(scratch)).is_file(), result.stderr)
+                    document = ROOT / Path(paths[0]).relative_to(scratch)
+                    self.assertTrue(document.is_file(), result.stderr)
+                    for step in ['tools/codex/pin.json', 'sha256sum', 'DITTO_CODEX_BINARY']:
+                        self.assertTrue(step in document.read_text(), f"missing Codex step: {step}")
                 with self.subTest(check='installer-language-and-next-step'):
                     self.assertTrue(result.stderr.isascii(), result.stderr)
                     self.assertIn('API', result.stderr)

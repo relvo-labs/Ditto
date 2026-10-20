@@ -544,6 +544,15 @@ TestCase {
         spy.destroy();
         compare(find(chat, item => item.text === "送出").enabled, false);
         compare(count("agent.providers.login"), 0);
+        const appearance = tokens.appearance;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        captureCanvas.visible = true;
+        entry.visible = false;
+        waitForRendering(chat, 250);
+        grabImage(chat).save(Qt.resolvedUrl("../.staged/out/ai-api-key-" + data.tag + ".png").toString().replace("file://", ""));
+        entry.visible = true;
+        captureCanvas.visible = false;
+        tokens.appearance = appearance;
         readsOnly();
     }
 
