@@ -1,50 +1,60 @@
 #!/usr/bin/env bash
-# #116 Soft Jelly application candidates on a logged-in development machine or
-# VM ("Ditto (Wayfire)" session). Development tool: candidates are proposals,
-# nothing here changes the installed defaults.
+# #116 style preview for what the Shell does not draw: Wayfire's server-side
+# title bars and foot, on a logged-in development machine or VM ("Ditto
+# (Wayfire)" session). Development tool.
 #
 #   tools/ui-candidates/apply.sh j1|j2|j3 [--restart-core]
 #   tools/ui-candidates/apply.sh off [--restart-core]
 #   tools/ui-candidates/apply.sh status
 #
+# The Shell's own windows follow the style chosen in personalization (the
+# Profile token appearance.tokens.ui_style, J1 by default; also
+# `dittoctl appearance set token.ui_style=j2`). This tool does not touch the
+# Profile or the Shell, so it cannot override that choice. The installed
+# session already uses J1 for title bars and foot (session/wayfire.ini
+# [decoration], session/xdg/foot/foot.ini); `j2`/`j3` preview the others until
+# the session follows the chosen style itself (component-sheet §8, follow-up).
+#
 # What `j1|j2|j3` does (and the only places it writes):
 #   1. $XDG_RUNTIME_DIR/ditto/ui-candidate/  (session-only; gone at logout)
-#        wayfire.ini            the session wayfire.ini with this candidate's
-#                               [decoration] merged in (for inspection or a
+#        wayfire.ini            the session wayfire.ini with this style's
+#                               [decoration] in place (for inspection or a
 #                               manual `wayfire --config` run; the running
 #                               session keeps its own --config file)
-#        xdg/foot/foot.ini      the candidate foot config
+#        xdg/foot/foot.ini      the style's foot config
 #        saved-decoration.json  Wayfire's decoration values before the first apply
 #        session.env.orig       the session.env before the first apply
-#        style                  the applied candidate
+#        style                  the applied style
 #   2. Wayfire, live: the [decoration] options through its IPC socket
 #      (`wayfire/set-config-options`). They last until Wayfire restarts or
-#      reloads its config file.
+#      reloads its config file. A title bar already drawn may keep its old
+#      text colour until its title changes or the window is opened again
+#      (seen on the VM, 2026-10-20).
 #   3. $XDG_RUNTIME_DIR/ditto/session.env (written by ditto-session at every
 #      login; ditto-core.service reads it at start): a marked block with
-#      DITTO_UI_STYLE=<style> and XDG_CONFIG_DIRS=<state>/xdg:<previous>.
-#      Core passes its environment to the Shell and to applications it
-#      launches, so they see it after Core restarts (`--restart-core`, or
-#      `systemctl --user restart ditto-core.service`; open windows stay).
-# Nothing is written to XDG_CONFIG_HOME, the repository, /etc or the
-# installed session. A person's own ~/.config/foot/foot.ini still wins over
-# the candidate (foot reads XDG_CONFIG_HOME before XDG_CONFIG_DIRS).
+#      XDG_CONFIG_DIRS=<state>/xdg:<the session's own>. Core passes its
+#      environment to applications it launches, so a foot started from the
+#      Dock or launcher sees the style after Core restarts (`--restart-core`,
+#      or `systemctl --user restart ditto-core.service`; open windows stay).
+# Nothing is written to XDG_CONFIG_HOME, the repository, /etc, the Profile or
+# the installed session. A person's own ~/.config/foot/foot.ini still wins
+# (foot reads XDG_CONFIG_HOME before XDG_CONFIG_DIRS).
 #
 # `off` undoes exactly that: Wayfire's saved values are set back, session.env
 # is restored byte for byte from session.env.orig, and the state directory is
 # removed. Logging out also ends everything except a still-running Wayfire's
 # live values, which end with it.
 #
-# Limits (see docs/design/default-desktop/component-sheet.md §8): foot started
-# by Wayfire's Super+Enter binding keeps Wayfire's environment, so it does not
-# see the candidate; start foot from the Dock or launcher, or run
+# Limits: foot started by Wayfire's Super+Enter binding keeps Wayfire's
+# environment (the session's J1), so it does not see a preview; start foot
+# from the Dock or launcher, or run
 #   foot -c "$XDG_RUNTIME_DIR/ditto/ui-candidate/xdg/foot/foot.ini".
 # Wayfire 0.11's decoration buttons keep their compiled-in hover colours.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
-candidates="$root/packaging/reference-image/session/candidates"
+styles="$root/packaging/reference-image/session/styles"
 session_ini="${DITTO_UI_SESSION_INI:-$root/packaging/reference-image/session/wayfire.ini}"
 runtime="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set: run this inside the logged-in session}"
 state="$runtime/ditto/ui-candidate"
@@ -54,7 +64,7 @@ python="${DITTO_UI_PYTHON:-python3}"
 begin='# >>> ditto-ui-candidate (tools/ui-candidates/apply.sh; remove with `apply.sh off`)'
 end='# <<< ditto-ui-candidate'
 
-usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 [[ $# -ge 1 ]] || usage
 action="$1"; shift
 restart_core=""
@@ -161,9 +171,9 @@ restart() {
 
 case "$action" in
   j1|j2|j3)
-    deco="$candidates/$action/wayfire-decoration.ini"
-    foot_ini="$candidates/$action/foot.ini"
-    [[ -r "$deco" && -r "$foot_ini" ]] || { echo "missing candidate files under $candidates/$action" >&2; exit 1; }
+    deco="$styles/$action/wayfire-decoration.ini"
+    foot_ini="$styles/$action/foot.ini"
+    [[ -r "$deco" && -r "$foot_ini" ]] || { echo "missing style files under $styles/$action" >&2; exit 1; }
     [[ -S "$socket" ]] || { echo "no Wayfire IPC socket at $socket (WAYFIRE_SOCKET)" >&2; exit 1; }
     [[ -f "$session_env" ]] || { echo "no $session_env: is this a Ditto (Wayfire) login?" >&2; exit 1; }
     if command -v foot >/dev/null 2>&1; then
@@ -173,8 +183,8 @@ case "$action" in
     fi
     values="$(decoration_json "$deco")"
     install -d -m 0700 "$state" "$state/xdg/foot"
-    # The originals are taken once, before the first candidate; switching
-    # candidates keeps them, so `off` always returns to the session's own.
+    # The originals are taken once, before the first preview; switching
+    # styles keeps them, so `off` always returns to the session's own.
     if [[ ! -f "$state/saved-decoration.json" ]]; then
       mapfile -t keys < <("$python" -c 'import json,sys; print("\n".join(json.loads(sys.argv[1])))' "$values")
       ipc get "${keys[@]}" > "$state/saved-decoration.json.tmp"
@@ -189,19 +199,19 @@ case "$action" in
     {
       cat "$state/session.env.orig"
       echo "$begin"
-      echo "DITTO_UI_STYLE=$action"
       echo "XDG_CONFIG_DIRS=$state/xdg:$previous_dirs"
       echo "$end"
     } > "$session_env.tmp"
     chmod 0600 "$session_env.tmp"
     mv "$session_env.tmp" "$session_env"
     echo "$action" > "$state/style"
-    echo "applied $action: Wayfire decoration (live), foot.ini at $state/xdg/foot/foot.ini, DITTO_UI_STYLE in $session_env"
+    echo "previewing $action: Wayfire decoration (live), foot.ini at $state/xdg/foot/foot.ini (XDG_CONFIG_DIRS in $session_env)"
+    echo "the Shell's windows follow personalization: dittoctl appearance set token.ui_style=$action"
     restart
     ;;
   off)
     if [[ ! -d "$state" ]]; then
-      echo "no candidate applied (no $state)"
+      echo "no style preview applied (no $state)"
       exit 0
     fi
     if [[ -f "$state/saved-decoration.json" ]]; then
@@ -220,10 +230,10 @@ case "$action" in
     ;;
   status)
     if [[ -f "$state/style" ]]; then
-      echo "candidate: $(cat "$state/style")"
+      echo "preview: $(cat "$state/style")"
       awk -v b="$begin" -v e="$end" '$0 == b { p = 1 } p { print } $0 == e { p = 0 }' "$session_env"
     else
-      echo "candidate: none"
+      echo "preview: none (the session's own: J1)"
     fi
     ;;
   *)
