@@ -46,3 +46,22 @@ Shell 控制 socket 新增：`chat`（唯讀 JSON：狀態、事件種類、變�
 G3 固定模板由 Shell **實際掛載物件的 config** 回報 artifact id。Core 只有在 id 與預期生成版本相同、元件已掛載可見時，才承認啟用成功。缺 id 或仍回報舊 id，會進入既有 readback 失敗與補償路徑。升版不能只憑不變的 entry id 判定成功。
 
 舊 Core 的 strict schema 不接受此新增欄位，故新增欄位只由配對的 G3 Core／Shell build 使用；混用舊 Core 會明確拒絕，不忽略欄位。新 Core 配舊 Shell 可以維持普通桌面；生成啟用因缺少版本證據而失敗，不宣告成功。此增補不新增事件、錯誤列舉或 approval 類型。三個共用向量涵蓋舊格式、新格式及錯誤型別拒絕。
+
+## 6. Codex 訂閱可用性與錯誤原因
+
+`agent.providers.status` 的 `available: false` 表示這次執行無法提供 Codex 訂閱連線，可能未配置支援版本，也可能初始化失敗；不能據此宣稱只是尚未登入。Shell 只在 `available: true` 且未登入時提供訂閱登入入口。AI 設定仍保留 API 金鑰選項；桌面啟動不要求 Codex。
+
+登入等 provider 請求沿用既有 `unavailable` 錯誤及 `data.reason: system_unavailable`，在選用的 `data` 物件內帶 `reason_code`；不新增 `UnavailableReason` 或 schema 欄位。Runtime 與 Core 僅傳遞以下原因碼：
+
+| reason_code | 意義 |
+| --- | --- |
+| `backend_unsupported` | 訂閱連線無法提供所需操作 |
+| `provider_unavailable` | 模型連線不可用 |
+| `provider_timeout` | 模型連線逾時 |
+| `rate_limited` | 訂閱額度限制 |
+
+Core 不轉送任意遠端錯誤資料或原始訊息。Shell 用原因碼選擇 i18n 文案，診斷另行呈現；有明確原因碼的失敗不當作啟動中自動重試。
+
+參考工作階段安裝程式會在找不到釘選 Codex 時提示安裝、重新安裝工作階段與重新登入，或改用 API 金鑰。登入後的 `$XDG_RUNTIME_DIR/ditto/session.env` 有 `DITTO_CODEX_STATUS=available|backend_unsupported`，只記錄安裝時是否配置釘選檔案，不代表執行期健康；執行期以 `agent.providers.status` 回讀為準。
+
+開發回歸入口：`python3 tests/g4/codex-availability/test.py`（設 `TMPDIR` 為 lane scratch）、`cargo test -p ditto-core provider_route`、`corepack pnpm --filter @ditto/agent-runtime test`、`tests/g4/visual/run.sh <evidence-dir>`。安裝測試只執行原安裝程式的選擇與 session 環境區段，不執行安裝或啟動桌面。

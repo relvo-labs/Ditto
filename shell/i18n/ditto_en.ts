@@ -1138,6 +1138,10 @@
         <translation>AI chat is off; the desktop works as usual</translation>
     </message>
     <message>
+        <source>Codex 訂閱暫不可用</source>
+        <translation>Codex subscription unavailable</translation>
+    </message>
+    <message>
         <source>只完成了一部分；請查看變更卡</source>
         <translation>Only partly done; see the change card</translation>
     </message>
@@ -1218,8 +1222,8 @@
         <translation>Subscription quota used up; try again after it resets</translation>
     </message>
     <message>
-        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復後重新登入桌面，也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
-        <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair it, then sign in to the desktop again, or use an API key in AI settings. You can keep using the desktop.</translation>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新安裝 Ditto 工作階段並登入；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair Codex, reinstall the Ditto session, then sign in again, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>需要你的確認</source>

@@ -28,6 +28,7 @@ TestCase {
         property var calls: []
         /// method -> { ok: result } | { fail: error }; absent = no answer yet.
         property var replies: ({})
+        signal changeUpdated(var change)
         signal disconnected()
         function t(text) { return text; }
         function key(text) { return text; }
@@ -52,6 +53,7 @@ TestCase {
         }
     }
     Jelly.Tokens { id: tokens }
+    Rectangle { id: captureCanvas; anchors.fill: parent; z: -1; visible: false; color: tokens.background }
 
     Component { id: conversationComponent; Chat.ConversationState {} }
     Component { id: entryComponent; Assistant.AssistantEntry {} }
@@ -388,12 +390,29 @@ TestCase {
             { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
         verify(chat !== null);
         verify(named(page, "aiProviderStatus").text.indexOf("無法使用 Codex 訂閱") >= 0);
-        verify(conversation.stateText.indexOf("無法使用 Codex 訂閱") >= 0);
+        verify(conversation.stateText.indexOf("Codex 訂閱暫不可用") >= 0);
         for (const surface of [page, chat]) {
             const signIn = find(surface, item => item.text === "使用 Codex 訂閱登入");
             verify(signIn && !signIn.visible, "missing backend still offers sign-in");
         }
         verify(find(chat, item => item.visible && item.text && item.text.indexOf("API 金鑰") >= 0));
+        // Isolated production surfaces on the existing light theme; fixture
+        // data only. Hide sibling surfaces before grabbing their native pixels.
+        const appearance = tokens.appearance;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        captureCanvas.visible = true;
+        entry.visible = false;
+        chat.visible = false;
+        waitForRendering(page, 250);
+        grabImage(page).save(Qt.resolvedUrl("../.staged/out/ai-settings-no-codex.png").toString().replace("file://", ""));
+        page.visible = false;
+        chat.visible = true;
+        waitForRendering(chat, 250);
+        grabImage(chat).save(Qt.resolvedUrl("../.staged/out/ai-chat-no-codex.png").toString().replace("file://", ""));
+        page.visible = true;
+        entry.visible = true;
+        captureCanvas.visible = false;
+        tokens.appearance = appearance;
         conversation.startLogin();
         compare(count("agent.providers.login"), 0);
         readsOnly();
@@ -421,7 +440,7 @@ TestCase {
 
     function test_direct_model_ignores_missing_codex() {
         answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn, {provider: "direct-model"}) },
-            "agent.providers.status": { ok: ready } });
+            "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
         const page = settingsPage();
         verify(find(page, item => item.visible && item.text === "儲存並使用"));
         verify(!find(page, item => item.text === "使用 Codex 訂閱登入").visible);
@@ -429,7 +448,7 @@ TestCase {
 
     function test_provider_closed_data() {
         return [
-            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "無法使用 Codex 訂閱" },
+            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "Codex 訂閱暫不可用" },
             { tag: "signed-out", provider: { available: true, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "模型尚未連接" },
             { tag: "core-disconnected", provider: null, status: "core_offline", text: "桌面服務未連線" },
             { tag: "ai-off", provider: null, status: "disabled", text: "AI 對話已關閉" }

@@ -71,7 +71,7 @@ QtObject {
     readonly property bool subscriptionSelected: !!settings && settings.provider === "codex-app-server"
     readonly property bool subscriptionUnavailable: subscriptionSelected && !!provider && provider.available === false
     readonly property bool canLogin: subscriptionSelected && !!provider && provider.available === true && !provider.authenticated
-    readonly property string subscriptionUnavailableText: client.t(qsTr("這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復後重新登入桌面，也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。"))
+    readonly property string subscriptionUnavailableText: client.t(qsTr("這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新安裝 Ditto 工作階段並登入；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。"))
     readonly property bool turnActive: !!turn && ["queued", "running", "awaiting_approval", "cancelling"].indexOf(turn.state) >= 0
 
     /// idle | thinking | executing | awaiting | done | failed | offline
@@ -146,7 +146,7 @@ QtObject {
         : settings && settings.enabled === false
             ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
             : settings && settings.enabled === true && provider && !connected
-                ? (subscriptionUnavailable ? subscriptionUnavailableText : client.t(qsTr("模型尚未連接；桌面仍可照常操作"))) : ""
+                ? (subscriptionUnavailable ? client.t(qsTr("Codex 訂閱暫不可用")) : client.t(qsTr("模型尚未連接；桌面仍可照常操作"))) : ""
 
     readonly property string stateText: {
         const result = turn && ["partial", "unknown", "cancelled"].indexOf(turn.state) >= 0
