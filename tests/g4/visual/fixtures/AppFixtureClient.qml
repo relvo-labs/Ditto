@@ -92,7 +92,16 @@ QtObject {
         ["ditto.tasks.panel", ["ui.tasks_panel"]], ["ditto.notifications.area", ["ui.notifications"]]
     ]
 
+    /// The appearance tokens `desktop.appearance.get` answers with; a test
+    /// changes them to stand for a change committed elsewhere (dittoctl, the
+    /// Agent, an undo). Every read is recorded in `reads`.
+    property var appearanceTokens: ({ accent: "#b9a4ff" })
+    /// When set, the whole appearance `desktop.appearance.get` answers with
+    /// (a test keeps it equal to the projection it gives the Shell).
+    property var appearanceValue: null
+    property var reads: []
     function capability(method, args, ok, fail) {
+        reads = reads.concat([method]);
         const answer = {
             "desktop.profiles.list": () => ({ profiles: profiles }),
             "desktop.profiles.get": () => {
@@ -119,8 +128,9 @@ QtObject {
                 { package: "ditto.layout.tile", name_key: "layout.tile" }] }),
             "desktop.changes.list": () => ({ changes: [] }),
             "desktop.appearance.get": () => ({
-                appearance: { theme: "soft-jelly-light", tokens: { accent: "#b9a4ff" }, locale: "zh-TW",
-                              reduced_motion: false, reduced_transparency: false, low_power_style: false },
+                appearance: appearanceValue ? appearanceValue
+                    : { theme: "soft-jelly-light", tokens: Object.assign({}, appearanceTokens), locale: "zh-TW",
+                        reduced_motion: false, reduced_transparency: false, low_power_style: false },
                 avatar: { enabled: true, hidden: false, scale: 1, animations: true, corner: "bottom_right", presentation: "assistant" } }),
             "desktop.shortcuts.list": () => ({ shortcuts: [] }),
             "desktop.commands.list": () => ({ commands: [{ command_id: "assistant.toggle", title_key: "command.assistant" }] }),

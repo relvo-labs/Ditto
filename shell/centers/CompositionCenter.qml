@@ -99,6 +99,10 @@ Flickable {
         function onProfileChanged(payload) {
             page.reload();
         }
+        // After a resync or a reconnect: what was missed is read again.
+        function onCapabilitiesReloaded() {
+            page.reload();
+        }
         function onChangeUpdated(change) {
             if (page.lastRecord && change.change_id === page.lastRecord.change_id) {
                 client.capability("desktop.changes.get", { change_id: change.change_id }, function (record) {

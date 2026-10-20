@@ -148,8 +148,15 @@ Flickable {
         client.setAppearance(fields, done, fail);
     }
 
+    /// The appearance every control shows and every "already chosen"
+    /// judgement uses: the committed projection the Shell runs
+    /// (`tokens.appearance`, from Core at every commit and at every
+    /// (re)connect), not this page's own read, which can miss an event.
+    /// Before Core has sent a projection, the page's read.
+    readonly property var committed: tokens.appearance ? tokens.appearance : appearance
+
     function token(name) {
-        return appearance && appearance.tokens ? appearance.tokens[name] : undefined;
+        return committed && committed.tokens ? committed.tokens[name] : undefined;
     }
 
     function setAvatar(field, value) {
@@ -177,6 +184,11 @@ Flickable {
     Connections {
         target: page.client
         function onProfileChanged(payload) {
+            page.reload();
+        }
+        // After a resync or a reconnect (the catalog is read again on both),
+        // as the plugin center does: an event missed meanwhile is not lost.
+        function onCapabilitiesReloaded() {
             page.reload();
         }
     }
@@ -247,7 +259,7 @@ Flickable {
                 tokens: page.tokens
                 enabled: !page.busy && !!page.appearance
                 accessibleName: page.t(qsTr("外觀風格"))
-                value: page.token("ui_style") || "j1"
+                value: page.tokens.uiStyleChosen
                 defaultValue: "j1"
                 defaultNote: page.t(qsTr("預設"))
                 options: [
@@ -259,7 +271,7 @@ Flickable {
                       caption: page.t(qsTr("泡泡與虹彩細邊，留白最多。")) }
                 ]
                 onChosen: value => {
-                    if (value !== (page.token("ui_style") || "j1")) page.setAppearance({ tokens: { ui_style: value } });
+                    if (value !== page.tokens.uiStyleChosen) page.setAppearance({ tokens: { ui_style: value } });
                 }
             }
             Text {
@@ -369,7 +381,7 @@ Flickable {
                 text: page.t(qsTr("降低透明度"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: !!page.appearance && page.appearance.reduced_transparency === true
+                checked: !!page.committed && page.committed.reduced_transparency === true
                 onToggled: value => page.setAppearance({ reduced_transparency: value })
             }
 
@@ -387,7 +399,7 @@ Flickable {
                 text: page.t(qsTr("低效能樣式（關閉模糊與陰影）"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: !!page.appearance && page.appearance.low_power_style === true
+                checked: !!page.committed && page.committed.low_power_style === true
                 onToggled: value => page.setAppearance({ low_power_style: value })
             }
         }
@@ -402,7 +414,7 @@ Flickable {
                 text: page.t(qsTr("減少動畫"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: !!page.appearance && page.appearance.reduced_motion === true
+                checked: !!page.committed && page.committed.reduced_motion === true
                 onToggled: value => page.setAppearance({ reduced_motion: value })
             }
 
@@ -424,7 +436,7 @@ Flickable {
             Choice {
                 tokens: page.tokens
                 enabled: !page.busy && !!page.appearance
-                value: page.appearance ? page.appearance.locale : "zh-TW"
+                value: page.committed && page.committed.locale ? page.committed.locale : "zh-TW"
                 accessibleName: page.t(qsTr("語言"))
                 options: [{ value: "zh-TW", label: qsTr("繁體中文") }, { value: "en", label: "English" }]
                 onChosen: value => page.setAppearance({ locale: value })

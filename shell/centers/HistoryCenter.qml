@@ -90,6 +90,10 @@ Flickable {
 
     Connections {
         target: page.client
+        // After a resync or a reconnect: changes made meanwhile are listed.
+        function onCapabilitiesReloaded() {
+            page.reload();
+        }
         function onChangeUpdated(change) {
             const index = page.changes.findIndex(item => item.change_id === change.change_id);
             if (index < 0) {

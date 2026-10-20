@@ -59,6 +59,10 @@ TestCase {
         return object;
     }
     function tokensOf(tree, appearance) {
+        // The page reads Core (the fixture) in the base and the projection in
+        // the current tree (#116 repair 1): both are the same document.
+        client.appearanceValue = appearance ? Object.assign({ tokens: {}, locale: "zh-TW", reduced_motion: false,
+            reduced_transparency: false, low_power_style: false }, appearance) : null;
         return make(tree, "shell/jelly/Tokens.qml", { appearance: appearance });
     }
     function snapshot() {
