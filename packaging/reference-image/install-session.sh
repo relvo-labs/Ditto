@@ -87,7 +87,7 @@ if [[ -n "$codex" && -f "$codex" && "$(sha256sum "$codex" | cut -d' ' -f1)" == "
   agent_backend_args="--agent-backend \"codex-app-server $pin_version $pin_sha $codex\""
   echo "Codex backend: $codex (pinned $pin_version)" >&2
 else
-  echo "Codex 訂閱無法使用：找不到 Ditto 支援的 Codex $pin_version（未安裝或檔案不符）。桌面仍可使用。請依 $workspace/tools/codex/README.md 安裝後重新執行本安裝程式並重新登入桌面，或在 AI 設定使用 API 金鑰。" >&2
+  echo "Codex subscription unavailable: supported Codex $pin_version was not found (missing or checksum mismatch). The desktop remains usable. Read $workspace/packaging/reference-image/README.md, install the supported version, rerun this installer and sign in to the desktop again, or use an API key in AI settings." >&2
 fi
 bash "$workspace/scripts/build-builtin-packages.sh" "$workspace/target/ditto-packages" >/dev/null
 # hostd's Node/V8 flags have one source; every launch path reads the same file.

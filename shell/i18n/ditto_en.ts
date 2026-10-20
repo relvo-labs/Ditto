@@ -645,6 +645,10 @@
         <translation>AI settings</translation>
     </message>
     <message>
+        <source>API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。</source>
+        <translation>The API key is unavailable. Add a key in AI settings, or unlock the system keyring and reopen AI settings.</translation>
+    </message>
+    <message>
         <source>Ditto 對話</source>
         <translation>Ditto chat</translation>
     </message>
@@ -679,6 +683,10 @@
     <message>
         <source>刪除這段對話（桌面維持原樣）</source>
         <translation>Delete this conversation (the desktop stays as it is)</translation>
+    </message>
+    <message>
+        <source>前往 AI 設定</source>
+        <translation>Open AI settings</translation>
     </message>
     <message>
         <source>剪貼簿</source>
@@ -1138,7 +1146,7 @@
         <translation>AI chat is off; the desktop works as usual</translation>
     </message>
     <message>
-        <source>Codex 訂閱暫不可用</source>
+        <source>Codex 訂閱無法使用</source>
         <translation>Codex subscription unavailable</translation>
     </message>
     <message>
@@ -1214,6 +1222,10 @@
         <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
+        <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
+        <translation>The selected model or reasoning effort is not supported. Choose another option in AI settings and try again.</translation>
+    </message>
+    <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
         <translation>The result is not confirmed yet; do not send it again — see the change history</translation>
     </message>
@@ -1222,8 +1234,8 @@
         <translation>Subscription quota used up; try again after it resets</translation>
     </message>
     <message>
-        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新安裝 Ditto 工作階段並登入；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
-        <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair Codex, reinstall the Ditto session, then sign in again, or use an API key in AI settings. You can keep using the desktop.</translation>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair Codex, rerun the Ditto installer, then sign in to the desktop again, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>需要你的確認</source>

@@ -645,6 +645,10 @@
         <translation>AI 設定</translation>
     </message>
     <message>
+        <source>API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。</source>
+        <translation>API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。</translation>
+    </message>
+    <message>
         <source>Ditto 對話</source>
         <translation>Ditto 對話</translation>
     </message>
@@ -679,6 +683,10 @@
     <message>
         <source>刪除這段對話（桌面維持原樣）</source>
         <translation>刪除這段對話（桌面維持原樣）</translation>
+    </message>
+    <message>
+        <source>前往 AI 設定</source>
+        <translation>前往 AI 設定</translation>
     </message>
     <message>
         <source>剪貼簿</source>
@@ -1138,8 +1146,8 @@
         <translation>AI 對話已關閉；桌面仍可照常操作</translation>
     </message>
     <message>
-        <source>Codex 訂閱暫不可用</source>
-        <translation>Codex 訂閱暫不可用</translation>
+        <source>Codex 訂閱無法使用</source>
+        <translation>Codex 訂閱無法使用</translation>
     </message>
     <message>
         <source>只完成了一部分；請查看變更卡</source>
@@ -1214,6 +1222,10 @@
         <translation>無法讀取 AI 設定；重新開啟會再讀取</translation>
     </message>
     <message>
+        <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
+        <translation>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</translation>
+    </message>
+    <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
         <translation>結果尚未確認；不要重複送出，請查看變更紀錄</translation>
     </message>
@@ -1222,8 +1234,8 @@
         <translation>訂閱額度已用完；等額度重設後再試</translation>
     </message>
     <message>
-        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新安裝 Ditto 工作階段並登入；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
-        <translation>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新安裝 Ditto 工作階段並登入；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
     <message>
         <source>需要你的確認</source>

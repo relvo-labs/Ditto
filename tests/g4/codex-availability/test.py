@@ -6,6 +6,7 @@ No install, network, systemd, compositor or real Codex is invoked.
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -27,21 +28,35 @@ class CodexAvailability(unittest.TestCase):
             installer = (ROOT / "packaging/reference-image/install-session.sh").read_text()
             selection = installer[installer.index('codex="$(readlink'):installer.index('bash "$workspace/scripts/build-builtin-packages.sh"')]
             session = (ROOT / "packaging/reference-image/session/ditto-session").read_text()
-            env_block = session[session.rindex('{\n', 0, session.index('  echo "WAYFIRE_SOCKET=')):session.index('chmod 0600 "$session_env"')]
+            env_block = session[session.rindex('{\n', 0, session.index('  echo "WAYFIRE_SOCKET=')):session.index('# D-Bus-activated services')]
             # Render exactly the installer-owned status placeholder, then run
             # the production env-file block without launching a desktop.
-            script = selection + '\n' + env_block.replace('@DITTO_CODEX_STATUS@', '${agent_backend_status}')
+            script = selection + '\n{\n' + env_block.replace('@DITTO_CODEX_STATUS@', '${agent_backend_status}') + '\n} 2>"$session_notice"'
             result = subprocess.run(['bash', '-eu', '-c', script], env={**os.environ,
                 'workspace': directory, 'DITTO_CODEX_BINARY': str(codex),
-                'WAYFIRE_SOCKET': 'fixture', 'variant': '', 'session_env': str(scratch / 'session.env')},
+                'WAYFIRE_SOCKET': 'fixture', 'variant': '', 'session_env': str(scratch / 'session.env'), 'session_notice': str(scratch / 'notice')},
                 text=True, capture_output=True, check=True)
             self.assertIn('DITTO_CODEX_STATUS=' + expected, (scratch / 'session.env').read_text())
             if expected == 'backend_unsupported':
-                self.assertIn('API', result.stderr)
-                self.assertIn('fixture', result.stderr)
-                self.assertIn('重新登入', result.stderr)
+                with self.subTest(check='help-path'):
+                    paths = re.findall(r'\S+README\.md', result.stderr)
+                    self.assertEqual(len(paths), 1, result.stderr)
+                    self.assertTrue((ROOT / Path(paths[0]).relative_to(scratch)).is_file(), result.stderr)
+                with self.subTest(check='installer-language-and-next-step'):
+                    self.assertTrue(result.stderr.isascii(), result.stderr)
+                    self.assertIn('API', result.stderr)
+                    self.assertIn('fixture', result.stderr)
+                    self.assertIn('rerun', result.stderr)
+                with self.subTest(check='session-notice'):
+                    notice = (scratch / 'notice').read_text()
+                    self.assertIn('Codex 訂閱無法使用', notice)
+                    self.assertIn('安裝程式', notice)
+                    self.assertIn('API 金鑰', notice)
+                    self.assertIn('桌面仍可照常操作', notice)
             else:
                 self.assertIn('pinned fixture', result.stderr)
+                self.assertTrue(result.stderr.isascii(), result.stderr)
+                self.assertEqual((scratch / 'notice').read_text(), '')
 
     def test_missing(self):
         self.check_selection(None, 'backend_unsupported')

@@ -189,6 +189,28 @@ Item {
                 }
             }
 
+            Column {
+                visible: window.conversation.enabled && !!window.conversation.settings
+                    && window.conversation.settings.provider === "direct-model"
+                    && !!window.conversation.provider && !window.conversation.connected
+                width: parent.width
+                spacing: window.tokens.spaceTight
+                Text {
+                    objectName: "apiKeyStatus"
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: window.t(qsTr("API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。"))
+                    color: window.tokens.foregroundMuted
+                    font.pixelSize: window.tokens.fontBody
+                }
+                Button {
+                    objectName: "apiKeySettings"
+                    tokens: window.tokens
+                    text: window.t(qsTr("前往 AI 設定"))
+                    onClicked: window.settingsRequested()
+                }
+            }
+
             // Signed out: the official device-code sign-in of the Codex
             // subscription. No API key field on this path.
             Column {

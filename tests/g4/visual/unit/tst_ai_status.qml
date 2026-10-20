@@ -383,8 +383,6 @@ TestCase {
         readsOnly();
     }
 
-    /// Readback that says the model cannot be used now: confirmed, not a
-    /// read failure.
     function test_missing_backend_surfaces() {
         answer({ "agent.settings.describe": { ok: settingsOn },
             "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
@@ -393,7 +391,7 @@ TestCase {
             { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
         verify(chat !== null);
         verify(named(page, "aiProviderStatus").text.indexOf("無法使用 Codex 訂閱") >= 0);
-        verify(conversation.stateText.indexOf("Codex 訂閱暫不可用") >= 0);
+        verify(conversation.stateText.indexOf("Codex 訂閱無法使用") >= 0);
         for (const surface of [page, chat]) {
             const signIn = find(surface, item => item.text === "使用 Codex 訂閱登入");
             verify(signIn && !signIn.visible, "missing backend still offers sign-in");
@@ -487,9 +485,73 @@ TestCase {
         readsOnly();
     }
 
+    function test_unsupported_model_does_not_suggest_installing_codex() {
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
+        conversation.open();
+        verify(conversation.connected);
+        conversation.turn = { turn_id: "fixture-turn", state: "failed", error_reason: "backend_unsupported" };
+        verify(conversation.stateText.indexOf("模型或思考深度") >= 0, conversation.stateText);
+        verify(conversation.stateText.indexOf("AI 設定") >= 0);
+        verify(conversation.stateText.indexOf("安裝") < 0);
+        conversation.provider = Object.assign({}, ready, { available: false, authenticated: false });
+        compare(conversation.failureText(conversation.turn), conversation.subscriptionUnavailableText);
+        readsOnly();
+    }
+
+    function test_failed_settings_fences_pending_provider_data() {
+        return [{ tag: "codex", direct: false }, { tag: "api-key", direct: true }];
+    }
+    function test_failed_settings_fences_pending_provider(data) {
+        const prefs = data.direct ? Object.assign({}, settingsOn, { provider: "direct-model",
+            endpoint: "https://api.example.com/v1", auth: { kind: "api_key", credential_ref: "fixture-key" } }) : settingsOn;
+        answer({ "agent.settings.describe": { ok: prefs } });
+        conversation.open();
+        const pending = client.pending[data.direct ? "agent.credentials.status" : "agent.providers.status"];
+        verify(pending && pending.ok && pending.fail);
+        answer({ "agent.settings.describe": { fail: error("internal") } });
+        conversation.refreshSettings();
+        compare(conversation.provider, null);
+        const diagnostic = conversation.errorDiagnostic;
+        pending.ok(data.direct ? { available: true } : ready);
+        compare(conversation.provider, null);
+        compare(report().connected, null);
+        pending.fail(error("timeout"));
+        compare(conversation.errorDiagnostic, diagnostic);
+        compare(conversation.providerFailed, false);
+        readsOnly();
+    }
+
+    function test_api_key_unavailable_has_settings_action_data() {
+        return [{ tag: "missing", auth: null }, { tag: "locked", auth: { kind: "api_key", credential_ref: "fixture-key" } }];
+    }
+    function test_api_key_unavailable_has_settings_action(data) {
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn,
+            { provider: "direct-model", endpoint: "https://api.example.com/v1", auth: data.auth }) },
+            "agent.credentials.status": { ok: { available: false } } });
+        conversation.open();
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        const notice = named(chat, "apiKeyStatus");
+        verify(notice && notice.visible, "missing API key next step");
+        verify(notice.text.indexOf("金鑰") >= 0 && notice.text.indexOf("解鎖") >= 0);
+        const action = named(chat, "apiKeySettings");
+        verify(action && action.visible && action.enabled);
+        const spy = Qt.createQmlObject('import QtTest; SignalSpy { signalName: "settingsRequested" }', testCase);
+        spy.target = chat;
+        action.clicked();
+        compare(spy.count, 1);
+        spy.destroy();
+        compare(find(chat, item => item.text === "送出").enabled, false);
+        compare(count("agent.providers.login"), 0);
+        readsOnly();
+    }
+
+    /// Readback that says the model cannot be used now: confirmed, not a
+    /// read failure.
     function test_provider_closed_data() {
         return [
-            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "Codex 訂閱暫不可用" },
+            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "Codex 訂閱無法使用" },
             { tag: "signed-out", provider: { available: true, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "模型尚未連接" },
             { tag: "core-disconnected", provider: null, status: "core_offline", text: "桌面服務未連線" },
             { tag: "ai-off", provider: null, status: "disabled", text: "AI 對話已關閉" }
