@@ -28,7 +28,10 @@ try{
 finally{
   try{process.kill(-child.pid,'SIGTERM')}catch{}
   await sleep(300);try{process.kill(-child.pid,'SIGKILL')}catch{}
-  try{execFileSync('systemctl',['--user','stop','ditto-job-*.scope'],{stdio:'ignore'})}catch{}
+  // Only the job scopes this run's Core created (driver.mjs lists them): a
+  // ditto-job-* glob would also stop a logged-in session's jobs (#124).
+  const own=existsSync(root+'/job-scopes')?[...new Set(readFileSync(root+'/job-scopes','utf8').split('\n').filter(Boolean))]:[]
+  if(own.length)try{execFileSync('systemctl',['--user','stop',...own],{stdio:'ignore'})}catch{}
   function writable(p){const s=lstatSync(p);if(s.isSymbolicLink())return;if(s.isDirectory()){chmodSync(p,0o700);for(const n of readdirSync(p))writable(p+'/'+n)}else chmodSync(p,0o600)}
   writable(root);rmSync(root,{recursive:true,force:true})
 }

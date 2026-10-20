@@ -11,9 +11,9 @@
     "ditto_commit": "fill from git rev-parse HEAD"
   },
   "units": [
-    { "name": "ditto-core.service", "layer": "core", "scope": "user" },
-    { "name": "ditto-shell.service", "layer": "shell", "scope": "user" },
-    { "name": "ditto-wayfire-session.scope", "layer": "compositor", "scope": "user" }
+    { "name": "ditto-measure-core.service", "layer": "core", "scope": "user" },
+    { "name": "ditto-measure-shell.service", "layer": "shell", "scope": "user" },
+    { "name": "ditto-measure-wayfire.service", "layer": "compositor", "scope": "user" }
   ],
   "excluded": [
     { "unit": "firefox.scope", "reason": "application the user opened" },
