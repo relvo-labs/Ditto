@@ -308,7 +308,7 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 | `GroupedList`／`ListRow` | 成組設定列，水面般的分隔線，放不下時控制項換到下一行 | Grouping＋列名 |
 | `OverflowMenu` | 卡片的 `⋯`，最多兩個主要動作以外的動作 | Enter／Space／↓ 開啟，↑↓ 循環並略過不可用項，Escape／Tab 關閉並回到按鈕；Escape 不會再關掉外層視窗；不可用項說明原因 |
 | `WindowControls`／`WindowHeader` | 自有視窗的單一標題列與三顆果凍珠；拖曳移動、雙擊放大 | 每顆都是有文字名稱的 Button，Tab／Enter／Space，命中區 28 px |
-| `EmptyState` | 單一空狀態：角色、標題、說明、主要動作、範例；不會畫出自己的框；矮於 470 px 時改用精簡版（52 px 角色、泡泡貼近角色、兩則範例），仍放不下就在框內捲動 | 範例是靜態引述，不是按鈕 |
+| `EmptyState` | 單一空狀態：角色、標題、說明、主要動作、範例；不會畫出自己的框；矮於 470 px 時改用精簡版（44 px 角色、泡泡貼近角色、兩則範例、說明可占兩行），仍放不下（放大文字）就在框內捲動 | 範例是靜態引述，不是按鈕，但每則是可讀出的 Tab 停點；焦點移入會捲到可見（`FocusReveal.js`，與中心頁共用），PageUp／PageDown 翻頁 |
 | `StylePicker` | 個人化中心的「外觀風格」：三張卡片，各有該風格自己的 Tokens 畫的即時小預覽、名稱與一句說明 | 一個 Tab 停點，方向鍵／Home／End 移動焦點但不選，Enter／Space／點擊才選；RadioButton＋名稱＋描述；預覽跟著降低透明度／低效能 |
 
 既有 `Button`（primary／secondary＝tonal／subtle＝ghost／danger／`dangerQuiet`，另加 `checked`、`jellyPad`）、`Badge`、`Section`、`Toggle`、`TextField`、`TextArea`、`Diagnostics`、`ChatInput` 只在有風格時換外觀（`SegmentedControl` 另有 `segmentPad`）。頁面：組合中心的元件列改成成組清單；每張組合卡最多「試看」「使用這個組合」，其餘（版本與差異、比較、複製、重新命名、匯出、刪除）在固定位置的 `⋯`；使用中的卡刪除項停用並說明；版本的起點／終點以已選凸珠表示。側欄不再重複「Ditto」，選中頁是泡泡。視窗高度在已知螢幕高度時留出 `uiWindowClearance`（228 px），讓 Wayfire 置中（工作區或輸出）時標題列在頂部列與待辦面板之下、底部在 Dock 之上；頁面有捲動條，Tab 到畫面外的控制項會捲進來，PageUp／PageDown 翻頁。對話：完整視窗只有一個標題；「對話／歷史」是分頁，「新對話／AI 設定／收合」是工具鈕（一行放不下時換到分頁下方，不重疊）；AI 關閉時沒有「新對話」，且沒有訊息時是一個空狀態（D1 小 Ditto、說明、「開啟 AI 對話」走同一個 `setEnabled`、三則範例），狀態徽章不再重複；輸入框停用時說明原因。確認視窗只換外觀，唯一的視窗鈕是「拒絕並關閉」。`tst_ui_style_pages.qml` 在基底上 10／12 失敗、目前 12／12 通過。
@@ -335,6 +335,14 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 | AI 關閉仍有「新對話」 | AI 關閉時隱藏 | 同上 |
 | J3 視窗鈕、邊界、灰字太淡；J3 分頁與工具重疊 | 見 §8.2；工具鈕放不下時換行、compact 工具列內距 14 | 同上 |
 | 三種 foot 幾乎一樣 | 三組色盤與標題列色 | `check-styles.py` |
+
+### 8.5.1 修正輪 1（獨立審查 R1–R3、VM @b0dc73b）
+
+- 個人化中心的選取標記與「已是目前值」判斷改看已提交投影（`tokens.appearance`），重同步／重連（`capabilitiesReloaded`）後重讀；組合中心、變更紀錄同樣重讀。
+- `WindowHeader` 只移除自己加上的 `FramelessWindowHint`，切到深色／無主題或撤銷時原生標題列回來（offscreen 斷言旗標值，真實 Wayfire 由 VM 驗證）。
+- 對話面板、對話視窗與確認視窗用 `uiSheet`（α0.99，降低透明度時不透明），不再透出後方設定視窗。compact 對話面板依設計沒有視窗鈕：它是角色旁的 layer-shell 面板，不是一般視窗，以 Escape 或助理入口關閉，「展開」開啟有視窗鈕的完整視窗。
+- 測試：`tests/g4/visual/unit/tst_ui_style_repair1.qml`。offscreen 文字比 VM 窄約 4%，所以 compact 案例另以 `font_scale` 1.05 重現 VM 的兩行說明。
+- Follow-up（本輪不修）：J2 說明「色／彩」斷在詞中；對話輸入框 placeholder 截斷；灰字偏淡但已達 4.5:1；對話訊息清單（ListView）中變更卡的按鈕 Tab 到畫面外時不會捲入（基底即有）；`TextArea` 游標移出可見範圍時不跟隨（基底即有）。
 
 ### 8.6 待 owner 決定
 
