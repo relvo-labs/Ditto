@@ -149,6 +149,7 @@ PYEOF
 install -d -m 0700 "$XDG_RUNTIME_DIR/ditto"
 {
   echo "DITTO_CODEX_STATUS=@DITTO_CODEX_STATUS@"
+  echo "DITTO_CODEX_LANDLOCK_ABI=@DITTO_CODEX_LANDLOCK_ABI@"
   echo "WAYFIRE_SOCKET=$WAYFIRE_SOCKET"
   echo "_WAYFIRE_SOCKET=$WAYFIRE_SOCKET"
   case "$variant" in
@@ -170,7 +171,9 @@ install -d -m 0700 "$XDG_RUNTIME_DIR/ditto"
   if [[ -n "$variant" ]]; then echo "DITTO_MEASURE_CONDITIONS=$conditions"; fi
 } >"$session_env"
 chmod 0600 "$session_env"
-if [[ "@DITTO_CODEX_STATUS@" == backend_unsupported ]]; then
+if [[ "@DITTO_CODEX_STATUS@" == isolation_unavailable ]]; then
+  echo '這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。' >&2
+elif [[ "@DITTO_CODEX_STATUS@" == backend_unsupported ]]; then
   echo 'Codex 訂閱無法使用：請安裝 Ditto 支援的版本後重新執行 Ditto 安裝程式並重新登入，或在 AI 設定使用 API 金鑰。桌面仍可照常操作。' >&2
 fi
 

@@ -486,7 +486,8 @@ TestCase {
     }
 
     function test_unsupported_model_does_not_suggest_installing_codex() {
-        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready },
+            "agent.runtime.get": { ok: { phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null } } });
         conversation.open();
         verify(conversation.connected);
         conversation.turn = { turn_id: "fixture-turn", state: "failed", error_reason: "backend_unsupported" };
@@ -554,6 +555,91 @@ TestCase {
         captureCanvas.visible = false;
         tokens.appearance = appearance;
         readsOnly();
+    }
+
+    function test_runtime_failures_have_correct_next_steps_data() {
+        return [
+            { tag: "isolation", reason: "isolation_unavailable", text: "安全隔離", noInstall: true },
+            { tag: "isolation-unread", reason: "isolation_unavailable", text: "安全隔離", noInstall: true, unread: true },
+            { tag: "isolation-stale", reason: "isolation_unavailable", text: "安全隔離", noInstall: true, stale: true },
+            { tag: "binary", reason: "backend_binary_mismatch", text: "檔案不符合", noInstall: false },
+            { tag: "catalog", reason: "backend_catalog_unavailable", text: "模型清單", noInstall: false },
+            { tag: "backend-launch", reason: "backend_launch_failed", text: "啟動成功", noInstall: true },
+            { tag: "controller-launch", reason: "launch_failed", text: "啟動成功", noInstall: true },
+            { tag: "startup", reason: "startup_timeout", text: "啟動成功", noInstall: true },
+            { tag: "exited", reason: "backend_exited", text: "已中斷", noInstall: true },
+            { tag: "drain", reason: "drain_timeout", text: "已中斷", noInstall: true },
+            { tag: "unknown", reason: "future-unrecognised-code", text: "無法使用 Codex 訂閱", noInstall: false }
+        ];
+    }
+    function test_runtime_failures_have_correct_next_steps(data) {
+        const replies = { "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: data.stale ? ready : { provider: "codex-app-server", available: false, authenticated: false, models: [] } },
+            "agent.runtime.get": { ok: { phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: data.reason } } };
+        if (data.unread) delete replies["agent.providers.status"];
+        answer(replies);
+        const page = settingsPage();
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        const text = named(page, "aiProviderStatus").text;
+        verify(text.indexOf(data.text) >= 0, text);
+        verify(find(chat, item => item.visible && item.text === text), "chat/settings mismatch");
+        if (data.noInstall) verify(text.indexOf("安裝") < 0, text);
+        if (data.reason === "isolation_unavailable") verify(text.indexOf("系統核心") >= 0, text);
+        verify(!conversation.canLogin);
+        compare(conversation.aiStatus, "model_offline");
+        compare(report().connected, false);
+        verify(conversation.stateText.indexOf("Codex 訂閱無法使用") >= 0);
+        for (const surface of [page, chat]) verify(!find(surface, item => item.text === "使用 Codex 訂閱登入").visible);
+        if (data.tag === "isolation") {
+            const appearance = tokens.appearance;
+            tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+            captureCanvas.visible = true;
+            entry.visible = false;
+            chat.visible = false;
+            waitForRendering(page, 250);
+            grabImage(page).save(Qt.resolvedUrl("../.staged/out/ai-settings-isolation.png").toString().replace("file://", ""));
+            page.visible = false;
+            chat.visible = true;
+            waitForRendering(chat, 250);
+            grabImage(chat).save(Qt.resolvedUrl("../.staged/out/ai-chat-isolation.png").toString().replace("file://", ""));
+            page.visible = true;
+            entry.visible = true;
+            captureCanvas.visible = false;
+            tokens.appearance = appearance;
+        }
+        readsOnly();
+    }
+
+    function test_runtime_readback_corrects_an_earlier_backend_error() {
+        conversation.settings = settingsOn;
+        conversation.setError({ name: "unavailable", code: -32007, message: "backend unavailable",
+            data: { reason: "system_unavailable", reason_code: "backend_unsupported" } });
+        conversation.runtime = { phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: "isolation_unavailable" };
+        compare(conversation.errorText, conversation.subscriptionUnavailableText);
+        verify(conversation.errorText.indexOf("安全隔離") >= 0);
+        verify(conversation.errorText.indexOf("安裝") < 0);
+    }
+
+    function test_missing_backend_turn_does_not_blame_model_data() {
+        const rows = [];
+        for (const provider of [null, ready]) {
+            for (const reason of ["isolation_unavailable", "backend_binary_mismatch", null]) {
+                rows.push({ tag: (provider ? "stale" : "unread") + "-" + (reason || "no-pid"), provider: provider, reason: reason });
+            }
+        }
+        return rows;
+    }
+    function test_missing_backend_turn_does_not_blame_model(data) {
+        conversation.settings = settingsOn;
+        conversation.provider = data.provider;
+        conversation.runtime = { phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: data.reason };
+        const text = conversation.failureText({ state: "failed", error_reason: "backend_unsupported" });
+        verify(text.indexOf("目前選的模型") < 0, text);
+        compare(conversation.connected, false);
+        compare(conversation.canLogin, false);
+        verify(text.indexOf(data.reason === "isolation_unavailable" ? "安全隔離" : "Codex") >= 0, text);
     }
 
     /// Readback that says the model cannot be used now: confirmed, not a

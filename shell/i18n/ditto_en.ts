@@ -1146,8 +1146,16 @@
         <translation>AI chat is off; the desktop works as usual</translation>
     </message>
     <message>
+        <source>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The AI connection could not start. Sign in to the desktop again and retry, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
         <source>Codex 訂閱無法使用</source>
         <translation>Codex subscription unavailable</translation>
+    </message>
+    <message>
+        <source>Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex connection stopped. Reopen the conversation and try again, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>只完成了一部分；請查看變更卡</source>
@@ -1222,6 +1230,10 @@
         <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
+        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex model list could not be read. Verify the supported Codex file and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
         <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
         <translation>The selected model or reasoning effort is not supported. Choose another option in AI settings and try again.</translation>
     </message>
@@ -1232,6 +1244,14 @@
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>Subscription quota used up; try again after it resets</translation>
+    </message>
+    <message>
+        <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>This computer cannot safely isolate Codex. Upgrade the system kernel or adjust its isolation settings, then sign in again, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>這台電腦的 Codex 檔案不符合 Ditto 支援的版本；請依安裝說明核對檔案後重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex file on this computer does not match a version supported by Ditto. Verify it using the installation instructions and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>

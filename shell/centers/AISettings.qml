@@ -116,7 +116,9 @@ Flickable {
                 objectName: "aiProviderStatus"
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: !page.provider
+                text: page.conversation.enabled && page.conversation.subscriptionUnavailable
+                    ? page.conversation.subscriptionUnavailableText
+                    : !page.provider
                     ? (!page.settings ? page.t(qsTr("讀取 AI 設定後才能確認模型連線。"))
                         : !page.conversation.enabled ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
                         : page.conversation.providerFailed ? page.t(qsTr("無法讀取模型連線狀態；目前無法確認是否已登入。"))

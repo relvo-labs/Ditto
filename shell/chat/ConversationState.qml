@@ -41,6 +41,7 @@ QtObject {
     /// The last error, in product language; diagnostics separately.
     property string errorText: ""
     property string errorDiagnostic: ""
+    property string errorReasonCode: ""
     /// The latest settings or provider status read ended in an error (other
     /// than "the Agent is still starting", which is read again). Nothing was
     /// confirmed by it: neither ready, nor off, nor offline. A new read
@@ -48,6 +49,7 @@ QtObject {
     property bool settingsFailed: false
     property bool providerFailed: false
     property int providerRead: 0
+    property int runtimeRead: 0
 
     // ---- what the user has not sent -------------------------------------------------
     property string draft: ""
@@ -69,10 +71,39 @@ QtObject {
 
     readonly property bool enabled: !!settings && settings.enabled === true
     readonly property bool connected: !!provider && provider.available === true && provider.authenticated === true
+        && !runtimeBackendUnavailable
     readonly property bool subscriptionSelected: !!settings && settings.provider === "codex-app-server"
-    readonly property bool subscriptionUnavailable: subscriptionSelected && !!provider && provider.available === false
-    readonly property bool canLogin: subscriptionSelected && !!provider && provider.available === true && !provider.authenticated
-    readonly property string subscriptionUnavailableText: client.t(qsTr("這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。"))
+    readonly property string runtimeFailureText: backendFailureText(runtime ? runtime.failure_reason : null)
+    readonly property bool runtimeBackendUnavailable: subscriptionSelected && !!runtime
+        && (runtimeFailureText.length > 0 || (runtime.phase === "ready" && runtime.backend_pid === null))
+    readonly property bool subscriptionUnavailable: subscriptionSelected
+        && ((!!provider && provider.available === false) || runtimeBackendUnavailable)
+    readonly property bool canLogin: subscriptionSelected && !!provider && provider.available === true && !provider.authenticated && !subscriptionUnavailable
+    readonly property string subscriptionUnavailableText: runtimeFailureText || client.t(qsTr("這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。"))
+    onSubscriptionUnavailableTextChanged: {
+        if (errorReasonCode === "backend_unsupported") errorText = subscriptionUnavailableText;
+    }
+    /// Core's closed runtime vocabulary. These are product recovery steps;
+    /// unknown codes retain the general message, never raw diagnostics.
+    function backendFailureText(reason) {
+        switch (reason) {
+        case "isolation_unavailable":
+            return client.t(qsTr("這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_binary_mismatch":
+            return client.t(qsTr("這台電腦的 Codex 檔案不符合 Ditto 支援的版本；請依安裝說明核對檔案後重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_catalog_unavailable":
+            return client.t(qsTr("無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_launch_failed":
+        case "launch_failed":
+        case "startup_timeout":
+            return client.t(qsTr("AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_exited":
+        case "drain_timeout":
+            return client.t(qsTr("Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        }
+        return "";
+    }
+
     readonly property bool turnActive: !!turn && ["queued", "running", "awaiting_approval", "cancelling"].indexOf(turn.state) >= 0
 
     /// idle | thinking | executing | awaiting | done | failed | offline
@@ -87,6 +118,7 @@ QtObject {
             }
             return toolOpen ? "executing" : "thinking";
         }
+        if (subscriptionUnavailable) return "offline";
         if (runtime && runtime.phase === "starting") {
             return "starting";
         }
@@ -129,6 +161,7 @@ QtObject {
         : !settings ? (settingsFailed ? "failed" : "pending")
         : settings.enabled !== true ? "disabled"
         : connected ? "ready"
+        : subscriptionUnavailable ? "model_offline"
         : provider ? "model_offline"
         : providerFailed ? "failed" : "pending"
 
@@ -146,7 +179,7 @@ QtObject {
         ? client.t(qsTr("桌面服務未連線"))
         : settings && settings.enabled === false
             ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
-            : settings && settings.enabled === true && provider && !connected
+            : settings && settings.enabled === true && (subscriptionUnavailable || (provider && !connected))
                 ? (subscriptionUnavailable ? client.t(qsTr("Codex 訂閱無法使用")) : client.t(qsTr("模型尚未連接；桌面仍可照常操作"))) : ""
 
     readonly property string stateText: {
@@ -196,8 +229,9 @@ QtObject {
         case "provider_timeout":
             return client.t(qsTr("模型沒有回應；桌面沒有被改動，可以再試一次"));
         case "backend_unsupported":
-            return subscriptionUnavailable ? subscriptionUnavailableText
-                : client.t(qsTr("目前選的模型或思考深度不支援；請在 AI 設定改選後再試。"));
+            return !subscriptionUnavailable && runtime && runtime.backend_pid > 0 && runtime.isolation_verified === true
+                ? client.t(qsTr("目前選的模型或思考深度不支援；請在 AI 設定改選後再試。"))
+                : subscriptionUnavailableText;
         case "tool_error":
             return client.t(qsTr("桌面變更沒有完成；請查看變更卡"));
         }
@@ -213,12 +247,13 @@ QtObject {
             ai_status: aiStatus,
             text: stateText,
             enabled: settings ? enabled : null,
-            connected: provider ? connected : null
+            connected: provider || runtimeBackendUnavailable ? connected : null
         };
     }
 
     function setError(error) {
         const reason = error && error.data ? error.data.reason_code : "";
+        errorReasonCode = reason || "";
         switch (reason) {
         case "backend_unsupported": errorText = subscriptionUnavailableText; break;
         case "provider_unavailable":
@@ -275,6 +310,8 @@ QtObject {
             // Unconfirmed settings: the provider status under them is not
             // shown as confirmed either (it is read again after settings).
             providerRead++;
+            runtimeRead++;
+            runtime = null;
             settings = null;
             provider = null;
             settingsFailed = true;
@@ -283,8 +320,16 @@ QtObject {
     }
 
     function refreshRuntime() {
+        const read = ++runtimeRead;
         client.capability("agent.runtime.get", {}, function (result) {
+            if (read !== runtimeRead || !client.online) return;
             runtime = result;
+            if (runtimeBackendUnavailable) {
+                login = null;
+                loginWatch.stop();
+            }
+        }, function () {
+            if (read === runtimeRead) runtime = null;
         });
     }
 
@@ -752,6 +797,8 @@ QtObject {
         target: state.client
         function onDisconnected() {
             state.providerRead++;
+            state.runtimeRead++;
+            state.runtime = null;
             state.reconnecting = state.wanted;
             state.subscriptionId = "";
             // Readback from the lost connection is not confirmed any more.
