@@ -533,6 +533,7 @@ impl Core {
             let mut child = self.lock_child.lock().expect("lock child");
             match child.as_mut().map(|child| child.try_wait()) {
                 Some(Ok(Some(status))) => {
+                    crate::log::process_exit("lock.exited", status);
                     *child = None;
                     Some(status.success())
                 }

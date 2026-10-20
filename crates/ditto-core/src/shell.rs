@@ -186,7 +186,8 @@ impl ShellManager {
             let mut inner = self.inner.lock().expect("shell state");
             let now = Instant::now();
             if let Some(child) = inner.child.as_mut() {
-                if let Ok(Some(_status)) = child.try_wait() {
+                if let Ok(Some(status)) = child.try_wait() {
+                    crate::log::process_exit("shell.exited", status);
                     inner.child = None;
                     exited = true;
                     inner.exits.push_back(now);
@@ -343,4 +344,121 @@ fn supervisor_requested_rescue() -> bool {
             .ok()
             .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
             .is_some_and(|request| request["reason"] == "shell_unresponsive")
+}
+
+#[cfg(test)]
+mod crash_tests {
+    use super::*;
+
+    #[test]
+    fn reaped_signal_exits_count_towards_backoff_and_rescue() {
+        let manager = ShellManager::new(
+            None,
+            None,
+            Arc::new(IdentityRegistry::new()),
+            "core.sock".into(),
+        );
+        for failure in 1..=SHELL_FAILURE_LIMIT {
+            let mut child = std::process::Command::new("/bin/sleep")
+                .arg("30")
+                .spawn()
+                .unwrap();
+            child.kill().unwrap();
+            let status = child.wait().unwrap();
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(status.signal(), Some(libc::SIGKILL));
+            manager.inner.lock().unwrap().child = Some(child);
+            let before = Instant::now();
+            assert!(manager.tick());
+            let inner = manager.inner.lock().unwrap();
+            assert_eq!(inner.exits.len(), failure);
+            if failure < SHELL_FAILURE_LIMIT {
+                let Run::Backoff { until } = inner.run else {
+                    panic!("no backoff")
+                };
+                assert!(until >= before + Duration::from_secs(SHELL_RESTART_BACKOFF[failure - 1]));
+            } else {
+                assert_eq!(inner.run, Run::RescueUi);
+            }
+        }
+    }
+
+    #[test]
+    fn signal_exits_back_off_issue_fresh_tokens_and_reach_rescue() {
+        let directory =
+            std::env::temp_dir().join(format!("shell-crash-{}", ditto_protocol::ids::ulid()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let specification = |kind: &str| Specification {
+            kind: kind.into(),
+            version: "0.3.1".into(),
+            executable: "/bin/sh".into(),
+            arguments: vec![
+                "-c".into(),
+                "read -r token <&3; printf '%s' \"$token\" > \"$1\"; kill -STOP $$".into(),
+                "fixture".into(),
+                directory.join(kind).into_os_string(),
+            ],
+        };
+        let registry = Arc::new(IdentityRegistry::new());
+        let manager = ShellManager::new(
+            Some(specification("quickshell")),
+            Some(specification("rescue-shell")),
+            Arc::clone(&registry),
+            directory.join("core.sock"),
+        );
+        manager.launch();
+        let mut previous_token = String::new();
+        for failure in 1..=SHELL_FAILURE_LIMIT {
+            let path = directory.join("quickshell");
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while !std::fs::read_to_string(&path).is_ok_and(|text| !text.is_empty())
+                && Instant::now() < deadline
+            {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let token = std::fs::read_to_string(&path).unwrap();
+            std::fs::remove_file(path).unwrap();
+            assert_ne!(token, previous_token);
+            let pid = manager.inner.lock().unwrap().child.as_ref().unwrap().id();
+            // SAFETY: getuid has no preconditions; the PID is our stopped child.
+            let uid = unsafe { libc::getuid() };
+            registry
+                .verify_once(&token, uid, pid, "quickshell", "0.3.1")
+                .unwrap();
+            assert!(registry
+                .verify_once(&token, uid, pid, "quickshell", "0.3.1")
+                .is_err());
+            previous_token = token;
+            {
+                let mut inner = manager.inner.lock().unwrap();
+                let child = inner.child.as_mut().unwrap();
+                child.kill().unwrap();
+                child.wait().unwrap();
+            }
+            assert!(manager.tick());
+            assert_eq!(manager.inner.lock().unwrap().exits.len(), failure);
+            if failure < SHELL_FAILURE_LIMIT {
+                let mut inner = manager.inner.lock().unwrap();
+                let Run::Backoff { until } = inner.run else {
+                    panic!("no backoff");
+                };
+                assert!(until > Instant::now());
+                assert!(inner.child.is_none());
+                drop(inner);
+                assert!(!manager.tick());
+                inner = manager.inner.lock().unwrap();
+                assert!(inner.child.is_none());
+                inner.run = Run::Backoff {
+                    until: Instant::now(),
+                };
+                drop(inner);
+                manager.tick();
+            }
+        }
+        assert!(manager.in_rescue_ui());
+        let mut rescue = manager.inner.lock().unwrap().rescue_child.take().unwrap();
+        rescue.kill().unwrap();
+        rescue.wait().unwrap();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

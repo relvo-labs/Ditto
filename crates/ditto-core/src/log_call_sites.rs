@@ -86,3 +86,14 @@ fn typed_error_call_sites_use_the_closed_code_converters() {
         );
     }
 }
+
+#[test]
+fn supervised_ui_exits_have_structured_status_events() {
+    for (file, event) in [("shell.rs", "shell.exited"), ("core.rs", "lock.exited")] {
+        let source = SOURCES.iter().find(|(name, _)| *name == file).unwrap().1;
+        assert!(
+            source.contains(&format!("crate::log::process_exit(\"{event}\", status)")),
+            "{file} must log the reaped exit status"
+        );
+    }
+}
