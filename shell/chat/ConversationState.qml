@@ -47,6 +47,7 @@ QtObject {
     /// clears it until its answer.
     property bool settingsFailed: false
     property bool providerFailed: false
+    property int providerRead: 0
 
     // ---- what the user has not sent -------------------------------------------------
     property string draft: ""
@@ -286,9 +287,43 @@ QtObject {
     }
 
     function refreshProvider(then) {
+        const read = ++providerRead;
         providerFailed = false;
+        providerRetry.stop();
+        if (settings && provider && provider.provider !== settings.provider) provider = null;
+        if (settings && settings.provider === "direct-model") {
+            provider = null;
+            login = null;
+            loginWatch.stop();
+            const directSettings = settings;
+            const auth = directSettings.auth;
+            // A configured API connection needs a usable key reference, not
+            // a Codex login. This does not probe the remote model or read a key.
+            function showDirect(usable) {
+                if (read !== providerRead) return;
+                provider = { provider: "direct-model", available: true,
+                    authenticated: usable && !!directSettings.endpoint,
+                    account_label: directSettings.model || directSettings.endpoint,
+                    models: [], rate_limits: null };
+                if (then) then(provider);
+            }
+            if (!auth || auth.kind !== "api_key" || !auth.credential_ref) {
+                showDirect(false);
+            } else {
+                client.capability("agent.credentials.status", { credential_ref: auth.credential_ref }, function (result) {
+                    showDirect(result.available === true);
+                }, function (error) {
+                    if (read !== providerRead) return;
+                    provider = null;
+                    providerFailed = true;
+                    setError(error);
+                });
+            }
+            return;
+        }
         refreshRuntime();
         client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
+            if (read !== providerRead) return;
             provider = result;
             providerFailed = false;
             if (!result.available || result.authenticated) {
@@ -300,6 +335,7 @@ QtObject {
                 then(result);
             }
         }, function (error) {
+            if (read !== providerRead) return;
             provider = null;
             refreshRuntime();
             // The Agent may still be starting; ask once more shortly.
@@ -475,6 +511,7 @@ QtObject {
         client.capability("agent.settings.patch", { expected_revision: settings.revision, settings: next }, function (result) {
             settings = result;
             setError(null);
+            if (enabled && ("provider" in fields || "auth" in fields || "endpoint" in fields)) refreshProvider();
             if (then) {
                 then(result);
             }
@@ -712,6 +749,7 @@ QtObject {
     property Connections connection: Connections {
         target: state.client
         function onDisconnected() {
+            state.providerRead++;
             state.reconnecting = state.wanted;
             state.subscriptionId = "";
             // Readback from the lost connection is not confirmed any more.

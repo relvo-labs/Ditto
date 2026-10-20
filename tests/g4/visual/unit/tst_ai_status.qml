@@ -20,7 +20,7 @@ TestCase {
     /// Reads the open flow already makes. Anything else would be a new
     /// capability or a business action resent by a status read.
     readonly property var readCapabilities: ["agent.settings.describe", "agent.sessions.list",
-        "agent.runtime.get", "agent.providers.status", "agent.sessions.read", "agent.turns.get"]
+        "agent.runtime.get", "agent.providers.status", "agent.credentials.status", "agent.sessions.read", "agent.turns.get"]
 
     QtObject {
         id: client
@@ -28,6 +28,7 @@ TestCase {
         property var calls: []
         /// method -> { ok: result } | { fail: error }; absent = no answer yet.
         property var replies: ({})
+        property var pending: ({})
         signal changeUpdated(var change)
         signal disconnected()
         function t(text) { return text; }
@@ -40,6 +41,7 @@ TestCase {
             calls = calls.concat([method]);
             const reply = replies[method];
             if (!reply) {
+                pending[method] = { ok: ok, fail: fail };
                 return;
             }
             if (reply.fail) {
@@ -75,6 +77,7 @@ TestCase {
         client.online = true;
         client.calls = [];
         client.replies = {};
+        client.pending = {};
         conversation = createTemporaryObject(conversationComponent, testCase, { client: client });
         entry = createTemporaryObject(entryComponent, testCase, { client: client, tokens: tokens, conversation: conversation });
         verify(conversation !== null && entry !== null);
@@ -444,6 +447,44 @@ TestCase {
         const page = settingsPage();
         verify(find(page, item => item.visible && item.text === "儲存並使用"));
         verify(!find(page, item => item.text === "使用 Codex 訂閱登入").visible);
+    }
+
+    function test_api_key_chat_without_codex_data() {
+        return [{ tag: "ready", available: true }, { tag: "locked-or-missing", available: false }];
+    }
+    function test_api_key_chat_without_codex(data) {
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn,
+                { provider: "direct-model", endpoint: "https://api.example.com/v1", auth: { kind: "api_key", credential_ref: "fixture-key" } }) },
+            "agent.credentials.status": { ok: { credential_ref: "fixture-key", available: data.available } },
+            "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
+        conversation.open();
+        compare(count("agent.providers.status"), 0);
+        compare(count("agent.credentials.status"), 1);
+        compare(conversation.connected, data.available);
+        compare(conversation.canLogin, false);
+        compare(conversation.subscriptionUnavailable, false);
+        conversation.draft = "fixture draft";
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        compare(find(chat, item => item.text === "送出").enabled, data.available);
+        readsOnly();
+    }
+
+    function test_subscription_reply_cannot_replace_api_key_status() {
+        answer({ "agent.settings.describe": { ok: settingsOn } });
+        conversation.open();
+        const old = client.pending["agent.providers.status"];
+        verify(old && old.ok);
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn,
+                { provider: "direct-model", endpoint: "https://api.example.com/v1", auth: { kind: "api_key", credential_ref: "fixture-key" } }) },
+            "agent.credentials.status": { ok: { available: true } } });
+        conversation.refreshSettings();
+        compare(conversation.provider.provider, "direct-model");
+        old.ok(ready);
+        compare(conversation.provider.provider, "direct-model");
+        compare(conversation.connected, true);
+        readsOnly();
     }
 
     function test_provider_closed_data() {

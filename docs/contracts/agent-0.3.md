@@ -49,7 +49,7 @@ G3 固定模板由 Shell **實際掛載物件的 config** 回報 artifact id。C
 
 ## 6. Codex 訂閱可用性與錯誤原因
 
-`agent.providers.status` 的 `available: false` 表示這次執行無法提供 Codex 訂閱連線，可能未配置支援版本，也可能初始化失敗；不能據此宣稱只是尚未登入。Shell 只在 `available: true` 且未登入時提供訂閱登入入口。AI 設定仍保留 API 金鑰選項；桌面啟動不要求 Codex。
+`agent.providers.status` 的 `available: false` 表示這次執行無法提供 Codex 訂閱連線，可能未配置支援版本，也可能初始化失敗；不能據此宣稱只是尚未登入。Shell 只在 `available: true` 且未登入時提供訂閱登入入口。AI 設定仍保留 API 金鑰選項；API 連線以 `agent.credentials.status` 確認金鑰引用可用，不要求 Codex 登入，也不讀取金鑰值。這是本機配置就緒狀態，不代表遠端模型已通過網路驗證。桌面啟動不要求 Codex。
 
 登入等 provider 請求沿用既有 `unavailable` 錯誤及 `data.reason: system_unavailable`，在選用的 `data` 物件內帶 `reason_code`；不新增 `UnavailableReason` 或 schema 欄位。Runtime 與 Core 僅傳遞以下原因碼：
 
