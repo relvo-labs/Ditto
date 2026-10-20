@@ -55,6 +55,98 @@ TestCase {
         conversation.loginWatch.stop();
         conversation.providerRetry.stop();
     }
+    // review2: settings invalidation at each start await must release its owner,
+    // even when refreshRuntime intentionally discards that owner's callback.
+    function test_review2_start_invalidation_data() {
+        const rows = [];
+        for (const phase of ["preflight", "login", "verification"])
+            for (const change of ["disable-enable", "provider-roundtrip"])
+                for (const fail of [false, true])
+                    rows.push({ tag: phase + "-" + change + (fail ? "-late-failure" : ""), phase: phase, change: change, fail: fail });
+        return rows;
+    }
+    function test_review2_start_invalidation(data) {
+        client.autoRuntime = false;
+        conversation.startLogin();
+        const preflight = latest("agent.runtime.get");
+        const a = attempt(); a.login_id = "fixture-A";
+        let start = null, verification = null;
+        if (data.phase !== "preflight") {
+            preflight.ok({ generation: 1, phase: "ready" });
+            start = latest("agent.providers.login");
+        }
+        if (data.phase === "verification") {
+            start.ok(a);
+            verification = latest("agent.runtime.get");
+        }
+        conversation.settings = data.change === "disable-enable"
+            ? { enabled: false, provider: "codex-app-server", revision: 2 }
+            : { enabled: true, provider: "direct-model", revision: 2 };
+        conversation.settings = on;
+        compare(calls("agent.providers.cancel_login").length, data.phase === "verification" ? 1 : 0,
+            "an already returned id must be cleaned without waiting for a discarded callback");
+        // Recovery must work before the invalidated callback ever returns.
+        client.autoRuntime = true;
+        conversation.refreshProvider();
+        compare(calls("agent.providers.status").length, 1, "account readback is blocked by an abandoned start");
+        latest("agent.providers.status").ok(signedOut);
+        conversation.startLogin();
+        const bStart = latest("agent.providers.login");
+        verify(bStart !== start, "a new start must be admitted after settings return");
+        const bToken = conversation.loginStart;
+        verify(bToken !== null);
+        // Deliver the old reply while B is still starting. It must neither
+        // release B's token nor rebind A; returned A ids are cancelled once.
+        const old = data.phase === "preflight" ? preflight : data.phase === "login" ? start : verification;
+        if (data.fail) old.fail(failure);
+        else old.ok(data.phase === "login" ? a : { generation: 1, phase: "ready" });
+        compare(conversation.loginStart, bToken);
+        compare(conversation.login, null);
+        const cancels = calls("agent.providers.cancel_login");
+        compare(cancels.length, data.phase === "verification" || (data.phase === "login" && !data.fail) ? 1 : 0);
+        if (cancels.length) compare(cancels[0].params.login_id, "fixture-A");
+        const b = attempt(); b.login_id = "fixture-B";
+        bStart.ok(b);
+        compare(conversation.login.login_id, "fixture-B");
+        verify(conversation.loginWatch.running);
+        compare(conversation.loginStart, null);
+        // Cleanup callbacks themselves cannot erase B or its account projection.
+        for (const cancel of cancels) if (cancel.ok) cancel.ok({ completed: true });
+        compare(conversation.login.login_id, "fixture-B");
+        compare(conversation.provider, signedOut);
+    }
+    function test_review2_cancel_disconnect_release_data() {
+        const rows = [];
+        for (const phase of ["preflight", "login", "verification"])
+            for (const exit of ["cancel", "disconnect"])
+                rows.push({ tag: phase + "-" + exit, phase: phase, exit: exit });
+        return rows;
+    }
+    function test_review2_cancel_disconnect_release(data) {
+        client.autoRuntime = false;
+        conversation.startLogin();
+        if (data.phase !== "preflight") latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+        if (data.phase === "verification") latest("agent.providers.login").ok(attempt());
+        const old = latest(data.phase === "login" ? "agent.providers.login" : "agent.runtime.get");
+        if (data.exit === "cancel") conversation.cancelLogin();
+        else { client.online = false; client.disconnected(); }
+        compare(conversation.loginStart, null, "exit releases without waiting for a callback");
+        compare(calls("agent.providers.cancel_login").length,
+            data.phase === "verification" && data.exit === "cancel" ? 1 : 0,
+            "never replay an old connection's cancel into a new controller");
+        client.autoRuntime = true;
+        client.online = true;
+        conversation.settings = on;
+        conversation.startLogin();
+        const bStart = latest("agent.providers.login"), bToken = conversation.loginStart;
+        verify(bToken !== null);
+        old.fail(failure);
+        compare(conversation.loginStart, bToken, "old failure must not release B");
+        const b = attempt(); b.login_id = "fixture-B";
+        bStart.ok(b);
+        compare(conversation.login.login_id, "fixture-B");
+        compare(conversation.loginStart, null);
+    }
     // review1 / authority v1.1: account truth and attempt expiry are independent.
     function test_review_expiry_account_data() {
         return [

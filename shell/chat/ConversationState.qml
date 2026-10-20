@@ -99,6 +99,9 @@ QtObject {
 
     function forgetLogin() {
         loginRequest++;
+        // Runtime reads may discard stale callbacks. Release the start and
+        // its unbound id here, without waiting for one of those callbacks.
+        if (loginStart) loginStart();
         login = null;
         loginResultReading = false;
         loginResultState = "";
@@ -438,40 +441,48 @@ QtObject {
         // Starting authorization does not itself change that readback.
         invalidateProvider(true);
         const request = ++loginRequest, connection = connectionEpoch;
-        const token = {};
+        let unbound = null;
+        // The identity is also its owner's finalizer; forgetLogin can release
+        // it synchronously even when a pending runtime callback is discarded.
+        const token = function () { release(); cleanup(); };
         loginStart = token;
         loginResultState = "";
         const current = () => request === loginRequest && connection === connectionEpoch && client.online
             && enabled && settings.provider === "codex-app-server";
         const release = () => { if (loginStart === token) loginStart = null; };
-        const cleanup = function (result) {
+        const cleanup = function () {
+            const result = unbound;
+            unbound = null; // drain once, including invalidation during verification
+            if (!result) return;
             // The serving generation may have moved. Cancel only this returned
             // id on this connection; the backend rejects an unrelated id.
             if (connection === connectionEpoch && client.online && (!login || login.login_id !== result.login_id))
                 client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: result.login_id });
         };
         const failed = function (error) {
-            release();
+            token();
             if (current()) setError(error);
         };
         refreshRuntime(function (before) {
             if (!current()) { release(); return; }
             token.generation = before.generation;
             client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
-                if (!current()) { release(); cleanup(result); return; }
+                unbound = result;
+                if (!current()) { token(); return; }
                 refreshRuntime(function (after) {
                     release();
                     if (!current() || before.generation !== after.generation || Date.now() >= result.expires_at_ms) {
                         if (current() && Date.now() >= result.expires_at_ms) loginResultState = "expired";
-                        cleanup(result);
+                        cleanup();
                         return;
                     }
+                    unbound = null; // ownership moves to the bound attempt
                     login = result;
                     loginResultState = "pending";
                     setError(null);
                     Qt.openUrlExternally(result.auth_url);
                     loginWatch.start();
-                }, function (error) { cleanup(result); failed(error); });
+                }, failed);
             }, failed, { deadlineMs: 30000 });
         }, failed);
     }
@@ -898,7 +909,6 @@ QtObject {
             state.connectionEpoch++;
             state.settingsRequest++;
             state.forgetLogin();
-            state.loginStart = null;
             state.invalidateProvider();
             state.runtime = null;
             state.runtimeGeneration = null;
