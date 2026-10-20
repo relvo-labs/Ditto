@@ -1170,12 +1170,12 @@
         <translation>No model connected yet; the desktop works as usual</translation>
     </message>
     <message>
-        <source>模型後端無法使用</source>
-        <translation>The model backend is unavailable</translation>
-    </message>
-    <message>
         <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
         <translation>The model did not answer; nothing on the desktop changed. You can try again</translation>
+    </message>
+    <message>
+        <source>模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。</source>
+        <translation>The model connection is temporarily unavailable. Check your network and try again. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>正在停止</source>
@@ -1216,6 +1216,10 @@
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>Subscription quota used up; try again after it resets</translation>
+    </message>
+    <message>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復後重新登入桌面，也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair it, then sign in to the desktop again, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>需要你的確認</source>

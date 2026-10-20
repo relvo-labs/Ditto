@@ -55,6 +55,7 @@ TestCase {
 
     Component { id: conversationComponent; Chat.ConversationState {} }
     Component { id: entryComponent; Assistant.AssistantEntry {} }
+    Component { id: chatComponent; Chat.ChatBody {} }
     Component { id: settingsComponent; Centers.AISettings {} }
 
     readonly property var settingsOn: ({ enabled: true, revision: "fixture-r1", provider: "codex-app-server", approval_mode: "ask", model: null })
@@ -379,9 +380,56 @@ TestCase {
 
     /// Readback that says the model cannot be used now: confirmed, not a
     /// read failure.
+    function test_missing_backend_surfaces() {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
+        const page = settingsPage();
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        verify(named(page, "aiProviderStatus").text.indexOf("無法使用 Codex 訂閱") >= 0);
+        verify(conversation.stateText.indexOf("無法使用 Codex 訂閱") >= 0);
+        for (const surface of [page, chat]) {
+            const signIn = find(surface, item => item.text === "使用 Codex 訂閱登入");
+            verify(signIn && !signIn.visible, "missing backend still offers sign-in");
+        }
+        verify(find(chat, item => item.visible && item.text && item.text.indexOf("API 金鑰") >= 0));
+        conversation.startLogin();
+        compare(count("agent.providers.login"), 0);
+        readsOnly();
+    }
+
+    function test_provider_reason_is_product_copy() {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { fail: { name: "unavailable", code: -32007,
+                message: "private diagnostic", data: { reason: "system_unavailable", reason_code: "backend_unsupported" } } } });
+        conversation.open();
+        compare(conversation.aiStatus, "failed");
+        verify(conversation.errorText.indexOf("無法使用 Codex 訂閱") >= 0);
+        verify(conversation.errorText.indexOf("private") < 0);
+        verify(conversation.errorDiagnostic.indexOf("private") >= 0);
+        wait(1800);
+        compare(count("agent.providers.status"), 1);
+    }
+
+    function test_available_subscription_still_offers_login() {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: { available: true, provider: "codex-app-server", authenticated: false, models: [] } } });
+        const page = settingsPage();
+        verify(find(page, item => item.text === "使用 Codex 訂閱登入").visible);
+    }
+
+    function test_direct_model_ignores_missing_codex() {
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn, {provider: "direct-model"}) },
+            "agent.providers.status": { ok: ready } });
+        const page = settingsPage();
+        verify(find(page, item => item.visible && item.text === "儲存並使用"));
+        verify(!find(page, item => item.text === "使用 Codex 訂閱登入").visible);
+    }
+
     function test_provider_closed_data() {
         return [
-            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "模型尚未連接" },
+            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "無法使用 Codex 訂閱" },
             { tag: "signed-out", provider: { available: true, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "模型尚未連接" },
             { tag: "core-disconnected", provider: null, status: "core_offline", text: "桌面服務未連線" },
             { tag: "ai-off", provider: null, status: "disabled", text: "AI 對話已關閉" }
@@ -394,7 +442,7 @@ TestCase {
         if (data.tag === "core-disconnected") client.online = false;
         compare(conversation.aiStatus, data.status);
         verify(conversation.stateText.indexOf(data.text) >= 0, conversation.stateText);
-        verify(conversation.stateText.indexOf("無法") < 0);
+        if (data.tag !== "unavailable-model") verify(conversation.stateText.indexOf("無法") < 0);
         compare(entry.Accessible.description, conversation.stateText);
         compare(conversation.taskState, "offline");
         const r = report();

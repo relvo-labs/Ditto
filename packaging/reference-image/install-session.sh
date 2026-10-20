@@ -18,7 +18,7 @@ libexec=/usr/local/libexec
 units_target=/etc/systemd/user
 qt_prefix="${DITTO_QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
 wayfire_prefix="${DITTO_WAYFIRE_PREFIX:-$HOME/wayfire}"
-temporary="$(mktemp -d /tmp/ditto-session-install.XXXXXX)"
+temporary="$(mktemp -d "${TMPDIR:-/tmp}/ditto-session-install.XXXXXX")"
 trap 'rm -rf -- "$temporary"' EXIT
 
 for command in cargo sed sudo install jq sha256sum; do
@@ -81,11 +81,13 @@ codex="$(readlink -f "${DITTO_CODEX_BINARY:-$HOME/.local/bin/codex}" 2>/dev/null
 pin_version="$(jq -r .version "$workspace/tools/codex/pin.json")"
 pin_sha="$(jq -r .sha256 "$workspace/tools/codex/pin.json")"
 agent_backend_args=""
+agent_backend_status=backend_unsupported
 if [[ -n "$codex" && -f "$codex" && "$(sha256sum "$codex" | cut -d' ' -f1)" == "$pin_sha" ]]; then
+  agent_backend_status=available
   agent_backend_args="--agent-backend \"codex-app-server $pin_version $pin_sha $codex\""
   echo "Codex backend: $codex (pinned $pin_version)" >&2
 else
-  echo "Codex backend: the pinned codex $pin_version binary was not found; the session runs without it" >&2
+  echo "Codex 訂閱無法使用：找不到 Ditto 支援的 Codex $pin_version（未安裝或檔案不符）。桌面仍可使用。請依 $workspace/tools/codex/README.md 安裝後重新執行本安裝程式並重新登入桌面，或在 AI 設定使用 API 金鑰。" >&2
 fi
 bash "$workspace/scripts/build-builtin-packages.sh" "$workspace/target/ditto-packages" >/dev/null
 # hostd's Node/V8 flags have one source; every launch path reads the same file.
@@ -99,6 +101,7 @@ substitute() {
     -e "s|@DITTO_NODE@|$node|g" \
     -e "s|@DITTO_HOSTD_NODE_FLAGS@|$hostd_node_flags|g" \
     -e "s|@DITTO_AGENT_BACKEND_ARGS@|$agent_backend_args|g" \
+    -e "s|@DITTO_CODEX_STATUS@|$agent_backend_status|g" \
     -e "s|@DITTO_SESSION_EXEC@|$libexec/ditto-session|g" "$1" >"$2"
   if grep -q '@DITTO_[A-Z_]*@' "$2"; then
     echo "unsubstituted placeholder in $1" >&2

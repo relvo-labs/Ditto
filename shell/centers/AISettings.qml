@@ -121,6 +121,7 @@ Flickable {
                         : !page.conversation.enabled ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
                         : page.conversation.providerFailed ? page.t(qsTr("無法讀取模型連線狀態；目前無法確認是否已登入。"))
                         : page.t(qsTr("正在讀取模型連線狀態…")))
+                    : page.conversation.subscriptionUnavailable ? page.conversation.subscriptionUnavailableText
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
                         : page.conversation.login ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg(page.conversation.login.auth_url).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
@@ -145,7 +146,7 @@ Flickable {
             Row {
                 spacing: page.tokens.space
                 Button {
-                    visible: !!page.provider && !page.provider.authenticated && !page.conversation.login
+                    visible: page.conversation.canLogin && !page.conversation.login
                     tokens: page.tokens
                     kind: "primary"
                     text: page.t(qsTr("使用 Codex 訂閱登入"))

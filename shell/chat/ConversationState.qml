@@ -68,6 +68,10 @@ QtObject {
 
     readonly property bool enabled: !!settings && settings.enabled === true
     readonly property bool connected: !!provider && provider.available === true && provider.authenticated === true
+    readonly property bool subscriptionSelected: !!settings && settings.provider === "codex-app-server"
+    readonly property bool subscriptionUnavailable: subscriptionSelected && !!provider && provider.available === false
+    readonly property bool canLogin: subscriptionSelected && !!provider && provider.available === true && !provider.authenticated
+    readonly property string subscriptionUnavailableText: client.t(qsTr("這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復後重新登入桌面，也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。"))
     readonly property bool turnActive: !!turn && ["queued", "running", "awaiting_approval", "cancelling"].indexOf(turn.state) >= 0
 
     /// idle | thinking | executing | awaiting | done | failed | offline
@@ -142,7 +146,7 @@ QtObject {
         : settings && settings.enabled === false
             ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
             : settings && settings.enabled === true && provider && !connected
-                ? client.t(qsTr("模型尚未連接；桌面仍可照常操作")) : ""
+                ? (subscriptionUnavailable ? subscriptionUnavailableText : client.t(qsTr("模型尚未連接；桌面仍可照常操作"))) : ""
 
     readonly property string stateText: {
         const result = turn && ["partial", "unknown", "cancelled"].indexOf(turn.state) >= 0
@@ -191,7 +195,7 @@ QtObject {
         case "provider_timeout":
             return client.t(qsTr("模型沒有回應；桌面沒有被改動，可以再試一次"));
         case "backend_unsupported":
-            return client.t(qsTr("模型後端無法使用"));
+            return subscriptionUnavailableText;
         case "tool_error":
             return client.t(qsTr("桌面變更沒有完成；請查看變更卡"));
         }
@@ -212,7 +216,14 @@ QtObject {
     }
 
     function setError(error) {
-        errorText = error ? client.errorText(error) : "";
+        const reason = error && error.data ? error.data.reason_code : "";
+        switch (reason) {
+        case "backend_unsupported": errorText = subscriptionUnavailableText; break;
+        case "provider_unavailable":
+        case "provider_timeout": errorText = client.t(qsTr("模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。")); break;
+        case "rate_limited": errorText = client.t(qsTr("訂閱額度已用完；等額度重設後再試")); break;
+        default: errorText = error ? client.errorText(error) : "";
+        }
         errorDiagnostic = error ? client.diagnosticText(error) : "";
     }
 
@@ -280,8 +291,9 @@ QtObject {
         client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
             provider = result;
             providerFailed = false;
-            if (result.authenticated) {
+            if (!result.available || result.authenticated) {
                 login = null;
+                loginWatch.stop();
             }
             refreshRuntime();
             if (then) {
@@ -291,7 +303,7 @@ QtObject {
             provider = null;
             refreshRuntime();
             // The Agent may still be starting; ask once more shortly.
-            providerFailed = !(error.name === "unavailable" && wanted);
+            providerFailed = !(error.name === "unavailable" && !(error.data && error.data.reason_code) && wanted);
             if (!providerFailed) {
                 providerRetry.restart();
             } else {
@@ -334,6 +346,7 @@ QtObject {
     /// browser gets the verification page and the person types the one-time
     /// code shown here; no token ever reaches the Shell.
     function startLogin() {
+        if (!canLogin) return;
         client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
             login = result;
             setError(null);

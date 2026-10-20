@@ -1170,12 +1170,12 @@
         <translation>模型尚未連接；桌面仍可照常操作</translation>
     </message>
     <message>
-        <source>模型後端無法使用</source>
-        <translation>模型後端無法使用</translation>
-    </message>
-    <message>
         <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
         <translation>模型沒有回應；桌面沒有被改動，可以再試一次</translation>
+    </message>
+    <message>
+        <source>模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。</source>
+        <translation>模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。</translation>
     </message>
     <message>
         <source>正在停止</source>
@@ -1216,6 +1216,10 @@
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>訂閱額度已用完；等額度重設後再試</translation>
+    </message>
+    <message>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復後重新登入桌面，也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復後重新登入桌面，也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
     <message>
         <source>需要你的確認</source>
