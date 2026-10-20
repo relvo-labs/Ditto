@@ -40,7 +40,7 @@ manifest 是**請求**，不是事實：信任等級、權限、資源預算都�
 | `migrations` | 記錄 | G3 |
 | `activation_events` | 記錄 | G1 一律在啟用時載入 |
 | `idle_policy` | 強制 | `resident`｜`on_demand`；**與 Agent 的 5 分鐘規則無關** |
-| `resource_budget` | 記錄＋比對 | `{ "memory_mib": 20, "cpu_percent": 5 }`；超過政策上限（服務類 64 MiB、10%）→ `budget_exceeded` |
+| `resource_budget` | 記錄＋比對 | 可省略（預設 `{}`）；`memory_mib`、`cpu_percent` 各自可省略或為 `null`，有值時須為 `u32`（0～4294967295），不接受其他欄位。例 `{ "memory_mib": 20 }` 或 `{ "memory_mib": 20, "cpu_percent": 5 }`；逐欄比對政策上限（服務類 64 MiB、10%），超過 → `budget_exceeded`。省略或 `null` 不代表獲准無上限，最終由 Core 政策決定 |
 | `rescue` | 記錄 | `{ "disable_safe": true }`：`dittoctl rescue disable` 可以直接停用它 |
 
 ## 套件格式 `.dittopkg`（D-10 提案）

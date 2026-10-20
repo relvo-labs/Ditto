@@ -242,10 +242,25 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
 
   const budget = m['resource_budget']
   if (budget !== undefined) {
-    if (!isObject(budget) || typeof budget['memory_mib'] !== 'number' || typeof budget['cpu_percent'] !== 'number') {
-      error('/resource_budget', 'schema_invalid', 'needs memory_mib and cpu_percent')
-    } else if (kind === 'service' && (budget['memory_mib'] > serviceBudget.memory_mib || budget['cpu_percent'] > serviceBudget.cpu_percent)) {
-      error('/resource_budget', 'budget_exceeded', `service plugins are capped at ${serviceBudget.memory_mib} MiB and ${serviceBudget.cpu_percent}%`)
+    if (!isObject(budget)) {
+      error('/resource_budget', 'schema_invalid', 'must be an object')
+    } else {
+      // Rust ResourceBudget is closed, with two defaulted Option<u32> fields.
+      // The generated schema's uint32 format is only an annotation, so check the domain here too.
+      for (const key of Object.keys(budget)) {
+        if (key !== 'memory_mib' && key !== 'cpu_percent') error(`/resource_budget/${key}`, 'schema_invalid', 'is not a resource budget field')
+      }
+      let exceedsServiceBudget = false
+      for (const key of ['memory_mib', 'cpu_percent'] as const) {
+        const value = budget[key]
+        if (value === undefined || value === null) continue
+        if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 4_294_967_295) {
+          error(`/resource_budget/${key}`, 'schema_invalid', 'must be null or an unsigned 32-bit integer (0..4294967295)')
+        } else if (kind === 'service' && value > serviceBudget[key]) {
+          exceedsServiceBudget = true
+        }
+      }
+      if (exceedsServiceBudget) error('/resource_budget', 'budget_exceeded', `service plugins are capped at ${serviceBudget.memory_mib} MiB and ${serviceBudget.cpu_percent}%`)
     }
   }
   const rescue = m['rescue']
