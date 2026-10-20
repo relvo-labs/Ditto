@@ -24,6 +24,23 @@ beforeAll(() => {
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))
 
 describe('ditto-plugin (built CLI)', () => {
+  describe.each(['schema', 'schema-free'])('declarative builtins (%s)', mode => {
+    it.each(['ditto.layout.floating', 'ditto.layout.simple-tile'])('validates %s while pack stays unsupported', id => {
+      const source = join(packages, '..', 'packaging/builtin', id)
+      const dir = mode === 'schema' ? source : join(scratch, `${id}-${mode}`)
+      if (mode === 'schema-free') cpSync(source, dir, { recursive: true })
+      const result = run('validate', dir)
+      expect(result.stderr).toBe('')
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain(mode === 'schema' ? '(schema ' : '(TypeScript rules only;')
+      const out = join(scratch, `${id}-${mode}.dittopkg`)
+      const packed = run('pack', dir, '--out', out)
+      expect(packed.status).toBe(1)
+      expect(packed.stderr).toContain('only cordis and qml packages are packed as .dittopkg')
+      expect(existsSync(out)).toBe(false)
+    })
+  })
+
   describe.each(['schema', 'schema-free'])('builtin panel budget (%s)', mode => {
     const source = join(packages, '..', 'shell/providers/panel_top')
     const dir = mode === 'schema' ? source : join(scratch, 'panel')

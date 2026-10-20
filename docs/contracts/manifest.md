@@ -43,8 +43,12 @@ manifest 是**請求**，不是事實：信任等級、權限、資源預算都�
 | `resource_budget` | 記錄＋比對 | 可省略（預設 `{}`）；`memory_mib`、`cpu_percent` 各自可省略或為 `null`，有值時須為 `u32`（0～4294967295），不接受其他欄位。例 `{ "memory_mib": 20 }` 或 `{ "memory_mib": 20, "cpu_percent": 5 }`；逐欄比對政策上限（服務類 64 MiB、10%），超過 → `budget_exceeded`。省略或 `null` 不代表獲准無上限，最終由 Core 政策決定 |
 | `rescue` | 記錄 | `{ "disable_safe": true }`：`dittoctl rescue disable` 可以直接停用它 |
 
+對 `declarative_bundle/core_builtin`，SDK 接受 Rust `Manifest` 的省略預設值：`runtime` 為 `{}`；`platform`、`slots`、`provides`、`requires`、`optional`、`conflicts`、`commands`、`shortcuts`、`events`、`permissions`、`migrations`、`activation_events` 為 `[]`；`config_schema` 為 `{ "type": "object" }`。空 `platform` 不限制平台，空 `permissions` 不授予權限。明確宣告的值仍須符合型別、範圍與政策規則；整個欄位為 `null` 不套預設值，`runtime.node`／`runtime.qt` 則依 Rust 的 `Option<String>` 可省略或為 `null`。SDK 不會把預設值寫回 manifest；service／QML 的 runtime 與入口必填檢查維持原狀。
+
 ## 套件格式 `.dittopkg`（D-10 提案）
 
 tar ＋ zstd，根目錄有 `manifest.json`，其餘是 `dist/`（cordis）或 `qml/`（qml）。Cordis 插件必須是**單一 ESM bundle**，不含 `node_modules`，不含原生 addon。套件的 sha256 是**整個 `.dittopkg` 檔案**的雜湊；安裝後展開到 `$XDG_DATA_HOME/ditto/packages/sha256/<sha256>/`（唯讀）。
+
+SDK 的 `validate` 可驗證宣告式組合；`pack` 目前仍只支援 Cordis／QML，通過驗證不代表宣告式組合可由 SDK 打包。
 
 Profile 的條目以 `(package, version)` 鎖定；同一 `package` 可以並存多個版本，安裝新版本不影響既有 revision（MOD-04）。
