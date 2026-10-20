@@ -44,7 +44,9 @@ TestCase {
         verify(o !== null, c.errorString()); mounted.push(o); return o;
     }
     function init() {
+        failOnWarning(/Binding loop detected/);
         StubDesktop.layer = layer; StubDesktop.screenWidth = 1280; StubDesktop.screenHeight = 800;
+        client.online = true;
         tokens.appearance = { theme: "soft-jelly-light", tokens: {}, reduced_motion: true };
         conversation.wanted = true;
         conversation.settings = { enabled: true };
@@ -61,6 +63,73 @@ TestCase {
             entryStyle: "fab", symbolVariant: "ditto" });
     }
     function control(s) { return s.contentItem.children.find(o => typeof o.symbolVariant === "string"); }
+    function test_sizing_without_binding_loops_data() {
+        return [{ tag: "capsule", style: "capsule", labelled: true, width: 218, height: 54 },
+            { tag: "fab", style: "fab", labelled: false, width: 56, height: 56 },
+            { tag: "fab-label", style: "fab", labelled: true, width: 195, height: 56 }];
+    }
+    function test_sizing_without_binding_loops(data) {
+        // Mount after init's warning guard: construction warnings must fail too.
+        const s = mount("shell/assistant/AssistantSurface.qml", { tokens: tokens, client: client,
+            conversation: conversation, screen: { name: "fixture", width: 1280, height: 800 },
+            entryStyle: data.style, labelExpanded: data.style === "fab" && data.labelled });
+        const entry = control(s);
+        s.dockMount = { binding: { package: "ditto.dock.pill" }, object: {
+            shown: true, reservedEdge: "bottom", screen: s.screen, edgeGap: 18, pillThickness: 56 } };
+        for (const scale of [1, 1.01, 1.25, 1.5, 1.64, 1]) {
+            s.entryScale = scale;
+            for (const state of [null, "running", "awaiting_approval", "succeeded", "failed", "unknown", "cancelled"]) {
+                conversation.turn = state ? { turn_id: "sizing-fixture", state: state } : null;
+                conversation.reconnecting = state === "unknown";
+                client.online = state !== "cancelled";
+                verify(waitForRendering(entry));
+                compare(entry.implicitWidth, data.width);
+                compare(entry.implicitHeight, data.height);
+                const w = Math.round(data.width * scale), h = Math.round(data.height * scale);
+                compare(s.implicitWidth, w); compare(s.implicitHeight, h);
+                compare(entry.width, w / scale); compare(entry.height, h / scale);
+                const inset = data.style === "fab" ? 46 : -1;
+                compare(s.dockCentreInset, inset);
+                const margin = inset >= h / 2 ? inset - h / 2 : 32;
+                compare(s.bottomMargin, margin); compare(s.margins.bottom, Math.floor(margin));
+                compare(s.contentItem.x, 1280 - 32 - w);
+                compare(s.contentItem.y, 800 - Math.floor(margin) - h);
+                compare(s.mask.item.width, w); compare(s.mask.item.height, h);
+                compare(s.mask.radius, Math.floor(h / 2));
+                verify(!s.mask.contains(1, 1)); verify(!s.mask.contains(w - 1, h - 1));
+                verify(s.mask.contains(w / 2, h / 2));
+                const area = entry.children.find(o => o.cursorShape !== undefined);
+                verify(!area.contains(Qt.point(1, 1)));
+                verify(area.contains(Qt.point(entry.width / 2, entry.height / 2)));
+            }
+        }
+    }
+    function test_font_resize_without_binding_loops() {
+        const s = surface(), entry = control(s);
+        s.labelExpanded = true;
+        for (const fontScale of [2, 0.75, 1.5, 1]) {
+            tokens.appearance = { theme: "soft-jelly-light", tokens: { font_scale: fontScale }, reduced_motion: true };
+            verify(waitForRendering(entry));
+            const height = s.implicitHeight;
+            verify(waitForRendering(entry));
+            compare(s.implicitHeight, height);
+        }
+    }
+    function test_width_sensitive_text_measurement_without_binding_loops() {
+        const s = surface(), entry = control(s);
+        s.labelExpanded = true;
+        const column = entry.children.find(o => o.spacing !== undefined);
+        const status = column.children.find(o => o.elide === Text.ElideRight);
+        // Diagnostic stress fixture, not the shipped single-line presentation:
+        // force width-sensitive text layout to expose the height -> x -> width
+        // -> text measurement cycle even with the offscreen layer-shell double.
+        status.wrapMode = Text.WordWrap;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: { font_scale: 2 }, reduced_motion: true };
+        verify(waitForRendering(entry));
+        const height = s.implicitHeight;
+        verify(waitForRendering(entry));
+        compare(s.implicitHeight, height);
+    }
     function luminance(c) {
         function channel(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
         return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
