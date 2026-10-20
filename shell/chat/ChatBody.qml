@@ -28,7 +28,7 @@ Item {
     /// Draw the "Ditto 對話" title here. A candidate full window shows it once,
     /// in its own header, and turns this off.
     property bool showTitle: true
-    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing chat.
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing chat.
     readonly property bool jelly: tokens.uiCandidate === true
     /// AI is off by Core's settings: the candidate says so once, in the
     /// empty state, instead of in the badge, a row and the composer.
@@ -142,13 +142,25 @@ Item {
                         Accessible.role: Accessible.Heading
                         Accessible.name: text
                     }
+                    // Tabs left, tools right; when both do not fit on one
+                    // line (the compact panel, J3's wider padding), the
+                    // tools move under the tabs instead of overlapping them.
                     Item {
+                        id: viewRow
+                        objectName: "chatViewRow"
+                        readonly property bool stacked: views.implicitWidth + tools.implicitWidth + window.tokens.uiGap * 2 > width
+                        /// A toolbar's padding: J3's airy 24 px would not fit
+                        /// tabs and tools on one line beside the character.
+                        readonly property int pad: window.compact ? Math.min(window.tokens.uiPadCard, 14) : window.tokens.uiPadCard
                         width: parent.width
-                        height: Math.max(views.implicitHeight, tools.implicitHeight)
+                        height: stacked ? views.implicitHeight + window.tokens.uiGap + tools.implicitHeight
+                            : Math.max(views.implicitHeight, tools.implicitHeight)
                         SegmentedControl {
                             id: views
-                            anchors.verticalCenter: parent.verticalCenter
+                            objectName: "chatViews"
+                            y: viewRow.stacked ? 0 : Math.round((viewRow.height - height) / 2)
                             tokens: window.tokens
+                            segmentPad: viewRow.pad
                             accessibleName: window.t(qsTr("對話檢視"))
                             options: [{ value: false, label: window.t(qsTr("對話")) }, { value: true, label: window.t(qsTr("歷史")) }]
                             value: history.open
@@ -156,11 +168,17 @@ Item {
                         }
                         Row {
                             id: tools
+                            objectName: "chatTools"
                             anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
+                            y: viewRow.stacked ? views.implicitHeight + window.tokens.uiGap : Math.round((viewRow.height - height) / 2)
                             spacing: window.tokens.uiGap / 2
+                            // Nothing to start while AI is off: the empty
+                            // state's one action is to turn it on.
                             Button {
+                                objectName: "chatNewConversation"
+                                visible: !window.aiOff
                                 tokens: window.tokens
+                                jellyPad: viewRow.pad
                                 kind: "subtle"
                                 text: window.t(qsTr("新對話"))
                                 enabled: !window.conversation.turnActive
@@ -168,12 +186,14 @@ Item {
                             }
                             Button {
                                 tokens: window.tokens
+                                jellyPad: viewRow.pad
                                 kind: "subtle"
                                 text: window.t(qsTr("AI 設定"))
                                 onClicked: window.settingsRequested()
                             }
                             Button {
                                 tokens: window.tokens
+                                jellyPad: viewRow.pad
                                 kind: "subtle"
                                 text: window.compact ? window.t(qsTr("展開")) : window.t(qsTr("收合"))
                                 accessibleName: window.compact ? window.t(qsTr("展開成完整視窗")) : window.t(qsTr("收合到角色旁"))

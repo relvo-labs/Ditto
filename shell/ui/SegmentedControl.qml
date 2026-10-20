@@ -20,6 +20,8 @@ Item {
     property real maxWidth: 0
     /// Shown after a sole option's value, e.g. 「唯一可用」.
     property string soleNote: ""
+    /// The side padding of each option (a dense toolbar may use less).
+    property int segmentPad: tokens.uiPadCard
     signal chosen(var value)
 
     readonly property bool sole: options.length === 1
@@ -114,7 +116,7 @@ Item {
                     required property int index
                     readonly property bool selected: index === control.selectedIndex
                     objectName: "segment_" + index
-                    width: segmentLabel.implicitWidth + control.tokens.uiPadCard * 2 + (dot.visible || control.tokens.uiJ3 ? dot.width + control.tokens.uiGap : 0)
+                    width: segmentLabel.implicitWidth + control.segmentPad * 2 + (dot.visible || control.tokens.uiJ3 ? dot.width + control.tokens.uiGap : 0)
                     height: control.tokens.uiControlHeight
                     activeFocusOnTab: control.enabled && index === control.tabIndex
                     Accessible.role: Accessible.RadioButton
@@ -161,7 +163,7 @@ Item {
                         width: control.tokens.uiJ3 ? 9 : 7
                         height: width
                         radius: width / 2
-                        x: control.tokens.uiPadCard - 2
+                        x: control.segmentPad - 2
                         anchors.verticalCenter: parent.verticalCenter
                         color: control.tokens.uiJ3 ? "transparent" : (control.enabled ? control.tokens.uiSelectDot : control.tokens.uiInkDisabled)
                         border.color: control.enabled ? control.tokens.uiSelectDot : control.tokens.uiInkDisabled
@@ -178,7 +180,7 @@ Item {
                         id: segmentLabel
                         objectName: "segmentLabel_" + segment.index
                         anchors.verticalCenter: parent.verticalCenter
-                        x: dot.visible || control.tokens.uiJ3 ? control.tokens.uiPadCard + dot.width + control.tokens.uiGap - 2 : control.tokens.uiPadCard
+                        x: dot.visible || control.tokens.uiJ3 ? control.segmentPad + dot.width + control.tokens.uiGap - 2 : control.segmentPad
                         text: segment.modelData.label
                         color: !control.enabled ? control.tokens.uiInkDisabled : control.tokens.uiInk
                         font.pixelSize: control.tokens.uiFontBody

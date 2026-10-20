@@ -20,11 +20,13 @@ Rectangle {
     /// Candidate style only: a pick that stays chosen (e.g. a diff's start)
     /// is drawn as a selected bead with a marker, never as a primary action.
     property bool checked: false
+    /// Styled face only: the side padding (a dense toolbar may use less).
+    property int jellyPad: tokens.uiPadCard
     signal clicked()
 
     readonly property bool jelly: tokens.uiCandidate === true
 
-    implicitWidth: jelly ? Math.max(tokens.uiControlHeight, jellyLabel.implicitWidth + tokens.uiPadCard * 2 + (checked ? 14 : 0))
+    implicitWidth: jelly ? Math.max(tokens.uiControlHeight, jellyLabel.implicitWidth + jellyPad * 2 + (checked ? 14 : 0))
         : label.implicitWidth + tokens.spaceWide * 2
     implicitHeight: jelly ? tokens.uiControlHeight : tokens.controlHeight
     radius: tokens.radiusSmall
@@ -187,7 +189,7 @@ Rectangle {
             Rectangle {
                 visible: face.picked
                 width: 7; height: 7; radius: 3.5
-                x: button.tokens.uiPadCard - 4
+                x: button.jellyPad - 4
                 anchors.verticalCenter: parent.verticalCenter
                 color: button.tokens.uiSelectDot
             }

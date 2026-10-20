@@ -62,7 +62,8 @@ Row {
             readonly property bool bubble: bead.tokens.uiJ3 === true && !bead.hot && !bead.reveal
             fill: bead.hot ? bead.tokens.uiBeadCloseHot : bubble ? bead.tokens.uiFill("#ffffff", 0.35) : bead.shade
             fillTop: Qt.lighter(fill, 1.12)
-            edge: bubble ? Qt.darker(bead.shade, 1.15) : Qt.darker(fill, 1.12)
+            // The hollow J3 bead is seen by its rim (≥3:1 on the canvas).
+            edge: bubble ? bead.tokens.uiBeadRim : Qt.darker(fill, 1.12)
             edgeWidth: bubble ? 2 : 1
             lift: beadArea.pressed ? 0.2 : 0.5
             sheen: true

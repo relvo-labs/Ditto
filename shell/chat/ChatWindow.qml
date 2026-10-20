@@ -29,12 +29,13 @@ FloatingWindow {
     signal collapseRequested()
     signal settingsRequested()
 
-    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing window.
+    /// #116 application style (Profile `ui_style`, light recipe); false
+    /// keeps the existing window.
     readonly property bool jelly: tokens.uiCandidate === true
 
     title: client.t(qsTr("Ditto 對話"))
     implicitWidth: 560
-    implicitHeight: jelly && screen && screen.height ? Math.max(420, Math.min(680, screen.height - 148)) : 680
+    implicitHeight: jelly && screen && screen.height ? Math.max(420, Math.min(680, screen.height - tokens.uiWindowClearance)) : 680
     minimumSize: Qt.size(420, 420)
     color: jelly ? "transparent" : assistantPresentation ? tokens.surface : tokens.background
     visible: true

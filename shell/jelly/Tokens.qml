@@ -206,21 +206,27 @@ QtObject {
     // Colour. Every text/fill pair is checked in tests/g4/visual/unit/
     // tst_ui_style.qml and, over the real wallpaper, by capture/ui_contrast.py.
     readonly property color uiInk: uiJ2 ? "#2a1a40" : uiJ3 ? "#221f3c" : "#231d3b"
-    readonly property color uiInkMuted: reducedTransparency ? "#423c5e" : uiJ2 ? "#564c72" : uiJ3 ? "#524f6f" : "#544e70"
+    /// J3 is the airiest style, so its grey text is darker (VM review
+    /// 2026-10-20: J3 had the weakest contrast).
+    readonly property color uiInkMuted: reducedTransparency ? "#423c5e" : uiJ2 ? "#564c72" : uiJ3 ? "#48456a" : "#544e70"
     /// Disabled labels: still legible (about 3:1), never mistaken for a
     /// sole option, which keeps full ink.
-    readonly property color uiInkDisabled: "#7d7896"
-    /// The window behind the content.
-    readonly property color uiCanvas: uiJ2 ? uiFill("#f5ebfb", 0.98) : uiJ3 ? uiFill("#f6f7ff", 0.86) : uiFill("#f4f2fd", 0.88)
+    readonly property color uiInkDisabled: uiJ3 ? "#6c6788" : "#7d7896"
+    /// The window behind the content. Wayfire 0.11 has no background blur,
+    /// so a more see-through canvas showed the wallpaper's (and windows')
+    /// shapes as ghosts on the VM; J1/J3 stay translucent but barely.
+    readonly property color uiCanvas: uiJ2 ? uiFill("#f5ebfb", 0.98) : uiJ3 ? uiFill("#f6f7ff", 0.94) : uiFill("#f4f2fd", 0.95)
     /// J3's water tint at the bottom of a window (gloss only).
-    readonly property color uiCanvasLow: uiJ3 ? uiFill("#eef5fb", 0.86) : uiCanvas
-    readonly property color uiSidebar: uiJ2 ? uiFill("#ecdcf9", 1.0) : uiJ3 ? "transparent" : uiFill("#e9e5fb", 0.72)
+    readonly property color uiCanvasLow: uiJ3 ? uiFill("#eef5fb", 0.94) : uiCanvas
+    /// J3's sidebar is a faint water tint with an edge, so the sidebar and
+    /// the page are told apart.
+    readonly property color uiSidebar: uiJ2 ? uiFill("#ecdcf9", 1.0) : uiJ3 ? uiFill("#e8ebfb", 0.85) : uiFill("#e9e5fb", 0.72)
     readonly property color uiCard: uiJ2 ? uiFill("#fffbff", 1.0) : uiJ3 ? uiFill("#ffffff", 0.6) : uiFill("#ffffff", 0.74)
     readonly property color uiCardBorder: reducedTransparency ? "#8f86bf"
-        : uiJ2 ? "#e6d6f8" : uiJ3 ? Qt.rgba(0.80, 0.78, 0.97, 0.7) : Qt.rgba(0.79, 0.75, 0.94, 0.6)
+        : uiJ2 ? "#e6d6f8" : uiJ3 ? Qt.rgba(0.60, 0.56, 0.88, 0.8) : Qt.rgba(0.79, 0.75, 0.94, 0.6)
     /// Bright inner edge of a jelly surface (none with reduced transparency).
     readonly property color uiCardHighlight: uiGloss ? Qt.rgba(1, 1, 1, uiJ2 ? 0.9 : 0.8) : "transparent"
-    readonly property color uiShadow: uiJ2 ? Qt.rgba(0.48, 0.30, 0.72, 0.26) : uiJ3 ? Qt.rgba(0.30, 0.45, 0.65, 0.12) : Qt.rgba(0.27, 0.22, 0.55, 0.16)
+    readonly property color uiShadow: uiJ2 ? Qt.rgba(0.48, 0.30, 0.72, 0.26) : uiJ3 ? Qt.rgba(0.30, 0.40, 0.65, 0.2) : Qt.rgba(0.27, 0.22, 0.55, 0.16)
     /// J2's gummy lip: a solid, unblurred edge under raised surfaces.
     readonly property color uiLip: "#dcc6f5"
     readonly property color uiAccentLip: "#4c2ab0"
@@ -229,7 +235,7 @@ QtObject {
     /// The recessed track of a segmented control and the selected bead in it.
     readonly property color uiTrack: uiJ2 ? uiFill("#eadcfa", 1.0) : uiJ3 ? uiFill("#eef0fd", 0.55) : uiFill("#e4dff8", 0.9)
     readonly property color uiBead: "#ffffff"
-    readonly property color uiBeadEdge: uiJ3 && !reducedTransparency ? "#c8bdf6" : uiJ2 ? "#cdbdf6" : "#d3cbf4"
+    readonly property color uiBeadEdge: uiJ3 && !reducedTransparency ? "#a99fe0" : uiJ2 ? "#cdbdf6" : "#d3cbf4"
     /// Selection marker: the small filled bead in front of a selected item.
     readonly property color uiSelectDot: uiJ2 ? "#7a3fd8" : uiJ3 ? "#5f86d6" : "#7262dc"
     /// Primary action fill (white text). J2 adds a jelly gradient.
@@ -283,6 +289,10 @@ QtObject {
     readonly property int uiControlHeight: Math.round(32 * fontScale)
     readonly property int uiRowHeight: Math.round((uiJ3 ? 56 : 48) * fontScale)
     readonly property int uiHeaderHeight: Math.round(52 * fontScale)
+    /// Screen height a styled window leaves free: top bar and the tasks
+    /// panel under it (about 90 px) and the Dock (about 96 px) on both
+    /// halves of a centred placement, plus a margin. See Centers.qml.
+    readonly property int uiWindowClearance: 228
 
     // Motion: press squashes the control's face (J2 the most), 120 ms OutCubic;
     // hit targets never scale. Off with reduced motion or the low-power style.

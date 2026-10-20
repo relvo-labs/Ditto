@@ -18,10 +18,15 @@ FloatingWindow {
     property string page: "composition"
     signal closeRequested()
 
-    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing window.
+    /// #116 application style (Profile `ui_style`, light recipe); false
+    /// keeps the existing window.
     readonly property bool jelly: !!tokens && tokens.uiCandidate === true
-    /// The screen's height when known: a candidate window stays clear of the
-    /// top bar and the Dock (about 36 + 96 px) instead of running under them.
+    /// The screen's height when known. A styled window leaves
+    /// `tokens.uiWindowClearance` of it free, so that where Wayfire centres
+    /// it (in the work area or on the output) its title row is below the top
+    /// bar and the tasks panel under it, and its bottom above the Dock (VM
+    /// 2026-10-20: a 740 px window on a 900 px screen had its title under
+    /// the tasks panel).
     readonly property real screenHeight: screen && screen.height ? screen.height : 0
 
     function t(source) {
@@ -38,7 +43,7 @@ FloatingWindow {
 
     title: t(qsTr("Ditto 設定"))
     implicitWidth: 1080
-    implicitHeight: jelly && screenHeight > 0 ? Math.max(520, Math.min(740, screenHeight - 148)) : 740
+    implicitHeight: jelly && screenHeight > 0 ? Math.max(520, Math.min(740, screenHeight - tokens.uiWindowClearance)) : 740
     minimumSize: Qt.size(760, 520)
     color: jelly ? "transparent" : tokens ? tokens.background : "#12121a"
     visible: true
@@ -58,8 +63,29 @@ FloatingWindow {
     onFocusedItemChanged: {
         if (focusedItem && focusedItem !== centersRoot) {
             lastFocused = focusedItem;
+            revealFocused();
         } else {
             Qt.callLater(recoverFocus);
+        }
+    }
+    /// Tab to a control below (or above) the visible part of a page scrolls
+    /// the page so the whole control shows, with a little room around it;
+    /// a keyboard user can reach the last saved composition's actions.
+    /// The current page (every page is a Flickable).
+    readonly property Flickable pageFlick: content.item as Flickable
+    function revealFocused() {
+        const flick = pageFlick;
+        if (!flick || !focusedItem) return;
+        let ancestor = focusedItem.parent;
+        while (ancestor && ancestor !== flick.contentItem) ancestor = ancestor.parent;
+        if (!ancestor) return;
+        const box = focusedItem.mapToItem(flick.contentItem, 0, 0, focusedItem.width, focusedItem.height);
+        const room = 16;
+        const maxY = Math.max(0, flick.contentHeight - flick.height);
+        if (box.y - room < flick.contentY) {
+            flick.contentY = Math.max(0, box.y - room);
+        } else if (box.y + box.height + room > flick.contentY + flick.height) {
+            flick.contentY = Math.min(maxY, box.y + box.height + room - flick.height);
         }
     }
     function recoverFocus() {
@@ -82,6 +108,15 @@ FloatingWindow {
         anchors.fill: parent
         focus: true
         Keys.onEscapePressed: window.closeRequested()
+        // Unhandled by the focused control: page the content (styled only).
+        Keys.onPressed: event => {
+            const flick = window.pageFlick;
+            if (!window.jelly || !flick) return;
+            const step = Math.max(40, flick.height - 48);
+            const maxY = Math.max(0, flick.contentHeight - flick.height);
+            if (event.key === Qt.Key_PageDown) { flick.contentY = Math.min(maxY, flick.contentY + step); event.accepted = true; }
+            else if (event.key === Qt.Key_PageUp) { flick.contentY = Math.max(0, flick.contentY - step); event.accepted = true; }
+        }
 
         // ---- #116 candidate frame: the window's one title and its controls ----
         Loader {
@@ -126,6 +161,9 @@ FloatingWindow {
             anchors.leftMargin: window.jelly ? window.tokens.uiGap : 0
             radius: window.jelly ? window.tokens.uiRadiusCard : 0
             color: window.jelly ? window.tokens.uiSidebar : window.tokens.surfaceStrong
+            // J3: the sidebar is told from the page by an edge, not only a tint.
+            border.color: window.jelly && window.tokens.uiJ3 ? window.tokens.uiCardBorder : "transparent"
+            border.width: window.jelly && window.tokens.uiJ3 ? 1 : 0
 
             Column {
                 anchors.fill: parent
@@ -241,6 +279,25 @@ FloatingWindow {
                 : window.page === "personalization" ? personalizationPage
                 : window.page === "ai" && window.conversation ? aiPage
                 : compositionPage
+        }
+
+        /// Styled pages show how far they scroll: a slim bar at the right
+        /// edge while there is more than fits (the wheel, PageUp/PageDown
+        /// and Tab scroll; the bar itself takes no input).
+        Rectangle {
+            id: scrollBar
+            objectName: "centersScrollBar"
+            readonly property var flick: content.item
+            readonly property bool overflow: !!flick && flick.contentHeight !== undefined && flick.contentHeight > flick.height + 1
+            visible: window.jelly && overflow
+            anchors.right: content.right
+            anchors.rightMargin: 4
+            y: content.y + 6 + (overflow ? (content.height - 12 - height) * Math.min(1, Math.max(0, flick.contentY / Math.max(1, flick.contentHeight - flick.height))) : 0)
+            width: 4
+            height: overflow ? Math.max(32, (content.height - 12) * flick.height / flick.contentHeight) : 0
+            radius: 2
+            color: window.jelly ? window.tokens.uiSeparator : "transparent"
+            Accessible.ignored: true
         }
     }
 
