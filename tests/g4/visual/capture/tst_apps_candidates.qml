@@ -6,11 +6,14 @@ import "../../../../shell/jelly" as Jelly
 import "../fixtures" as Fixtures
 import "../.staged/capture-data.js" as Data
 
-// #116 candidate screens, 1280×800 at scale 1, offscreen. For the current
-// presentation (no DITTO_UI_STYLE) and each candidate J1/J2/J3: composition
-// center (normal, reduced transparency, low power, and with the ⋯ menu open),
-// personalization, AI settings, chat with AI off, chat in progress with a
-// pending approval, and the Dock with applications that have no icon.
+// #116 style screens, 1280×800 at scale 1, offscreen. For each selectable
+// style (Profile `appearance.tokens.ui_style`; J1 jelly glass is the
+// default, owner 2026-10-20) J1/J2/J3: composition center (normal, reduced
+// transparency, low power, and with the ⋯ menu open), personalization (with
+// the style choice), AI settings, chat with AI off (window and the compact
+// panel beside the character), chat in progress with a pending approval, and
+// the Dock with applications that have no icon. The earlier light
+// presentation is no longer a choice and is not captured.
 //
 // Everything drawn is the real Shell QML: Backdrop with the light recipe's
 // wallpaper, the staged PanelTop and DockPill providers, Centers, ChatWindow,
@@ -48,7 +51,12 @@ TestCase {
     Fixtures.ConversationFixture { id: activeConversation; scene: "active" }
 
     property var mounted: []
-    readonly property var styles: ["current", "j1", "j2", "j3"]
+    readonly property var styles: ["j1", "j2", "j3"]
+    /// Work area of this 1280×800 scene: the top bar (36) and the pill
+    /// Dock's reservation (82) as on the VM; Wayfire centres new windows in it.
+    function centredY(height) {
+        return Math.round(36 + (800 - 36 - 82 - height) / 2);
+    }
 
     function findChild(root, name) {
         if (!root) return null;
@@ -73,7 +81,11 @@ TestCase {
         return { x: Math.round(p.x), y: Math.round(p.y), width: Math.round(item.width), height: Math.round(item.height) };
     }
     function mount(path, properties, staged) {
-        const component = Qt.createComponent(Qt.resolvedUrl(staged ? "../.staged/providers/" + path : "../../../../shell/" + path));
+        // staged: true = a staged provider; "chat" = the staged ui116 copy of
+        // shell/chat (ChatPanel is a layer-shell window, see stage-ui116.mjs).
+        const url = staged === "chat" ? "../.staged/ui116/current/shell/chat/" + path
+            : staged ? "../.staged/providers/" + path : "../../../../shell/" + path;
+        const component = Qt.createComponent(Qt.resolvedUrl(url));
         verify(component.status === Component.Ready, component.errorString());
         const incubator = component.incubateObject(layer, properties);
         incubator.forceCompletion();
@@ -102,11 +114,14 @@ TestCase {
     }
 
     function shell(style, mode) {
+        // The style as a Profile holds it: J1 is also what no value gives.
+        const tokens = { accent: "#b9a4ff" };
+        if (style !== "j1") tokens.ui_style = style;
         sceneTokens.appearance = {
-            theme: "soft-jelly-light", tokens: { accent: "#b9a4ff" }, locale: "zh-TW",
+            theme: "soft-jelly-light", tokens: tokens, locale: "zh-TW",
             reduced_transparency: mode === "reduced-transparency", low_power_style: mode === "low-power"
         };
-        sceneTokens.uiStyle = style === "current" ? "" : style;
+        compare(sceneTokens.uiStyle, style);
         const pinned = client.apps.map(app => app.app_id);
         const dock = mount("DockPill.qml", { client: client, tokens: sceneTokens, config: { position: "bottom", pinned: pinned },
                                              entryId: "dock", slotName: "ui.dock", shown: false }, true);
@@ -138,19 +153,19 @@ TestCase {
             style: style, scene: scene, mode: mode || "normal", file: path,
             viewport: { width: 1280, height: 800, scale: 1 },
             renderer: screen.GraphicsInfo.api === GraphicsInfo.Software ? "software" : "hardware",
-            ui_style_env: sceneTokens.uiStyle, fixture: true
+            ui_style: sceneTokens.uiStyle, fixture: true
         }, extra || {})));
     }
 
     function centers(style, page, mode, openMenu) {
         const dock = shell(style, mode);
         client.windows = [];
-        const window = mount("centers/Centers.qml", { client: client, tokens: sceneTokens, conversation: offConversation, page: page });
-        // Where Wayfire's `place` would centre a window of this size between
-        // the top bar and the Dock; the stub has no real placement.
-        window.implicitHeight = sceneTokens.uiCandidate ? Math.min(740, 800 - 148) : 740;
+        const window = mount("centers/Centers.qml", { client: client, tokens: sceneTokens, conversation: offConversation, page: page,
+                                                       screen: { width: 1280, height: 800 } });
+        // Where Wayfire's `place` would centre a window of its own height in
+        // the work area; the stub has no real placement.
         window.x = Math.round((1280 - window.width) / 2);
-        window.y = sceneTokens.uiCandidate ? 48 : 40;
+        window.y = centredY(window.height);
         if (openMenu) tryVerify(() => findChild(window, "profileCard") !== null, 3000);
         settle(dock);
         let menu = null;
@@ -180,10 +195,10 @@ TestCase {
         const dock = shell(style, "normal");
         const conversation = scene === "chat-active" ? activeConversation : offConversation;
         client.windows = scene === "chat-active" ? [{ id: "w-chat", app_id: "ditto.chat", title: "Ditto 對話", focused: true }] : [];
-        const window = mount("chat/ChatWindow.qml", { client: client, tokens: sceneTokens, conversation: conversation, assistantPresentation: true });
-        window.implicitHeight = sceneTokens.uiCandidate ? 640 : 680;
+        const window = mount("chat/ChatWindow.qml", { client: client, tokens: sceneTokens, conversation: conversation, assistantPresentation: true,
+                                                       screen: { width: 1280, height: 800 } });
         window.x = scene === "chat-active" ? 220 : Math.round((1280 - window.width) / 2);
-        window.y = 48;
+        window.y = centredY(window.height);
         let approval = null;
         if (scene === "chat-active") {
             approval = mount("chat/ApprovalWindow.qml", { client: client, tokens: sceneTokens,
@@ -203,6 +218,18 @@ TestCase {
         save(style, scene, "normal", { window: rect(window), approval: approval ? rect(approval) : null });
         unmountAll();
         client.windows = [];
+    }
+
+    /// The compact chat beside the character (the assistant's corner entry,
+    /// bottom right), AI off: the VM defect scene of 2026-10-20.
+    function chatPanel(style) {
+        const dock = shell(style, "normal");
+        client.windows = [];
+        const panel = mount("ChatPanel.qml", { client: client, tokens: sceneTokens, conversation: offConversation,
+            screen: { width: 1280, height: 800 }, animations: false, entryRect: Qt.rect(1196, 730, 56, 56) }, "chat");
+        settle(dock);
+        save(style, "chat-panel-off", "normal", { panel: rect(findChild(layer, "chatPresentationFrame")) });
+        unmountAll();
     }
 
     function dockScene(style) {
@@ -228,11 +255,11 @@ TestCase {
             centers(style, "composition", "normal", false);
             centers(style, "composition", "reduced-transparency", false);
             centers(style, "composition", "low-power", false);
-            // The current presentation has no ⋯ menu (eight buttons per card).
-            if (style !== "current") centers(style, "composition", "normal", true);
+            centers(style, "composition", "normal", true);
             centers(style, "personalization", "normal", false);
             centers(style, "ai", "normal", false);
             chat(style, "chat-off");
+            chatPanel(style);
             chat(style, "chat-active");
             dockScene(style);
         }

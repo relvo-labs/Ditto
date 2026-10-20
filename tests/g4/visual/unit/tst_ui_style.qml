@@ -70,22 +70,60 @@ TestCase {
     }
 
     // ---- the switch -----------------------------------------------------------------
-    function test_style_comes_from_the_environment_and_defaults_off() {
-        compare(createTemporaryObject(tokenFactory, testCase).uiStyle, "", "unset: existing presentation");
+    // Owner 2026-10-20: three styles to choose from, J1 by default. The choice
+    // is the Profile's appearance token `ui_style`; it applies to the light
+    // recipe only.
+    function test_style_comes_from_the_profile_and_defaults_to_j1() {
+        const light = style => ({ theme: "soft-jelly-light", tokens: style === undefined ? {} : { ui_style: style } });
+        compare(createTemporaryObject(tokenFactory, testCase).uiStyle, "", "no projection yet: dark defaults, no style");
+        compare(createTemporaryObject(tokenFactory, testCase, { appearance: light() }).uiStyle, "j1",
+                "light recipe, no value: J1 (existing Profiles are not rewritten)");
         for (const value of ["j1", "j2", "j3"]) {
-            Quickshell.environment = ({ DITTO_UI_STYLE: value });
-            const tokens = createTemporaryObject(tokenFactory, testCase);
+            const tokens = createTemporaryObject(tokenFactory, testCase, { appearance: light(value) });
             compare(tokens.uiStyle, value);
             verify(tokens.uiCandidate);
+            compare(tokens.uiStyleChosen, value);
         }
-        for (const value of ["J1", "macos", "1", ""]) {
-            Quickshell.environment = ({ DITTO_UI_STYLE: value });
-            compare(createTemporaryObject(tokenFactory, testCase).uiStyle, "", "unknown value '" + value + "' counts as unset");
+        // Core refuses these in preflight; an older document still draws J1.
+        for (const value of ["J2", "macos", "current", "", 3]) {
+            compare(createTemporaryObject(tokenFactory, testCase, { appearance: light(value) }).uiStyle, "j1",
+                    "invalid value '" + value + "' draws J1");
         }
+        // Dark and theme-less Profiles keep the existing presentation, even
+        // with a value.
+        for (const appearance of [{ theme: "soft-jelly", tokens: { ui_style: "j2" } }, { tokens: { ui_style: "j3" } }]) {
+            const tokens = createTemporaryObject(tokenFactory, testCase, { appearance: appearance });
+            compare(tokens.uiStyle, "", JSON.stringify(appearance));
+            verify(!tokens.uiCandidate);
+        }
+        // The former development switch is gone: the Profile is the only source.
+        Quickshell.environment = ({ DITTO_UI_STYLE: "j3" });
+        compare(createTemporaryObject(tokenFactory, testCase, { appearance: light("j2") }).uiStyle, "j2");
+        compare(createTemporaryObject(tokenFactory, testCase, { appearance: light() }).uiStyle, "j1");
+    }
+
+    /// A committed change replaces the projection's appearance; the style
+    /// follows at once (no new Shell, no logout).
+    function test_style_follows_a_committed_change_live() {
+        const tokens = createTemporaryObject(tokenFactory, testCase, { appearance: { theme: "soft-jelly-light", tokens: {} } });
+        const button = createTemporaryObject(buttonFactory, desktop, { tokens: tokens, kind: "primary" });
+        compare(tokens.uiStyle, "j1");
+        verify(tokens.uiJ1);
+        const j1Radius = tokens.uiRadiusCard;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: { ui_style: "j3" } };
+        compare(tokens.uiStyle, "j3");
+        verify(tokens.uiJ3 && !tokens.uiJ1);
+        verify(tokens.uiRadiusCard !== j1Radius, "J3 cards are rounder");
+        compare(find(button, "buttonFace").faceRadius, button.height / 2, "J3 buttons are pills");
+        tokens.appearance = { theme: "soft-jelly", tokens: { ui_style: "j3" } };
+        compare(tokens.uiStyle, "", "switching to the dark theme leaves the styles");
+        verify(!find(button, "buttonFace").visible);
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        compare(tokens.uiStyle, "j1", "back to J1 when the value is removed (undo)");
     }
 
     function test_unset_style_keeps_every_app_alias_equal_to_its_token() {
-        for (const theme of [null, "soft-jelly", "soft-jelly-light"]) {
+        for (const theme of [null, "soft-jelly"]) {
             const tokens = createTemporaryObject(tokenFactory, testCase, { appearance: theme ? { theme: theme, tokens: {} } : null });
             verify(!tokens.uiCandidate);
             compare(tokens.appInk, tokens.foreground);

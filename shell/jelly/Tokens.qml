@@ -261,6 +261,9 @@ QtObject {
     readonly property color uiBeadMaximize: uiJ2 ? "#b9a2f5" : "#c2b6f3"
     readonly property color uiBeadClose: uiJ2 ? "#9476ec" : "#a596ea"
     readonly property color uiBeadCloseHot: "#e26d84"
+    /// J3's hollow window beads: the rim alone has to be seen (≥3:1 on the
+    /// canvas, WCAG non-text contrast).
+    readonly property color uiBeadRim: "#7f74c9"
     readonly property color uiBeadGlyph: "#2b2350"
 
     // Shape, type and spacing (8 pt grid). Profile radius/font/space scales apply.
@@ -307,8 +310,12 @@ QtObject {
     /// One read of the desktop preference at startup. It is not watched:
     /// a later change applies at the next Shell start, which is stated in
     /// the personalization center.
+    /// False for a preview's tokens (the personalization style picker): they
+    /// take `systemReducedMotion` from the Shell's own instead of starting
+    /// another process.
+    property bool readsSystemPreference: true
     property Process systemMotion: Process {
-        running: true
+        running: tokens.readsSystemPreference
         command: ["sh", "-c", "command -v gsettings >/dev/null && gsettings get org.gnome.desktop.interface enable-animations 2>/dev/null || true"]
         stdout: StdioCollector {
             onStreamFinished: tokens.systemReducedMotion = text.trim() === "false"

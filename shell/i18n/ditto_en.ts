@@ -2479,6 +2479,26 @@
         <translation>%1 (not connected)</translation>
     </message>
     <message>
+        <source>J1 果凍玻璃</source>
+        <translation>J1 Jelly glass</translation>
+    </message>
+    <message>
+        <source>J1 果凍玻璃（預設）</source>
+        <translation>J1 Jelly glass (default)</translation>
+    </message>
+    <message>
+        <source>J2 軟糖</source>
+        <translation>J2 Gummy</translation>
+    </message>
+    <message>
+        <source>J3 泡泡</source>
+        <translation>J3 Bubble</translation>
+    </message>
+    <message>
+        <source>不透明的軟糖質感，按下會微微壓扁，色彩較暖。</source>
+        <translation>Opaque, gummy surfaces that squash a little when pressed; warmer colours.</translation>
+    </message>
+    <message>
         <source>主螢幕</source>
         <translation>Primary screen</translation>
     </message>
@@ -2511,6 +2531,10 @@
         <translation>Motion</translation>
     </message>
     <message>
+        <source>半透明磨砂與柔光邊，安靜、輕盈。</source>
+        <translation>Frosted, translucent surfaces with a soft bright edge; quiet and light.</translation>
+    </message>
+    <message>
         <source>右上</source>
         <translation>Top right</translation>
     </message>
@@ -2527,12 +2551,20 @@
         <translation>Appearance</translation>
     </message>
     <message>
+        <source>外觀風格</source>
+        <translation>Window style</translation>
+    </message>
+    <message>
         <source>大</source>
         <translation>Large</translation>
     </message>
     <message>
         <source>大小</source>
         <translation>Size</translation>
+    </message>
+    <message>
+        <source>套用到設定、對話、確認視窗與膠囊式 Dock。其他應用的標題列與終端機目前維持果凍玻璃樣式。</source>
+        <translation>Applies to settings, chat, confirmation windows and the pill Dock. Other applications’ title bars and the terminal keep the jelly glass style for now.</translation>
     </message>
     <message>
         <source>小</source>
@@ -2589,6 +2621,10 @@
     <message>
         <source>正在套用…</source>
         <translation>Applying…</translation>
+    </message>
+    <message>
+        <source>泡泡與虹彩細邊，留白最多。</source>
+        <translation>Bubbles and iridescent rims, with the most white space.</translation>
     </message>
     <message>
         <source>減少動畫</source>
@@ -2685,6 +2721,10 @@
     <message>
         <source>降低透明度</source>
         <translation>Reduce transparency</translation>
+    </message>
+    <message>
+        <source>預設</source>
+        <translation>Default</translation>
     </message>
     <message>
         <source>顯示 Ditto 角色</source>

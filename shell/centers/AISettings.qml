@@ -12,7 +12,7 @@ Flickable {
 
     required property var client
     required property var tokens
-    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing page.
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
     readonly property bool jelly: tokens.uiCandidate === true
     required property var conversation
 

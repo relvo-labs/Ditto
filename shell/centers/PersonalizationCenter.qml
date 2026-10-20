@@ -14,7 +14,7 @@ Flickable {
 
     required property var client
     required property var tokens
-    /// #116 candidate style (DITTO_UI_STYLE); false keeps the existing page.
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
     readonly property bool jelly: tokens.uiCandidate === true
     property var providers: null
 
@@ -226,6 +226,51 @@ Flickable {
         Section {
             tokens: page.tokens
             title: page.t(qsTr("外觀"))
+
+            // #116 (owner 2026-10-20): three application styles, J1 jelly
+            // glass by default. A ChangeSet like every appearance token;
+            // the Shell's windows change as soon as it commits. The styles
+            // belong to the light theme; with another theme nothing here
+            // would change anything, so the choice is not shown.
+            Text {
+                visible: page.tokens.lightRecipe
+                text: page.t(qsTr("外觀風格"))
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
+                font.weight: Font.DemiBold
+            }
+            StylePicker {
+                id: stylePicker
+                objectName: "uiStylePicker"
+                visible: page.tokens.lightRecipe
+                width: parent.width
+                tokens: page.tokens
+                enabled: !page.busy && !!page.appearance
+                accessibleName: page.t(qsTr("外觀風格"))
+                value: page.token("ui_style") || "j1"
+                defaultValue: "j1"
+                defaultNote: page.t(qsTr("預設"))
+                options: [
+                    { value: "j1", label: page.t(qsTr("J1 果凍玻璃")), accessibleName: page.t(qsTr("J1 果凍玻璃（預設）")),
+                      caption: page.t(qsTr("半透明磨砂與柔光邊，安靜、輕盈。")) },
+                    { value: "j2", label: page.t(qsTr("J2 軟糖")), accessibleName: page.t(qsTr("J2 軟糖")),
+                      caption: page.t(qsTr("不透明的軟糖質感，按下會微微壓扁，色彩較暖。")) },
+                    { value: "j3", label: page.t(qsTr("J3 泡泡")), accessibleName: page.t(qsTr("J3 泡泡")),
+                      caption: page.t(qsTr("泡泡與虹彩細邊，留白最多。")) }
+                ]
+                onChosen: value => {
+                    if (value !== (page.token("ui_style") || "j1")) page.setAppearance({ tokens: { ui_style: value } });
+                }
+            }
+            Text {
+                objectName: "uiStyleNote"
+                visible: page.tokens.lightRecipe
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.t(qsTr("套用到設定、對話、確認視窗與膠囊式 Dock。其他應用的標題列與終端機目前維持果凍玻璃樣式。"))
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
+            }
 
             Row {
                 spacing: page.tokens.space

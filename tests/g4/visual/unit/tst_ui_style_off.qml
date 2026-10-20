@@ -4,8 +4,10 @@ import DittoStub
 import Quickshell
 import "../fixtures" as Fixtures
 
-// #116: with no DITTO_UI_STYLE the Shell's application surfaces must render
-// exactly as at the base (87a2462, PR #115). ../stage-ui116.mjs exports the
+// #116: the application styles (Profile token `ui_style`, J1 by default)
+// belong to the light recipe. With the dark recipe (`soft-jelly`, also when
+// its Profile sets `ui_style`) and with no theme, the Shell's application
+// surfaces must render exactly as at the base (87a2462, PR #115). ../stage-ui116.mjs exports the
 // base files to .staged/ui116/base and copies the working tree to
 // .staged/ui116/current (layer-shell lines removed in both, recorded in its
 // staging.json). Each scene is drawn from each tree with that tree's own
@@ -27,9 +29,10 @@ TestCase {
 
     readonly property url staged: Qt.resolvedUrl("../.staged/ui116/")
     readonly property var appearances: [
-        { tag: "light", value: { theme: "soft-jelly-light", tokens: {}, locale: "zh-TW" } },
-        { tag: "light-reduced-transparency", value: { theme: "soft-jelly-light", tokens: {}, reduced_transparency: true } },
-        { tag: "light-low-power", value: { theme: "soft-jelly-light", tokens: {}, low_power_style: true } },
+        { tag: "dark", value: { theme: "soft-jelly", tokens: {}, locale: "zh-TW" } },
+        { tag: "dark-ui-style-j3", value: { theme: "soft-jelly", tokens: { ui_style: "j3" }, locale: "zh-TW" } },
+        { tag: "dark-reduced-transparency", value: { theme: "soft-jelly", tokens: {}, reduced_transparency: true } },
+        { tag: "dark-low-power", value: { theme: "soft-jelly", tokens: {}, low_power_style: true } },
         { tag: "no-theme", value: null }
     ]
     property var created: []

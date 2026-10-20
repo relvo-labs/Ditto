@@ -42,7 +42,7 @@ Scope {
 
     /// The light recipe's presentation; false keeps the earlier one.
     readonly property bool soft: tokens !== null && tokens.lightRecipe === true
-    /// #116 candidate style (DITTO_UI_STYLE) on top of the light recipe: a
+    /// #116 application style (Profile `ui_style`) on top of the light recipe: a
     /// themed squircle for an application without an icon and one indicator
     /// shape for running and in-use windows. Off: the light recipe as before.
     readonly property bool jelly: soft && tokens.uiCandidate === true

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""#116: comparison sheets of the candidate captures (development evidence).
+"""#116: comparison sheets of the style captures (development evidence).
 
-For every scene captured by tst_apps_candidates.qml: a 2×2 sheet (current,
-J1, J2, J3) at half size, and a phone-portrait strip (the four stacked at
-640 px wide), each tile labelled. Also writes candidates.json binding every
+For every scene captured by tst_apps_candidates.qml: a sheet of the three
+selectable styles (J1 default, J2, J3) side by side at half size, and a
+phone-portrait strip (the three stacked at 640 px wide), each tile labelled. Also writes candidates.json binding every
 PNG (sha256) to the capture metadata in the log. Sheets are scaled down
 copies; judge legibility from the 1280×800 originals.
 
@@ -17,12 +17,11 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 LABELS = {
-    "current": "現行（未設定 DITTO_UI_STYLE）",
-    "j1": "J1 果凍玻璃",
+    "j1": "J1 果凍玻璃（預設）",
     "j2": "J2 軟糖",
     "j3": "J3 泡泡",
 }
-ORDER = ["current", "j1", "j2", "j3"]
+ORDER = ["j1", "j2", "j3"]
 
 
 def font(size):
@@ -65,12 +64,12 @@ def main():
             else:
                 blank = Image.new("RGB", (640, 400), (70, 66, 90))
                 tiles.append(label(blank, LABELS[style] + "：此場景不適用"))
-        grid = Image.new("RGB", (1280, 800), (255, 255, 255))
+        grid = Image.new("RGB", (640 * len(tiles), 400), (255, 255, 255))
         for index, tile in enumerate(tiles):
-            grid.paste(tile, ((index % 2) * 640, (index // 2) * 400))
+            grid.paste(tile, (index * 640, 0))
         grid_name = f"sheet-{scene}.png"
         grid.save(os.path.join(directory, grid_name))
-        strip = Image.new("RGB", (640, 1600), (255, 255, 255))
+        strip = Image.new("RGB", (640, 400 * len(tiles)), (255, 255, 255))
         for index, tile in enumerate(tiles):
             strip.paste(tile, (0, index * 400))
         strip_name = f"phone-{scene}.png"

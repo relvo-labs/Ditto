@@ -40,6 +40,7 @@ TestCase {
             else fail({ name: "unexpected", message: method });
         }
     }
+    Component { id: tokenFactory; Jelly.Tokens {} }
     property var dock: null
 
     function find(root, name) {
@@ -59,11 +60,11 @@ TestCase {
         if (dock) { dock.release(); dock.destroy(); dock = null; }
         wait(20);
     }
-    function mount(style) {
-        tokens.uiStyle = style;
+    function mount(style, withTokens) {
+        if (style !== undefined) tokens.uiStyle = style;
         const component = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/DockPill.qml"));
         verify(component.status === Component.Ready, component.errorString());
-        const incubator = component.incubateObject(testCase, { client: client, tokens: tokens, entryId: "dock", slotName: "ui.dock", shown: false,
+        const incubator = component.incubateObject(testCase, { client: client, tokens: withTokens || tokens, entryId: "dock", slotName: "ui.dock", shown: false,
             config: { position: "bottom", pinned: ["org.example.Files", "org.example.Orbit", "org.example.Icon"] } });
         incubator.forceCompletion();
         dock = incubator.object;
@@ -102,12 +103,16 @@ TestCase {
         compare(files.Accessible.name, "files（使用中）（已釘選）", "the state is in words too");
     }
 
-    function test_no_style_keeps_the_light_recipe() {
-        mount("");
-        verify(!dock.jelly && dock.soft);
+    // Owner 2026-10-20: J1 is the default. A light Profile that never chose
+    // a style (no `ui_style` value) draws the J1 Dock: the earlier lettered
+    // tile is no longer what the light recipe shows.
+    function test_light_recipe_without_a_choice_is_j1() {
+        const fresh = createTemporaryObject(tokenFactory, testCase, { appearance: { theme: "soft-jelly-light", tokens: {}, locale: "zh-TW" } });
+        compare(fresh.uiStyle, "j1");
+        mount(undefined, fresh);
+        verify(dock.jelly && dock.soft);
         const files = find(desktop, "dockTile_org.example.Files");
-        verify(find(files, "dockIconFallback").visible);
-        verify(!find(files, "dockIconSquircle").visible);
-        compare(find(files, "dockIndicator").width, 16);
+        verify(find(files, "dockIconSquircle").visible);
+        verify(!find(files, "dockIconFallback").visible);
     }
 }

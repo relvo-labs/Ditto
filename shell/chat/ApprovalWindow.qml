@@ -16,7 +16,7 @@ FloatingWindow {
     required property var approval
     signal decided(string decision)
 
-    /// #116 candidate style (DITTO_UI_STYLE): visual only. Refusing stays the
+    /// #116 application style (Profile `ui_style`): visual only. Refusing stays the
     /// keyboard default, Escape and closing still refuse.
     readonly property bool jelly: tokens.uiCandidate === true
 
