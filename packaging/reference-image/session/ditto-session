@@ -85,6 +85,13 @@ if [[ -z "${WLR_DRM_DEVICES:-}" && -n "$drm_vendor" ]]; then
   done
 fi
 unset DISPLAY SWAYSOCK
+# #116: the session's default application configuration (foot in the J1
+# style, packaging/reference-image/session/xdg/foot/foot.ini) comes before the
+# system's. A person's own XDG_CONFIG_HOME files still win; nothing is written
+# there. Wayfire (its Super+Enter terminal) inherits it, and session.env below
+# gives it to Core and what Core launches.
+ditto_xdg="$workspace/packaging/reference-image/session/xdg"
+export XDG_CONFIG_DIRS="$ditto_xdg:${XDG_CONFIG_DIRS:-/etc/xdg}"
 # A previous login can leave the fixed IPC pathname behind after an abort.
 # Wayfire must create a fresh socket before Core starts probing it.
 rm -f -- "$WAYFIRE_SOCKET"
@@ -150,6 +157,7 @@ install -d -m 0700 "$XDG_RUNTIME_DIR/ditto"
 {
   echo "WAYFIRE_SOCKET=$WAYFIRE_SOCKET"
   echo "_WAYFIRE_SOCKET=$WAYFIRE_SOCKET"
+  echo "XDG_CONFIG_DIRS=$XDG_CONFIG_DIRS"
   case "$variant" in
     avatar-off) echo 'DITTO_AVATAR=off' ;;
     reduced-motion) echo 'DITTO_REDUCED_MOTION=1' ;;

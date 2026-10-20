@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import "../ui"
 import "../change"
@@ -13,10 +14,12 @@ Flickable {
 
     required property var client
     required property var tokens
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
+    readonly property bool jelly: tokens.uiCandidate === true
     property var providers: null
 
     contentWidth: width
-    contentHeight: column.implicitHeight + tokens.spaceSection * 2
+    contentHeight: column.implicitHeight + tokens.appPagePad * 2
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
@@ -145,8 +148,15 @@ Flickable {
         client.setAppearance(fields, done, fail);
     }
 
+    /// The appearance every control shows and every "already chosen"
+    /// judgement uses: the committed projection the Shell runs
+    /// (`tokens.appearance`, from Core at every commit and at every
+    /// (re)connect), not this page's own read, which can miss an event.
+    /// Before Core has sent a projection, the page's read.
+    readonly property var committed: tokens.appearance ? tokens.appearance : appearance
+
     function token(name) {
-        return appearance && appearance.tokens ? appearance.tokens[name] : undefined;
+        return committed && committed.tokens ? committed.tokens[name] : undefined;
     }
 
     function setAvatar(field, value) {
@@ -176,19 +186,24 @@ Flickable {
         function onProfileChanged(payload) {
             page.reload();
         }
+        // After a resync or a reconnect (the catalog is read again on both),
+        // as the plugin center does: an event missed meanwhile is not lost.
+        function onCapabilitiesReloaded() {
+            page.reload();
+        }
     }
 
     Column {
         id: column
-        x: page.tokens.spaceSection
-        y: page.tokens.spaceSection
-        width: page.width - page.tokens.spaceSection * 2
+        x: page.tokens.appPagePad
+        y: page.tokens.appPagePad
+        width: page.width - page.tokens.appPagePad * 2
         spacing: page.tokens.spaceSection
 
         Text {
             text: page.t(qsTr("個人化設定"))
-            color: page.tokens.foreground
-            font.pixelSize: page.tokens.fontHeading
+            color: page.tokens.appInk
+            font.pixelSize: page.tokens.appFontHeading
             font.bold: true
             Accessible.role: Accessible.Heading
             Accessible.name: text
@@ -199,8 +214,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.notice
-            color: page.tokens.warning
-            font.pixelSize: page.tokens.fontBody
+            color: page.tokens.appWarning
+            font.pixelSize: page.tokens.appFontBody
             Accessible.role: Accessible.AlertMessage
             Accessible.name: text
         }
@@ -224,14 +239,59 @@ Flickable {
             tokens: page.tokens
             title: page.t(qsTr("外觀"))
 
+            // #116 (owner 2026-10-20): three application styles, J1 jelly
+            // glass by default. A ChangeSet like every appearance token;
+            // the Shell's windows change as soon as it commits. The styles
+            // belong to the light theme; with another theme nothing here
+            // would change anything, so the choice is not shown.
+            Text {
+                visible: page.tokens.lightRecipe
+                text: page.t(qsTr("外觀風格"))
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
+                font.weight: Font.DemiBold
+            }
+            StylePicker {
+                id: stylePicker
+                objectName: "uiStylePicker"
+                visible: page.tokens.lightRecipe
+                width: parent.width
+                tokens: page.tokens
+                enabled: !page.busy && !!page.appearance
+                accessibleName: page.t(qsTr("外觀風格"))
+                value: page.tokens.uiStyleChosen
+                defaultValue: "j1"
+                defaultNote: page.t(qsTr("預設"))
+                options: [
+                    { value: "j1", label: page.t(qsTr("J1 果凍玻璃")), accessibleName: page.t(qsTr("J1 果凍玻璃（預設）")),
+                      caption: page.t(qsTr("半透明磨砂與柔光邊，安靜、輕盈。")) },
+                    { value: "j2", label: page.t(qsTr("J2 軟糖")), accessibleName: page.t(qsTr("J2 軟糖")),
+                      caption: page.t(qsTr("不透明的軟糖質感，按下會微微壓扁，色彩較暖。")) },
+                    { value: "j3", label: page.t(qsTr("J3 泡泡")), accessibleName: page.t(qsTr("J3 泡泡")),
+                      caption: page.t(qsTr("泡泡與虹彩細邊，留白最多。")) }
+                ]
+                onChosen: value => {
+                    if (value !== page.tokens.uiStyleChosen) page.setAppearance({ tokens: { ui_style: value } });
+                }
+            }
+            Text {
+                objectName: "uiStyleNote"
+                visible: page.tokens.lightRecipe
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.t(qsTr("套用到設定、對話、確認視窗與膠囊式 Dock。其他應用的標題列與終端機目前維持果凍玻璃樣式。"))
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
+            }
+
             Row {
                 spacing: page.tokens.space
                 Text {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("強調色"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Repeater {
                     model: page.accents
@@ -252,10 +312,21 @@ Flickable {
                         Keys.onReturnPressed: page.setAppearance({ tokens: { accent: modelData } })
                         Text {
                             anchors.centerIn: parent
-                            visible: parent.selected
+                            visible: parent.selected && !page.jelly
                             text: "✓"
                             color: "#1a1626"
                             font.bold: true
+                        }
+                        // Candidate: the chosen colour is a bubble ring (white
+                        // inner ring inside a thick ink ring), not a ✓ character.
+                        Rectangle {
+                            visible: parent.selected && page.jelly
+                            anchors.fill: parent
+                            anchors.margins: 3
+                            radius: width / 2
+                            color: "transparent"
+                            border.color: "#ffffff"
+                            border.width: 3
                         }
                         MouseArea {
                             anchors.fill: parent
@@ -272,8 +343,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("圓角"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -291,8 +362,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("文字大小"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -310,7 +381,7 @@ Flickable {
                 text: page.t(qsTr("降低透明度"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: !!page.appearance && page.appearance.reduced_transparency === true
+                checked: !!page.committed && page.committed.reduced_transparency === true
                 onToggled: value => page.setAppearance({ reduced_transparency: value })
             }
 
@@ -318,8 +389,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("關閉「降低透明度」後會出現倒數，按「保留」才會留下，避免看不清楚時無法改回。"))
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
 
             Toggle {
@@ -328,7 +399,7 @@ Flickable {
                 text: page.t(qsTr("低效能樣式（關閉模糊與陰影）"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: !!page.appearance && page.appearance.low_power_style === true
+                checked: !!page.committed && page.committed.low_power_style === true
                 onToggled: value => page.setAppearance({ low_power_style: value })
             }
         }
@@ -343,7 +414,7 @@ Flickable {
                 text: page.t(qsTr("減少動畫"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: !!page.appearance && page.appearance.reduced_motion === true
+                checked: !!page.committed && page.committed.reduced_motion === true
                 onToggled: value => page.setAppearance({ reduced_motion: value })
             }
 
@@ -353,8 +424,8 @@ Flickable {
                 text: page.tokens.systemReducedMotion
                     ? page.t(qsTr("系統已設定減少動畫，這裡關閉也不會恢復動畫。系統設定在桌面啟動時讀取。"))
                     : page.t(qsTr("系統的減少動畫設定在桌面啟動時讀取，兩者任一開啟都會減少動畫。"))
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
         }
 
@@ -365,7 +436,7 @@ Flickable {
             Choice {
                 tokens: page.tokens
                 enabled: !page.busy && !!page.appearance
-                value: page.appearance ? page.appearance.locale : "zh-TW"
+                value: page.committed && page.committed.locale ? page.committed.locale : "zh-TW"
                 accessibleName: page.t(qsTr("語言"))
                 options: [{ value: "zh-TW", label: qsTr("繁體中文") }, { value: "en", label: "English" }]
                 onChosen: value => page.setAppearance({ locale: value })
@@ -387,16 +458,16 @@ Flickable {
                         width: 140
                         anchors.verticalCenter: parent.verticalCenter
                         text: modelData.chord
-                        color: page.tokens.foreground
-                        font.pixelSize: page.tokens.fontBody
+                        color: page.tokens.appInk
+                        font.pixelSize: page.tokens.appFontBody
                         font.family: "monospace"
                     }
                     Text {
                         width: 200
                         anchors.verticalCenter: parent.verticalCenter
                         text: page.commandTitle(modelData.command)
-                        color: page.tokens.foreground
-                        font.pixelSize: page.tokens.fontBody
+                        color: page.tokens.appInk
+                        font.pixelSize: page.tokens.appFontBody
                     }
                     Badge {
                         anchors.verticalCenter: parent.verticalCenter
@@ -479,8 +550,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("大小"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -498,8 +569,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("螢幕"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -518,8 +589,8 @@ Flickable {
                     width: 140
                     anchors.verticalCenter: parent.verticalCenter
                     text: page.t(qsTr("位置"))
-                    color: page.tokens.foreground
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.tokens.appInk
+                    font.pixelSize: page.tokens.appFontBody
                 }
                 Choice {
                     tokens: page.tokens
@@ -536,8 +607,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.placementText()
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
                 Accessible.role: Accessible.StaticText
                 Accessible.name: text
             }
@@ -546,8 +617,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("主螢幕是排列在最左上的螢幕。角色所在的螢幕拔除時，角色會移到主螢幕，接回後再回去。被視窗蓋住時可以用喚回快捷鍵叫出來。"))
-                color: page.tokens.foregroundMuted
-                font.pixelSize: page.tokens.fontSmall
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontCaption
             }
         }
 
@@ -559,8 +630,8 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("鍵盤焦點一律以外框標示，所有操作都可以只用 Tab、Enter、空白鍵與方向鍵完成。每個按鈕與欄位都有螢幕閱讀器可以讀出的名稱；狀態同時以文字表示，不只靠顏色或動畫。"))
-                color: page.tokens.foreground
-                font.pixelSize: page.tokens.fontBody
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
             }
         }
     }

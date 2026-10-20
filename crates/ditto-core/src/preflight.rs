@@ -10,7 +10,7 @@ use ditto_protocol::{
     change::{ChangeCard, ChangeOp, ChangeOrigin, HotSwapLevel, PreflightCode, PreflightReason},
     manifest::{Manifest, TrustLevel},
     participant::ParticipantRole,
-    profile::{is_area, HostKind, ProfileDocument, TokenKind, APPEARANCE_TOKENS},
+    profile::{is_area, token_choices, HostKind, ProfileDocument, TokenKind, APPEARANCE_TOKENS},
     PROTOCOL_VERSION,
 };
 use serde_json::json;
@@ -69,6 +69,25 @@ fn origin_may_change_while_locked(origin: &ChangeOrigin) -> bool {
 fn is_color(value: &str) -> bool {
     let hex = value.strip_prefix('#').unwrap_or("");
     matches!(hex.len(), 6 | 8) && hex.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Why the Shell could not use `value` for the appearance token `name`, or
+/// `None` when it can. Names outside the token table are not judged here.
+fn token_problem(name: &str, value: &str) -> Option<&'static str> {
+    let spec = APPEARANCE_TOKENS.iter().find(|spec| spec.0 == name)?;
+    match spec {
+        (_, TokenKind::Color, ..) if !is_color(value) => Some("token_not_a_color"),
+        (_, TokenKind::Number, _, range, _) => match value.trim().parse::<f64>() {
+            Ok(n) if n.is_finite() => range
+                .filter(|(lo, hi)| n < *lo || n > *hi)
+                .map(|_| "token_out_of_range"),
+            _ => Some("token_not_a_number"),
+        },
+        (_, TokenKind::Text, ..) => token_choices(name)
+            .filter(|choices| !choices.contains(&value))
+            .map(|_| "token_not_a_choice"),
+        _ => None,
+    }
 }
 
 fn version_matches(range: &str, version: &str) -> bool {
@@ -185,18 +204,7 @@ fn check_all(
         if base.appearance.tokens.get(token) == Some(value) {
             continue;
         }
-        let spec = APPEARANCE_TOKENS.iter().find(|spec| spec.0 == token);
-        let why = match spec {
-            Some((_, TokenKind::Color, ..)) if !is_color(value) => Some("token_not_a_color"),
-            Some((_, TokenKind::Number, _, range, _)) => match value.trim().parse::<f64>() {
-                Ok(n) if n.is_finite() => range
-                    .filter(|(lo, hi)| n < *lo || n > *hi)
-                    .map(|_| "token_out_of_range"),
-                _ => Some("token_not_a_number"),
-            },
-            _ => None,
-        };
-        if let Some(why) = why {
+        if let Some(why) = token_problem(token, value) {
             reasons.push(reason(
                 PreflightCode::SchemaInvalid,
                 None,
@@ -733,5 +741,30 @@ mod tests {
         edges.insert("e", vec!["e"]);
         let found = cycles(&edges);
         assert_eq!(found, vec![vec!["a", "b", "c"], vec!["e"]]);
+    }
+
+    /// #116: the application style takes only the values the Shell draws;
+    /// other tokens keep their checks, unknown names stay free.
+    #[test]
+    fn token_values_are_judged_by_their_kind() {
+        for style in ["j1", "j2", "j3"] {
+            assert_eq!(token_problem("ui_style", style), None, "{style}");
+        }
+        for style in ["j4", "J1", "", " j1", "current", "macos"] {
+            assert_eq!(
+                token_problem("ui_style", style),
+                Some("token_not_a_choice"),
+                "{style:?}"
+            );
+        }
+        assert_eq!(token_problem("accent", "#9d7bff"), None);
+        assert_eq!(token_problem("accent", "purple"), Some("token_not_a_color"));
+        assert_eq!(token_problem("font_scale", "9"), Some("token_out_of_range"));
+        assert_eq!(
+            token_problem("font_scale", "big"),
+            Some("token_not_a_number")
+        );
+        assert_eq!(token_problem("font_family", "Noto Sans"), None);
+        assert_eq!(token_problem("not_a_token", "anything"), None);
     }
 }
