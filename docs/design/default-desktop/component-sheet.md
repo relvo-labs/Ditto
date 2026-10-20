@@ -350,7 +350,7 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 - **原因**（Qt 6.10.2 wayland-egl 原始碼）：在已顯示的視窗上改 `FramelessWindowHint`，`QWaylandWindow::setWindowFlags` 會在 GUI 執行緒立即建立或移除 Qt 標題列；render thread 每幀在 `makeCurrent`（有標題列才建 content FBO）與 `swapBuffers`（有標題列就從 content FBO blit）各讀一次。兩者之間出現的標題列會從沒建立的 FBO 讀取。修正前 `WindowHeader` 在建立、銷毀與風格切換時都會改旗標；Quickshell 關閉視窗時以 `deleteLater` 刪除後端視窗，所以關閉或收合有風格的視窗時，header 的 `Component.onDestruction` 也在仍顯示的視窗上移除旗標。owner 這次沒有切換主題，最符合紀錄的觸發點是關閉或收合有風格的對話視窗；未在 VM 重現，屬推斷。
 - **修正**：`WindowHeader` 不再碰旗標。`shell/ui/WindowFrameless.qml` 由 Centers、ChatWindow、ApprovalWindow 各自宣告，只在視窗未顯示時改旗標：第一次開啟時 Quickshell 先把內容接上後端視窗再顯示，旗標在顯示前就定好；J1／J2／J3 之間不改旗標；風格開↔關（淺色↔深色、撤銷到無主題、Agent 改主題）時先經 FloatingWindow 的 `visible` 隱藏（不是關閉，確認視窗不會因此拒絕）、改旗標、再顯示；關閉視窗不改旗標。只移除自己加上的旗標。
 - **可見的代價**：視窗開著時切換有風格／無風格，該視窗會短暫消失再出現，合成器可能重新擺放它的位置。J1／J2／J3 之間切換沒有這個現象。
-- **測試**：`tests/g4/visual/unit/tst_ui_style_frameless.qml`。`DittoStub.StubFloatingWindow` 依 Quickshell 0.3.1 的接上與顯示順序建模，後端是真的 offscreen 視窗，會記錄每次旗標變更時視窗是否顯示中；`stage-ui116.mjs` 把三個視窗的根型別換成它（只改這一行，記在 `staging.json`）。涵蓋：第一次顯示、J1→J2→J3→關→J1、撤銷、主題切換、他處設的旗標保留、關閉視窗。修正前 `74a19c9` 上 18／33 失敗，修正後 33／33 通過。修正輪 1 的旗標測試移到這裡，改在真實視窗上跑。
+- **測試**：`tests/g4/visual/unit/tst_ui_style_frameless.qml`。`DittoStub.StubFloatingWindow` 依 Quickshell 0.3.1 的接上與顯示順序建模，後端是真的 offscreen 視窗，會記錄每次旗標變更時視窗是否顯示中；`stage-ui116.mjs` 把三個視窗的根型別換成它（只改這一行，記在 `staging.json`）。涵蓋：第一次顯示、J1→J2→J3→關→J1、撤銷、主題切換、他處設的旗標保留、關閉視窗，以及隱藏再顯示後頁面、未送出的草稿、待確認的請求與焦點都還在（offscreen；真實合成器上的焦點與位置由 VM 驗證）。修正前 `74a19c9` 上 36 列中 21 列失敗，修正後 36／36 通過。修正輪 1 的旗標測試移到這裡，改在真實視窗上跑。
 
 ### 8.6 待 owner 決定
 

@@ -138,6 +138,48 @@ TestCase {
         compare(win.maps, 3);
     }
 
+    function all(root, test) {
+        const found = [];
+        const walk = item => {
+            for (const child of item.children) {
+                if (test(child)) found.push(child);
+                walk(child);
+            }
+        };
+        walk(root);
+        return found;
+    }
+    function test_hide_and_show_keeps_the_window_data() {
+        return windows.map(kind => ({ tag: kind.tag, kind: kind }));
+    }
+    // Hidden and shown again, the window is the same window: the page, an
+    // unsent draft, the pending request and the focused control are kept.
+    function test_hide_and_show_keeps_the_window(row) {
+        const tokens = tokensWith(light("j1"));
+        const win = open(row.kind, tokens);
+        let draft = null;
+        if (row.kind.tag === "centers") {
+            win.page = "history";
+            const tab = all(win.contentItem, item => item.Accessible.role === Accessible.PageTab && item.Accessible.name === "變更紀錄")[0];
+            verify(tab, "the history tab");
+            tab.forceActiveFocus(Qt.TabFocusReason);
+        } else if (row.kind.tag === "chat") {
+            draft = all(win.contentItem, item => typeof item.focusInput === "function" && typeof item.text === "string")[0];
+            verify(draft, "the composer");
+            draft.text = "還沒送出的草稿";
+        }
+        tryVerify(() => win.focusedItem !== null, 1000, "a control has focus");
+        const focused = win.focusedItem;
+        for (const [appearance, styled, label] of [[dark, false, "off"], [light("j3"), true, "on"]]) {
+            step(win, tokens, appearance, styled, label);
+            tryCompare(win, "focusedItem", focused, 1000, label + ": focus is on the same control");
+            if (row.kind.tag === "centers") compare(win.page, "history", label + ": same page");
+            if (draft) compare(draft.text, "還沒送出的草稿", label + ": the draft is kept");
+            if (row.kind.tag === "approval") compare(win.approval.request_id, "req", label + ": same request, not decided");
+        }
+        compare(win.maps, 3, "hidden and shown once per change");
+    }
+
     function test_undo_and_theme_switch_data() {
         return each(kind => [
             { tag: kind.tag + "/undo", kind: kind, sequence: [
