@@ -136,8 +136,10 @@ export class CodexBackend {
   /** Device-code sign-in: the person opens the verification page on any
    * browser and enters the one-time code. No local callback port is opened. */
   async startLogin():Promise<{login_id:string;auth_url:string;user_code:string;expires_at_ms:number}>{
+    if(!this.alive)throw new Error('provider_unavailable')
     if(this.login&&this.login.expires_at_ms>Date.now())return this.login
     const result=object(await this.peer.request('account/login/start',{type:'chatgptDeviceCode'}))
+    if(!this.alive)throw new Error('provider_unavailable')
     if(result.type!=='chatgptDeviceCode')throw new Error('unsupported subscription login response')
     const url=new URL(string(result.verificationUrl))
     if(url.protocol!=='https:'||url.hostname!=='auth.openai.com'||url.username||url.password)throw new Error('invalid authentication destination')
@@ -148,8 +150,14 @@ export class CodexBackend {
     return this.login
   }
   async cancelLogin(id:string):Promise<{completed:boolean}>{
-    if(this.login?.login_id!==id)return {completed:false}
-    await this.peer.request('account/login/cancel',{loginId:id});this.login=undefined;return {completed:true}
+    const attempt=this.login
+    if(attempt?.login_id!==id)return {completed:false}
+    const result=object(await this.peer.request('account/login/cancel',{loginId:id}))
+    if(result.status!=='canceled'&&result.status!=='notFound')throw new Error('invalid login cancellation')
+    // Completion may clear this attempt and a new start may finish before
+    // this cancellation acknowledgement. Never clear that newer attempt.
+    if(this.login===attempt)this.login=undefined
+    return {completed:result.status==='canceled'}
   }
   async logout():Promise<{completed:boolean}>{
     if(this.busy)throw new Error('stop the active turn before logout')

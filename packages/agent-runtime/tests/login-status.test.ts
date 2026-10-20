@@ -97,6 +97,69 @@ describe('device login account readback through the controller seam',()=>{
     expect(await backend.startLogin()).toBe(next)
     expect((await backend.status()).authenticated).toBe(false)
   })
+  it('does not let a late cancellation acknowledgement clear a newer attempt',async()=>{
+    const peer=new LoginPeer(),backend=new CodexBackend(peer),first=await backend.startLogin()
+    const original=peer.request.bind(peer)
+    let acknowledge!:(value:unknown)=>void
+    peer.request=<T>(method:string,params:unknown)=>method==='account/login/cancel'
+      ?new Promise<T>(resolve=>{acknowledge=value=>resolve(value as T)}):original<T>(method,params)
+    const cancellation=backend.cancelLogin(first.login_id)
+    peer.complete(first.login_id,false)
+    const next=await backend.startLogin()
+    acknowledge({status:'canceled'});await cancellation
+    expect(await backend.startLogin()).toBe(next)
+  })
+  it('does not report upstream notFound as a confirmed cancellation',async()=>{
+    const peer=new LoginPeer(),backend=new CodexBackend(peer),login=await backend.startLogin(),original=peer.request.bind(peer)
+    peer.request=async<T>(method:string,params:unknown)=>method==='account/login/cancel'?{status:'notFound'} as T:original<T>(method,params)
+    expect(await backend.cancelLogin(login.login_id)).toEqual({completed:false})
+    expect((await backend.status()).authenticated).toBe(false)
+  })
+  it('keeps a malformed cancellation acknowledgement unknown',async()=>{
+    const peer=new LoginPeer(),backend=new CodexBackend(peer),login=await backend.startLogin(),original=peer.request.bind(peer)
+    peer.request=async<T>(method:string,params:unknown)=>method==='account/login/cancel'?{} as T:original<T>(method,params)
+    await expect(backend.cancelLogin(login.login_id)).rejects.toThrow('invalid login cancellation')
+  })
+  it('rejects a login response after the backend connection was lost',async()=>{
+    const peer=new LoginPeer(),backend=new CodexBackend(peer),original=peer.request.bind(peer)
+    let reply!:(value:unknown)=>void
+    peer.request=<T>(method:string,params:unknown)=>method==='account/login/start'
+      ?new Promise<T>(resolve=>{reply=value=>resolve(value as T)}):original<T>(method,params)
+    const pending=backend.startLogin()
+    peer.close()
+    reply({type:'chatgptDeviceCode',loginId:'fixture-late',verificationUrl:'https://auth.openai.com/codex/device',userCode:'TEST-ONLY'})
+    await expect(pending).rejects.toThrow('provider_unavailable')
+  })
+  it.each(['model/list','account/rateLimits/read'])('keeps turn admission closed when cancelled during %s',async method=>{
+    const peer=new LoginPeer();peer.account=subscription
+    const backend=new CodexBackend(peer),original=peer.request.bind(peer),abort=new AbortController()
+    let entered!:()=>void,release!:(value:unknown)=>void
+    const waiting=new Promise<void>(resolve=>{entered=resolve})
+    peer.request=<T>(name:string,params:unknown)=>{
+      if(name!==method)return original<T>(name,params)
+      entered();return new Promise<T>(resolve=>{release=value=>resolve(value as T)})
+    }
+    const pending=backend.run('fixture','',settings,[],async()=>({contentItems:[],success:true}),abort.signal)
+    const rejected=expect(pending).rejects.toThrow('cancelled')
+    await waiting;abort.abort();release({});await rejected
+    expect(peer.calls).not.toContain('thread/start')
+  })
+  it.each(['model/list','account/rateLimits/read'])('keeps auxiliary readback unknown when disconnected during %s',async method=>{
+    const peer=new LoginPeer();peer.account=subscription
+    const original=peer.request.bind(peer)
+    peer.request=async<T>(name:string,params:unknown)=>{
+      if(name===method){peer.close();throw new Error('synthetic disconnect')}
+      return original<T>(name,params)
+    }
+    await expect(new CodexBackend(peer).status()).rejects.toThrow('provider_unavailable')
+  })
+  it('characterizes the contract gap: failed completion and pending authorization have identical status',async()=>{
+    const peer=new LoginPeer(),backend=new CodexBackend(peer),runtime=new AgentRuntime(core,backend)
+    const login=await backend.startLogin(),before=await status(runtime)
+    peer.complete(login.login_id,false)
+    expect(await status(runtime)).toEqual(before) // no public login-result field; not evidence of sign-out
+    await runtime.stop()
+  })
   it('expires the local attempt without asserting account failure or restarting auth on reconnect',async()=>{
     vi.useFakeTimers()
     const peer=new LoginPeer(),backend=new CodexBackend(peer),login=await backend.startLogin()

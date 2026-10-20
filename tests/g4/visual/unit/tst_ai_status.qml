@@ -37,7 +37,10 @@ TestCase {
         function diagnosticText(error) { return error ? error.name + " (" + error.code + "): " + error.message : ""; }
         function capability(method, params, ok, fail, options) {
             calls = calls.concat([method]);
-            const reply = replies[method];
+            // Provider readback now checks the existing Core generation before
+            // and after the account query. This fixture has one stable runtime.
+            const reply = replies[method] || (method === "agent.runtime.get"
+                ? { ok: { generation: 1, phase: "ready" } } : null);
             if (!reply) {
                 return;
             }

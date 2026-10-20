@@ -64,7 +64,56 @@ QtObject {
     property bool reconnecting: false
     property bool reading: false
     property bool readAgain: false
+    // Request identities belong to this projection, never to Core policy.
+    property int connectionEpoch: 0
+    property int settingsRequest: 0
+    property int providerEpoch: 0
+    property int providerRequest: 0
+    property int runtimeRequest: 0
+    property int loginRequest: 0
+    property bool providerReading: false
+    property var loginStart: null
+    property string settingsContext: ""
+    property var runtimeGeneration: null
     readonly property int pageSize: 50
+
+    function invalidateProvider(keepReadback) {
+        providerEpoch++;
+        providerRequest++;
+        runtimeRequest++;
+        providerReading = false;
+        providerRetry.stop();
+        if (!keepReadback) provider = null;
+        providerFailed = false;
+    }
+
+    function forgetLogin() {
+        loginRequest++;
+        login = null;
+        loginWatch.stop();
+    }
+
+    onSettingsChanged: {
+        const context = settings ? String(settings.enabled) + ":" + settings.provider : "";
+        if (context !== settingsContext) {
+            settingsContext = context;
+            if (login || loginStart) cancelLogin();
+            invalidateProvider();
+        }
+    }
+
+    onRuntimeChanged: {
+        if (!runtime || runtime.generation === undefined) return;
+        const changed = runtimeGeneration !== null && runtimeGeneration !== runtime.generation;
+        runtimeGeneration = runtime.generation;
+        if (changed) {
+            // An old generation's code cannot be cancelled through a new one.
+            forgetLogin();
+            invalidateProvider();
+            if (client.online && wanted && enabled && settings.provider === "codex-app-server")
+                providerRetry.restart();
+        }
+    }
 
     readonly property bool enabled: !!settings && settings.enabled === true
     readonly property bool connected: !!provider && provider.available === true && provider.authenticated === true
@@ -251,7 +300,10 @@ QtObject {
 
     function refreshSettings() {
         settingsFailed = false;
+        const connection = connectionEpoch, request = ++settingsRequest;
+        const current = () => connection === connectionEpoch && request === settingsRequest && client.online;
         client.capability("agent.settings.describe", {}, function (result) {
+            if (!current()) return;
             settings = result;
             settingsFailed = false;
             if (settings.enabled) {
@@ -259,6 +311,7 @@ QtObject {
                 loadSession();
             }
         }, function (error) {
+            if (!current()) return;
             // Unconfirmed settings: the provider status under them is not
             // shown as confirmed either (it is read again after settings).
             settings = null;
@@ -268,41 +321,56 @@ QtObject {
         });
     }
 
-    function refreshRuntime() {
+    function refreshRuntime(then, failed) {
+        const connection = connectionEpoch, request = ++runtimeRequest;
         client.capability("agent.runtime.get", {}, function (result) {
+            if (connection !== connectionEpoch || request !== runtimeRequest || !client.online) return;
             runtime = result;
+            if (then) then(result);
+        }, function (error) {
+            if (connection !== connectionEpoch || request !== runtimeRequest || !client.online) return;
+            if (failed) failed(error);
         });
     }
 
     function refreshProvider(then) {
+        if (!client.online || !enabled || settings.provider === "direct-model") return;
+        const epoch = providerEpoch, request = ++providerRequest;
+        const current = () => epoch === providerEpoch && request === providerRequest && client.online;
         providerFailed = false;
-        refreshRuntime();
-        client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
-            provider = result;
-            providerFailed = false;
-            if (result.authenticated) {
-                login = null;
-            }
-            refreshRuntime();
-            if (then) {
-                then(result);
-            }
-        }, function (error) {
+        providerReading = true;
+        const failed = function (error) {
+            if (!current()) return;
+            providerReading = false;
             provider = null;
-            refreshRuntime();
-            // The Agent may still be starting; ask once more shortly.
+            // Retain the existing startup retry. A read failure is unknown,
+            // not proof of sign-out or of a failed device-code exchange.
             providerFailed = !(error.name === "unavailable" && wanted);
-            if (!providerFailed) {
-                providerRetry.restart();
-            } else {
-                setError(error);
-            }
-        }, { deadlineMs: 30000 });
+            if (!providerFailed) providerRetry.restart();
+            else setError(error);
+        };
+        // Core already exposes generation. Bracket the account read with its
+        // snapshots so a restarted backend cannot confirm an old response.
+        refreshRuntime(function (before) {
+            if (!current()) return;
+            client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
+                if (!current()) return;
+                refreshRuntime(function (after) {
+                    if (!current()) return;
+                    providerReading = false;
+                    if (before.generation !== after.generation) return;
+                    provider = result;
+                    providerFailed = false;
+                    if (result.authenticated) forgetLogin();
+                    if (then) then(result);
+                }, failed);
+            }, failed, { deadlineMs: 30000 });
+        }, failed);
     }
 
     property Timer providerRetry: Timer {
         interval: 1500
-        onTriggered: if (state.wanted && state.enabled && !state.connected) state.refreshProvider()
+        onTriggered: if (state.wanted && state.enabled && !state.connected && !state.providerReading) state.refreshProvider()
     }
 
     function setEnabled(on) {
@@ -316,7 +384,10 @@ QtObject {
             }
         }
         next.enabled = on;
+        const connection = connectionEpoch, request = ++settingsRequest;
+        const current = () => connection === connectionEpoch && request === settingsRequest && client.online;
         client.capability("agent.settings.patch", { expected_revision: settings.revision, settings: next }, function (result) {
+            if (!current()) return;
             settings = result;
             setError(null);
             if (on) {
@@ -324,6 +395,7 @@ QtObject {
                 loadSession();
             }
         }, function (error) {
+            if (!current()) return;
             setError(error);
             refreshSettings(); // another surface changed it: show the current one
         });
@@ -334,45 +406,65 @@ QtObject {
     /// browser gets the verification page and the person types the one-time
     /// code shown here; no token ever reaches the Shell.
     function startLogin() {
+        if (!client.online || !enabled || settings.provider !== "codex-app-server" || login || loginStart) return;
+        // Keep the last account read visible while the code is displayed.
+        // Starting authorization does not itself change that readback.
+        invalidateProvider(true);
+        const request = ++loginRequest, connection = connectionEpoch, generation = runtimeGeneration;
+        const token = {};
+        loginStart = token;
+        const current = () => request === loginRequest && connection === connectionEpoch && generation === runtimeGeneration;
         client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
+            if (loginStart === token) loginStart = null;
+            if (!current() || Date.now() >= result.expires_at_ms) {
+                // A cancelled start may have reached Core before its reply.
+                // Clean up only on that same connection and generation.
+                if (connection === connectionEpoch && generation === runtimeGeneration && client.online)
+                    client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: result.login_id });
+                return;
+            }
             login = result;
             setError(null);
             Qt.openUrlExternally(result.auth_url);
             loginWatch.start();
         }, function (error) {
-            setError(error);
+            if (loginStart === token) loginStart = null;
+            if (current()) setError(error);
         }, { deadlineMs: 30000 });
     }
 
     function cancelLogin() {
-        if (!login) {
-            return;
-        }
-        const id = login.login_id;
-        login = null;
-        loginWatch.stop();
-        client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: id }, null, function (error) {
+        const attempt = login;
+        forgetLogin();
+        invalidateProvider();
+        if (!attempt || !client.online) return;
+        const epoch = providerEpoch;
+        const readback = function () {
+            if (epoch === providerEpoch && client.online && enabled && settings.provider === "codex-app-server")
+                refreshProvider();
+        };
+        client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: attempt.login_id }, readback, function (error) {
+            if (epoch !== providerEpoch) return;
             setError(error);
+            readback(); // cancellation acknowledgement lost: query, never assume sign-out
         });
     }
 
-    /// Sign-in finishes in the browser; there is no event for it, so the
-    /// status is read every few seconds while (and only while) a sign-in is
-    /// pending, until its expiry.
+    /// Core has no login-result event; query while a bounded attempt exists.
+    /// A slow read must finish before the timer starts another one.
     property Timer loginWatch: Timer {
         interval: 3000
         repeat: true
         onTriggered: {
-            if (!state.login || Date.now() > state.login.expires_at_ms || !state.wanted) {
-                state.login = null;
+            if (state.login && Date.now() >= state.login.expires_at_ms) {
+                state.cancelLogin();
+                return;
+            }
+            if (!state.login || !state.wanted || !state.client.online || !state.enabled || state.settings.provider !== "codex-app-server") {
                 stop();
                 return;
             }
-            state.refreshProvider(function (result) {
-                if (result.authenticated) {
-                    state.loginWatch.stop();
-                }
-            });
+            if (!state.providerReading) state.refreshProvider();
         }
     }
 
@@ -459,13 +551,17 @@ QtObject {
             }
         }
         Object.assign(next, fields);
+        const connection = connectionEpoch, request = ++settingsRequest;
+        const current = () => connection === connectionEpoch && request === settingsRequest && client.online;
         client.capability("agent.settings.patch", { expected_revision: settings.revision, settings: next }, function (result) {
+            if (!current()) return;
             settings = result;
             setError(null);
             if (then) {
                 then(result);
             }
         }, function (error) {
+            if (!current()) return;
             setError(error);
             refreshSettings();
         });
@@ -480,10 +576,13 @@ QtObject {
     }
 
     function logout() {
+        forgetLogin();
+        invalidateProvider();
+        const epoch = providerEpoch;
         client.capability("agent.providers.logout", { provider: "codex-app-server" }, function () {
-            refreshProvider();
+            if (epoch === providerEpoch) refreshProvider();
         }, function (error) {
-            setError(error);
+            if (epoch === providerEpoch) setError(error);
         }, { deadlineMs: 30000 });
     }
 
@@ -699,6 +798,13 @@ QtObject {
     property Connections connection: Connections {
         target: state.client
         function onDisconnected() {
+            state.connectionEpoch++;
+            state.settingsRequest++;
+            state.forgetLogin();
+            state.loginStart = null;
+            state.invalidateProvider();
+            state.runtime = null;
+            state.runtimeGeneration = null;
             state.reconnecting = state.wanted;
             state.subscriptionId = "";
             // Readback from the lost connection is not confirmed any more.
