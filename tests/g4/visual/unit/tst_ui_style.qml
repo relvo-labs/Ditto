@@ -120,6 +120,9 @@ TestCase {
         verify(!find(button, "buttonFace").visible);
         tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
         compare(tokens.uiStyle, "j1", "back to J1 when the value is removed (undo)");
+        // Before its tokens: a styled face reads them until it is gone.
+        button.destroy();
+        wait(0);
     }
 
     function test_unset_style_keeps_every_app_alias_equal_to_its_token() {
