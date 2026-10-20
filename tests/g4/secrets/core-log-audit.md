@@ -1,6 +1,6 @@
 # #73：Core 日誌欄位盤點
 
-對應 SEC-07、REC-06、AT-15。基底 `25c0b726ef3c3bc7c8e00232514604cc0498007e`；用以下指令盤點 `crates/` 中全部 58 個呼叫；初版欄位共 42 種，repair1 加入 `reason_code/subject_kind` 後共 44 種（不含 logger 自動加入的欄位）。沒有 `log::warn/error/info` 呼叫，結果全是 Core 的 `log::event`。
+對應 SEC-07、REC-06、AT-15。以下 58 呼叫／44 欄位數是歷史盤點，非目前總數；本輪監督事件與新增欄位見後方補表。歷史基底 `25c0b726ef3c3bc7c8e00232514604cc0498007e`；用以下指令盤點 `crates/` 中全部 58 個呼叫；初版欄位共 42 種，repair1 加入 `reason_code/subject_kind` 後共 44 種（不含 logger 自動加入的欄位）。沒有 `log::warn/error/info` 呼叫，結果全是 Core 的 `log::event`。
 
 ```sh
 git grep -n 'log::event\|log::warn\|log::error\|log::info' -- crates/
@@ -42,7 +42,7 @@ git grep -n 'log::event\|log::warn\|log::error\|log::info' -- crates/
 | `pid` | 診斷資料 | peer PID | 保留 |
 | `point` | 封閉分類 | fault-injection 的靜態呼叫位置 | 保留 |
 | `reason` | 內容 | 原 27 個呼叫分成 4 個封閉代碼與 23 個自由文字來源；詳見下表 | 自由文字仍遮蔽；4 個封閉來源改用 `reason_code` |
-| `reason_code` | 封閉分類 | 4 個既有封閉來源與 22 個型別化錯誤來源；只取固定 literals、enum 變體／ErrorKind，不取 payload | 保留安全原因分類，共 26 個呼叫 |
+| `reason_code` | 封閉分類 | 4 個既有封閉來源與 22 個型別化錯誤來源；只取固定 literals、enum 變體／ErrorKind，不取 payload | 保留安全原因分類；歷史原群組共 26 個呼叫，本輪監督事件另見補表 |
 | `role` | 封閉分類 | participant 的固定角色 | 保留 |
 | `rule_id` | 診斷資料 | region rule 的識別，不是 matcher 或使用者需求文字 | 保留識別 |
 | `socket` | 診斷資料 | Core socket 路徑 | 沿用 HOME 路徑遮蔽 |
@@ -55,43 +55,53 @@ git grep -n 'log::event\|log::warn\|log::error\|log::info' -- crates/
 | `url` | 封閉分類 | 僅 test provider；`agent_backend::parse_test_provider` 嚴格限制 `http://127.0.0.1:<非零 u16>/v1`，沒有 userinfo／query／任意路徑 | 保留 |
 | `window_id` | 診斷資料 | 合成器視窗識別 | 保留識別 |
 
+本輪新增的監督欄位沿用 `log::event` 的遮蔽入口：
+
+| 欄位鍵 | 分類 | 來源與內容判斷 | 結論 |
+| --- | --- | --- | --- |
+| `exit_code` | 診斷資料 | OS ExitStatus 的數字代碼；signal 退出時為空字串 | 保留，不含程序輸出 |
+| `signal` | 診斷資料 | ExitStatusExt::signal 的數字；正常退出時為空字串 | 保留，不含程序輸出 |
+| `failure_count` | 診斷資料 | Core 記憶體中的失敗次數 | 保留 |
+| `backoff_seconds` | 診斷資料 | 固定退避秒數 1／2／60；rescue 使用短退避 | 保留 |
+| `recovery` | 封閉分類 | 固定恢復入口分類，不來自 peer 或錯誤文字 | 保留 |
+
 Logger 自動欄位 `ts`、`event`、`session_id` 分別是時間、程式碼固定事件名、Core session 識別，均保留。既有 `title/summary/body/clipboard/text/content/window_title` 繼續遮蔽。`description/message/prompt` 沒有出現在這批呼叫的欄位鍵；`CoreError.message` 是以 `reason` 鍵送出，已涵蓋。
 
 識別欄位與 HOME 以外的路徑仍屬診斷資料；本次不是任意字串秘密辨識器，也沒有保證呼叫者故意把內容塞進識別字時都會被辨識。未更改 panic hook、audit 儲存與 wire response；它們不屬上述一般日誌呼叫出口。
 
 ## repair1：原 27 個 reason 呼叫的來源分類
 
-下表行號固定於 repair1 起點 `39f5cfe2fe2b6fb59b45a83ba3f9efbc2026c427`，檔名相對 `crates/ditto-core/src/`。分類依原 `reason` 值的來源；增加安全錯誤分類不會把原自由文字改稱封閉代碼。
+下表保留原 27 個 reason 呼叫的來源分類；行號已依 #128 repair1 的程式碼更新，指向事件字串所在行，檔名相對 `crates/ditto-core/src/`。後續改動請以事件名定位並重查行號。分類依原 `reason` 值的來源；增加安全錯誤分類不會把原自由文字改稱封閉代碼。
 
 | 呼叫點 | 事件 | 原值來源 | 分類 | repair1 的 reason_code |
 | --- | --- | --- | --- | --- |
-| `agent_manager.rs:171` | `agent.backend_refused` | `Refusal::as_str()` | 封閉代碼 | 原 as_str 值：`backend_binary_mismatch/backend_catalog_unavailable/isolation_unavailable/backend_launch_failed` |
-| `coordinator.rs:196` | `retention.failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:267` | `jobs.recovery_cleanup_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:282` | `boot.profile_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:298` | `agent.tools_reconcile_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:340` | `boot.builtin_refused`（insert） | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:349` | `boot.builtin_refused`（unpack） | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:798` | `generation.journal_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:1516` | `change.commit_write_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `coordinator.rs:1731` | `change.timed_revert_failed` | CoreError.message | 自由文字 | `ErrorName::as_str()` 的 snake_case wire 名稱 |
-| `coordinator.rs:2120` | `recovery.read_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `core.rs:163` | `host.lost` | production detach 僅傳兩個固定 literals | 封閉代碼 | `connection_closed/heartbeat_timeout`；呼叫點明確 match，其餘為 `unknown` |
-| `core.rs:479` | `lock.start_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
-| `generation.rs:557` | `generation.journal_recovery_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `hosts.rs:276` | `host.start_refused` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
-| `lib.rs:236` | `connection.identity_rejected` | 固定分支 literals | 封閉代碼 | `binding_mismatch/unknown_kind` |
-| `main.rs:191` | `compositor.unreachable` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
-| `main.rs:330` | `system.component_unavailable` | RealSystem.problems 的 String，可能來自 D-Bus 錯誤 | 自由文字 | 無型別化原因可取；reason 遮蔽，保留 component |
-| `main.rs:351` | `core.store_refused` | StoreError Display | 自由文字 | StoreError 變體分類 |
-| `main.rs:396` | `shortcut.command_failed` | CoreError.message | 自由文字 | `ErrorName::as_str()` 的 snake_case wire 名稱 |
-| `main.rs:427` | `launch.failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
-| `main.rs:454` | `connection.ended` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
-| `outputs.rs:263` | `outputs.rescue_failed` | AdapterError 的含 payload Debug | 自由文字 | 既有 `error_kind` 只 match enum 變體 |
-| `outputs.rs:287` | `outputs.window_stranded` | rescue_windows 的 literals／error_kind，不是視窗文字 | 封閉代碼 | `no_geometry/unsupported/not_found/unavailable/readback/internal` |
-| `outputs.rs:302` | `outputs.notice_failed` | SystemError 的含 payload Debug | 自由文字 | 呼叫點 match：`unavailable/not_found/invalid/failed` |
-| `shell.rs:87` | `shell.start_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
-| `shell.rs:244` | `shell.rescue_ui_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `agent_manager.rs:172` | `agent.backend_refused` | `Refusal::as_str()` | 封閉代碼 | 原 as_str 值：`backend_binary_mismatch/backend_catalog_unavailable/isolation_unavailable/backend_launch_failed` |
+| `coordinator.rs:197` | `retention.failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:274` | `jobs.recovery_cleanup_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:292` | `boot.profile_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:314` | `agent.tools_reconcile_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:359` | `boot.builtin_refused`（insert） | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:369` | `boot.builtin_refused`（unpack） | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:823` | `generation.journal_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:1542` | `change.commit_write_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `coordinator.rs:1761` | `change.timed_revert_failed` | CoreError.message | 自由文字 | `ErrorName::as_str()` 的 snake_case wire 名稱 |
+| `coordinator.rs:2154` | `recovery.read_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `core.rs:233` | `host.lost` | production detach 僅傳兩個固定 literals | 封閉代碼 | `connection_closed/heartbeat_timeout`；呼叫點明確 match，其餘為 `unknown` |
+| `core.rs:593` | `lock.start_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `generation.rs:558` | `generation.journal_recovery_failed` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `hosts.rs:277` | `host.start_refused` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `lib.rs:237` | `connection.identity_rejected` | 固定分支 literals | 封閉代碼 | `binding_mismatch/unknown_kind` |
+| `main.rs:193` | `compositor.unreachable` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `main.rs:335` | `system.component_unavailable` | RealSystem.problems 的 String，可能來自 D-Bus 錯誤 | 自由文字 | 無型別化原因可取；reason 遮蔽，保留 component |
+| `main.rs:356` | `core.store_refused` | StoreError Display | 自由文字 | StoreError 變體分類 |
+| `main.rs:407` | `shortcut.command_failed` | CoreError.message | 自由文字 | `ErrorName::as_str()` 的 snake_case wire 名稱 |
+| `main.rs:442` | `launch.failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `main.rs:473` | `connection.ended` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `outputs.rs:264` | `outputs.rescue_failed` | AdapterError 的含 payload Debug | 自由文字 | 既有 `error_kind` 只 match enum 變體 |
+| `outputs.rs:289` | `outputs.window_stranded` | rescue_windows 的 literals／error_kind，不是視窗文字 | 封閉代碼 | `no_geometry/unsupported/not_found/unavailable/readback/internal` |
+| `outputs.rs:304` | `outputs.notice_failed` | SystemError 的含 payload Debug | 自由文字 | 呼叫點 match：`unavailable/not_found/invalid/failed` |
+| `shell.rs:104` | `shell.start_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
+| `shell.rs:340` | `shell.rescue_ui_failed` | io::Error Display | 自由文字 | `io_error_code(error.kind())` 的 snake_case 代碼 |
 
 合計 **4 個封閉代碼、23 個自由文字**。4 個封閉來源移除原 reason 欄位，改記 reason_code。23 個自由文字中，11 個 StoreError、7 個 io::Error、2 個 CoreError、1 個 AdapterError、1 個 SystemError 共 22 個取得安全分類；只有 RealSystem.problems 沒有型別化原因。每個自由文字的 reason 仍保持 `[redacted]`。
 
@@ -115,3 +125,22 @@ StoreError 分類由 `log::store_error_code` 對 8 個 enum 變體逐一 match�
 `desktop.changes.propose` 的合法輸入沒有 `subject`。Core 的 `subject_for_kind`／`origin_for`／router 綁定 subject，CLI 為 `cli`；不新增或偽造身分輸入。產品 driver 的私人哨兵放在 `idempotency_key`，用空 ops 建立 ChangeSet 並以 `desktop.changes.get` 回讀確認保存，覆蓋真正的 `change.draft` 路徑。它不是產品 RPC 注入任意 subject 的證據；任意 subject 的遮蔽由 logger 回歸測試覆蓋。
 
 產品 `run.py` 需 socket，依 runner 合約交 coordinator 在 sandbox 外執行；預期 `flow.ok=true`、`hit_count=0`、`default_privacy_scan.hit_count=0`。本機不宣稱產品掃描已通過。
+
+## #128 repair1：Shell／lock／rescue 監督事件
+
+以下位置為本輪程式碼的事件字串行；退出欄位統一由 `log.rs::process_exit` 產生，只取 OS 數字狀態。`reason_code` 僅為封閉 literals，不從日誌尾端或錯誤 Display 推測。所有事件仍經 `log::event`，自動附時間與已設定的 session_id；沒有可合理附帶的 change_id／operation_id，不虛構交易關聯。
+
+| 呼叫點 | 事件 | 安全欄位與 reason_code | 行為／恢復 |
+| --- | --- | --- | --- |
+| `shell.rs:209` | `shell.exited` | `exit_code,signal`；`exit_code/signal` | 主 Shell 失敗計數、短退避與救援 |
+| `core.rs:556` | `lock.exited` | `exit_code,signal`；`exit_code/signal` | 重連回收舊 client 或一般監督回收；重連時不計舊失敗、不因舊 exit 0 解鎖 |
+| `core.rs:650` | `lock.exited` | `exit_code,signal`；`exit_code/signal` | 重連回收舊 client 或一般監督回收；重連時不計舊失敗、不因舊 exit 0 解鎖 |
+| `shell.rs:281` | `rescue.exited` | `exit_code,signal`；`exit_code/signal` | 回收 rescue child；非 0 退避，0 為使用者正常關閉 |
+| `core.rs:149` | `lock.restart_scheduled` | `failure_count,backoff_seconds`；`client_failure/failure_limit_backoff` | 前兩次 1／2 秒；達上限後每 60 秒；離線不啟動 |
+| `core.rs:127` | `lock.restart_stopped` | `failure_count,recovery`；`failure_limit` | 停止快速重試；recovery=`long_retry_or_lock_requested_or_compositor_reconnected`，session 維持 locked |
+| `shell.rs:317` | `rescue.restart_scheduled` | `failure_count,backoff_seconds`；`client_failure` | 600 秒視窗內 1／2 秒退避；啟動失敗亦計數 |
+| `shell.rs:305` | `rescue.restart_stopped` | `failure_count,recovery`；`failure_limit` | 第三次停止自動重試；recovery=`rescue_open`，保留 Super+Escape 入口 |
+
+`log::call_sites::supervised_ui_exits_have_structured_status_events` 固定三類退出的 helper 呼叫；logger 單元確認 exit code／signal 的互斥欄位與封閉分類，實際 signal／exit 注入則由 Shell／Core 監督測試覆蓋。sandbox 的 socket 傳送受阻時，受控重啟案例須標 BLOCKED，不能推定新 client 已恢復。
+
+停用上游 Quickshell handler 不代表 OS dump 已遮蔽。診斷改查 Core 日誌／journal；`core_pattern` 決定是否交 systemd-coredump／apport 收集。core dump 是程序記憶體，可能包含視窗標題或對話，#59 必須在目標機讀回設定與實際產物；未新增收集或上傳介面。`tests/g0/measure/session.sh` 由 #129 處理，本輪未改動。

@@ -144,6 +144,47 @@ pub fn line(name: &str, fields: &[(&str, &str)]) -> String {
     Value::Object(object).to_string()
 }
 
+/// Numeric OS status only: no arguments, token or child log content.
+fn exit_status_fields(status: std::process::ExitStatus) -> [(&'static str, String); 3] {
+    use std::os::unix::process::ExitStatusExt;
+    [
+        (
+            "reason_code",
+            if status.signal().is_some() {
+                "signal"
+            } else {
+                "exit_code"
+            }
+            .into(),
+        ),
+        (
+            "exit_code",
+            status
+                .code()
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+        ),
+        (
+            "signal",
+            status
+                .signal()
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+        ),
+    ]
+}
+
+pub(crate) fn process_exit(name: &str, status: std::process::ExitStatus) {
+    let fields = exit_status_fields(status);
+    event(
+        name,
+        &fields
+            .iter()
+            .map(|(key, value)| (*key, value.as_str()))
+            .collect::<Vec<_>>(),
+    );
+}
+
 pub fn event(name: &str, fields: &[(&str, &str)]) {
     let text = line(name, fields);
     let mut stderr = std::io::stderr().lock();
@@ -157,6 +198,26 @@ mod call_sites;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn process_exit_fields_preserve_code_or_signal_without_content() {
+        use std::os::unix::process::ExitStatusExt;
+        for (raw, reason, code, signal) in [
+            (0, "exit_code", "0", ""),
+            (17 << 8, "exit_code", "17", ""),
+            (libc::SIGSEGV, "signal", "", "11"),
+        ] {
+            let fields = exit_status_fields(std::process::ExitStatus::from_raw(raw));
+            let fields: Vec<_> = fields
+                .iter()
+                .map(|(key, value)| (*key, value.as_str()))
+                .collect();
+            let record: Value = serde_json::from_str(&line("shell.exited", &fields)).unwrap();
+            assert_eq!(record["reason_code"], reason);
+            assert_eq!(record["exit_code"], code);
+            assert_eq!(record["signal"], signal);
+        }
+    }
 
     #[test]
     fn classified_reason_sites_keep_closed_causes_and_redact_text() {

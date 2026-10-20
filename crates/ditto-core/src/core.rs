@@ -4,7 +4,7 @@
 //! here, which is also what serializes commits to one configuration (CHG-05).
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -92,10 +92,79 @@ pub enum CoordinateError {
     Stopped,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LockState {
     pub locked: bool,
     pub client_running: bool,
+}
+
+const LOCK_LONG_RETRY: Duration = Duration::from_secs(60);
+
+#[derive(Default)]
+struct LockClient {
+    child: Option<std::process::Child>,
+    failures: VecDeque<Instant>,
+    retry_at: Option<Instant>,
+    // Rapid retries stopped; online recovery continues at LOCK_LONG_RETRY.
+    stopped: bool,
+}
+
+impl LockClient {
+    fn reset_failures(&mut self) {
+        self.failures.clear();
+        self.retry_at = None;
+        self.stopped = false;
+    }
+
+    fn failed(&mut self, now: Instant) {
+        use crate::shell::{SHELL_FAILURE_LIMIT, SHELL_FAILURE_WINDOW, SHELL_RESTART_BACKOFF};
+        self.failures
+            .retain(|at| now.duration_since(*at) <= SHELL_FAILURE_WINDOW);
+        self.failures.push_back(now);
+        let long_retry = self.stopped || self.failures.len() >= SHELL_FAILURE_LIMIT;
+        if long_retry && !self.stopped {
+            crate::log::event(
+                "lock.restart_stopped",
+                &[
+                    ("reason_code", "failure_limit"),
+                    ("failure_count", &self.failures.len().to_string()),
+                    (
+                        "recovery",
+                        "long_retry_or_lock_requested_or_compositor_reconnected",
+                    ),
+                ],
+            );
+        }
+        // Stop rapid retries, not recovery at a locked physical seat: its
+        // global shortcuts are unavailable (D-33). Retry once a minute while
+        // Session says the compositor is online; every failure stays locked.
+        self.stopped = long_retry;
+        let delay = if long_retry {
+            LOCK_LONG_RETRY.as_secs()
+        } else {
+            SHELL_RESTART_BACKOFF[(self.failures.len() - 1).min(SHELL_RESTART_BACKOFF.len() - 1)]
+        };
+        self.retry_at = Some(now + Duration::from_secs(delay));
+        crate::log::event(
+            "lock.restart_scheduled",
+            &[
+                (
+                    "reason_code",
+                    if long_retry {
+                        "failure_limit_backoff"
+                    } else {
+                        "client_failure"
+                    },
+                ),
+                ("failure_count", &self.failures.len().to_string()),
+                ("backoff_seconds", &delay.to_string()),
+            ],
+        );
+    }
+
+    fn ready(&self, now: Instant) -> bool {
+        self.retry_at.is_none_or(|at| at <= now)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -130,7 +199,7 @@ pub struct Core {
     readers: Mutex<Vec<Store>>,
     connections: AtomicU64,
     pub lock_spec: Option<Specification>,
-    lock_child: Mutex<Option<std::process::Child>>,
+    lock_client: Mutex<LockClient>,
 }
 
 /// The parts of the configuration the coordinator reads while running.
@@ -293,7 +362,7 @@ impl Core {
             readers: Mutex::new(Vec::new()),
             connections: AtomicU64::new(0),
             lock_spec: config.lock.clone(),
-            lock_child: Mutex::new(None),
+            lock_client: Mutex::new(LockClient::default()),
         });
         hosts.set_events(Arc::new(Events(Arc::downgrade(&core))));
         crate::outputs::install(&core, config.output_settle);
@@ -452,36 +521,70 @@ impl Core {
         self.lock.lock().expect("lock state").locked
     }
 
-    /// Start the lock client (D-30 proposal: a separate process, not a slot).
-    /// The compositor keeps the session locked if it dies (C-19 decides
-    /// whether that holds on Wayfire); Core starts a new one right away.
+    /// Start the lock client (D-30: a separate process, not a slot).
+    /// Only a request during long retry waiting resets the budget; ordinary
+    /// repeated requests cannot bypass short backoff or erase failures.
     pub fn lock_session(&self) -> bool {
-        {
-            let mut state = self.lock.lock().expect("lock state");
-            state.locked = true;
+        let mut client = self.lock_client.lock().expect("lock client");
+        self.request_lock(&mut client, Instant::now())
+    }
+
+    fn request_lock(&self, client: &mut LockClient, now: Instant) -> bool {
+        self.lock.lock().expect("lock state").locked = true;
+        if client.stopped && client.child.is_none() {
+            client.reset_failures();
         }
-        let started = self.start_lock_client();
-        self.system.set_lock_state(true, started);
-        self.publish(DesktopEventPayload::SessionChanged {
-            state: self.session_state(),
-        });
+        let started = self.start_lock_client(client, now);
+        self.publish_lock_state();
         started
     }
 
-    fn start_lock_client(&self) -> bool {
+    /// Called by the existing compositor reconnect path. A child that died
+    /// with the old compositor is reaped without consuming the new budget or
+    /// unlocking, even on exit 0. A live child keeps its state and budget: it
+    /// may still own a lock surface, so never spawn a duplicate alongside it.
+    pub fn compositor_reconnected(&self) {
+        let mut client = self.lock_client.lock().expect("lock client");
+        self.reconnect_lock_client(&mut client, Instant::now());
+    }
+
+    fn reconnect_lock_client(&self, client: &mut LockClient, now: Instant) {
+        let before = self.lock.lock().expect("lock state").clone();
+        if let Some(child) = client.child.as_mut() {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    crate::log::process_exit("lock.exited", status);
+                    client.child = None;
+                    self.lock.lock().expect("lock state").client_running = false;
+                }
+                // Unknown status is not permission to replace a live client.
+                Ok(None) | Err(_) => return,
+            }
+        }
+        client.reset_failures();
+        self.start_lock_client(client, now);
+        if *self.lock.lock().expect("lock state") != before {
+            self.publish_lock_state();
+        }
+    }
+
+    // The client guard serializes lock requests, reconnection and supervision:
+    // only supervision reaps a child, so no exit status can be discarded by a
+    // concurrent request. Spawn failures use the same bounded retry budget.
+    fn start_lock_client(&self, client: &mut LockClient, now: Instant) -> bool {
+        if client.child.is_some() {
+            return true;
+        }
+        if !self.session_locked() || !self.session.is_online() || !client.ready(now) {
+            return false;
+        }
         let Some(spec) = &self.lock_spec else {
             return false;
         };
-        let mut child = self.lock_child.lock().expect("lock child");
-        if child
-            .as_mut()
-            .is_some_and(|child| child.try_wait().ok().flatten().is_none())
-        {
-            return true;
-        }
         match crate::launcher::launch_parsed(&self.registry, spec, &self.config.socket, None, &[]) {
             Ok(started) => {
-                *child = Some(started);
+                client.child = Some(started);
+                client.retry_at = None;
                 self.lock.lock().expect("lock state").client_running = true;
                 true
             }
@@ -493,9 +596,17 @@ impl Core {
                         ("reason_code", crate::log::io_error_code(error.kind())),
                     ],
                 );
+                client.failed(now);
                 false
             }
         }
+    }
+
+    fn publish_lock_state(&self) {
+        let state = self.session_state();
+        self.system
+            .set_lock_state(state.locked, state.lock_client_running);
+        self.publish(DesktopEventPayload::SessionChanged { state });
     }
 
     pub fn session_state(&self) -> ditto_protocol::services::SessionState {
@@ -529,33 +640,421 @@ impl Core {
         if self.shell.tick() {
             self.note_instability("shell exited");
         }
-        let exited = {
-            let mut child = self.lock_child.lock().expect("lock child");
-            match child.as_mut().map(|child| child.try_wait()) {
-                Some(Ok(Some(status))) => {
-                    *child = None;
-                    Some(status.success())
-                }
-                _ => None,
-            }
-        };
-        if let Some(unlocked) = exited {
-            if unlocked {
+        let mut client = self.lock_client.lock().expect("lock client");
+        self.supervise_lock(&mut client, Instant::now());
+    }
+
+    fn supervise_lock(&self, client: &mut LockClient, now: Instant) {
+        let before = self.lock.lock().expect("lock state").clone();
+        if let Some(Ok(Some(status))) = client.child.as_mut().map(|child| child.try_wait()) {
+            crate::log::process_exit("lock.exited", status);
+            client.child = None;
+            self.lock.lock().expect("lock state").client_running = false;
+            if status.success() {
                 // The lock client exits 0 only after PAM accepted the user.
-                {
-                    let mut state = self.lock.lock().expect("lock state");
-                    state.locked = false;
-                    state.client_running = false;
-                }
-                self.system.set_lock_state(false, false);
+                self.lock.lock().expect("lock state").locked = false;
+                client.reset_failures();
             } else {
-                // Crashed or killed: the session stays locked; start another.
-                self.lock.lock().expect("lock state").client_running = false;
-                self.start_lock_client();
+                // Crashed or killed: remain locked throughout backoff, offline
+                // suspension and the long retry interval (SEC-08).
+                client.failed(now);
             }
-            self.publish(DesktopEventPayload::SessionChanged {
-                state: self.session_state(),
-            });
         }
+        self.start_lock_client(client, now);
+        if *self.lock.lock().expect("lock state") != before {
+            self.publish_lock_state();
+        }
+    }
+}
+
+#[cfg(test)]
+mod lock_supervision_tests {
+    use super::*;
+
+    fn fixture_with_spec(spec: Option<Specification>) -> (Arc<Core>, PathBuf) {
+        let root =
+            std::env::temp_dir().join(format!("lock-supervision-{}", ditto_protocol::ids::ulid()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut config = CoreConfig::new(Paths::under(&root), root.join("core.sock"));
+        config.mode = CoreMode::Rescue;
+        config.lock = spec;
+        config.recovery_wait_shell = Duration::ZERO;
+        config.recovery_wait_host = Duration::ZERO;
+        let (adapter, _) = ditto_compositor::fixture::FixtureCompositor::paired();
+        let core = Core::start(
+            config,
+            Arc::new(Session::new(Box::new(adapter))),
+            Arc::new(ditto_system::fake::FakeSystem::default()),
+            Arc::new(IdentityRegistry::new()),
+        )
+        .unwrap();
+        core.coordinate(Duration::from_secs(5), |_| ()).unwrap();
+        (core, root)
+    }
+
+    fn fixture() -> (Arc<Core>, PathBuf) {
+        fixture_with_spec(None)
+    }
+
+    fn missing_spec() -> Specification {
+        crate::launcher::parse("lock 0.3.1 /nonexistent-ditto-lock-fixture").unwrap()
+    }
+
+    fn crashed_child() -> std::process::Child {
+        let mut child = std::process::Command::new("/bin/sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        child.kill().unwrap();
+        child.wait().unwrap();
+        child
+    }
+
+    #[test]
+    fn signal_failure_schedules_backoff_and_keeps_session_locked() {
+        let (core, root) = fixture();
+        // Holding the same guard as supervision makes the clock deterministic
+        // even while Core's normal supervisor thread is running.
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        core.lock.lock().unwrap().client_running = true;
+        client.child = Some(crashed_child());
+        let now = Instant::now();
+        core.supervise_lock(&mut client, now);
+        assert_eq!(client.retry_at, Some(now + Duration::from_secs(1)));
+        assert_eq!(client.failures.len(), 1);
+        assert!(core.session_state().locked);
+        assert!(!core.session_state().lock_client_running);
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn consecutive_crashes_enter_long_backoff_and_stay_locked_until_a_new_request() {
+        let (core, root) = fixture();
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        let mut now = Instant::now();
+        for failure in 1..=3 {
+            client.child = Some(crashed_child());
+            core.lock.lock().unwrap().client_running = true;
+            core.supervise_lock(&mut client, now);
+            assert_eq!(client.failures.len(), failure);
+            assert!(core.session_state().locked);
+            assert!(!core.session_state().lock_client_running);
+            let system_state = core.system.session_state().unwrap();
+            assert!(system_state.locked);
+            assert!(!system_state.lock_client_running);
+            if failure < 3 {
+                let deadline = now + Duration::from_secs(failure as u64);
+                assert_eq!(client.retry_at, Some(deadline));
+                assert!(!client.ready(deadline - Duration::from_nanos(1)));
+                core.supervise_lock(&mut client, deadline - Duration::from_nanos(1));
+                assert!(client.child.is_none());
+                assert!(client.ready(deadline));
+                now = deadline;
+            }
+        }
+        assert!(client.stopped);
+        assert!(client.ready(now + LOCK_LONG_RETRY));
+        core.supervise_lock(&mut client, now + Duration::from_secs(3600));
+        assert!(client.child.is_none());
+        assert!(core.session_locked());
+        drop(client);
+        assert!(!core.lock_session()); // Missing UI cannot unlock either.
+        let client = core.lock_client.lock().unwrap();
+        assert!(client.failures.is_empty());
+        assert!(!client.stopped);
+        assert!(core.session_locked());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn offline_session_pauses_retries_and_reconnection_resets_a_long_retry_budget() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        core.session.mark_offline("fixture_disconnect");
+        assert!(!core.lock_session());
+        let mut client = core.lock_client.lock().unwrap();
+        let now = Instant::now();
+        for step in [0, 1, 3, 3600] {
+            core.supervise_lock(&mut client, now + Duration::from_secs(step));
+        }
+        // An attempted launch would fail canonicalization and consume a retry.
+        assert!(client.failures.is_empty());
+        assert!(core.session_state().locked);
+        client.child = Some(crashed_child());
+        core.supervise_lock(&mut client, now);
+        core.supervise_lock(&mut client, now + Duration::from_secs(1));
+        assert_eq!(client.failures.len(), 1); // Reap while offline, no restart.
+        client.failed(now);
+        client.failed(now);
+        assert!(client.stopped);
+        drop(client);
+        let (adapter, _) = ditto_compositor::fixture::FixtureCompositor::paired();
+        core.session.reconnect(Box::new(adapter)).unwrap();
+        core.compositor_reconnected();
+        let client = core.lock_client.lock().unwrap();
+        assert!(!client.stopped);
+        // Reconnection tried once. No binary exists, so it starts a fresh budget.
+        assert_eq!(client.failures.len(), 1);
+        assert!(client.retry_at.is_some());
+        assert!(core.session_state().locked);
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn launch_errors_also_back_off_and_use_long_retries_at_the_failure_limit() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        let mut client = core.lock_client.lock().unwrap();
+        assert!(!core.request_lock(&mut client, Instant::now()));
+        assert_eq!(client.failures.len(), 1);
+        let first_deadline = client.retry_at.unwrap();
+        core.supervise_lock(&mut client, first_deadline - Duration::from_nanos(1));
+        assert_eq!(client.failures.len(), 1);
+        core.supervise_lock(&mut client, first_deadline);
+        assert_eq!(client.failures.len(), 2);
+        let second_deadline = client.retry_at.unwrap();
+        assert_eq!(second_deadline, first_deadline + Duration::from_secs(2));
+        core.supervise_lock(&mut client, second_deadline);
+        assert_eq!(client.failures.len(), 3);
+        assert!(client.stopped);
+        core.supervise_lock(
+            &mut client,
+            second_deadline + LOCK_LONG_RETRY - Duration::from_nanos(1),
+        );
+        assert_eq!(client.failures.len(), 3);
+        core.supervise_lock(&mut client, second_deadline + LOCK_LONG_RETRY);
+        assert_eq!(client.failures.len(), 4);
+        assert!(core.session_locked());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn only_zero_exit_unlocks_even_when_compositor_is_offline() {
+        let (core, root) = fixture();
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        core.session.mark_offline("fixture_disconnect");
+        for code in [17, 0] {
+            let mut child = std::process::Command::new("/bin/sh")
+                .args(["-c", &format!("exit {code}")])
+                .spawn()
+                .unwrap();
+            assert_eq!(child.wait().unwrap().code(), Some(code));
+            client.child = Some(child);
+            core.lock.lock().unwrap().client_running = true;
+            core.supervise_lock(&mut client, Instant::now());
+            assert_eq!(core.session_locked(), code != 0);
+            assert!(!core.session_state().lock_client_running);
+            assert_eq!(core.system.session_state().unwrap().locked, code != 0);
+        }
+        assert!(client.failures.is_empty());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn old_failures_age_out_before_the_limit_is_reached() {
+        let mut client = LockClient::default();
+        let now = Instant::now();
+        client.failed(now);
+        client.failed(now + crate::shell::SHELL_FAILURE_WINDOW + Duration::from_secs(1));
+        assert_eq!(client.failures.len(), 1);
+        assert!(!client.stopped);
+        assert_eq!(
+            client.retry_at,
+            Some(now + crate::shell::SHELL_FAILURE_WINDOW + Duration::from_secs(2))
+        );
+    }
+
+    #[test]
+    fn reconnect_does_not_start_a_lock_client_for_an_unlocked_session() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        core.compositor_reconnected();
+        let client = core.lock_client.lock().unwrap();
+        assert!(client.child.is_none());
+        assert!(client.failures.is_empty());
+        assert!(!core.session_locked());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn controlled_lock_restarts_after_backoff_and_reconnect_then_unlocks_on_zero() {
+        let spec = crate::launcher::parse("lock 0.3.1 /bin/sh -c unused").unwrap();
+        let spec = Specification {
+            arguments: vec![
+                "-c".into(),
+                "read -r token <&3; kill -STOP $$; exit 0".into(),
+            ],
+            ..spec
+        };
+        let (core, root) = fixture_with_spec(Some(spec));
+        assert!(core.lock_session(), "controlled lock launch failed");
+        let mut client = core.lock_client.lock().unwrap();
+        let mut now = Instant::now();
+        for failure in 1..=3 {
+            let child = client.child.as_mut().unwrap();
+            child.kill().unwrap();
+            child.wait().unwrap();
+            core.supervise_lock(&mut client, now);
+            assert!(core.session_locked());
+            assert!(client.child.is_none());
+            assert_eq!(client.failures.len(), failure);
+            if failure < 3 {
+                let deadline = client.retry_at.unwrap();
+                core.supervise_lock(&mut client, deadline - Duration::from_nanos(1));
+                assert!(client.child.is_none());
+                core.supervise_lock(&mut client, deadline);
+                assert!(client.child.is_some());
+                assert!(core.session_state().lock_client_running);
+                now = deadline;
+            }
+        }
+        assert!(client.stopped);
+        core.supervise_lock(&mut client, now + LOCK_LONG_RETRY - Duration::from_nanos(1));
+        assert!(client.child.is_none());
+        core.session.mark_offline("fixture_disconnect");
+        core.supervise_lock(&mut client, now + LOCK_LONG_RETRY);
+        assert!(client.child.is_none());
+        assert!(core.session_locked());
+        drop(client);
+        let (adapter, _) = ditto_compositor::fixture::FixtureCompositor::paired();
+        core.session.reconnect(Box::new(adapter)).unwrap();
+        core.compositor_reconnected();
+        let mut client = core.lock_client.lock().unwrap();
+        assert!(client.failures.is_empty());
+        assert!(!client.stopped);
+        assert!(core.session_locked());
+        let child = client.child.as_mut().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let stat = std::fs::read_to_string(format!("/proc/{}/stat", child.id())).unwrap();
+            if stat.rsplit_once(')').unwrap().1.split_whitespace().next() == Some("T") {
+                break;
+            }
+            assert!(Instant::now() < deadline, "lock fixture never stopped");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        // SAFETY: this is our child, stopped after reading its launcher token.
+        assert_eq!(unsafe { libc::kill(child.id() as i32, libc::SIGCONT) }, 0);
+        assert!(child.wait().unwrap().success());
+        core.supervise_lock(&mut client, Instant::now());
+        assert!(!core.session_locked());
+        assert!(!core.session_state().lock_client_running);
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn failure_limit_retries_every_minute_but_never_while_offline() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        let mut now = Instant::now();
+        for _ in 0..3 {
+            core.supervise_lock(&mut client, now);
+            now = client.retry_at.unwrap_or(now + Duration::from_secs(60));
+        }
+        assert_eq!(client.failures.len(), 3);
+        assert!(
+            client.retry_at.is_some(),
+            "limit must schedule a long retry"
+        );
+        let deadline = client.retry_at.unwrap();
+        core.supervise_lock(&mut client, deadline - Duration::from_nanos(1));
+        assert_eq!(client.failures.len(), 3);
+        core.session.mark_offline("fixture_disconnect");
+        core.supervise_lock(&mut client, deadline);
+        assert_eq!(client.failures.len(), 3);
+        assert!(core.session_locked());
+        let (adapter, _) = ditto_compositor::fixture::FixtureCompositor::paired();
+        core.session.reconnect(Box::new(adapter)).unwrap();
+        core.supervise_lock(&mut client, deadline);
+        assert_eq!(client.failures.len(), 4);
+        assert_eq!(client.retry_at, Some(deadline + Duration::from_secs(60)));
+        assert!(core.session_locked());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reconnect_reaps_an_old_lock_without_counting_it_as_a_failure() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        core.lock.lock().unwrap().client_running = true;
+        client.child = Some(crashed_child());
+        core.reconnect_lock_client(&mut client, Instant::now());
+        assert!(
+            client.child.is_none(),
+            "reconnect must reap the old child immediately"
+        );
+        // Exactly one failed launch of the replacement; no failure for the old child.
+        assert_eq!(client.failures.len(), 1);
+        assert!(core.session_locked());
+        assert!(!core.session_state().lock_client_running);
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn repeated_lock_requests_preserve_the_short_retry_budget() {
+        let (core, root) = fixture();
+        core.session.mark_offline("fixture_disconnect");
+        let mut client = core.lock_client.lock().unwrap();
+        let now = Instant::now();
+        client.failed(now);
+        for _ in 0..10 {
+            core.request_lock(&mut client, now);
+        }
+        assert_eq!(client.failures.len(), 1);
+        assert!(client.retry_at.is_some());
+        assert!(core.session_locked());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn reconnect_preserves_a_live_lock_and_its_budget() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        core.lock.lock().unwrap().client_running = true;
+        client.failed(Instant::now());
+        let deadline = client.retry_at;
+        let child = std::process::Command::new("/bin/sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        let pid = child.id();
+        client.child = Some(child);
+        core.reconnect_lock_client(&mut client, Instant::now());
+        assert_eq!(client.child.as_ref().unwrap().id(), pid);
+        assert_eq!(client.failures.len(), 1);
+        assert_eq!(client.retry_at, deadline);
+        assert!(core.session_state().lock_client_running);
+        assert!(core.session_locked());
+        let mut child = client.child.take().unwrap();
+        child.kill().unwrap();
+        child.wait().unwrap();
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reconnect_reaps_old_zero_exit_without_unlocking_the_new_compositor() {
+        let (core, root) = fixture_with_spec(Some(missing_spec()));
+        let mut client = core.lock_client.lock().unwrap();
+        core.lock.lock().unwrap().locked = true;
+        core.lock.lock().unwrap().client_running = true;
+        let mut child = std::process::Command::new("/bin/true").spawn().unwrap();
+        child.wait().unwrap();
+        client.child = Some(child);
+        core.reconnect_lock_client(&mut client, Instant::now());
+        assert!(client.child.is_none());
+        assert_eq!(client.failures.len(), 1);
+        assert!(core.session_locked());
+        drop(client);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
