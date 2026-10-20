@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Panel-owned build/pack regressions; isolated copies, no desktop services."""
 import hashlib
+import json
 import mmap
 import os
 from pathlib import Path
@@ -19,9 +20,12 @@ class BuildTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='panel-build-test-', dir=os.environ['TMPDIR'])
         self.addCleanup(self.temp.cleanup)
         self.work = Path(self.temp.name)
-        self.panel = self.work / 'panel'
+        self.panel = self.work / 'repo/shell/providers/panel_top'
+        packages = self.work / 'repo/packages'
+        packages.mkdir(parents=True)
+        (packages / 'host-sdk').symlink_to(ROOT / 'packages/host-sdk', target_is_directory=True)
         shutil.copytree(PANEL, self.panel, ignore=shutil.ignore_patterns(
-            '*.so', 'BuiltPanelTop.qml', '.gitignore', '*.dittopkg'))
+            '*.so', '*.dittopkg'))
         self.env = dict(os.environ)
         self.env['DITTO_PANEL_NETWORK_BUILD'] = str(self.work / 'build')
 
@@ -62,11 +66,34 @@ class BuildTests(unittest.TestCase):
         self.assertIn('missing-panel-cxx', result.stdout)
         self.assertIn('QT_PREFIX', result.stdout)
 
-    def test_clean_sdk_pack_requires_panel_build(self):
-        result = self.run_command(['sh', str(SDK), 'pack', str(self.panel), '--out', str(self.work / 'clean.dittopkg')])
-        self.assertNotEqual(result.returncode, 0, 'clean SDK pack must not silently omit native module')
-        self.assertIn('package_missing', result.stdout)
-        self.assertIn('build first', result.stdout)
+    def test_clean_source_validates_and_panel_pack_builds_module(self):
+        library = self.panel / 'qml/network/libdittonetwork.so'
+        self.assertFalse(library.exists())
+        result = self.run_command(['sh', str(SDK), 'validate', str(self.panel)])
+        self.assertEqual(result.returncode, 0, 'source validation must not require build artifacts')
+        archive = self.work / 'panel.dittopkg'
+        command = ['bash', str(self.panel / 'pack.sh'), '--out', str(archive)]
+        result = self.run_command(command, QT_PREFIX=str(self.work / 'missing-qt'))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('WARNING: missing panel network module', result.stdout)
+        self.assertFalse(archive.exists(), 'failed native build must not produce a package')
+        result = self.run_command(command)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('WARNING: missing panel network module', result.stdout)
+        listing = self.run_command(['tar', '--zstd', '-tf', str(archive)])
+        self.assertEqual(listing.returncode, 0)
+        self.assertIn('qml/network/libdittonetwork.so', listing.stdout)
+        self.assertNotIn('BuiltPanelTop.qml', listing.stdout)
+
+    def test_panel_pack_refuses_missing_module_after_build(self):
+        # A broken builder returning success cannot make the wrapper ship an
+        # incomplete archive through the generic SDK pack command.
+        (self.panel / 'build-network.sh').write_text('#!/usr/bin/env bash\nexit 0\n')
+        archive = self.work / 'incomplete.dittopkg'
+        result = self.run_command(['bash', str(self.panel / 'pack.sh'), '--out', str(archive)])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Panel pack refused: missing', result.stdout)
+        self.assertFalse(archive.exists())
 
     def test_prefix_reproducibility_atomic_copy_and_payload(self):
         qt = Path(self.env['QT_PREFIX'])
@@ -95,6 +122,10 @@ class BuildTests(unittest.TestCase):
         listing = self.run_command(['tar', '--zstd', '-tf', str(second)])
         self.assertEqual(listing.returncode, 0)
         self.assertIn('qml/network/libdittonetwork.so', listing.stdout)
+        manifest = self.run_command(['tar', '--zstd', '-xOf', str(second), 'manifest.json'])
+        self.assertEqual(manifest.returncode, 0)
+        self.assertEqual(json.loads(manifest.stdout)['qml_entry'], 'qml/PanelTop.qml')
+        self.assertNotIn('BuiltPanelTop.qml', listing.stdout)
         for entry in listing.stdout.splitlines():
             self.assertFalse(entry.endswith(('.cpp', '.pro', '.sh', '.gitignore')), entry)
 

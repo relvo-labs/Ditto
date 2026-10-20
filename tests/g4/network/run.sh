@@ -7,6 +7,8 @@ mkdir -p "$evidence"
 export DITTO_NETWORK_TEST_ROOT="$root" DITTO_NETWORK_TEST_EVIDENCE="$evidence"
 export QT_PREFIX="${QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
 : "${TMPDIR:?set TMPDIR to the task scratch directory}"
+# Required build/pack regressions are part of this canonical network gate.
+python3 "$root/tests/g4/network/test_build.py" 2>&1 | tee "$evidence/build.log"
 bus_config=$(mktemp "$TMPDIR/ditto-network-bus.XXXXXX.conf")
 trap 'rm -f "$bus_config"' EXIT
 python3 - "$root/tests/g4/network/bus.conf" "$bus_config" "$TMPDIR" <<'PY'

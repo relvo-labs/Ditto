@@ -11,9 +11,11 @@ bash shell/providers/panel_top/pack.sh --out target/ditto-packages/
 
 建置需要 qmake、make 與 C++17 編譯器（預設 `g++`，可用 `CXX` 指定）。
 `build-network.sh --check` 只檢查工具鏈；內建套件建置會先跑此檢查。
-建置成功才產生 manifest 的 `qml/BuiltPanelTop.qml` 入口與原生 `.so`；
-乾淨 checkout 直接執行 SDK pack 會明確回報 `package_missing`／`build first`。
-panel 的 `pack.sh` 會先重新建置，再呼叫 SDK pack。直接使用 SDK 時也必須先重新建置，不可只複製產生的 QML 入口。
+manifest 的 `qml/PanelTop.qml` 是已提交的原始入口；乾淨 checkout 的 SDK validate 不依賴原生建置產物。
+panel 的 `pack.sh` 在缺少 `.so` 時會明確警告，再重新建置；建置失敗或仍缺模組時拒絕產包。
+內建套件建置也會先建置原生模組。這兩條是發行打包路徑。
+通用 SDK pack 只驗證 manifest 與 QML 入口，**不會建置或檢查原生模組**；
+直接對乾淨來源使用它，可能得到只有 NM 路徑的開發用包，不可用於發行。請使用上述 panel `pack.sh`。
 `native/`、建置腳本與文件不屬於套件內容。
 
 固定同一套 Qt、編譯器與 libstdc++ 時，Qt prefix 路徑別名不應影響 archive hash；

@@ -70,7 +70,7 @@ TestCase {
         Networking.backend = NetworkBackendType.NetworkManager;
         Networking.connectivity = NetworkConnectivity.Unknown;
         Networking.devices = { values: [{ type: DeviceType.Wired, connected: false }] };
-        const component = Qt.createComponent("../visual/.staged/providers/BuiltPanelTop.qml");
+        const component = Qt.createComponent("../visual/.staged/providers/PanelTop.qml");
         compare(component.status, Component.Ready, component.errorString());
         panel = component.createObject(testCase, {client: client, tokens: tokens, shown: true});
         verify(panel !== null);

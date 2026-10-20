@@ -24,6 +24,11 @@ Allowed focus: panel_top provider, narrowly scoped network status helper if need
 
 - Qt 模組以 `no_qt_rpath` 建置；固定相同 Qt／編譯器／libstdc++ 的 prefix 別名重建需得到相同 archive hash，不宣稱跨工具鏈可重現。
 - panel 建置先檢查 qmake 6.10.2、make、C++17 編譯器；內建總建置在處理任何 archive 前檢查。每次建置用獨立目錄，模組與視覺 staging 都以 rename 原子替換。
-- 建置來源移到 `native/`，payload 僅含 manifest 與 runtime QML／模組；SDK 的 QML 入口由成功建置產生，乾淨 checkout 缺少入口會明確拒絕 pack。打包前重新建置的命令見 panel README。
+- 建置來源移到 `native/`，payload 僅含 manifest 與 runtime QML／模組；review2 後 manifest 恢復 committed `qml/PanelTop.qml`，source validate 不依賴產物。panel `pack.sh` 缺模組時警告並先建置，建置失敗或仍缺模組就拒絕產包；通用 SDK pack 不承擔原生依賴檢查。打包前重新建置的命令見 panel README。
 - 普通 PropertiesChanged 讀回期間保留最後快照；擁有者消失與失敗／逾時讀取仍清空，不把過期讀取當作成功。
 - VM 待驗：Shell 持續執行時由 1.1.0 升至 1.1.1，再回退；逐步回讀 Loader.status／error、networkd 與 NM 呈現、隱藏／release 清理，確認同 URI 第二份 `.so` 不造成退回 NM-only。此處沒有 live 驗收證據。
+
+## review2 修補
+
+- 以與 node.yml 相同的 install → SDK build → fixture/service build → 四套件 test 順序，在全新本機 clone 重現未追蹤入口造成的 P1，再以新 HEAD 的全新 clone 驗證；不依賴目前工作樹的 `.so` 或 dist。
+- 移除 BuiltPanelTop 產生步驟與入口間接層。`tests/g4/network/run.sh` 必須先跑 `test_build.py`，再跑私有 bus QML；兩者任一失敗皆保留非零 exit。

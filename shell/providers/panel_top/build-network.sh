@@ -20,8 +20,8 @@ build_root="${DITTO_PANEL_NETWORK_BUILD:-${TMPDIR:-$here/../../../target}/panel-
 mkdir -p "$build_root"
 build="$(mktemp -d "$build_root/run.XXXXXX")"
 build="$(cd "$build" && pwd)"
-library_tmp= entry_tmp=
-trap 'rm -rf "$build"; rm -f "$library_tmp" "$entry_tmp"' EXIT
+library_tmp=
+trap 'rm -rf "$build"; rm -f "$library_tmp"' EXIT
 "$qt/bin/qmake" -o "$build/Makefile" "$here/native/network.pro" "QMAKE_CXX=$cxx" "QMAKE_LINK=$cxx"
 make -C "$build" -j2
 # Rename on the destination filesystem: a running Shell can keep its mmap of
@@ -30,9 +30,3 @@ library_tmp="$(mktemp "$here/qml/network/.libdittonetwork.so.XXXXXX")"
 cp "$build/libdittonetwork.so" "$library_tmp"
 chmod 755 "$library_tmp"
 mv -f "$library_tmp" "$here/qml/network/libdittonetwork.so"
-# The SDK checks qml_entry existence before packing. A clean checkout must
-# fail with package_missing/build first instead of silently omitting the .so.
-entry_tmp="$(mktemp "$here/qml/.BuiltPanelTop.qml.XXXXXX")"
-printf 'import QtQuick\n\nPanelTop {}\n' > "$entry_tmp"
-chmod 644 "$entry_tmp"
-mv -f "$entry_tmp" "$here/qml/BuiltPanelTop.qml"

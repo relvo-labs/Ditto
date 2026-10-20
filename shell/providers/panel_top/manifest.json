@@ -30,7 +30,7 @@
   "requires": [],
   "optional": [],
   "conflicts": [],
-  "qml_entry": "qml/BuiltPanelTop.qml",
+  "qml_entry": "qml/PanelTop.qml",
   "config_schema": {
     "type": "object",
     "properties": {},
