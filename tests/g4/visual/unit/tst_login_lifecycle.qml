@@ -55,6 +55,182 @@ TestCase {
         conversation.loginWatch.stop();
         conversation.providerRetry.stop();
     }
+    // review1 / authority v1.1: account truth and attempt expiry are independent.
+    function test_review_expiry_account_data() {
+        return [
+            { tag: "row1-success-account-confirmed", success: true, authenticated: true },
+            { tag: "row2-success-account-unconfirmed", success: true, authenticated: false },
+            { tag: "row3-pending-account-confirmed", success: false, authenticated: true },
+            { tag: "row4-pending-account-unconfirmed", success: false, authenticated: false }
+        ];
+    }
+    function test_review_expiry_account(data) {
+        const a = attempt(); conversation.login = a;
+        if (data.success) {
+            conversation.refreshLoginResult();
+            latest("agent.providers.login_result").ok(resultReply("succeeded"));
+        } else conversation.refreshProvider();
+        const account = latest("agent.providers.status");
+        // Synthetic absolute-deadline crossing while the callback is deferred.
+        // No UI timer runs, and no real authorization or clock policy changes.
+        a.expires_at_ms = Date.now() - 1;
+        account.ok(data.authenticated ? ready : signedOut);
+        compare(conversation.connected, data.authenticated);
+        compare(conversation.login, null, "the code surface must be cleared");
+        verify(!conversation.loginWatch.running);
+        if (data.authenticated) compare(conversation.loginResultState, "", "confirmed account clears attempt outcome");
+        else {
+            compare(conversation.loginResultState, "expired");
+            compare(conversation.provider, signedOut, "publish the fenced account readback, independently of expiry");
+        }
+    }
+    function test_review_late_attempt_data() {
+        return ["succeeded", "failed"].map(outcome => ({ tag: "row5-" + outcome, outcome: outcome }));
+    }
+    function test_review_late_attempt(data) {
+        conversation.provider = ready;
+        const a = attempt(); conversation.login = a;
+        conversation.refreshLoginResult();
+        const query = latest("agent.providers.login_result");
+        a.expires_at_ms = Date.now() - 1;
+        query.ok(resultReply(data.outcome));
+        compare(conversation.login, null); verify(!conversation.loginWatch.running);
+        compare(conversation.loginResultState, "expired");
+        verify(conversation.connected, "an expired attempt reply must not erase an independently confirmed account");
+    }
+    function test_review_preaccount_expiry_data() { return [true, false].map(authenticated => ({ tag: authenticated ? "confirmed" : "unconfirmed", authenticated: authenticated })); }
+    function test_review_preaccount_expiry(data) {
+        client.autoRuntime = false;
+        const a = attempt(); conversation.login = a;
+        conversation.refreshProvider();
+        a.expires_at_ms = Date.now() - 1;
+        latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+        compare(conversation.login, null, "clear expired code before awaiting the account");
+        latest("agent.providers.status").ok(data.authenticated ? ready : signedOut);
+        latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+        compare(conversation.connected, data.authenticated); compare(conversation.login, null);
+        compare(conversation.loginResultState, data.authenticated ? "" : "expired");
+    }
+    function test_review_expiry_preserves_inflight_account_data() { return [true, false].map(authenticated => ({ tag: authenticated ? "confirmed" : "unconfirmed", authenticated: authenticated })); }
+    function test_review_expiry_preserves_inflight_account(data) {
+        const a = attempt(); conversation.login = a; conversation.loginWatch.triggered();
+        const account = latest("agent.providers.status"), query = latest("agent.providers.login_result");
+        a.expires_at_ms = Date.now() - 1;
+        query.ok(resultReply("succeeded")); // expires the attempt, never the official account read
+        latest("agent.providers.cancel_login").ok({ completed: false });
+        compare(calls("agent.providers.status").length, 1, "expiry cleanup must not overlap the existing account read");
+        account.ok(data.authenticated ? ready : signedOut);
+        compare(conversation.connected, data.authenticated); compare(conversation.login, null);
+        compare(conversation.provider, data.authenticated ? ready : signedOut);
+        compare(conversation.loginResultState, data.authenticated ? "" : "expired");
+    }
+    function test_review_expiry_ack_after_confirmed_account_data() { return [true, false].map(completed => ({ tag: completed ? "cancelled" : "notFound", completed: completed })); }
+    function test_review_expiry_ack_after_confirmed_account(data) {
+        conversation.login = attempt(); conversation.refreshProvider();
+        const account = latest("agent.providers.status");
+        conversation.expireLogin();
+        const cancel = latest("agent.providers.cancel_login");
+        account.ok(ready);
+        verify(conversation.connected); compare(conversation.loginResultState, "");
+        cancel.ok({ completed: data.completed });
+        verify(conversation.connected); compare(conversation.loginResultState, "");
+        compare(conversation.login, null); verify(!conversation.loginWatch.running);
+    }
+    function test_review_failed_account_after_expiry_data() {
+        return [true, false].map(success => ({ tag: success ? "succeeded" : "pending", success: success }));
+    }
+    function test_review_failed_account_after_expiry(data) {
+        conversation.provider = ready;
+        const a = attempt(); conversation.login = a;
+        if (data.success) {
+            conversation.refreshLoginResult();
+            latest("agent.providers.login_result").ok(resultReply("succeeded"));
+        } else conversation.refreshProvider();
+        a.expires_at_ms = Date.now() - 1;
+        latest("agent.providers.status").fail(failure);
+        compare(conversation.loginResultState, "expired");
+        compare(conversation.provider, null); verify(!conversation.connected);
+        compare(conversation.login, null); verify(!conversation.loginWatch.running);
+    }
+    function test_review_confirmation_context_data() {
+        return ["new-attempt", "disabled", "provider", "disconnect", "generation"].map(kind => ({ tag: kind, kind: kind }));
+    }
+    function test_review_confirmation_context(data) {
+        const a = attempt(); conversation.login = a;
+        conversation.refreshLoginResult(); latest("agent.providers.login_result").ok(resultReply("succeeded"));
+        const oldAccount = latest("agent.providers.status");
+        if (data.kind === "new-attempt") {
+            conversation.startLogin(); const b = attempt(); b.login_id = "fixture-B";
+            latest("agent.providers.login").ok(b);
+        }
+        if (data.kind === "disabled") conversation.settings = { enabled: false, provider: "codex-app-server" };
+        if (data.kind === "provider") conversation.settings = { enabled: true, provider: "direct-model" };
+        if (data.kind === "disconnect") { client.online = false; client.disconnected(); }
+        if (data.kind === "generation") { client.generation = 2; conversation.refreshRuntime(); }
+        a.expires_at_ms = Date.now() - 1;
+        oldAccount.ok(ready);
+        verify(!conversation.connected, "a stale confirmation cannot publish account data");
+        if (data.kind === "new-attempt") { compare(conversation.login.login_id, "fixture-B"); verify(conversation.loginWatch.running); }
+        else compare(conversation.login, null);
+        verify(conversation.loginResultState !== "expired", "stale deadline must not overwrite the new context");
+    }
+    function test_review_start_generation_data() {
+        return [{ tag: "row6-stale-shell-snapshot", stale: true }, { tag: "row7-generation-moved-during-start", stale: false }];
+    }
+    function test_review_start_generation(data) {
+        client.autoRuntime = false;
+        conversation.startLogin();
+        const preflightCount = calls("agent.runtime.get").length;
+        // Accept both old/new request sequences to expose observable behavior,
+        // not a missing helper or an assertion that merely demands a new call.
+        if (preflightCount) latest("agent.runtime.get").ok({ generation: data.stale ? 2 : 1, phase: "ready" });
+        latest("agent.providers.login").ok(attempt());
+        if (!data.stale) compare(conversation.login, null, "do not display a code before generation is verified");
+        if (calls("agent.runtime.get").length > preflightCount)
+            latest("agent.runtime.get").ok({ generation: 2, phase: "ready" });
+        if (data.stale) {
+            conversation.refreshRuntime();
+            latest("agent.runtime.get").ok({ generation: 2, phase: "ready" });
+            verify(conversation.login !== null, "same serving generation must keep its new attempt");
+            verify(conversation.loginWatch.running);
+            conversation.refreshLoginResult();
+            compare(latest("agent.providers.login_result").params.generation, 2);
+        } else {
+            compare(conversation.login, null);
+            verify(!conversation.loginWatch.running);
+            compare(calls("agent.providers.cancel_login").length, 1, "clean up the unbound attempt through the existing cancel path");
+            conversation.refreshLoginResult();
+            compare(calls("agent.providers.login_result").length, 0);
+        }
+    }
+    function test_review_start_read_failures_data() { return [{ tag: "preflight", after: false }, { tag: "verification", after: true }]; }
+    function test_review_start_read_failures(data) {
+        client.autoRuntime = false;
+        conversation.startLogin();
+        if (data.after) {
+            latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+            latest("agent.providers.login").ok(attempt());
+        }
+        latest("agent.runtime.get").fail(failure);
+        compare(conversation.login, null); compare(conversation.loginStart, null);
+        verify(!conversation.loginWatch.running);
+        compare(calls("agent.providers.login").length, data.after ? 1 : 0);
+        compare(calls("agent.providers.cancel_login").length, data.after ? 1 : 0);
+    }
+    function test_review_start_status_does_not_steal_runtime_identity() {
+        client.autoRuntime = false;
+        conversation.startLogin();
+        const before = latest("agent.runtime.get");
+        conversation.refreshProvider(); conversation.providerRetry.triggered();
+        compare(calls("agent.runtime.get").length, 1);
+        before.ok({ generation: 2, phase: "ready" });
+        latest("agent.providers.login").ok(attempt());
+        const after = latest("agent.runtime.get");
+        conversation.refreshProvider(); conversation.providerRetry.triggered();
+        compare(calls("agent.runtime.get").length, 2);
+        after.ok({ generation: 2, phase: "ready" });
+        verify(conversation.login !== null); verify(conversation.loginWatch.running);
+    }
     function test_failed_completion_stops_waiting_and_preserves_confirmed_account() {
         conversation.provider = ready;
         conversation.login = attempt();
@@ -174,7 +350,7 @@ TestCase {
         a.expires_at_ms = Date.now() - 1;
         if (data.kind === "result-success") query.ok(resultReply("succeeded"));
         if (data.kind === "result-failure") query.fail(failure);
-        if (data.kind === "account") account.ok(ready);
+        if (data.kind === "account") account.ok(signedOut); // v1.1: authenticated counterpart is review row3
         if (data.kind === "cancel") latest("agent.providers.cancel_login").ok({ completed: true });
         compare(conversation.loginResultState, "expired");
         compare(conversation.login, null); verify(!conversation.connected);

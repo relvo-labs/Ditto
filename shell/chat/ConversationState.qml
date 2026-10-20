@@ -120,10 +120,12 @@ QtObject {
         const changed = runtimeGeneration !== null && runtimeGeneration !== runtime.generation;
         runtimeGeneration = runtime.generation;
         if (changed) {
-            // An old generation's code cannot be cancelled through a new one.
-            forgetLogin();
+            // Bound attempts belong to the generation that served their start.
+            // A preflight has not issued login yet; its fresh generation
+            // must not invalidate the new start it is about to serve.
+            if (login || !loginStart || loginStart.generation !== undefined) forgetLogin();
             invalidateProvider();
-            if (client.online && wanted && enabled && settings.provider === "codex-app-server")
+            if (!loginStart && client.online && wanted && enabled && settings.provider === "codex-app-server")
                 providerRetry.restart();
         }
     }
@@ -346,17 +348,24 @@ QtObject {
         });
     }
 
-    function refreshProvider(then) {
-        if (!client.online || !enabled || settings.provider === "direct-model") return;
+    function refreshProvider(then, confirmation) {
+        if (loginStart || !client.online || !enabled || settings.provider === "direct-model") return;
         const epoch = providerEpoch, request = ++providerRequest;
         const current = () => epoch === providerEpoch && request === providerRequest && client.online;
         providerFailed = false;
         providerReading = true;
+        const expireUnconfirmed = function () {
+            const attempt = confirmation || login;
+            if (!attempt || Date.now() < attempt.expires_at_ms) return;
+            if (login) expireLogin();
+            else loginResultState = "expired";
+        };
         const failed = function (error) {
             if (!current()) return;
-            if (login && Date.now() >= login.expires_at_ms) { expireLogin(); return; }
             providerReading = false;
             provider = null;
+            expireUnconfirmed();
+            if (!current()) return;
             // Retain the existing startup retry. A read failure is unknown,
             // not proof of sign-out or of a failed device-code exchange.
             providerFailed = !(error.name === "unavailable" && wanted);
@@ -367,22 +376,19 @@ QtObject {
         // snapshots so a restarted backend cannot confirm an old response.
         refreshRuntime(function (before) {
             if (!current()) return;
-            if (login && Date.now() >= login.expires_at_ms) { expireLogin(); return; }
+            if (login && Date.now() >= login.expires_at_ms) expireLogin();
             client.capability("agent.providers.status", { provider: "codex-app-server" }, function (result) {
                 if (!current()) return;
                 refreshRuntime(function (after) {
                     if (!current()) return;
                     providerReading = false;
                     if (before.generation !== after.generation) return;
-                    // Awaited status cannot revive a device attempt past its
-                    // absolute deadline, even when its timer never ran.
-                    if (login && Date.now() >= login.expires_at_ms) {
-                        expireLogin();
-                        return;
-                    }
+                    // Attempt expiry cannot veto a fenced official account
+                    // readback. Only an unconfirmed account keeps its deadline.
                     provider = result;
                     providerFailed = false;
-                    if (result.authenticated && login) forgetLogin();
+                    if (result.authenticated) forgetLogin();
+                    else expireUnconfirmed();
                     if (then) then(result);
                 }, failed);
             }, failed, { deadlineMs: 30000 });
@@ -391,7 +397,7 @@ QtObject {
 
     property Timer providerRetry: Timer {
         interval: 1500
-        onTriggered: if (state.wanted && state.enabled && !state.connected && !state.providerReading) state.refreshProvider()
+        onTriggered: if (state.wanted && state.enabled && !state.connected && !state.providerReading && !state.loginStart) state.refreshProvider()
     }
 
     function setEnabled(on) {
@@ -431,41 +437,55 @@ QtObject {
         // Keep the last account read visible while the code is displayed.
         // Starting authorization does not itself change that readback.
         invalidateProvider(true);
-        const request = ++loginRequest, connection = connectionEpoch, generation = runtimeGeneration;
+        const request = ++loginRequest, connection = connectionEpoch;
         const token = {};
         loginStart = token;
         loginResultState = "";
-        const current = () => request === loginRequest && connection === connectionEpoch && generation === runtimeGeneration;
-        client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
-            if (loginStart === token) loginStart = null;
-            if (!current() || Date.now() >= result.expires_at_ms) {
-                if (current()) loginResultState = "expired";
-                // A cancelled start may have reached Core before its reply.
-                // Clean up only on that same connection and generation.
-                if (connection === connectionEpoch && generation === runtimeGeneration && client.online)
-                    client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: result.login_id });
-                return;
-            }
-            login = result;
-            loginResultState = "pending";
-            setError(null);
-            Qt.openUrlExternally(result.auth_url);
-            loginWatch.start();
-        }, function (error) {
-            if (loginStart === token) loginStart = null;
+        const current = () => request === loginRequest && connection === connectionEpoch && client.online
+            && enabled && settings.provider === "codex-app-server";
+        const release = () => { if (loginStart === token) loginStart = null; };
+        const cleanup = function (result) {
+            // The serving generation may have moved. Cancel only this returned
+            // id on this connection; the backend rejects an unrelated id.
+            if (connection === connectionEpoch && client.online && (!login || login.login_id !== result.login_id))
+                client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: result.login_id });
+        };
+        const failed = function (error) {
+            release();
             if (current()) setError(error);
-        }, { deadlineMs: 30000 });
+        };
+        refreshRuntime(function (before) {
+            if (!current()) { release(); return; }
+            token.generation = before.generation;
+            client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
+                if (!current()) { release(); cleanup(result); return; }
+                refreshRuntime(function (after) {
+                    release();
+                    if (!current() || before.generation !== after.generation || Date.now() >= result.expires_at_ms) {
+                        if (current() && Date.now() >= result.expires_at_ms) loginResultState = "expired";
+                        cleanup(result);
+                        return;
+                    }
+                    login = result;
+                    loginResultState = "pending";
+                    setError(null);
+                    Qt.openUrlExternally(result.auth_url);
+                    loginWatch.start();
+                }, function (error) { cleanup(result); failed(error); });
+            }, failed, { deadlineMs: 30000 });
+        }, failed);
     }
 
     function cancelLogin(expired) {
         const attempt = login;
         forgetLogin();
-        invalidateProvider();
+        // Expiry fences only attempt replies, never a current account read.
+        if (expired !== true) invalidateProvider();
         if (expired === true) loginResultState = "expired";
         if (!attempt || !client.online) return;
         const epoch = providerEpoch, request = loginRequest;
         const readback = function () {
-            if (epoch === providerEpoch && client.online && enabled && settings.provider === "codex-app-server")
+            if (epoch === providerEpoch && client.online && enabled && settings.provider === "codex-app-server" && !providerReading)
                 refreshProvider();
         };
         client.capability("agent.providers.cancel_login", { provider: "codex-app-server", login_id: attempt.login_id }, function (result) {
@@ -517,7 +537,13 @@ QtObject {
             forgetLogin();
             invalidateProvider(true); // fence older reads, keep independently confirmed account
             loginResultState = outcome;
-            if (outcome === "succeeded") refreshProvider(); // completion never substitutes for account read
+            if (outcome === "succeeded") {
+                // Retain only identity/deadline in this bounded confirmation
+                // callback. The code surface is already cleared by forgetLogin.
+                delete attempt.auth_url;
+                delete attempt.user_code;
+                refreshProvider(undefined, attempt);
+            }
         }, unknown, { deadlineMs: 30000 });
     }
 

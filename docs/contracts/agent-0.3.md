@@ -55,6 +55,6 @@ Core 僅查詢已註冊 controller，不 ensure、不啟動授權、不續 resou
 
 Adapter 只留一筆當前／最近 attempt 的 id、原 deadline、封閉 state；terminal、取消、到期清除 code，下一次 start 取代該筆，logout／child close 清除。到期查詢只回 expired，不保留 history/map/DB；controller 仍依既有資源政策退出。單一 in-flight start 可暫存一筆先於 ACK 的去敏 completion，僅與 ACK id 完全相符時採用，ACK 後清除；不關聯其他 attempt。原生 `success` boolean 和 `loginId` 是唯一 completion 證據，原始 error 與其他欄位不複製至回覆、UI 或紀錄。
 
-`succeeded` 只表示該 attempt 完成，當前登入仍須 provider 的 authoritative account readback。failed／pending／unknown 結果不抹除已確認帳號；cancelled 不是 logout，native notFound 是 unknown。期限在 completion、各 await 與 publication 前重驗；Shell 的 connection/settings/provider/runtime generation/request identity 使晚到 A 回覆不能更改 B 或已確認帳號。
+`succeeded` 只表示該 attempt 完成，當前登入仍須 provider 的 authoritative account readback。failed／pending／unknown 結果不抹除已確認帳號；cancelled 不是 logout，native notFound 是 unknown。期限只限制 attempt 的 code、等待與晚到結果；通過 connection/settings/provider/runtime generation/request 圍欄的正式 `authenticated:true` 回讀，即使晚於 attempt 期限仍發布為已登入並清除 attempt。未登入或讀取失敗時才依原 deadline 顯示 expired／未確認。Shell 在 login 前後以既有 runtime read 驗證 serving generation，相同才顯示 code；generation 移動時以既有 exact-id cancel 清理未綁定結果，晚到 A 回覆不能更改 B 或已確認帳號。
 
 相容：舊 consumer 使用不變的 status/login/cancel；新 Shell 遇舊 Core 目錄不送新 method，顯示 unknown 並保留原 bounded account polling；新 Core 遇舊 controller 回 unknown。沒有匿名端點、auth storage 讀取或 production debug bypass。合成 pinned rust-v0.160.0 fixtures 證明本地回讀行為，並非真人登入／現場故障證據。
