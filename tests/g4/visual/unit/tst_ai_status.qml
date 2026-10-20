@@ -565,10 +565,10 @@ TestCase {
             { tag: "binary", reason: "backend_binary_mismatch", text: "檔案不符合", noInstall: false },
             { tag: "catalog", reason: "backend_catalog_unavailable", text: "模型清單", noInstall: false },
             { tag: "backend-launch", reason: "backend_launch_failed", text: "啟動成功", noInstall: true },
-            { tag: "controller-launch", reason: "launch_failed", text: "啟動成功", noInstall: true },
-            { tag: "startup", reason: "startup_timeout", text: "啟動成功", noInstall: true },
+            { tag: "controller-launch", reason: "launch_failed", text: "AI 對話", noInstall: false, noApi: true },
+            { tag: "startup", reason: "startup_timeout", text: "AI 對話", noInstall: false, noApi: true },
             { tag: "exited", reason: "backend_exited", text: "已中斷", noInstall: true },
-            { tag: "drain", reason: "drain_timeout", text: "已中斷", noInstall: true },
+            { tag: "drain", reason: "drain_timeout", text: "正常停止", noInstall: true, noApi: true },
             { tag: "unknown", reason: "future-unrecognised-code", text: "無法使用 Codex 訂閱", noInstall: false }
         ];
     }
@@ -586,6 +586,7 @@ TestCase {
         verify(text.indexOf(data.text) >= 0, text);
         verify(find(chat, item => item.visible && item.text === text), "chat/settings mismatch");
         if (data.noInstall) verify(text.indexOf("安裝") < 0, text);
+        if (data.noApi) verify(text.indexOf("API 金鑰") < 0, text);
         if (data.reason === "isolation_unavailable") verify(text.indexOf("系統核心") >= 0, text);
         verify(!conversation.canLogin);
         compare(conversation.aiStatus, "model_offline");

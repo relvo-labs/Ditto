@@ -1146,6 +1146,14 @@
         <translation>AI chat is off; the desktop works as usual</translation>
     </message>
     <message>
+        <source>AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。</source>
+        <translation>AI conversations could not start. Sign in to the desktop again and retry. If the problem persists, rerun the Ditto installer or check diagnostics. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI conversations did not stop normally. Sign in to the desktop again and retry. If the problem persists, check diagnostics. You can keep using the desktop.</translation>
+    </message>
+    <message>
         <source>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>The AI connection could not start. Sign in to the desktop again and retry, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>

@@ -53,7 +53,7 @@ G3 固定模板由 Shell **實際掛載物件的 config** 回報 artifact id。C
 
 Shell 也讀取 `agent.runtime.get`：已確認的啟動故障或 ready 世代的空 `backend_pid` 會優先於過時的 provider 狀態，阻止登入。只有回讀到存在且隔離已驗證的 backend，`backend_unsupported` 才提示改選模型；其他情況顯示可用性或復原步驟。
 
-`failure_reason` 在 wire schema 是選用字串；目前 Core 的封閉產生值為 `backend_binary_mismatch`、`backend_catalog_unavailable`、`isolation_unavailable`、`backend_launch_failed`、`launch_failed`、`backend_exited`、`startup_timeout`、`drain_timeout`。Shell 分別提示核對檔案、核對模型清單、檢查核心與隔離、重新登入或重新開啟對話；未知值沿用通用文案，不顯示原始字串。runtime 回覆也以讀取序號作廢晚到訊息，斷線或設定讀取失敗會清除舊世代投影。
+`failure_reason` 在 wire schema 是選用字串；目前 Core 的封閉產生值為 `backend_binary_mismatch`、`backend_catalog_unavailable`、`isolation_unavailable`、`backend_launch_failed`、`launch_failed`、`backend_exited`、`startup_timeout`、`drain_timeout`。Shell 分別提示核對檔案、核對模型清單、檢查核心與隔離、重新登入或重新開啟對話；對話程序本身的啟動／停止故障不承諾改用 API 金鑰即可恢復。未知值沿用通用文案，不顯示原始字串。runtime 回覆也以讀取序號作廢晚到訊息，斷線或設定讀取失敗會清除舊世代投影。
 
 登入等 provider 請求沿用既有 `unavailable` 錯誤及 `data.reason: system_unavailable`，在選用的 `data` 物件內帶 `reason_code`；不新增 `UnavailableReason` 或 schema 欄位。Runtime 與 Core 僅傳遞以下原因碼：
 

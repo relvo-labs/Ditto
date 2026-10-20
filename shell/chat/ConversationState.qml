@@ -94,12 +94,14 @@ QtObject {
         case "backend_catalog_unavailable":
             return client.t(qsTr("無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
         case "backend_launch_failed":
+            return client.t(qsTr("AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
         case "launch_failed":
         case "startup_timeout":
-            return client.t(qsTr("AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+            return client.t(qsTr("AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。"));
         case "backend_exited":
-        case "drain_timeout":
             return client.t(qsTr("Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "drain_timeout":
+            return client.t(qsTr("AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。"));
         }
         return "";
     }
