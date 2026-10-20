@@ -33,6 +33,7 @@ index = next(i for i, name in socket.if_nameindex()
 state = {"AdministrativeState": "configured", "OperationalState": "routable", "AddressState": "routable"}
 failed = False
 pending = []
+readbacks = 0
 
 
 def method(connection, sender, path, interface, name, params, invocation):
@@ -46,6 +47,9 @@ def method(connection, sender, path, interface, name, params, invocation):
 
 
 def prop(connection, sender, path, interface, name):
+    global readbacks
+    if name == "AddressState":
+        readbacks += 1
     return GLib.Variant("s", state[name])
 
 
@@ -98,7 +102,12 @@ class Control(BaseHTTPRequestHandler):
 
     def do_GET(self):
         name = self.path.removeprefix("/")
-        if name not in {"reset", "offline", "unknown", "unmanaged", "link-local", "fail", "timeout", "service-down"}:
+        if name == "readbacks":
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(str(readbacks).encode())
+            return
+        if name not in {"refresh", "reset", "offline", "unknown", "unmanaged", "link-local", "fail", "timeout", "service-down"}:
             self.send_error(404)
             return
         GLib.idle_add(action, name)

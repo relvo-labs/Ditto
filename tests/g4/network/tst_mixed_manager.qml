@@ -35,6 +35,31 @@ TestCase {
         tryVerify(() => done);
         compare(request.status, 200);
     }
+    SignalSpy { id: connectionChanges; target: panel; signalName: "networkConnectedChanged" }
+    function readbacks() {
+        const request = new XMLHttpRequest();
+        let done = false;
+        request.onreadystatechange = function() {
+            if (request.readyState === XMLHttpRequest.DONE) done = true;
+        };
+        request.open("GET", Fixture.endpoint + "/readbacks");
+        request.send();
+        tryVerify(() => done);
+        compare(request.status, 200);
+        return Number(request.responseText);
+    }
+    function test_refresh_preserves_connected_snapshot() {
+        const network = findChild(desktop, "panelNetwork");
+        tryCompare(network, "connected", true);
+        const before = readbacks();
+        connectionChanges.clear();
+        control("refresh");
+        // Wait for the real D-Bus GetAll readback, not a fixed delay. Any
+        // intermediate disconnect/reconnect changes remain in the signal spy.
+        tryVerify(() => readbacks() > before);
+        compare(network.connected, true);
+        compare(connectionChanges.count, 0);
+    }
     function init() {
         control("reset");
         StubDesktop.layer = desktop;
@@ -45,7 +70,7 @@ TestCase {
         Networking.backend = NetworkBackendType.NetworkManager;
         Networking.connectivity = NetworkConnectivity.Unknown;
         Networking.devices = { values: [{ type: DeviceType.Wired, connected: false }] };
-        const component = Qt.createComponent("../visual/.staged/providers/PanelTop.qml");
+        const component = Qt.createComponent("../visual/.staged/providers/BuiltPanelTop.qml");
         compare(component.status, Component.Ready, component.errorString());
         panel = component.createObject(testCase, {client: client, tokens: tokens, shown: true});
         verify(panel !== null);

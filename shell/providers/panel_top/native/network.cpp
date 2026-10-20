@@ -74,9 +74,9 @@ private:
     }
     void queueRefresh() {
         if (!active) return;
-        // Invalidate before reading again. An error or removed service cannot
-        // leave a stale connected icon. Coalesce events while a read is pending.
-        publish(false, "other");
+        // Keep the last snapshot during an ordinary property refresh. Owner
+        // loss clears immediately; failed/expired reads publish a disconnected
+        // result. Coalesce events while a read is pending.
         dirty = true;
         if (!busy && !refreshTimer.isActive()) refreshTimer.start(0);
     }
@@ -89,8 +89,8 @@ private:
     }
     void finish(bool value, const QString &kind) {
         busy = false;
+        if (!value || !dirty) publish(value, kind);
         if (dirty) queueRefresh();
-        else publish(value, kind);
     }
     void refresh() {
         if (!active || busy) return;

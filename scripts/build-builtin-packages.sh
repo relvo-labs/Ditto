@@ -10,10 +10,13 @@
 #                         the D-34 simple plugins and the fault fixtures, never shipped)
 #
 # The archives are reproducible: fixed mtime, owner and sort order, so the
-# same sources give the same sha256 and the Profile's locks stay valid.
+# same sources AND pinned Qt/compiler/libstdc++ toolchain give the same sha256.
+# Native module hashes are not promised to match across toolchain versions.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 out="${1:-$root/target/ditto-packages}"
+# Check the panel toolchain before deleting old archives or packing anything.
+bash "$root/shell/providers/panel_top/build-network.sh" --check
 mkdir -p "$out"
 # Plugin pack scripts run from their own directory; retain one output root.
 out="$(cd "$out" && pwd)"
@@ -30,7 +33,11 @@ pack_dir() {
   # Name the top-level entries instead of `.`: archive paths must be `manifest.json`, not
   # `./manifest.json` (Core looks the manifest up by that exact name). Dotfiles stay out.
   local entries
-  mapfile -t entries < <(cd "$directory" && find . -mindepth 1 -maxdepth 1 ! -name '.*' -printf '%P\n' | sort)
+  if [[ "$directory" == "$root/shell/providers/panel_top" ]]; then
+    entries=(manifest.json qml)
+  else
+    mapfile -t entries < <(cd "$directory" && find . -mindepth 1 -maxdepth 1 ! -name '.*' -printf '%P\n' | sort)
+  fi
   tar --zstd --sort=name --mtime='2026-01-01 00:00Z' --owner=0 --group=0 --numeric-owner \
     --exclude='*.qmlc' --exclude='.*' -cf "$out/$id-$version.dittopkg" -C "$directory" "${entries[@]}"
   echo "$id $version $(sha256sum "$out/$id-$version.dittopkg" | cut -d' ' -f1)"

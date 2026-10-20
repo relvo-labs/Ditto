@@ -314,7 +314,7 @@ Scope {
                 }
             }
 
-            /// Read-only link state. networkd cannot establish Internet access.
+            /// Read-only link state. a routable networkd link does not prove Internet reachability.
             Text {
                 id: network
                 objectName: "panelNetworkLegacy"

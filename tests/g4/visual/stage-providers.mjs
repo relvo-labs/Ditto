@@ -5,7 +5,7 @@
 // there is no layer shell for them to act on. Nothing else is changed: every
 // removed line is listed in .staged/staging.json, and the run fails if a
 // layer-shell reference is left or a non-layer-shell line would be removed.
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, renameSync, mkdtempSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -20,14 +20,22 @@ mkdirSync(out, { recursive: true });
 // Keep its real D-Bus implementation in the tests; only Quickshell is stubbed.
 execFileSync('bash', [join(root, 'shell/providers/panel_top/build-network.sh')], { stdio: 'inherit' });
 mkdirSync(join(out, 'network'), { recursive: true });
-for (const name of ['qmldir', 'NetworkdSource.qml', 'libdittonetwork.so']) {
-  copyFileSync(join(root, 'shell/providers/panel_top/qml/network', name), join(out, 'network', name));
+const networkStage = mkdtempSync(join(out, 'network', '.copy-'));
+try {
+  for (const name of ['qmldir', 'NetworkdSource.qml', 'libdittonetwork.so']) {
+    const temporary = join(networkStage, name);
+    copyFileSync(join(root, 'shell/providers/panel_top/qml/network', name), temporary);
+    renameSync(temporary, join(out, 'network', name));
+  }
+} finally {
+  rmSync(networkStage, { recursive: true, force: true });
 }
 
 const providers = [
   'shell/providers/dock_pill/qml/DockPill.qml',
   'shell/providers/dock_bottom/qml/DockBottom.qml',
   'shell/providers/panel_top/qml/PanelTop.qml',
+  'shell/providers/panel_top/qml/BuiltPanelTop.qml',
   'shell/providers/launcher_grid/qml/LauncherGrid.qml',
   'shell/providers/launcher_search/qml/LauncherSearch.qml',
   'shell/providers/tasks_panel/qml/TasksPanel.qml',
