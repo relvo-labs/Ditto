@@ -48,6 +48,13 @@ FloatingWindow {
         body.focusInput();
     }
 
+    // Qt's own title bar off while the style draws the one title; changed
+    // only while the window is not shown (see WindowFrameless).
+    WindowFrameless {
+        hostWindow: window
+        frameless: window.jelly
+    }
+
     // ---- #116 candidate frame and its one title ----
     Loader {
         anchors.fill: parent

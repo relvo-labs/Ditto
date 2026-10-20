@@ -1,2 +1,3 @@
 module DittoStub
 singleton StubDesktop 1.0 StubDesktop.qml
+StubFloatingWindow 1.0 StubFloatingWindow.qml

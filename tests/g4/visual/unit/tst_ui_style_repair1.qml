@@ -8,7 +8,7 @@ import "../fixtures" as Fixtures
 // files of a staged tree (`tree`: "current" is the working copy; the RED run
 // points it at b0dc73b staged the same way). Tokens always come from the
 // current tree. Fixture data, offscreen, Quickshell stubbed: development
-// evidence. Real window flags on Wayfire are the coordinator's VM check.
+// evidence. Window flags: tst_ui_style_frameless.qml; on Wayfire, the coordinator's VM check.
 //
 // Offscreen text is about 4% narrower than on the VM (the empty state's
 // message fits one 332 px line here, 320.9 px, and wraps on the VM); the
@@ -173,62 +173,10 @@ TestCase {
         verify(client.reads.indexOf(row.read) >= 0, row.page + " re-reads " + row.read + " after a resync: " + JSON.stringify(client.reads));
     }
 
-    // ---- Class B: the header undoes only what it did --------------------------
-    Component {
-        id: headerHarness
-        Window {
-            id: harness
-            property var tokens
-            property bool styled: tokens.uiCandidate === true
-            readonly property QtObject host: QtObject {
-                property bool maximized: false
-                property bool minimized: false
-                function startSystemMove() {}
-            }
-            width: 400; height: 200
-            visible: true
-            Loader {
-                id: headerLoader
-                objectName: "harnessHeader"
-                anchors.left: parent.left
-                anchors.right: parent.right
-                active: harness.styled
-                // As Centers/ChatWindow do: the host is bound at creation.
-                Component.onCompleted: setSource(testCase.staged + testCase.tree + "/shell/ui/WindowHeader.qml",
-                    { tokens: harness.tokens, hostWindow: harness.host, title: "fixture" })
-            }
-        }
-    }
-    function test_frameless_is_undone_when_the_style_goes_away_data() {
-        return [{ tag: "light-dark-light", leave: { theme: "soft-jelly", tokens: {} } },
-                { tag: "undo-to-no-theme", leave: { tokens: {} } }];
-    }
-    function test_frameless_is_undone_when_the_style_goes_away(row) {
-        const tokens = tokensWith({ theme: "soft-jelly", tokens: {} });
-        const original = Qt.Window | Qt.WindowStaysOnTopHint;
-        const win = headerHarness.createObject(testCase, { tokens: tokens, flags: original });
-        created.push(win);
-        verify(!(win.flags & Qt.FramelessWindowHint));
-        tokens.appearance = light();
-        tryVerify(() => (win.flags & Qt.FramelessWindowHint) !== 0, 1000, "styled: one title, Qt draws none");
-        verify(win.flags & Qt.WindowStaysOnTopHint);
-        tokens.appearance = row.leave;
-        tryCompare(win, "flags", original, 1000, "no style: the native title bar is back, other flags kept");
-        tokens.appearance = light({ ui_style: "j3" });
-        tryVerify(() => (win.flags & Qt.FramelessWindowHint) !== 0, 1000, "styled again");
-        tokens.appearance = row.leave;
-        tryCompare(win, "flags", original, 1000);
-    }
-    function test_frameless_set_by_someone_else_is_kept() {
-        const tokens = tokensWith(light());
-        const original = Qt.Window | Qt.FramelessWindowHint;
-        const win = headerHarness.createObject(testCase, { tokens: tokens, flags: original });
-        created.push(win);
-        tryVerify(() => one(win.contentItem, "harnessHeader").status === Loader.Ready, 1000);
-        tokens.appearance = { theme: "soft-jelly", tokens: {} };
-        tryVerify(() => one(win.contentItem, "harnessHeader").status === Loader.Null, 1000);
-        compare(win.flags, original, "the header did not add it, so it does not take it away");
-    }
+    // ---- Class B: Ditto takes away only the hint it added -----------------------
+    // Moved to tst_ui_style_frameless.qml (repair 2): the header no longer
+    // changes window flags; WindowFrameless does, only while the window is
+    // hidden, and the same R2 assertions run there on the real windows.
 
     // ---- Class C/D: the compact chat beside the character, AI off -------------
     function panel(style, fontScale) {

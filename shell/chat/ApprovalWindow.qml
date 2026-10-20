@@ -71,6 +71,13 @@ FloatingWindow {
     /// The control with keyboard focus, for the Shell's `focus` line.
     readonly property Item focusedItem: approvalRoot.Window.activeFocusItem
 
+    // Qt's own title bar off while the style draws the one title; changed
+    // only while the window is not shown (see WindowFrameless).
+    WindowFrameless {
+        hostWindow: window
+        frameless: window.jelly
+    }
+
     Item {
         id: approvalRoot
         anchors.fill: parent

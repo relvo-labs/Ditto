@@ -315,7 +315,7 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 
 ### 8.4 視窗裝飾、foot 與 Dock
 
-- **誰畫標題列**：Ditto 自有視窗由 `WindowHeader` 畫唯一標題與果凍珠，並在真實視窗上要求 Qt `FramelessWindowHint`。其他應用（foot）的標題列由 Wayfire `decoration` 外掛畫（server-side）。
+- **誰畫標題列**：Ditto 自有視窗由 `WindowHeader` 畫唯一標題與果凍珠；Qt 不畫自己的標題列（`FramelessWindowHint`）由視窗本身的 `WindowFrameless` 決定，只在視窗未顯示時改（見 §8.5.2）。其他應用（foot）的標題列由 Wayfire `decoration` 外掛畫（server-side）。
 - **安裝的預設＝J1**：`packaging/reference-image/session/wayfire.ini` 有 J1 的 `[decoration]`（深色標題字，在標題列上 11:1），`ditto-session` 把 `session/xdg`（`foot/foot.ini` → `styles/j1/foot.ini`）放在 `XDG_CONFIG_DIRS` 前面，Wayfire（Super＋Enter 的終端機）與經 `session.env` 的 Core 及其啟動的應用都看得到；使用者自己的 `~/.config/foot/foot.ini` 仍優先。`install-session.sh` 在有 foot 時以 `foot --check-config` 檢查。
 - **單一標題列**：三份 `styles/<j1|j2|j3>/foot.ini` 都是 `[csd] preferred=server`，foot 不再自己畫標題列，只剩 Wayfire 那一條（coordinator 依推薦的可逆決定，2026-10-20）。代價：hover 時按鈕是 `libdecoration.so` 編譯內建的紅／綠／黃，設定檔改不掉。
 - **VM 上 J1 標題字看不見**：c9df5eb 的 J1 設定本身是 9.2:1；推斷是 `apply.sh` 以 IPC 即時改色時，已畫好的標題字仍是 Wayfire 預設的白色（標題變更或重開視窗才重畫）。現在 J1 從登入就寫在 `wayfire.ini`，不靠即時改色。真 Wayfire 上**未驗證**。
@@ -339,10 +339,18 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 ### 8.5.1 修正輪 1（獨立審查 R1–R3、VM @b0dc73b）
 
 - 個人化中心的選取標記與「已是目前值」判斷改看已提交投影（`tokens.appearance`），重同步／重連（`capabilitiesReloaded`）後重讀；組合中心、變更紀錄同樣重讀。
-- `WindowHeader` 只移除自己加上的 `FramelessWindowHint`，切到深色／無主題或撤銷時原生標題列回來（offscreen 斷言旗標值，真實 Wayfire 由 VM 驗證）。
+- 只移除 Ditto 自己加上的 `FramelessWindowHint`，切到深色／無主題或撤銷時原生標題列回來（offscreen 斷言旗標值，真實 Wayfire 由 VM 驗證）。修正輪 2 起改由 `WindowFrameless` 負責，見 §8.5.2。
 - 對話面板、對話視窗與確認視窗用 `uiSheet`（α0.99，降低透明度時不透明），不再透出後方設定視窗。compact 對話面板依設計沒有視窗鈕：它是角色旁的 layer-shell 面板，不是一般視窗，以 Escape 或助理入口關閉，「展開」開啟有視窗鈕的完整視窗。
 - 測試：`tests/g4/visual/unit/tst_ui_style_repair1.qml`。offscreen 文字比 VM 窄約 4%，所以 compact 案例另以 `font_scale` 1.05 重現 VM 的兩行說明。
 - Follow-up（本輪不修）：J2 說明「色／彩」斷在詞中；對話輸入框 placeholder 截斷；灰字偏淡但已達 4.5:1；對話訊息清單（ListView）中變更卡的按鈕 Tab 到畫面外時不會捲入（基底即有）；`TextArea` 游標移出可見範圍時不跟隨（基底即有）。
+
+### 8.5.2 修正輪 2（Shell 崩潰，VM @74a19c9）
+
+- **現象**：2026-10-20 13:03 UTC，J2、開了 foot 與對話視窗後主 Shell segfault，堆疊在 render thread 的 `QWaylandGLContext::swapBuffers → DecorationsBlitter::blit → QOpenGLFramebufferObject::texture()`。
+- **原因**（Qt 6.10.2 wayland-egl 原始碼）：在已顯示的視窗上改 `FramelessWindowHint`，`QWaylandWindow::setWindowFlags` 會在 GUI 執行緒立即建立或移除 Qt 標題列；render thread 每幀在 `makeCurrent`（有標題列才建 content FBO）與 `swapBuffers`（有標題列就從 content FBO blit）各讀一次。兩者之間出現的標題列會從沒建立的 FBO 讀取。修正前 `WindowHeader` 在建立、銷毀與風格切換時都會改旗標；Quickshell 關閉視窗時以 `deleteLater` 刪除後端視窗，所以關閉或收合有風格的視窗時，header 的 `Component.onDestruction` 也在仍顯示的視窗上移除旗標。owner 這次沒有切換主題，最符合紀錄的觸發點是關閉或收合有風格的對話視窗；未在 VM 重現，屬推斷。
+- **修正**：`WindowHeader` 不再碰旗標。`shell/ui/WindowFrameless.qml` 由 Centers、ChatWindow、ApprovalWindow 各自宣告，只在視窗未顯示時改旗標：第一次開啟時 Quickshell 先把內容接上後端視窗再顯示，旗標在顯示前就定好；J1／J2／J3 之間不改旗標；風格開↔關（淺色↔深色、撤銷到無主題、Agent 改主題）時先經 FloatingWindow 的 `visible` 隱藏（不是關閉，確認視窗不會因此拒絕）、改旗標、再顯示；關閉視窗不改旗標。只移除自己加上的旗標。
+- **可見的代價**：視窗開著時切換有風格／無風格，該視窗會短暫消失再出現，合成器可能重新擺放它的位置。J1／J2／J3 之間切換沒有這個現象。
+- **測試**：`tests/g4/visual/unit/tst_ui_style_frameless.qml`。`DittoStub.StubFloatingWindow` 依 Quickshell 0.3.1 的接上與顯示順序建模，後端是真的 offscreen 視窗，會記錄每次旗標變更時視窗是否顯示中；`stage-ui116.mjs` 把三個視窗的根型別換成它（只改這一行，記在 `staging.json`）。涵蓋：第一次顯示、J1→J2→J3→關→J1、撤銷、主題切換、他處設的旗標保留、關閉視窗。修正前 `74a19c9` 上 18／33 失敗，修正後 33／33 通過。修正輪 1 的旗標測試移到這裡，改在真實視窗上跑。
 
 ### 8.6 待 owner 決定
 
@@ -352,5 +360,6 @@ Legacy avatar 掛載區塊、Avatar.qml 與 ApprovalWindow.qml 對照 `25c0b72` 
 4. `shell/change/`、頂部列、啟動器、通知是否一起套用風格。
 5. 是否同時處理新視窗不 cascade（Wayfire `place` 模式），本輪未改。
 6. Ditto 自有視窗無邊框後，邊緣拖曳調整大小消失（Super＋右鍵仍可）是否接受。
+7. 視窗開著時切換有風格／無風格，視窗會短暫消失再出現（§8.5.2）是否接受；替代做法是固定無邊框並在無風格時也畫 Ditto 標題列，但會改變深色主題的外觀。
 
 未執行：VM／參考機實機截圖與操作、Wayfire 真實裝飾與 FramelessWindowHint、foot 1.16 實際 `--check-config`、Orca、繁中輸入法、2× 實體螢幕、NFR 量測。

@@ -8,11 +8,19 @@ import QtQuick
 /// Quickshell FloatingWindow does; an offscreen double does not, and then the
 /// row is only drawn).
 ///
-/// `frameless` asks Qt not to draw its own title bar for this window (Qt's
-/// FramelessWindowHint), so the title appears once. It is applied only to a
-/// real window and only while a style is on (the header exists only then),
-/// and undone when the header goes; whether the compositor and Qt honour it
-/// on the target session is checked there.
+/// This header never changes its window's flags. Qt not drawing its own
+/// title bar (FramelessWindowHint) is the window's WindowFrameless, which
+/// changes it only while the window is not shown. Changing it on a shown
+/// window crashed the Shell (VM, 2026-10-20 13:03 UTC, Qt 6.10.2, wayland-egl):
+/// `QWaylandWindow::setWindowFlags` creates or drops Qt's title bar on the
+/// GUI thread at once, while the render thread checks `decoration()` twice
+/// per frame. `makeCurrent → bindContentFBO` makes the content buffer only if
+/// there is a title bar; `swapBuffers` blits the title bar, reading that
+/// buffer's texture, whenever there is one. A title bar that appears between
+/// the two is blitted from a buffer that was never made (segfault in
+/// `QOpenGLFramebufferObject::texture()` under `DecorationsBlitter::blit`).
+/// The header comes and goes with the style (Loader `active: jelly`), so it
+/// must not own anything that cannot change while the window is shown.
 Item {
     id: header
 
@@ -23,7 +31,6 @@ Item {
     property var hostWindow: null
     property bool showMinimize: true
     property bool showMaximize: true
-    property bool frameless: true
     property string minimizeText: ""
     property string maximizeText: ""
     property string restoreText: ""
@@ -36,34 +43,6 @@ Item {
 
     implicitHeight: tokens.uiHeaderHeight
     height: implicitHeight
-
-    /// The window this header made frameless, or null. Only a hint the
-    /// header added is taken away again (when the header goes: the style is
-    /// turned off, the theme changes, an undo), so the window gets its
-    /// native title bar back and keeps every flag it had before.
-    property var framelessWindow: null
-    function applyFrameless() {
-        const backing = header.Window.window;
-        if (framelessWindow && framelessWindow !== backing) restoreFrameless();
-        if (!frameless || !canMove || !backing || backing.flags === undefined) return;
-        if (!(backing.flags & Qt.FramelessWindowHint)) {
-            backing.flags = backing.flags | Qt.FramelessWindowHint;
-            framelessWindow = backing;
-        }
-    }
-    function restoreFrameless() {
-        const backing = framelessWindow;
-        framelessWindow = null;
-        if (backing && backing.flags !== undefined) backing.flags = backing.flags & ~Qt.FramelessWindowHint;
-    }
-    Component.onCompleted: applyFrameless()
-    Component.onDestruction: restoreFrameless()
-    onHostWindowChanged: applyFrameless()
-    onFramelessChanged: frameless ? applyFrameless() : restoreFrameless()
-    Connections {
-        target: header.Window
-        function onWindowChanged() { header.applyFrameless(); }
-    }
 
     MouseArea {
         anchors.fill: parent
