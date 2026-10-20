@@ -1,19 +1,25 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "FocusReveal.js" as FocusReveal
 
 /// #116: one empty state for a candidate surface — a character (`art`, e.g.
 /// the assistant's small Ditto) resting on a soft pool with a few bubbles, a
 /// title, one message, one primary action, an optional quiet second action,
 /// and up to three example phrases. The examples are static quotes (what one
-/// could say once the feature is on, already quoted by the caller), not buttons: they take no input and no
-/// Tab stop. Decoration is plain shapes; with reduced transparency or the
-/// low-power style the bubbles and pool are not drawn, the content stays.
+/// could say once the feature is on, already quoted by the caller), not
+/// buttons: they take no action, but each is a Tab stop that is read out, so
+/// a keyboard user reaches them. Decoration is plain shapes; with reduced
+/// transparency or the low-power style the bubbles and pool are not drawn,
+/// the content stays.
 ///
 /// Nothing is drawn outside the item's own box (VM review 2026-10-20: in the
 /// compact chat panel the character covered the tabs and an example ran
 /// under the composer). A short box (`compact`) gets a smaller character,
-/// bubbles kept close to it and two examples; content that still does not
-/// fit scrolls inside the box instead of spilling over its neighbours.
+/// bubbles kept close to it, two examples and tighter spacing, with room for
+/// a message on two lines (VM 2026-10-20 at b0dc73b: the VM's text is wider
+/// than offscreen and the message wrapped). Content that still does not fit
+/// (large text) scrolls inside the box: focus scrolls into view
+/// (FocusReveal, as the centers do) and PageUp/PageDown page it.
 Item {
     id: empty
 
@@ -39,6 +45,13 @@ Item {
     Accessible.role: Accessible.Grouping
     Accessible.name: title
 
+    readonly property Item focusedItem: Window.activeFocusItem
+    onFocusedItemChanged: FocusReveal.reveal(scroller, focusedItem, empty.tokens.uiGap)
+    Keys.onPressed: event => {
+        if (event.key === Qt.Key_PageDown) event.accepted = FocusReveal.page(scroller, 1) || empty.scrolls;
+        else if (event.key === Qt.Key_PageUp) event.accepted = FocusReveal.page(scroller, -1) || empty.scrolls;
+    }
+
     function focusPrimary() {
         primary.forceActiveFocus(Qt.TabFocusReason);
     }
@@ -59,13 +72,13 @@ Item {
             x: Math.round((scroller.width - width) / 2)
             y: Math.max(0, Math.round((scroller.height - height) / 2))
             width: empty.contentWidth
-            spacing: empty.tokens.uiGap * (empty.compact ? 1 : 1.5)
+            spacing: empty.compact ? Math.round(empty.tokens.uiGap * 0.75) : empty.tokens.uiGap * 1.5
 
             Item {
                 id: pool
                 objectName: "emptyStatePool"
                 width: parent.width
-                height: empty.compact ? 72 : 112
+                height: empty.compact ? 56 : 112
                 clip: true
 
                 // The pool: a flat lavender ellipse with a bright rim (water).
@@ -122,11 +135,11 @@ Item {
                 Item {
                     id: stage
                     objectName: "emptyStateArt"
-                    width: empty.compact ? 52 : 76
+                    width: empty.compact ? 44 : 76
                     height: width
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.bottom
-                    anchors.bottomMargin: empty.compact ? 8 : 12
+                    anchors.bottomMargin: empty.compact ? 6 : 12
                 }
             }
 
@@ -136,7 +149,7 @@ Item {
                 wrapMode: Text.WordWrap
                 text: empty.title
                 color: empty.tokens.uiInk
-                font.pixelSize: empty.tokens.uiFontPage - 4
+                font.pixelSize: empty.compact ? empty.tokens.uiFontCardTitle + 2 : empty.tokens.uiFontPage - 4
                 font.weight: Font.DemiBold
                 Accessible.role: Accessible.Heading
                 Accessible.name: text
@@ -148,7 +161,7 @@ Item {
                 text: empty.message
                 color: empty.tokens.uiInkMuted
                 font.pixelSize: empty.tokens.uiFontBody
-                lineHeight: 1.3
+                lineHeight: empty.compact ? 1.15 : 1.3
             }
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -169,7 +182,7 @@ Item {
                 }
             }
 
-            Item { width: 1; height: empty.tokens.uiGap / 2 }
+            Item { visible: !empty.compact; width: 1; height: empty.tokens.uiGap / 2 }
 
             Text {
                 visible: empty.examples.length > 0 && empty.examplesTitle.length > 0
@@ -182,7 +195,7 @@ Item {
             Column {
                 id: quotes
                 width: parent.width
-                spacing: empty.tokens.uiGap
+                spacing: empty.compact ? Math.round(empty.tokens.uiGap * 0.75) : empty.tokens.uiGap
                 Repeater {
                     model: empty.examples.slice(0, empty.shownExamples)
                     Rectangle {
@@ -191,7 +204,7 @@ Item {
                         required property string modelData
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Math.min(quotes.width, quoteText.implicitWidth + empty.tokens.uiPadCard * 2)
-                        height: quoteText.implicitHeight + empty.tokens.uiGap * 1.5
+                        height: quoteText.implicitHeight + empty.tokens.uiGap * (empty.compact ? 0.75 : 1.5)
                         radius: empty.tokens.uiJ1 ? empty.tokens.uiRadiusControl : height / 2
                         bottomLeftRadius: 6
                         color: empty.tokens.uiFill("#ffffff", 0.7)
@@ -199,6 +212,16 @@ Item {
                         border.width: 1
                         Accessible.role: Accessible.StaticText
                         Accessible.name: modelData
+                        Accessible.focusable: true
+                        activeFocusOnTab: true
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: -3
+                            radius: parent.radius + 3
+                            color: "transparent"
+                            border.color: empty.tokens.uiFocus
+                            border.width: quote.activeFocus ? 2 : 0
+                        }
                         Text {
                             id: quoteText
                             anchors.centerIn: parent

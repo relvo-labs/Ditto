@@ -88,8 +88,8 @@ PanelWindow {
         objectName: "chatPresentationFrame"
         anchors.fill: parent
         radius: panel.tokens.uiCandidate ? panel.tokens.uiRadiusWindow : panel.tokens.radiusLarge
-        // #116 candidate: the same jelly canvas as the full window.
-        color: panel.tokens.uiCandidate ? panel.tokens.uiCanvas : panel.entryRect ? panel.tokens.surface : panel.tokens.background
+        // #116 style: the chat's nearly opaque sheet, as the full window.
+        color: panel.tokens.uiCandidate ? panel.tokens.uiSheet : panel.entryRect ? panel.tokens.surface : panel.tokens.background
         border.color: panel.tokens.uiCandidate ? panel.tokens.uiCardBorder : panel.tokens.border
         border.width: 1
         Jelly.MotionValue {

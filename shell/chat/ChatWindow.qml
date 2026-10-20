@@ -55,8 +55,8 @@ FloatingWindow {
         sourceComponent: JellySurface {
             tokens: window.tokens
             radius: window.tokens.uiRadiusWindow
-            fill: window.tokens.uiJ3 && window.tokens.uiGloss ? window.tokens.uiCanvasLow : window.tokens.uiCanvas
-            fillTop: window.tokens.uiGloss ? Qt.lighter(window.tokens.uiCanvas, 1.03) : window.tokens.uiCanvas
+            fill: window.tokens.uiJ3 && window.tokens.uiGloss ? window.tokens.uiSheetLow : window.tokens.uiSheet
+            fillTop: window.tokens.uiGloss ? Qt.lighter(window.tokens.uiSheet, 1.03) : window.tokens.uiSheet
             raised: false
             iris: window.tokens.uiJ3
             bubbles: true

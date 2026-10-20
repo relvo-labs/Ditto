@@ -218,6 +218,12 @@ QtObject {
     readonly property color uiCanvas: uiJ2 ? uiFill("#f5ebfb", 0.98) : uiJ3 ? uiFill("#f6f7ff", 0.94) : uiFill("#f4f2fd", 0.95)
     /// J3's water tint at the bottom of a window (gloss only).
     readonly property color uiCanvasLow: uiJ3 ? uiFill("#eef5fb", 0.94) : uiCanvas
+    /// The chat (compact panel and window) and approval surfaces: they sit
+    /// over other windows, and without blur even 5% see-through showed the
+    /// settings window's cards and text behind the chat (VM, b0dc73b). Nearly
+    /// opaque; reduced transparency: opaque.
+    readonly property color uiSheet: uiJ2 ? uiFill("#f5ebfb", 0.99) : uiJ3 ? uiFill("#f6f7ff", 0.99) : uiFill("#f4f2fd", 0.99)
+    readonly property color uiSheetLow: uiJ3 ? uiFill("#eef5fb", 0.99) : uiSheet
     /// J3's sidebar is a faint water tint with an edge, so the sidebar and
     /// the page are told apart.
     readonly property color uiSidebar: uiJ2 ? uiFill("#ecdcf9", 1.0) : uiJ3 ? uiFill("#e8ebfb", 0.85) : uiFill("#e9e5fb", 0.72)

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "../ui"
+import "../ui/FocusReveal.js" as FocusReveal
 
 /// The four centers in one window: composition, plugins, change history and
 /// personalization. The window exists only while open; a closed center
@@ -74,19 +75,7 @@ FloatingWindow {
     /// The current page (every page is a Flickable).
     readonly property Flickable pageFlick: content.item as Flickable
     function revealFocused() {
-        const flick = pageFlick;
-        if (!flick || !focusedItem) return;
-        let ancestor = focusedItem.parent;
-        while (ancestor && ancestor !== flick.contentItem) ancestor = ancestor.parent;
-        if (!ancestor) return;
-        const box = focusedItem.mapToItem(flick.contentItem, 0, 0, focusedItem.width, focusedItem.height);
-        const room = 16;
-        const maxY = Math.max(0, flick.contentHeight - flick.height);
-        if (box.y - room < flick.contentY) {
-            flick.contentY = Math.max(0, box.y - room);
-        } else if (box.y + box.height + room > flick.contentY + flick.height) {
-            flick.contentY = Math.min(maxY, box.y + box.height + room - flick.height);
-        }
+        FocusReveal.reveal(pageFlick, focusedItem, 16);
     }
     function recoverFocus() {
         if (focusedItem && focusedItem !== centersRoot) {
@@ -110,12 +99,9 @@ FloatingWindow {
         Keys.onEscapePressed: window.closeRequested()
         // Unhandled by the focused control: page the content (styled only).
         Keys.onPressed: event => {
-            const flick = window.pageFlick;
-            if (!window.jelly || !flick) return;
-            const step = Math.max(40, flick.height - 48);
-            const maxY = Math.max(0, flick.contentHeight - flick.height);
-            if (event.key === Qt.Key_PageDown) { flick.contentY = Math.min(maxY, flick.contentY + step); event.accepted = true; }
-            else if (event.key === Qt.Key_PageUp) { flick.contentY = Math.max(0, flick.contentY - step); event.accepted = true; }
+            if (!window.jelly || !window.pageFlick) return;
+            if (event.key === Qt.Key_PageDown) { FocusReveal.page(window.pageFlick, 1); event.accepted = true; }
+            else if (event.key === Qt.Key_PageUp) { FocusReveal.page(window.pageFlick, -1); event.accepted = true; }
         }
 
         // ---- #116 candidate frame: the window's one title and its controls ----

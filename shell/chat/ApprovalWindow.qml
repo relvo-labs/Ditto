@@ -84,7 +84,7 @@ FloatingWindow {
             sourceComponent: JellySurface {
                 tokens: window.tokens
                 radius: window.tokens.uiRadiusWindow
-                fill: window.tokens.uiFill("#fbfaff", 0.97)
+                fill: window.tokens.uiFill("#fbfaff", 0.99)
                 edge: window.tokens.uiSelectDot
                 edgeWidth: 2
                 raised: false
