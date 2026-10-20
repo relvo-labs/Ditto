@@ -362,13 +362,13 @@ ShellRoot {
             WlrLayershell.layer: WlrLayer.Background
             WlrLayershell.namespace: "ditto-background"
 
-            /// The canvas (a gradient in the light recipe). No wallpaper yet:
-            /// the asset and its Profile field are still to be decided
-            /// (docs/design/default-desktop/component-sheet.md).
+            /// The canvas, with the light recipe's default wallpaper on top
+            /// once it has loaded. A per-Profile wallpaper field is still
+            /// Core's (docs/design/default-desktop/component-sheet.md H2).
             Backdrop {
                 anchors.fill: parent
                 tokens: root.shellTokens
-                wallpaperSource: ""
+                wallpaperSource: root.shellTokens.wallpaper
             }
         }
     }

@@ -117,7 +117,7 @@ Section {
         function onProfileChanged(payload) { page.reload(); }
         function onCapabilitiesReloaded() { page.reload(); }
     }
-    Text { width:parent.width;visible:page.notice.length>0;text:page.notice;textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.warning }
+    Text { width:parent.width;visible:page.notice.length>0;text:page.notice;textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appWarning }
     ChangeCard {width:parent.width;visible:!!page.record;client:page.client;tokens:page.tokens;record:page.record}
     Repeater {
         model: page.artifacts
@@ -128,23 +128,23 @@ Section {
             readonly property bool running: work.some(job=>["queued","running","cancelling"].indexOf(job.state)>=0)
             width:parent.width
             spacing:page.tokens.space
-            Text {width:parent.width;text:item.modelData.description.title+" · "+item.modelData.description.version;textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foreground;font.bold:true}
-            Text {objectName:"generationState_"+item.modelData.artifact_id;width:parent.width;text:page.stateText(item.modelData.state);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foregroundMuted}
-            Text {width:parent.width;text:page.client.t(qsTr("需求：%1")).arg(item.modelData.origin.request_summary);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foreground}
-            Text {width:parent.width;visible:!!item.modelData.parent_id;text:page.client.t(qsTr("本版本修改：%1")).arg(item.modelData.changed_fields.map(field=>page.fieldName(field)).join(", "));textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foregroundMuted}
-            Text {width:parent.width;visible:item.modelData.repair.stopped;text:page.client.t(qsTr("已停止自動修復。請檢查診斷，重新說明需求後再試。"));textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.warning}
+            Text {width:parent.width;text:item.modelData.description.title+" · "+item.modelData.description.version;textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appInk;font.bold:true}
+            Text {objectName:"generationState_"+item.modelData.artifact_id;width:parent.width;text:page.stateText(item.modelData.state);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appInkMuted}
+            Text {width:parent.width;text:page.client.t(qsTr("需求：%1")).arg(item.modelData.origin.request_summary);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appInk}
+            Text {width:parent.width;visible:!!item.modelData.parent_id;text:page.client.t(qsTr("本版本修改：%1")).arg(item.modelData.changed_fields.map(field=>page.fieldName(field)).join(", "));textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appInkMuted}
+            Text {width:parent.width;visible:item.modelData.repair.stopped;text:page.client.t(qsTr("已停止自動修復。請檢查診斷，重新說明需求後再試。"));textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appWarning}
             Repeater {
                 model:item.work
                 Column {
                     required property var modelData
                     width:item.width
-                    Text {objectName:"generationJob_"+modelData.job_id;width:item.width;text:page.jobText(modelData);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.foreground}
+                    Text {objectName:"generationJob_"+modelData.job_id;width:item.width;text:page.jobText(modelData);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:page.tokens.appInk}
                     Button {objectName:"cancelGeneration_"+modelData.job_id;tokens:page.tokens;visible:modelData.cancellable;enabled:modelData.state!=="cancelling";text:modelData.kind==="generation.preview"?page.client.t(qsTr("關閉測試資料預覽")):page.client.t(qsTr("取消驗證"));onClicked:page.cancelJob(modelData)}
                 }
             }
             Repeater {
                 model:item.modelData.validation ? item.modelData.validation.stages : []
-                Text {required property var modelData;objectName:"generationStage_"+item.modelData.artifact_id+"_"+modelData.stage;width:item.width;text:page.stageText(modelData.stage)+" · "+page.resultText(modelData.result);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:modelData.result==="failed"?page.tokens.warning:page.tokens.foregroundMuted}
+                Text {required property var modelData;objectName:"generationStage_"+item.modelData.artifact_id+"_"+modelData.stage;width:item.width;text:page.stageText(modelData.stage)+" · "+page.resultText(modelData.result);textFormat:Text.PlainText;wrapMode:Text.Wrap;color:modelData.result==="failed"?page.tokens.appWarning:page.tokens.appInkMuted}
             }
             Flow {
                 width:parent.width

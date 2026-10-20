@@ -42,7 +42,10 @@ TestCase {
     }
     function cleanup() { provider.release(); provider.destroy(); provider = null; wait(10); }
     function tile() { return findChild(layer, "dockTile_fixture"); }
-    function icon() { return findChild(tile(), "dockIconFallback"); }
+    // The fallback that is drawn: the light recipe shows the application
+    // style the Profile chose (#116, J1 by default), whose fallback is the
+    // themed squircle; the earlier lettered tile is hidden then.
+    function icon() { return findChild(tile(), provider.jelly ? "dockIconSquircle" : "dockIconFallback"); }
     function test_click_is_not_launch_success_and_readback_is_feedback() {
         mousePress(tile(), 26, 26);
         wait(35);
@@ -56,7 +59,7 @@ TestCase {
         const currentTile = tile(); // the existing model may rebuild the delegate
         tryVerify(() => currentTile.confirmedScale < 1);
         tryCompare(currentTile, "confirmedScale", 1);
-        compare(findChild(currentTile, "dockIndicator").width, 16);
+        compare(findChild(currentTile, "dockIndicator").width, provider.jelly ? 18 : 16);
         compare(currentTile.Accessible.name, "Fixture（使用中）（已釘選）");
         compare(client.calls.length, 2);
     }

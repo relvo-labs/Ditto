@@ -106,6 +106,15 @@ substitute() {
   fi
 }
 
+# #116: the session's default foot configuration (J1) must load; foot 1.16
+# can check a file without opening a window. Wayfire reads [decoration] from
+# session/wayfire.ini, which the session uses in place.
+if command -v foot >/dev/null; then
+  foot --check-config --config="$here/session/xdg/foot/foot.ini" \
+    || { echo "foot rejects $here/session/xdg/foot/foot.ini" >&2; exit 1; }
+else
+  echo 'foot not installed: the session foot.ini was not checked' >&2
+fi
 substitute "$here/session/ditto-session" "$temporary/ditto-session"
 substitute "$here/session/ditto.desktop" "$temporary/ditto.desktop"
 sudo install -D -m 0755 "$temporary/ditto-session" "$libexec/ditto-session"

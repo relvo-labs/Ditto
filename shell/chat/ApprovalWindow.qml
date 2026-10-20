@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "../ui"
@@ -14,6 +15,10 @@ FloatingWindow {
     required property var tokens
     required property var approval
     signal decided(string decision)
+
+    /// #116 application style (Profile `ui_style`): visual only. Refusing stays the
+    /// keyboard default, Escape and closing still refuse.
+    readonly property bool jelly: tokens.uiCandidate === true
 
     function t(source) {
         return client.t(source);
@@ -58,13 +63,20 @@ FloatingWindow {
 
     title: t(qsTr("Ditto 需要你的確認"))
     implicitWidth: 460
-    implicitHeight: 300
-    color: tokens.background
+    implicitHeight: jelly ? Math.max(240, approvalColumn.implicitHeight + window.tokens.uiHeaderHeight + window.tokens.uiPadCard * 3) : 300
+    color: jelly ? "transparent" : tokens.background
     visible: true
     onClosed: window.decided("rejected")
 
     /// The control with keyboard focus, for the Shell's `focus` line.
     readonly property Item focusedItem: approvalRoot.Window.activeFocusItem
+
+    // Qt's own title bar off while the style draws the one title; changed
+    // only while the window is not shown (see WindowFrameless).
+    WindowFrameless {
+        hostWindow: window
+        frameless: window.jelly
+    }
 
     Item {
         id: approvalRoot
@@ -72,9 +84,42 @@ FloatingWindow {
         focus: true
         Keys.onEscapePressed: window.decided("rejected")
 
-        Column {
+        // ---- #116 candidate frame; its one window button refuses ----
+        Loader {
             anchors.fill: parent
-            anchors.margins: window.tokens.spaceWide
+            active: window.jelly
+            sourceComponent: JellySurface {
+                tokens: window.tokens
+                radius: window.tokens.uiRadiusWindow
+                fill: window.tokens.uiFill("#fbfaff", 0.99)
+                edge: window.tokens.uiSelectDot
+                edgeWidth: 2
+                raised: false
+                iris: window.tokens.uiJ3
+            }
+        }
+        Loader {
+            id: header
+            active: window.jelly
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            sourceComponent: WindowHeader {
+                tokens: window.tokens
+                hostWindow: window
+                title: window.title
+                showMinimize: false
+                showMaximize: false
+                closeText: window.t(qsTr("拒絕並關閉"))
+                onCloseRequested: window.decided("rejected")
+            }
+        }
+
+        Column {
+            id: approvalColumn
+            anchors.fill: parent
+            anchors.margins: window.jelly ? window.tokens.uiPadCard + 4 : window.tokens.spaceWide
+            anchors.topMargin: window.jelly ? header.height + window.tokens.uiPadCard : window.tokens.spaceWide
             spacing: window.tokens.space
             Accessible.role: Accessible.Grouping
             Accessible.name: window.t(qsTr("確認請求"))
@@ -83,8 +128,8 @@ FloatingWindow {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: window.t(qsTr("Ditto 想在這次對話中做一件需要你同意的事："))
-                color: window.tokens.foreground
-                font.pixelSize: window.tokens.fontBody
+                color: window.tokens.appInk
+                font.pixelSize: window.tokens.appFontBody
             }
 
             Repeater {
@@ -93,9 +138,21 @@ FloatingWindow {
                     required property var modelData
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: "•  " + window.scopeText(modelData)
-                    color: window.tokens.foreground
-                    font.pixelSize: window.tokens.fontTitle
+                    // Candidate: a request reads as a tinted row, not a bullet.
+                    leftPadding: window.jelly ? window.tokens.uiPadCard : 0
+                    rightPadding: leftPadding
+                    topPadding: window.jelly ? window.tokens.uiGap * 1.5 : 0
+                    bottomPadding: topPadding
+                    Rectangle {
+                        visible: window.jelly
+                        z: -1
+                        anchors.fill: parent
+                        radius: window.tokens.uiRadiusControl
+                        color: window.tokens.uiWarningFill
+                    }
+                    text: (window.jelly ? "" : "•  ") + window.scopeText(modelData)
+                    color: window.tokens.appInk
+                    font.pixelSize: window.tokens.appFontTitle
                 }
             }
 
@@ -103,8 +160,8 @@ FloatingWindow {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: window.t(qsTr("只允許這一次；下次需要時會再問。拒絕不會影響目前的桌面。"))
-                color: window.tokens.foregroundMuted
-                font.pixelSize: window.tokens.fontSmall
+                color: window.tokens.appInkMuted
+                font.pixelSize: window.tokens.appFontCaption
             }
 
             Row {

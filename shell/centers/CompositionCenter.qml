@@ -13,9 +13,11 @@ Flickable {
 
     required property var client
     required property var tokens
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
+    readonly property bool jelly: tokens.uiCandidate === true
 
     contentWidth: width
-    contentHeight: column.implicitHeight + tokens.spaceSection * 2
+    contentHeight: column.implicitHeight + tokens.appPagePad * 2
     clip: true
     boundsBehavior: Flickable.StopAtBounds
 
@@ -95,6 +97,10 @@ Flickable {
     Connections {
         target: page.client
         function onProfileChanged(payload) {
+            page.reload();
+        }
+        // After a resync or a reconnect: what was missed is read again.
+        function onCapabilitiesReloaded() {
             page.reload();
         }
         function onChangeUpdated(change) {
@@ -273,15 +279,15 @@ Flickable {
 
     Column {
         id: column
-        x: page.tokens.spaceSection
-        y: page.tokens.spaceSection
-        width: page.width - page.tokens.spaceSection * 2
+        x: page.tokens.appPagePad
+        y: page.tokens.appPagePad
+        width: page.width - page.tokens.appPagePad * 2
         spacing: page.tokens.spaceSection
 
         Text {
             text: page.t(qsTr("組合中心"))
-            color: page.tokens.foreground
-            font.pixelSize: page.tokens.fontHeading
+            color: page.tokens.appInk
+            font.pixelSize: page.tokens.appFontHeading
             font.bold: true
             Accessible.role: Accessible.Heading
             Accessible.name: text
@@ -292,8 +298,8 @@ Flickable {
             width: parent.width
             wrapMode: Text.WordWrap
             text: page.notice
-            color: page.tokens.warning
-            font.pixelSize: page.tokens.fontBody
+            color: page.tokens.appWarning
+            font.pixelSize: page.tokens.appFontBody
             Accessible.role: Accessible.AlertMessage
             Accessible.name: text
         }
@@ -325,6 +331,7 @@ Flickable {
                 Column {
                     id: slotRow
                     required property var modelData
+                    required property int index
                     readonly property string slot: modelData
                     readonly property string current: page.boundPackage(slot)
                     readonly property var options: slot === "layout.strategy" && page.layout
@@ -337,15 +344,24 @@ Flickable {
                     // told apart by assistive technology.
                     Accessible.role: Accessible.Grouping
                     Accessible.name: page.client.tr.slotName(slot)
+                    function preview() {
+                        page.propose(page.swapOps(slotRow.slot, slotRow.chosen), "preview");
+                        slotRow.chosen = "";
+                    }
+                    function apply() {
+                        page.propose(page.swapOps(slotRow.slot, slotRow.chosen), "apply");
+                        slotRow.chosen = "";
+                    }
 
                     Row {
+                        visible: !page.jelly
                         spacing: page.tokens.space
                         Text {
                             width: 150
                             anchors.verticalCenter: parent.verticalCenter
                             text: page.client.tr.slotName(slotRow.slot)
-                            color: page.tokens.foreground
-                            font.pixelSize: page.tokens.fontBody
+                            color: page.tokens.appInk
+                            font.pixelSize: page.tokens.appFontBody
                             font.bold: true
                         }
                         Choice {
@@ -361,46 +377,107 @@ Flickable {
                             visible: slotRow.options.length === 0
                             anchors.verticalCenter: parent.verticalCenter
                             text: slotRow.current.length > 0 ? page.client.tr.packageName(slotRow.current) : page.t(qsTr("（未設定）"))
-                            color: page.tokens.foregroundMuted
-                            font.pixelSize: page.tokens.fontBody
+                            color: page.tokens.appInkMuted
+                            font.pixelSize: page.tokens.appFontBody
                         }
                     }
 
                     Row {
-                        visible: slotRow.chosen.length > 0
+                        visible: slotRow.chosen.length > 0 && !page.jelly
                         spacing: page.tokens.space
                         leftPadding: 158
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: page.t(qsTr("把「%1」換成「%2」")).arg(page.client.tr.packageName(slotRow.current)).arg(page.client.tr.packageName(slotRow.chosen))
-                            color: page.tokens.foreground
-                            font.pixelSize: page.tokens.fontBody
+                            color: page.tokens.appInk
+                            font.pixelSize: page.tokens.appFontBody
                         }
                         Button {
                             tokens: page.tokens
                             text: page.t(qsTr("試看"))
                             enabled: !page.busy
-                            onClicked: {
-                                page.propose(page.swapOps(slotRow.slot, slotRow.chosen), "preview");
-                                slotRow.chosen = "";
-                            }
+                            onClicked: slotRow.preview()
                         }
                         Button {
                             tokens: page.tokens
                             kind: "primary"
                             text: page.t(qsTr("套用"))
                             enabled: !page.busy
-                            onClicked: {
-                                page.propose(page.swapOps(slotRow.slot, slotRow.chosen), "apply");
-                                slotRow.chosen = "";
-                            }
+                            onClicked: slotRow.apply()
                         }
                         Button {
                             tokens: page.tokens
                             kind: "subtle"
                             text: page.t(qsTr("取消"))
                             onClicked: slotRow.chosen = ""
+                        }
+                    }
+
+                    // ---- #116 candidate: a grouped-list row --------------------------
+                    Loader {
+                        active: page.jelly
+                        visible: active
+                        width: parent.width
+                        sourceComponent: ListRow {
+                            tokens: page.tokens
+                            width: slotRow.width
+                            separated: slotRow.index > 0
+                            label: page.client.tr.slotName(slotRow.slot)
+                            labelWidth: 150
+
+                            Row {
+                                spacing: page.tokens.uiGap
+                                Choice {
+                                    tokens: page.tokens
+                                    maxWidth: slotRow.width - 170
+                                    options: slotRow.options
+                                    value: slotRow.chosen.length > 0 ? slotRow.chosen : slotRow.current
+                                    accessibleName: page.client.tr.slotName(slotRow.slot)
+                                    soleNote: page.t(qsTr("唯一可用"))
+                                    enabled: !page.busy && slotRow.options.length > 1
+                                    onChosen: value => slotRow.chosen = value === slotRow.current ? "" : value
+                                }
+                                Text {
+                                    visible: slotRow.options.length === 0
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: slotRow.current.length > 0 ? page.client.tr.packageName(slotRow.current) : page.t(qsTr("（未設定）"))
+                                    color: page.tokens.appInkMuted
+                                    font.pixelSize: page.tokens.appFontBody
+                                }
+                            }
+
+                            below: Flow {
+                                visible: slotRow.chosen.length > 0
+                                width: slotRow.width
+                                spacing: page.tokens.uiGap
+                                Text {
+                                    height: page.tokens.uiControlHeight
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: page.t(qsTr("把「%1」換成「%2」")).arg(page.client.tr.packageName(slotRow.current)).arg(page.client.tr.packageName(slotRow.chosen))
+                                    color: page.tokens.appInk
+                                    font.pixelSize: page.tokens.appFontBody
+                                }
+                                Button {
+                                    tokens: page.tokens
+                                    text: page.t(qsTr("試看"))
+                                    enabled: !page.busy
+                                    onClicked: slotRow.preview()
+                                }
+                                Button {
+                                    tokens: page.tokens
+                                    kind: "primary"
+                                    text: page.t(qsTr("套用"))
+                                    enabled: !page.busy
+                                    onClicked: slotRow.apply()
+                                }
+                                Button {
+                                    tokens: page.tokens
+                                    kind: "subtle"
+                                    text: page.t(qsTr("取消"))
+                                    onClicked: slotRow.chosen = ""
+                                }
+                            }
                         }
                     }
                 }
@@ -411,6 +488,8 @@ Flickable {
         Section {
             tokens: page.tokens
             title: page.t(qsTr("已存的組合"))
+            // Each composition is its own card.
+            carded: false
 
             Repeater {
                 model: page.profiles
@@ -419,30 +498,143 @@ Flickable {
                     id: profileRow
                     required property var modelData
                     property string mode: ""     // "" | rename | duplicate | confirmDelete
+                    readonly property bool viewing: !!page.selected && page.selected.profile.profile_id === modelData.profile_id
                     Accessible.role: Accessible.Grouping
                     Accessible.name: modelData.name
                     width: parent.width
-                    height: profileColumn.implicitHeight + page.tokens.space * 2
-                    radius: page.tokens.radiusSmall
-                    color: page.selected && page.selected.profile.profile_id === modelData.profile_id ? page.tokens.surfaceStrong : page.tokens.surface
-                    border.color: page.tokens.border
+                    height: profileColumn.implicitHeight + (page.jelly ? page.tokens.uiPadCard : page.tokens.space) * 2
+                    radius: page.tokens.appPlateRadius
+                    color: page.jelly ? "transparent" : viewing ? page.tokens.appPlateStrong : page.tokens.surface
+                    border.color: page.jelly ? "transparent" : page.tokens.appPlateBorder
                     border.width: 1
+
+                    // The pages' own actions, shared by both presentations.
+                    function preview() { page.propose([{ op: "switch_profile", to_profile: modelData.profile_id }], "preview"); }
+                    function use() { page.propose([{ op: "switch_profile", to_profile: modelData.profile_id }], "apply"); }
+                    function act(id) {
+                        if (id === "versions") page.selectProfile(modelData.profile_id);
+                        else if (id === "compare") page.diffProfiles(page.active.profile.profile_id, modelData.profile_id);
+                        else if (id === "duplicate") mode = "duplicate";
+                        else if (id === "rename") mode = "rename";
+                        else if (id === "export") page.exportProfile(modelData.profile_id);
+                        else if (id === "delete") mode = "confirmDelete";
+                    }
+
+                    // ---- #116 candidate card: jelly surface; the one being viewed
+                    // has a ring and says so in words. ----
+                    Loader {
+                        anchors.fill: parent
+                        active: page.jelly
+                        sourceComponent: JellySurface {
+                            objectName: "profileCard"
+                            tokens: page.tokens
+                            fill: page.tokens.uiCard
+                            edge: profileRow.viewing ? page.tokens.uiSelectDot : page.tokens.uiCardBorder
+                            edgeWidth: profileRow.viewing ? 2 : 1
+                            iris: page.tokens.uiJ3
+                        }
+                    }
 
                     Column {
                         id: profileColumn
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        anchors.margins: page.tokens.space
-                        spacing: page.tokens.spaceTight
+                        anchors.margins: page.jelly ? page.tokens.uiPadCard : page.tokens.space
+                        spacing: page.jelly ? page.tokens.uiGap : page.tokens.spaceTight
+
+                        // Candidate header: name, state and date on the left; at
+                        // most two main actions and the ⋯ menu on the right, in the
+                        // same place on every card.
+                        Loader {
+                            active: page.jelly
+                            visible: active
+                            width: parent.width
+                            sourceComponent: Item {
+                                width: profileColumn.width
+                                height: Math.max(titles.implicitHeight, actions.height)
+
+                                Column {
+                                    id: titles
+                                    width: parent.width - actions.width - page.tokens.uiGap * 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 4
+                                    Row {
+                                        spacing: page.tokens.uiGap
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: profileRow.modelData.name
+                                            color: page.tokens.uiInk
+                                            font.pixelSize: page.tokens.uiFontCardTitle
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Badge {
+                                            visible: profileRow.modelData.active
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            tokens: page.tokens
+                                            tone: "good"
+                                            text: page.t(qsTr("使用中"))
+                                        }
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        wrapMode: Text.WordWrap
+                                        text: page.t(qsTr("最後修改 %1")).arg(words.dateTime(profileRow.modelData.updated_at))
+                                            + (profileRow.viewing ? "  ·  " + page.t(qsTr("下方顯示這個組合的版本")) : "")
+                                        color: page.tokens.uiInkMuted
+                                        font.pixelSize: page.tokens.uiFontCaption
+                                    }
+                                }
+
+                                Row {
+                                    id: actions
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: page.tokens.uiGap
+                                    Button {
+                                        visible: !profileRow.modelData.active
+                                        tokens: page.tokens
+                                        text: page.t(qsTr("試看"))
+                                        enabled: !page.busy
+                                        onClicked: profileRow.preview()
+                                    }
+                                    Button {
+                                        visible: !profileRow.modelData.active
+                                        tokens: page.tokens
+                                        kind: "primary"
+                                        text: page.t(qsTr("使用這個組合"))
+                                        enabled: !page.busy
+                                        onClicked: profileRow.use()
+                                    }
+                                    OverflowMenu {
+                                        tokens: page.tokens
+                                        accessibleName: page.t(qsTr("更多動作：%1")).arg(profileRow.modelData.name)
+                                        items: [
+                                            { id: "versions", label: page.t(qsTr("版本與差異")) },
+                                            { id: "compare", label: page.t(qsTr("與目前使用的比較")),
+                                              enabled: !!page.active && !profileRow.modelData.active,
+                                              reason: page.t(qsTr("這就是目前使用的組合")) },
+                                            { id: "duplicate", label: page.t(qsTr("複製")) },
+                                            { id: "rename", label: page.t(qsTr("重新命名")) },
+                                            { id: "export", label: page.t(qsTr("匯出")) },
+                                            { id: "delete", label: page.t(qsTr("刪除")), danger: true,
+                                              enabled: !profileRow.modelData.active,
+                                              reason: page.t(qsTr("使用中的組合不能刪除")) }
+                                        ]
+                                        onTriggered: id => profileRow.act(id)
+                                    }
+                                }
+                            }
+                        }
 
                         Row {
+                            visible: !page.jelly
                             spacing: page.tokens.space
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: profileRow.modelData.name
-                                color: page.tokens.foreground
-                                font.pixelSize: page.tokens.fontBody
+                                color: page.tokens.appInk
+                                font.pixelSize: page.tokens.appFontBody
                                 font.bold: true
                             }
                             Badge {
@@ -455,12 +647,13 @@ Flickable {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: page.t(qsTr("最後修改 %1")).arg(words.dateTime(profileRow.modelData.updated_at))
-                                color: page.tokens.foregroundMuted
-                                font.pixelSize: page.tokens.fontSmall
+                                color: page.tokens.appInkMuted
+                                font.pixelSize: page.tokens.appFontCaption
                             }
                         }
 
                         Flow {
+                            visible: !page.jelly
                             width: parent.width
                             spacing: page.tokens.space
                             Button {
@@ -519,8 +712,8 @@ Flickable {
                         Text {
                             visible: profileRow.modelData.active
                             text: page.t(qsTr("使用中的組合不能刪除；先切換到另一個組合。"))
-                            color: page.tokens.foregroundMuted
-                            font.pixelSize: page.tokens.fontSmall
+                            color: page.tokens.appInkMuted
+                            font.pixelSize: page.tokens.appFontCaption
                         }
 
                         Row {
@@ -561,8 +754,8 @@ Flickable {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: page.t(qsTr("刪除「%1」？它的版本紀錄也會一起刪除。")).arg(profileRow.modelData.name)
-                                color: page.tokens.warning
-                                font.pixelSize: page.tokens.fontBody
+                                color: page.tokens.appWarning
+                                font.pixelSize: page.tokens.appFontBody
                             }
                             Button {
                                 tokens: page.tokens
@@ -626,8 +819,8 @@ Flickable {
                     required property int index
                     width: parent.width
                     height: revisionLine.implicitHeight + page.tokens.space
-                    radius: page.tokens.radiusSmall
-                    color: page.diffFrom === modelData.revision_id || page.diffTo === modelData.revision_id ? page.tokens.surfaceStrong : "transparent"
+                    radius: page.tokens.appPlateRadius
+                    color: page.diffFrom === modelData.revision_id || page.diffTo === modelData.revision_id ? page.tokens.appPlateStrong : "transparent"
 
                     Row {
                         id: revisionLine
@@ -639,15 +832,15 @@ Flickable {
                             anchors.verticalCenter: parent.verticalCenter
                             width: 130
                             text: words.dateTime(revisionRow.modelData.created_at)
-                            color: page.tokens.foreground
-                            font.pixelSize: page.tokens.fontSmall
+                            color: page.tokens.appInk
+                            font.pixelSize: page.tokens.appFontCaption
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             width: 110
                             text: words.revisionOrigin(revisionRow.modelData.origin)
-                            color: page.tokens.foreground
-                            font.pixelSize: page.tokens.fontSmall
+                            color: page.tokens.appInk
+                            font.pixelSize: page.tokens.appFontCaption
                         }
                         Badge {
                             visible: revisionRow.index === 0
@@ -673,13 +866,16 @@ Flickable {
                         Button {
                             tokens: page.tokens
                             kind: "subtle"
-                            text: page.diffFrom === revisionRow.modelData.revision_id ? page.t(qsTr("起點 ✓")) : page.t(qsTr("設為起點"))
+                            // Candidate: the pick is a selected bead, not a ✓ character.
+                            checked: page.diffFrom === revisionRow.modelData.revision_id
+                            text: checked ? (page.jelly ? page.t(qsTr("起點")) : page.t(qsTr("起點 ✓"))) : page.t(qsTr("設為起點"))
                             onClicked: page.diffFrom = revisionRow.modelData.revision_id
                         }
                         Button {
                             tokens: page.tokens
                             kind: "subtle"
-                            text: page.diffTo === revisionRow.modelData.revision_id ? page.t(qsTr("終點 ✓")) : page.t(qsTr("設為終點"))
+                            checked: page.diffTo === revisionRow.modelData.revision_id
+                            text: checked ? (page.jelly ? page.t(qsTr("終點")) : page.t(qsTr("終點 ✓"))) : page.t(qsTr("設為終點"))
                             onClicked: page.diffTo = revisionRow.modelData.revision_id
                         }
                     }
@@ -776,8 +972,8 @@ Flickable {
                     text: page.importCheck && page.importCheck.importable
                         ? page.t(qsTr("可以匯入。"))
                         : page.t(qsTr("不能匯入，原因如下。"))
-                    color: page.importCheck && page.importCheck.importable ? page.tokens.success : page.tokens.warning
-                    font.pixelSize: page.tokens.fontBody
+                    color: page.importCheck && page.importCheck.importable ? page.tokens.appSuccess : page.tokens.appWarning
+                    font.pixelSize: page.tokens.appFontBody
                     font.bold: true
                 }
 
@@ -789,8 +985,8 @@ Flickable {
                         wrapMode: Text.WordWrap
                         text: "• " + page.client.key(modelData.detail_key, modelData.detail || {})
                             + (modelData.blocking ? "" : page.t(qsTr("（不影響匯入）")))
-                        color: modelData.blocking ? page.tokens.warning : page.tokens.foregroundMuted
-                        font.pixelSize: page.tokens.fontBody
+                        color: modelData.blocking ? page.tokens.appWarning : page.tokens.appInkMuted
+                        font.pixelSize: page.tokens.appFontBody
                     }
                 }
 
