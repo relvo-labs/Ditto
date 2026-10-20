@@ -214,9 +214,12 @@ fn client_command(
     if matches!(parsed.kind.as_str(), "quickshell" | "lock" | "rescue-shell") {
         // Quickshell's handler re-execs the same PID with a spent token,
         // bypassing Core's exit supervision. Core must own all UI restarts.
-        // This forgoes Quickshell's crash directory (including its log tail):
-        // diagnose via Core logs, systemd journal and coredump if available.
-        // Do not add content collection here (#59). Apply after extra env so
+        // This forgoes Quickshell's crash directory (including its log tail).
+        // Diagnose via Core logs and journal. OS core dump collection depends
+        // on core_pattern (systemd-coredump/apport); dumps contain full process
+        // memory and may include window titles or conversations. Read back the
+        // actual policy and artifacts during #59 acceptance; do not assume
+        // dumps are redacted or add collection here. Apply after extra env so
         // callers cannot accidentally turn the upstream handler back on.
         command.env("QS_DISABLE_CRASH_HANDLER", "1");
     }

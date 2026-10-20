@@ -12,7 +12,7 @@ dittoctl="$workspace/target/release/dittoctl"
 
 if [[ -f "$rescue_qml" && -x "$qt_prefix/bin/quickshell" ]]; then
   started=$SECONDS
-  "$qt_prefix/bin/quickshell" --no-color -p "$rescue_qml"
+  QS_DISABLE_CRASH_HANDLER=1 "$qt_prefix/bin/quickshell" --no-color -p "$rescue_qml"
   status=$?
   # A normal exit (the user closed it, or the main Shell came back and systemd
   # stopped this unit) is not a failure to fall back from.
