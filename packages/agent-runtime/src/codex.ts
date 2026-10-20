@@ -92,14 +92,18 @@ export class CodexBackend {
     })
   }
   async status(budget?:RequestBudget):Promise<ProviderStatus>{
+    return this.readStatus(false,budget)
+  }
+  private async readStatus(requireTurnChecks:boolean,budget?:RequestBudget):Promise<ProviderStatus>{
+    if(!this.alive)throw new Error('provider_unavailable')
     const account=object(await this.bounded('account/read',{refreshToken:false},budget))
-    const identity=account.account?object(account.account):undefined
+    const identity=account.account===null?undefined:object(account.account)
     // API-key auth or another CLI's credentials never count as subscription
     // login for this backend. The isolated launch owns its own keyring key.
     const authenticated=this.options.testProvider||identity?.type==='chatgpt'
     const models:Array<ProviderStatus['models'][number]>=[]
     let cursor:string|undefined
-    for(let page=0;page<4;page++){
+    try{for(let page=0;page<4;page++){
       const result=object(await this.bounded('model/list',{...(cursor?{cursor}:{}),limit:100},budget))
       if(!Array.isArray(result.data))throw new Error('invalid model catalog')
       for(const item of result.data){
@@ -108,9 +112,14 @@ export class CodexBackend {
         models.push({id:string(model.model??model.id),label:string(model.displayName),reasoning_efforts:efforts,default_effort:typeof model.defaultReasoningEffort==='string'?model.defaultReasoningEffort:null,supports_images:Array.isArray(model.inputModalities)&&model.inputModalities.includes('image')})
       }
       cursor=typeof result.nextCursor==='string'?result.nextCursor:undefined;if(!cursor)break
+    }}catch(error){
+      if(requireTurnChecks)throw error
+      // Account readback is authoritative for sign-in. Catalog failure must
+      // not hide it, and an incomplete catalog must not become a selection.
+      models.length=0
     }
     let limits:ProviderStatus['rate_limits']=null
-    if(authenticated&&!this.options.testProvider){
+    try{if(authenticated&&!this.options.testProvider){
       const result=object(await this.bounded('account/rateLimits/read',{},budget));const rate=object(result.rateLimits)
       const window=(value:unknown)=>{
         if(!value)return null;const v=object(value)
@@ -118,7 +127,10 @@ export class CodexBackend {
         return {used_percent:v.usedPercent,resets_at_ms:count(v.resetsAt)!==undefined?(v.resetsAt as number)*1000:null,window_minutes:count(v.windowDurationMins)??null}
       }
       limits={primary:window(rate.primary),secondary:window(rate.secondary)}
-    }
+    }}catch(error){if(requireTurnChecks)throw error} // null means unknown, never zero quota usage
+    // A closed child cannot confirm a current account, even if account/read
+    // answered before the connection was lost during catalog/quota discovery.
+    if(!this.alive)throw new Error('provider_unavailable')
     return {available:true,provider:'codex-app-server',authenticated,account_label:this.options.testProvider?'loopback test model':authenticated&&typeof identity?.email==='string'?identity.email:null,models,rate_limits:limits}
   }
   /** Device-code sign-in: the person opens the verification page on any
@@ -152,7 +164,9 @@ export class CodexBackend {
     const deadline=Date.now()+settings.turn_timeout_ms
     if(signal.aborted)throw new Error('cancelled')
     const budget={deadline,signal}
-    const status=await this.status(budget)
+    // Starting a turn still requires catalog and quota checks to succeed;
+    // only the UI's read-only status can return missing auxiliary details.
+    const status=await this.readStatus(true,budget)
     if(signal.aborted)throw new Error('cancelled')
     if(Date.now()>=deadline)throw new Error('provider_timeout')
     if(!status.authenticated)throw new Error('provider_unavailable')
