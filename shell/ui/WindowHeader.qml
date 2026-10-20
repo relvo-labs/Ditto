@@ -10,8 +10,9 @@ import QtQuick
 ///
 /// `frameless` asks Qt not to draw its own title bar for this window (Qt's
 /// FramelessWindowHint), so the title appears once. It is applied only to a
-/// real window and only while a candidate style is on; whether the
-/// compositor and Qt honour it on the target session is checked there.
+/// real window and only while a style is on (the header exists only then),
+/// and undone when the header goes; whether the compositor and Qt honour it
+/// on the target session is checked there.
 Item {
     id: header
 
@@ -36,12 +37,29 @@ Item {
     implicitHeight: tokens.uiHeaderHeight
     height: implicitHeight
 
+    /// The window this header made frameless, or null. Only a hint the
+    /// header added is taken away again (when the header goes: the style is
+    /// turned off, the theme changes, an undo), so the window gets its
+    /// native title bar back and keeps every flag it had before.
+    property var framelessWindow: null
     function applyFrameless() {
         const backing = header.Window.window;
+        if (framelessWindow && framelessWindow !== backing) restoreFrameless();
         if (!frameless || !canMove || !backing || backing.flags === undefined) return;
-        if (!(backing.flags & Qt.FramelessWindowHint)) backing.flags = backing.flags | Qt.FramelessWindowHint;
+        if (!(backing.flags & Qt.FramelessWindowHint)) {
+            backing.flags = backing.flags | Qt.FramelessWindowHint;
+            framelessWindow = backing;
+        }
+    }
+    function restoreFrameless() {
+        const backing = framelessWindow;
+        framelessWindow = null;
+        if (backing && backing.flags !== undefined) backing.flags = backing.flags & ~Qt.FramelessWindowHint;
     }
     Component.onCompleted: applyFrameless()
+    Component.onDestruction: restoreFrameless()
+    onHostWindowChanged: applyFrameless()
+    onFramelessChanged: frameless ? applyFrameless() : restoreFrameless()
     Connections {
         target: header.Window
         function onWindowChanged() { header.applyFrameless(); }
