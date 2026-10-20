@@ -3,6 +3,7 @@ import QtQuick.Dialogs
 import Quickshell
 import "../ui"
 import "../change"
+import "../assistant" as Assistant
 
 /// The chat itself (G2-SHELL-01): header, conversation, composer. The full
 /// window and the compact panel beside the character both show this, over
@@ -24,6 +25,17 @@ Item {
     property bool compact: false
     /// Bound assistant suggestions to the existing compact content padding.
     property bool boundedSuggestions: false
+    /// Draw the "Ditto 對話" title here. A candidate full window shows it once,
+    /// in its own header, and turns this off.
+    property bool showTitle: true
+    /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing chat.
+    readonly property bool jelly: tokens.uiCandidate === true
+    /// AI is off by Core's settings: the candidate says so once, in the
+    /// empty state, instead of in the badge, a row and the composer.
+    readonly property bool aiOff: client.online && !!conversation.settings && !conversation.enabled
+    /// Why the composer does not take input, in words (candidate style).
+    readonly property string composerReason: !conversation.enabled ? t(qsTr("開啟 AI 對話後才能輸入。"))
+        : !conversation.connected ? t(qsTr("登入模型後才能輸入。")) : ""
     signal closeRequested()
     signal expandRequested()
     signal collapseRequested()
@@ -89,12 +101,13 @@ Item {
             spacing: window.tokens.space
 
             Row {
+                visible: !window.jelly
                 width: parent.width
                 spacing: window.tokens.space
                 Text {
                     text: window.t(qsTr("Ditto 對話"))
-                    color: window.tokens.foreground
-                    font.pixelSize: window.tokens.fontTitle
+                    color: window.tokens.appInk
+                    font.pixelSize: window.tokens.appFontTitle
                     font.weight: Font.DemiBold
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -111,7 +124,99 @@ Item {
                 }
             }
 
+            // ---- #116 candidate header: views (對話／歷史) on the left as tabs,
+            // actions on the right as tool buttons, the state on its own line.
+            Loader {
+                active: window.jelly
+                visible: active
+                width: parent.width
+                sourceComponent: Column {
+                    width: header.width
+                    spacing: window.tokens.uiGap
+                    Text {
+                        visible: window.showTitle
+                        text: window.t(qsTr("Ditto 對話"))
+                        color: window.tokens.uiInk
+                        font.pixelSize: window.tokens.uiFontCardTitle
+                        font.weight: Font.DemiBold
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    // Tabs left, tools right; when both do not fit on one
+                    // line (the compact panel, J3's wider padding), the
+                    // tools move under the tabs instead of overlapping them.
+                    Item {
+                        id: viewRow
+                        objectName: "chatViewRow"
+                        readonly property bool stacked: views.implicitWidth + tools.implicitWidth + window.tokens.uiGap * 2 > width
+                        /// A toolbar's padding: J3's airy 24 px would not fit
+                        /// tabs and tools on one line beside the character.
+                        readonly property int pad: window.compact ? Math.min(window.tokens.uiPadCard, 14) : window.tokens.uiPadCard
+                        width: parent.width
+                        height: stacked ? views.implicitHeight + window.tokens.uiGap + tools.implicitHeight
+                            : Math.max(views.implicitHeight, tools.implicitHeight)
+                        SegmentedControl {
+                            id: views
+                            objectName: "chatViews"
+                            y: viewRow.stacked ? 0 : Math.round((viewRow.height - height) / 2)
+                            tokens: window.tokens
+                            segmentPad: viewRow.pad
+                            accessibleName: window.t(qsTr("對話檢視"))
+                            options: [{ value: false, label: window.t(qsTr("對話")) }, { value: true, label: window.t(qsTr("歷史")) }]
+                            value: history.open
+                            onChosen: value => history.open = value
+                        }
+                        Row {
+                            id: tools
+                            objectName: "chatTools"
+                            anchors.right: parent.right
+                            y: viewRow.stacked ? views.implicitHeight + window.tokens.uiGap : Math.round((viewRow.height - height) / 2)
+                            spacing: window.tokens.uiGap / 2
+                            // Nothing to start while AI is off: the empty
+                            // state's one action is to turn it on.
+                            Button {
+                                objectName: "chatNewConversation"
+                                visible: !window.aiOff
+                                tokens: window.tokens
+                                jellyPad: viewRow.pad
+                                kind: "subtle"
+                                text: window.t(qsTr("新對話"))
+                                enabled: !window.conversation.turnActive
+                                onClicked: window.conversation.newConversation()
+                            }
+                            Button {
+                                tokens: window.tokens
+                                jellyPad: viewRow.pad
+                                kind: "subtle"
+                                text: window.t(qsTr("AI 設定"))
+                                onClicked: window.settingsRequested()
+                            }
+                            Button {
+                                tokens: window.tokens
+                                jellyPad: viewRow.pad
+                                kind: "subtle"
+                                text: window.compact ? window.t(qsTr("展開")) : window.t(qsTr("收合"))
+                                accessibleName: window.compact ? window.t(qsTr("展開成完整視窗")) : window.t(qsTr("收合到角色旁"))
+                                onClicked: window.compact ? window.expandRequested() : window.collapseRequested()
+                            }
+                        }
+                    }
+                    Badge {
+                        visible: !window.aiOff
+                        tokens: window.tokens
+                        width: Math.min(implicitWidth, header.width)
+                        text: window.conversation.stateText + (window.conversation.transportText ? " · " + window.conversation.transportText : "")
+                        tone: window.conversation.taskState === "failed" ? "bad"
+                            : window.conversation.taskState === "done" ? "good"
+                            : window.conversation.taskState === "offline" ? "neutral" : "info"
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: window.conversation.stateText
+                    }
+                }
+            }
+
             Row {
+                visible: !window.jelly
                 spacing: window.tokens.spaceTight
                 Button {
                     tokens: window.tokens
@@ -166,13 +271,15 @@ Item {
             }
 
             // AI off: the desktop works without it; turning it on is explicit.
+            // (With a candidate style and no messages, the empty state below
+            // carries this instead.)
             Row {
-                visible: window.client.online && !!window.conversation.settings && !window.conversation.enabled
+                visible: window.aiOff && (!window.jelly || window.visibleEvents.length > 0)
                 spacing: window.tokens.space
                 Text {
                     text: window.t(qsTr("AI 對話目前關閉。開啟後才會連接模型。"))
-                    color: window.tokens.foregroundMuted
-                    font.pixelSize: window.tokens.fontBody
+                    color: window.tokens.appInkMuted
+                    font.pixelSize: window.tokens.appFontBody
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Button {
@@ -202,16 +309,16 @@ Item {
                     text: window.conversation.login
                         ? window.t(qsTr("在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。"))
                         : window.t(qsTr("使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。"))
-                    color: window.tokens.foregroundMuted
-                    font.pixelSize: window.tokens.fontBody
+                    color: window.tokens.appInkMuted
+                    font.pixelSize: window.tokens.appFontBody
                 }
                 TextEdit {
                     visible: !!window.conversation.login
                     readOnly: true
                     selectByMouse: true
                     text: window.conversation.login ? window.conversation.login.user_code : ""
-                    color: window.tokens.foreground
-                    font.pixelSize: window.tokens.fontTitle
+                    color: window.tokens.appInk
+                    font.pixelSize: window.tokens.appFontTitle
                     font.family: "monospace"
                     font.letterSpacing: 2
                     Accessible.role: Accessible.StaticText
@@ -227,8 +334,8 @@ Item {
                     wrapMode: TextEdit.Wrap
                     text: window.conversation.login
                         ? window.t(qsTr("沒有開啟瀏覽器時，可在任何裝置開啟：%1")).arg(window.conversation.login.auth_url) : ""
-                    color: window.tokens.foregroundMuted
-                    font.pixelSize: window.tokens.fontSmall
+                    color: window.tokens.appInkMuted
+                    font.pixelSize: window.tokens.appFontCaption
                 }
                 Row {
                     spacing: window.tokens.space
@@ -270,8 +377,8 @@ Item {
                         : window.t(qsTr("尚無配額資料"));
                     return account + "  ·  " + used;
                 }
-                color: window.tokens.foregroundMuted
-                font.pixelSize: window.tokens.fontSmall
+                color: window.tokens.appInkMuted
+                font.pixelSize: window.tokens.appFontCaption
             }
         }
 
@@ -293,11 +400,32 @@ Item {
             ]
             Text {
                 text: window.t(qsTr("可以試試："))
-                color: window.tokens.foregroundMuted
-                font.pixelSize: window.tokens.fontSmall
+                color: window.tokens.appInkMuted
+                font.pixelSize: window.tokens.appFontCaption
+            }
+            // Candidate: the same three suggestions as wrapped tonal chips.
+            Flow {
+                visible: window.jelly
+                width: examples.width
+                spacing: window.tokens.uiGap
+                Repeater {
+                    model: examples.visible && window.jelly ? examples.items : []
+                    Button {
+                        required property var modelData
+                        tokens: window.tokens
+                        enabled: modelData.ok
+                        // Never wider than the content (compact panel, large text).
+                        width: Math.min(implicitWidth, examples.width)
+                        text: modelData.ok ? modelData.text : window.t(qsTr("%1（%2）")).arg(modelData.text).arg(modelData.why)
+                        onClicked: {
+                            window.conversation.draft = modelData.text;
+                            window.conversation.send();
+                        }
+                    }
+                }
             }
             Repeater {
-                model: examples.visible ? examples.items : []
+                model: examples.visible && !window.jelly ? examples.items : []
                 Button {
                     required property var modelData
                     tokens: window.tokens
@@ -321,8 +449,8 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         text: parent.suggestionText
                         wrapMode: Text.WordWrap
-                        color: window.tokens.foreground
-                        font.pixelSize: window.tokens.fontBody
+                        color: window.tokens.appInk
+                        font.pixelSize: window.tokens.appFontBody
                         font.family: window.tokens.fontFamily.length > 0 ? window.tokens.fontFamily : Qt.application.font.family
                     }
                     onClicked: {
@@ -333,8 +461,42 @@ Item {
             }
         }
 
+        // ---- #116 candidate: AI off, nothing said yet — one empty state ----
+        Loader {
+            id: offState
+            objectName: "chatAiOffState"
+            active: window.jelly && window.aiOff && window.visibleEvents.length === 0
+            visible: active
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: header.bottom
+            anchors.bottom: composer.top
+            anchors.margins: window.tokens.spaceWide
+            sourceComponent: EmptyState {
+                tokens: window.tokens
+                title: window.t(qsTr("AI 對話目前關閉"))
+                message: window.t(qsTr("關閉時不連接模型；桌面、設定中心與救援照常使用。"))
+                primaryText: window.t(qsTr("開啟 AI 對話"))
+                secondaryText: window.t(qsTr("先不要"))
+                examplesTitle: window.t(qsTr("開啟後可以這樣說："))
+                examples: [window.t(qsTr("「%1」")).arg(window.t(qsTr("把 Dock 移到左邊"))),
+                    window.t(qsTr("「%1」")).arg(window.t(qsTr("幫我做專注工作區，通知安靜一點"))),
+                    window.t(qsTr("「%1」")).arg(window.t(qsTr("把現在的桌面保存成一個新組合")))]
+                onPrimaryClicked: window.conversation.setEnabled(true)
+                onSecondaryClicked: window.closeRequested()
+                Assistant.AssistantSymbol {
+                    anchors.fill: parent
+                    tokens: window.tokens
+                    variant: "ditto"
+                }
+            }
+        }
+
         ListView {
             id: list
+            // Nothing to list while the candidate's AI-off state is shown;
+            // hidden, it does not take that state's clicks either.
+            visible: !offState.active
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: header.bottom
@@ -361,9 +523,10 @@ Item {
                 visible: window.conversation.streamText.length > 0 && window.conversation.turnActive
                 width: Math.min(list.width * 0.85, streaming.implicitWidth + window.tokens.spaceWide * 2)
                 height: visible ? streaming.implicitHeight + window.tokens.space * 2 : 0
-                radius: window.tokens.radiusSmall
-                color: window.tokens.surface
-                border.color: window.tokens.border
+                radius: window.jelly ? 18 : window.tokens.radiusSmall
+                Binding on bottomLeftRadius { when: window.jelly; value: 6 }
+                color: window.jelly ? window.tokens.uiCard : window.tokens.surface
+                border.color: window.jelly ? window.tokens.uiCardBorder : window.tokens.border
                 Text {
                     id: streaming
                     anchors.fill: parent
@@ -372,8 +535,8 @@ Item {
                     wrapMode: Text.Wrap
                     textFormat: Text.PlainText
                     text: window.conversation.streamText
-                    color: window.tokens.foregroundMuted
-                    font.pixelSize: window.tokens.fontBody
+                    color: window.tokens.appInkMuted
+                    font.pixelSize: window.tokens.appFontBody
                     Accessible.role: Accessible.StaticText
                     Accessible.name: window.t(qsTr("Ditto 正在回答：")) + text
                 }
@@ -393,9 +556,14 @@ Item {
                     implicitHeight: message.implicitHeight + window.tokens.space * 2
                     anchors.right: row.mine ? parent.right : undefined
                     anchors.left: row.mine ? undefined : parent.left
-                    radius: window.tokens.radiusSmall
-                    color: row.mine ? window.tokens.surfaceStrong : window.tokens.surface
-                    border.color: window.tokens.border
+                    // Candidate: a jelly bubble with a small tail corner on
+                    // the speaker's side; the user's is lavender, Ditto's white.
+                    radius: window.jelly ? 18 : window.tokens.radiusSmall
+                    Binding on bottomRightRadius { when: window.jelly && row.mine; value: 6 }
+                    Binding on bottomLeftRadius { when: window.jelly && !row.mine; value: 6 }
+                    color: window.jelly ? (row.mine ? window.tokens.uiInfoFill : window.tokens.uiCard)
+                        : row.mine ? window.tokens.surfaceStrong : window.tokens.surface
+                    border.color: window.jelly ? (row.mine ? "transparent" : window.tokens.uiCardBorder) : window.tokens.border
 
                     Text {
                         id: message
@@ -407,8 +575,8 @@ Item {
                         wrapMode: Text.Wrap
                         textFormat: Text.PlainText
                         text: row.modelData.data && typeof row.modelData.data.text === "string" ? row.modelData.data.text : ""
-                        color: window.tokens.foreground
-                        font.pixelSize: window.tokens.fontBody
+                        color: window.tokens.appInk
+                        font.pixelSize: window.tokens.appFontBody
                         Accessible.role: Accessible.StaticText
                         Accessible.name: (row.mine ? window.t(qsTr("你：")) : window.t(qsTr("Ditto："))) + text
                     }
@@ -436,6 +604,20 @@ Item {
             }
         }
 
+        // Candidate: the composer sits on a soft jelly tray.
+        Loader {
+            active: window.jelly
+            anchors.fill: composer
+            anchors.margins: -window.tokens.uiGap
+            sourceComponent: JellySurface {
+                tokens: window.tokens
+                fill: window.tokens.uiCard
+                radius: window.tokens.uiRadiusCard
+                lift: 0.6
+                iris: window.tokens.uiJ3
+            }
+        }
+
         Column {
             id: composer
             anchors.left: parent.left
@@ -449,8 +631,8 @@ Item {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: window.conversation.errorText
-                color: window.tokens.danger
-                font.pixelSize: window.tokens.fontSmall
+                color: window.tokens.appDanger
+                font.pixelSize: window.tokens.appFontCaption
             }
 
             Diagnostics {
@@ -487,8 +669,8 @@ Item {
                             text: (chip.modelData.kind === "clipboard" ? chip.kindText : window.t(qsTr("%1：%2")).arg(chip.kindText).arg(chip.modelData.label))
                                 + "  " + Math.max(1, Math.round(chip.modelData.bytes / 1024)) + " KB"
                                 + (chip.modelData.truncated ? window.t(qsTr("（已截斷）")) : "")
-                            color: window.tokens.foreground
-                            font.pixelSize: window.tokens.fontSmall
+                            color: window.tokens.appInk
+                            font.pixelSize: window.tokens.appFontCaption
                         }
                         Button {
                             id: remove
@@ -523,8 +705,8 @@ Item {
                         ? window.t(qsTr("預覽：")) + preview.text
                         : window.t(qsTr("螢幕畫面 %1×%2，只在送出時傳給模型")).arg(preview.image_size[0]).arg(preview.image_size[1]);
                 }
-                color: window.tokens.foregroundMuted
-                font.pixelSize: window.tokens.fontSmall
+                color: window.tokens.appInkMuted
+                font.pixelSize: window.tokens.appFontCaption
             }
 
             Row {
@@ -559,7 +741,7 @@ Item {
 
                 ChatInput {
                     id: input
-                    width: parent.width - send.width - stop.width - fresh.width - window.tokens.space * 3
+                    width: parent.width - send.width - stop.width - fresh.width - window.tokens.space * (window.jelly ? 2 : 3)
                     tokens: window.tokens
                     placeholder: window.t(qsTr("描述想調整的桌面，例如「開啟通知專注模式」"))
                     accessibleName: window.t(qsTr("訊息"))
@@ -588,12 +770,28 @@ Item {
                 }
                 Button {
                     id: fresh
+                    // Candidate: 新對話 is a header action.
+                    visible: !window.jelly
+                    width: visible ? implicitWidth : 0
                     tokens: window.tokens
                     kind: "subtle"
                     text: window.t(qsTr("新對話"))
                     enabled: !window.conversation.turnActive
                     onClicked: window.conversation.newConversation()
                 }
+            }
+
+            // Candidate: a composer that takes no input says why.
+            Text {
+                objectName: "composerReason"
+                visible: window.jelly && !input.enabled && window.composerReason.length > 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: window.composerReason
+                color: window.tokens.uiInkMuted
+                font.pixelSize: window.tokens.uiFontCaption
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
             }
         }
 

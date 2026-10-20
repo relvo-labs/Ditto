@@ -87,9 +87,10 @@ PanelWindow {
         id: frame
         objectName: "chatPresentationFrame"
         anchors.fill: parent
-        radius: panel.tokens.radiusLarge
-        color: panel.entryRect ? panel.tokens.surface : panel.tokens.background
-        border.color: panel.tokens.border
+        radius: panel.tokens.uiCandidate ? panel.tokens.uiRadiusWindow : panel.tokens.radiusLarge
+        // #116 style: the chat's nearly opaque sheet, as the full window.
+        color: panel.tokens.uiCandidate ? panel.tokens.uiSheet : panel.entryRect ? panel.tokens.surface : panel.tokens.background
+        border.color: panel.tokens.uiCandidate ? panel.tokens.uiCardBorder : panel.tokens.border
         border.width: 1
         Jelly.MotionValue {
             id: presentation

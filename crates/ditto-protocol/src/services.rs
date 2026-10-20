@@ -350,9 +350,11 @@ pub struct AppearanceSetInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
     /// Token name → value, as a string: `#RRGGBB` for colours, a decimal
-    /// such as `"1.2"` for numbers. `desktop.appearance.get` lists every
-    /// token (corner roundness `radius_scale`, text size `font_scale`,
-    /// spacing, blur, opacity, colours) with its default and range.
+    /// such as `"1.2"` for numbers, one of the listed `choices` for a choice
+    /// (the window style `ui_style`: `j1`, `j2` or `j3`).
+    /// `desktop.appearance.get` lists every token (corner roundness
+    /// `radius_scale`, text size `font_scale`, spacing, blur, opacity,
+    /// colours, window style) with its default and range or choices.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tokens: Option<BTreeMap<String, String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

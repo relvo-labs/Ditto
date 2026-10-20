@@ -903,6 +903,19 @@ fn an_appearance_change_commits_only_after_the_shell_reads_back() {
         (radius["kind"].as_str(), radius["default"].as_str()),
         (Some("number"), Some("1"))
     );
+    // #116: the application style is listed with its default and its three
+    // values, so a caller (the Agent, dittoctl) need not guess them.
+    let style = applied["tokens_available"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "ui_style")
+        .expect("ui_style is listed");
+    assert_eq!(
+        (style["kind"].as_str(), style["default"].as_str()),
+        (Some("text"), Some("j1"))
+    );
+    assert_eq!(style["choices"], json!(["j1", "j2", "j3"]));
     // Undo goes back to the base content, as a new change.
     let undone = record(&cli.result(
         catalog::CHANGES_UNDO,
@@ -914,6 +927,60 @@ fn an_appearance_change_commits_only_after_the_shell_reads_back() {
     let history = cli.result(catalog::CHANGES_LIST, json!({}));
     assert_eq!(history["changes"][0]["change_id"], json!(undone.change_id));
     assert_eq!(history["changes"][1]["change_id"], json!(change.change_id));
+}
+
+/// #116: the application style is an appearance token like any other. A
+/// Profile that never chose one has no value (the Shell draws J1); choosing
+/// J2 is one ChangeSet the Shell reads back, and undo returns to no value.
+#[test]
+fn the_application_style_is_chosen_by_changeset() {
+    let harness = harness("ui-style");
+    let state = Arc::new(Mutex::new(ShellState::default()));
+    let _shell = fake_shell(&harness.core, Arc::clone(&state));
+    let cli = TestPeer::connect(&harness.core, "dittoctl", None);
+    // An existing Profile is not rewritten: no value until someone chooses.
+    assert_eq!(document(&cli)["appearance"]["tokens"].get("ui_style"), None);
+    let before = head(&cli);
+    let response = cli.call(
+        catalog::APPEARANCE_SET,
+        json!({"base_revision": before, "tokens": {"ui_style": "j2"}, "idempotency_key": "style-j2"}),
+    );
+    let change = record(&response["result"]);
+    assert_eq!(change.state, ChangeState::Committed, "{response}");
+    assert_eq!(response["result"]["_meta"]["readback_verified"], true);
+    assert_eq!(document(&cli)["appearance"]["tokens"]["ui_style"], "j2");
+    assert_eq!(
+        state
+            .lock()
+            .unwrap()
+            .committed
+            .as_ref()
+            .unwrap()
+            .appearance
+            .tokens["ui_style"],
+        "j2"
+    );
+    let undone = record(&cli.result(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": change.change_id}),
+    ));
+    assert_eq!(undone.state, ChangeState::Committed);
+    assert_eq!(document(&cli)["appearance"]["tokens"].get("ui_style"), None);
+    // A value the Shell has no face for is refused before anything changes.
+    let head_now = head(&cli);
+    let refused = cli.call(
+        catalog::APPEARANCE_SET,
+        json!({"base_revision": head_now, "tokens": {"ui_style": "macos"}}),
+    );
+    assert_eq!(refused["error"]["name"], "preflight_rejected", "{refused}");
+    assert!(refused["error"]["data"]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason["code"] == "schema_invalid"
+            && reason["detail"]["token"] == "ui_style"
+            && reason["detail"]["why"] == "token_not_a_choice"));
+    assert_eq!(head(&cli), head_now);
 }
 
 #[test]
@@ -1780,6 +1847,20 @@ fn preflight_refuses_every_problem_at_once_and_changes_nothing() {
         // The Shell would clamp it to 2 and the change would read back as 9.
         (
             json!([{"op": "set_value", "path": "/appearance/tokens/radius_scale", "after": "9"}]),
+            "schema_invalid",
+        ),
+        // #116: the application style is one of three; anything else would
+        // commit and the Shell would quietly draw J1.
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/ui_style", "after": "j4"}]),
+            "schema_invalid",
+        ),
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/ui_style", "after": "J2"}]),
+            "schema_invalid",
+        ),
+        (
+            json!([{"op": "set_value", "path": "/appearance/tokens/ui_style", "after": ""}]),
             "schema_invalid",
         ),
     ];

@@ -58,14 +58,34 @@ TestCase {
         return rows;
     }
 
+    // The derived status foreground is not the Profile's `on_accent`. The
+    // light recipe now always draws an application style (#116, J1 by
+    // default), whose badges use the style's own status inks; the earlier
+    // light face is no longer reachable, so the override is checked on the
+    // dark recipe and the styled badge separately.
     function test_accent_override_keeps_status_foreground() {
-        const tokens = createTemporaryObject(tokenFactory, testCase, {
+        const dark = createTemporaryObject(tokenFactory, testCase, {
+            appearance: { theme: "soft-jelly", tokens: { on_accent: "#ff0000" } }
+        });
+        const status = createTemporaryObject(badgeFactory, desktop, { tokens: dark, tone: "good" });
+        const accent = createTemporaryObject(badgeFactory, desktop, { tokens: dark, tone: "info" });
+        compare(String(label(status, "Fixture").color), String(dark.statusForeground));
+        compare(String(label(accent, "Fixture").color), "#ff0000");
+        const light = createTemporaryObject(tokenFactory, testCase, {
             appearance: { theme: "soft-jelly-light", tokens: { on_accent: "#ff0000" } }
         });
-        const status = createTemporaryObject(badgeFactory, desktop, { tokens: tokens, tone: "good" });
-        const accent = createTemporaryObject(badgeFactory, desktop, { tokens: tokens, tone: "info" });
-        compare(String(label(status, "Fixture").color), "#ffffff");
-        compare(String(label(accent, "Fixture").color), "#ff0000");
+        compare(light.uiStyle, "j1");
+        const styled = createTemporaryObject(badgeFactory, desktop, { tokens: light, tone: "good" });
+        compare(String(label(styled, "Fixture").color), String(light.uiSuccess));
+    }
+
+    function face(root) {
+        if (root.objectName === "buttonFace") return root;
+        for (const child of root.children) {
+            const found = face(child);
+            if (found) return found;
+        }
+        return null;
     }
 
     function test_fill_pairs(row) {
@@ -91,9 +111,18 @@ TestCase {
             text = label(root, "Fixture");
         }
         verify(text !== null, row.tag + ": rendered label");
-        const ratio = contrast(text.color, text.parent.color);
-        console.log("CONTRAST " + [row.tag, String(text.color), String(text.parent.color), ratio.toFixed(2), 4.5].join(" "));
+        // A styled button (#116) draws its label on the jelly face, not on
+        // the label's parent: measure the ink against the face's fill.
+        const styled = row.pair.indexOf("Button.") === 0 && root.jelly === true;
+        const ink = styled ? face(root).inkColor : text.color;
+        const fill = styled ? face(root).fillColor : text.parent.color;
+        if (styled) verify(text.visible === false || text.color === ink, row.tag + ": the drawn label is the face's");
+        const ratio = contrast(ink, fill);
+        console.log("CONTRAST " + [row.tag, String(ink), String(fill), ratio.toFixed(2), 4.5].join(" "));
         if (root.release) root.release();
+        // Before its tokens: a styled face reads them until it is gone.
+        root.destroy();
+        wait(0);
         verify(ratio >= 4.5, row.tag + ": text/fill " + ratio.toFixed(2));
     }
 }
