@@ -10,5 +10,6 @@
 | [profile-document.md](profile-document.md) | ProfileDocument 欄位、所有權、revision 與匯出語意 | 實作中 |
 | [manifest.md](manifest.md) | 插件 manifest 的欄位與 Core 如何使用它們 | 實作中 |
 | [agent-0.3.md](agent-0.3.md) | G2：Agent 後端隔離的語意、`conversations` 事件主題、Shell 對話入口 | 實作中（G2 M1） |
+| [shell-extensions.md](shell-extensions.md) | #159：surface provider、設定頁、背景與佈景的擴充契約、信任矩陣、狀態所有權與回讀 | 提案；P02 實作中 |
 
 型別的單一事實來源是 `crates/ditto-protocol`（D-13）。這些文件描述語意與不變量；欄位的確切形狀以 `schema/*.json` 為準，兩者不一致時是缺陷，以 Rust 型別為準修正文件。
