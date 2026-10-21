@@ -2512,6 +2512,10 @@
         <translation>網路已連線</translation>
     </message>
     <message>
+        <source>網路已連線（網際網路狀態未知）</source>
+        <translation>網路已連線（網際網路狀態未知）</translation>
+    </message>
+    <message>
         <source>網路未連線</source>
         <translation>網路未連線</translation>
     </message>
