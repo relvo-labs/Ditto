@@ -1,0 +1,10 @@
+{
+  "kind": "shape",
+  "type": "provider-login-result-input",
+  "valid": true,
+  "value": {
+    "provider": "codex-app-server",
+    "login_id": "synthetic-attempt",
+    "generation": 7
+  }
+}

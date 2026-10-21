@@ -2,6 +2,8 @@ import {Context,Service} from '@deepseek-ai/cordis'
 import type {CoreChannel} from '../../host-runtime/src/bridge/core-link.ts'
 import type {TurnClaimOutput} from '../../protocol/src/generated/turn-claim-output.ts'
 import type {Turn} from '../../protocol/src/generated/turn.ts'
+import type {ProviderLoginResultInput} from '../../protocol/src/generated/provider-login-result-input.ts'
+import type {ProviderLoginReadback} from '../../protocol/src/generated/provider-login-readback.ts'
 import type {ProviderStatus} from '../../protocol/src/generated/provider-status.ts'
 import {CoreSessionHandle} from './session.ts'
 import {DesktopTools} from './tools.ts'
@@ -158,6 +160,14 @@ export class AgentRuntime {
     if(!method.startsWith('agent.controller.provider.')||!params||typeof params!=='object')throw new Error('unsupported controller request')
     const p=params as Record<string,unknown>
     if(p.provider!=='codex-app-server')throw new Error('unsupported model provider')
+    if(method==='agent.controller.provider.login_result'){
+      if(Object.keys(p).some(key=>!['provider','login_id','generation'].includes(key))||
+        typeof p.login_id!=='string'||!p.login_id||p.login_id.length>256||
+        typeof p.generation!=='number'||!Number.isSafeInteger(p.generation)||p.generation<0)throw new Error('invalid login result request')
+      const input=p as unknown as ProviderLoginResultInput
+      return this.backend?.loginReadback(input.login_id,input.generation)??
+        {result:{login_id:input.login_id,generation:input.generation,state:'unknown'},expires_at_ms:null} satisfies ProviderLoginReadback
+    }
     if(!this.backend){
       if(method.endsWith('.status'))return {available:false,provider:'codex-app-server',authenticated:false,account_label:null,models:[],rate_limits:null} satisfies ProviderStatus
       throw new DittoError('unavailable','Codex subscription is unavailable',{reason:'system_unavailable',reason_code:'backend_unsupported'})

@@ -188,9 +188,11 @@ pub fn resolve(core: &Core, contract: &CapabilityContract) -> Resolved {
     }
     if id.starts_with("agent.") && id != "agent.runtime.get" {
         let storage = !core.agent_storage_ready;
-        let process = id.starts_with("agent.providers.") || id == "agent.runtime.ensure";
+        let process = id.starts_with("agent.providers.") && id != "agent.providers.login_result"
+            || id == "agent.runtime.ensure";
         let unsupported_backend = id.starts_with("agent.providers.")
             && id != "agent.providers.status"
+            && id != "agent.providers.login_result"
             && !core.agent.status().isolation_verified;
         if storage
             || process && (!core.agent.installed() || core.mode == CoreMode::Rescue)

@@ -339,6 +339,15 @@ Item {
                     color: window.tokens.appInkMuted
                     font.pixelSize: window.tokens.appFontBody
                 }
+                Text {
+                    objectName: "chatLoginResult"
+                    visible: (window.conversation.loginResultText || "").length > 0
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: window.conversation.loginResultText || ""
+                    color: window.tokens.appInkMuted
+                    font.pixelSize: window.tokens.appFontBody
+                }
                 TextEdit {
                     visible: !!window.conversation.login
                     readOnly: true

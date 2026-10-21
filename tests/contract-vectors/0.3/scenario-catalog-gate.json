@@ -1,2 +1,2 @@
-{"kind": "scenario", "description": "目錄中每項能力的 resource_scope 都非空；catalog_revision 為 6", "client": {"kind": "dittoctl"},
- "steps": [{"send": {"method": "desktop.capabilities.list", "params": {}}, "expect": {"result_path": "/catalog_revision", "equals": 6, "every_scope_nonempty": true}}]}
+{"kind": "scenario", "description": "目錄中每項能力的 resource_scope 都非空；catalog_revision 為 7", "client": {"kind": "dittoctl"},
+ "steps": [{"send": {"method": "desktop.capabilities.list", "params": {}}, "expect": {"result_path": "/catalog_revision", "equals": 7, "every_scope_nonempty": true}}]}

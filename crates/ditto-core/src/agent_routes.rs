@@ -339,6 +339,57 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
             empty(call)?;
             written(core.agent.stop())
         }
+        "agent.providers.login_result" => {
+            let input: ProviderLoginResultInput = serde_json::from_value(json!(call.params))
+                .map_err(|_| CoreError::invalid("invalid login result request"))?;
+            provider(&input.provider)?;
+            if input.login_id.is_empty() || input.login_id.len() > 256 {
+                return Err(CoreError::invalid("invalid login identity"));
+            }
+            let unknown = ProviderLoginResult {
+                login_id: input.login_id.clone(),
+                generation: input.generation,
+                state: ProviderLoginState::Unknown,
+            };
+            // A read must not launch/revive an authorization or extend its lease.
+            if core.agent.status().generation != input.generation {
+                return ok(unknown);
+            }
+            let Some(peer) = core.agent.peer() else {
+                return ok(unknown);
+            };
+            let result = peer.request(
+                "agent.controller.provider.login_result",
+                json!(input),
+                call.remaining().min(Duration::from_secs(30)),
+            );
+            if core.agent.status().generation != input.generation
+                || !core.agent.is_connection(&peer.connection_id)
+            {
+                return ok(unknown);
+            }
+            // Includes older controllers: transport/unsupported failures reveal
+            // no completion evidence. Never forward their error or payload.
+            let Ok(value) = result else {
+                return ok(unknown);
+            };
+            let readback: ProviderLoginReadback = serde_json::from_value(value)
+                .map_err(|_| CoreError::internal("invalid login result"))?;
+            let mut result = readback.result;
+            if result.login_id != input.login_id || result.generation != input.generation {
+                return Err(CoreError::internal("mismatched login result"));
+            }
+            match readback.expires_at_ms {
+                Some(expiry) if expiry <= ditto_store::time::unix_millis_now().max(0) as u64 => {
+                    result.state = ProviderLoginState::Expired;
+                }
+                None if result.state != ProviderLoginState::Unknown => {
+                    return Err(CoreError::internal("missing login deadline"));
+                }
+                _ => {}
+            }
+            ok(result)
+        }
         "agent.providers.status"
         | "agent.providers.login"
         | "agent.providers.cancel_login"

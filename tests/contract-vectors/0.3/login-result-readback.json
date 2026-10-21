@@ -1,0 +1,13 @@
+{
+  "kind": "shape",
+  "type": "provider-login-readback",
+  "valid": true,
+  "value": {
+    "result": {
+      "login_id": "synthetic-attempt",
+      "generation": 7,
+      "state": "failed"
+    },
+    "expires_at_ms": 1234567
+  }
+}

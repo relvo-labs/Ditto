@@ -39,7 +39,10 @@ TestCase {
         function diagnosticText(error) { return error ? error.name + " (" + error.code + "): " + error.message : ""; }
         function capability(method, params, ok, fail, options) {
             calls = calls.concat([method]);
-            const reply = replies[method];
+            // Provider readback now checks the existing Core generation before
+            // and after the account query. This fixture has one stable runtime.
+            const reply = replies[method] || (method === "agent.runtime.get"
+                ? { ok: { generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true } } : null);
             if (!reply) {
                 pending[method] = { ok: ok, fail: fail };
                 return;
@@ -724,6 +727,29 @@ TestCase {
         compare(count("agent.providers.status"), 2);
         compare(conversation.aiStatus, "ready");
         verify(!retry.visible);
+        readsOnly();
+    }
+
+    function test_login_result_surface_data() {
+        return [
+            { tag: "failed-existing-account", state: "failed", authenticated: true, visible: true, words: "登入未完成" },
+            { tag: "success-unconfirmed", state: "succeeded", authenticated: false, visible: true, words: "仍待確認" },
+            { tag: "success-confirmed", state: "succeeded", authenticated: true, visible: false, words: "" },
+            { tag: "unknown-existing-account", state: "unknown", authenticated: true, visible: true, words: "無法確認這次登入結果" }
+        ];
+    }
+    function test_login_result_surface(data) {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: Object.assign({}, ready, { authenticated: data.authenticated }) } });
+        const page = settingsPage();
+        conversation.loginResultState = data.state;
+        const result = named(page, "aiLoginResult");
+        verify(result !== null); compare(result.visible, data.visible);
+        if (data.visible) verify(result.text.indexOf(data.words) >= 0);
+        else compare(result.text, "");
+        verify(result.text.indexOf("SENSITIVE-LOGIN-SENTINEL") < 0);
+        compare(conversation.connected, data.authenticated);
+        if (data.authenticated) verify(named(page, "aiProviderStatus").text.indexOf("已登入") >= 0);
         readsOnly();
     }
 

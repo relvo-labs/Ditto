@@ -19,6 +19,7 @@ class Peer implements BackendTransport {
     else if(method==='model/list')result={data:[{id:'example-model',model:'example-model',displayName:'Example',description:'Example model',isDefault:true,hidden:false,supportedReasoningEfforts:[{reasoningEffort:'medium',description:'Medium'}],defaultReasoningEffort:'medium',inputModalities:['text']}],nextCursor:null}
     else if(method==='account/rateLimits/read')result={rateLimits:{primary:{usedPercent:this.limit,resetsAt:1234567890,windowDurationMins:300},secondary:null}}
     else if(method==='account/login/start')result={type:'chatgptDeviceCode',loginId:'login-test',verificationUrl:'https://auth.openai.com/codex/device',userCode:'ABCD-1234'}
+    else if(method==='account/login/cancel')result={status:'canceled'}
     else if(method==='thread/start')result={thread:{id:'thread-1'}}
     else if(method==='turn/start')return (this.start?.()??Promise.resolve({turn:{id:'turn-1'}})) as Promise<T>
     return Promise.resolve(result as T)

@@ -1274,8 +1274,16 @@
         <translation>已停止</translation>
     </message>
     <message>
+        <source>已取消這次登入。</source>
+        <translation>已取消這次登入。</translation>
+    </message>
+    <message>
         <source>待命中</source>
         <translation>待命中</translation>
+    </message>
+    <message>
+        <source>授權已完成，仍待確認帳號連線。</source>
+        <translation>授權已完成，仍待確認帳號連線。</translation>
     </message>
     <message>
         <source>桌面服務未連線</source>
@@ -1338,6 +1346,14 @@
         <translation>無法讀取 AI 設定；重新開啟會再讀取</translation>
     </message>
     <message>
+        <source>登入未完成，請重新嘗試。</source>
+        <translation>登入未完成，請重新嘗試。</translation>
+    </message>
+    <message>
+        <source>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</source>
+        <translation>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</translation>
+    </message>
+    <message>
         <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
@@ -1352,6 +1368,10 @@
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>訂閱額度已用完；等額度重設後再試</translation>
+    </message>
+    <message>
+        <source>這次登入已逾期，請重新開始。</source>
+        <translation>這次登入已逾期，請重新開始。</translation>
     </message>
     <message>
         <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>

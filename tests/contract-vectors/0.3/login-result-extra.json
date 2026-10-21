@@ -1,0 +1,11 @@
+{
+  "kind": "shape",
+  "type": "provider-login-result",
+  "valid": false,
+  "value": {
+    "login_id": "synthetic-attempt",
+    "generation": 7,
+    "state": "failed",
+    "error": "SENSITIVE-LOGIN-SENTINEL"
+  }
+}

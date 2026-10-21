@@ -1,6 +1,9 @@
 import {BlockAssembler} from '../vendor/harness/llm/assembler.ts'
 import type {TokenUsage} from '../vendor/harness/llm/types.ts'
 import type {AgentPreferences} from '../../protocol/src/generated/agent-preferences.ts'
+import type {ProviderLoginResult,ProviderLoginState} from '../../protocol/src/generated/provider-login-result.ts'
+import type {ProviderLoginReadback} from '../../protocol/src/generated/provider-login-readback.ts'
+import type {ProviderLoginOutput} from '../../protocol/src/generated/provider-login-output.ts'
 import type {ProviderStatus} from '../../protocol/src/generated/provider-status.ts'
 import type {DynamicTool,ToolReply} from './tools.ts'
 import {BASE_INSTRUCTIONS} from './tool-catalog.ts'
@@ -63,13 +66,17 @@ export class CodexBackend {
   private active?:Active
   private alive=true
   private busy=false
-  private login?:{login_id:string;auth_url:string;user_code:string;expires_at_ms:number}
+  private login?:ProviderLoginOutput
+  // One ephemeral current/recent attempt; no credential, history or timer.
+  private attempt?:{login_id:string;expires_at_ms:number;state:ProviderLoginState}
+  private starting?:{completion?:{loginId:string;state:ProviderLoginState}}
+  private loginStart?:Promise<ProviderLoginOutput>
   /** `testProvider` is set only by Core for its loopback test endpoint
    * (fixture compositor); a desktop session always uses the subscription. */
   constructor(private peer:BackendTransport,private options:{modelProvider:string;testProvider:boolean}={modelProvider:'openai',testProvider:false}){
     peer.onNotification=(method,params)=>this.notification(method,params)
     peer.onRequest=(method,params)=>this.request(method,params)
-    peer.onClosed=error=>{this.alive=false;this.active?.reject(error)}
+    peer.onClosed=error=>{this.alive=false;this.login=undefined;this.attempt=undefined;this.starting=undefined;this.active?.reject(error)}
   }
   async initialize():Promise<void>{
     await this.peer.request('initialize',{clientInfo:{name:'ditto',title:'Ditto',version:'0.3.0'},capabilities:{experimentalApi:true}})
@@ -92,14 +99,19 @@ export class CodexBackend {
     })
   }
   async status(budget?:RequestBudget):Promise<ProviderStatus>{
+    return this.readStatus(false,budget)
+  }
+  private async readStatus(requireTurnChecks:boolean,budget?:RequestBudget):Promise<ProviderStatus>{
+    if(!this.alive)throw new Error('provider_unavailable')
+    this.expireAttempt()
     const account=object(await this.bounded('account/read',{refreshToken:false},budget))
-    const identity=account.account?object(account.account):undefined
+    const identity=account.account===null?undefined:object(account.account)
     // API-key auth or another CLI's credentials never count as subscription
     // login for this backend. The isolated launch owns its own keyring key.
     const authenticated=this.options.testProvider||identity?.type==='chatgpt'
     const models:Array<ProviderStatus['models'][number]>=[]
     let cursor:string|undefined
-    for(let page=0;page<4;page++){
+    try{for(let page=0;page<4;page++){
       const result=object(await this.bounded('model/list',{...(cursor?{cursor}:{}),limit:100},budget))
       if(!Array.isArray(result.data))throw new Error('invalid model catalog')
       for(const item of result.data){
@@ -108,9 +120,14 @@ export class CodexBackend {
         models.push({id:string(model.model??model.id),label:string(model.displayName),reasoning_efforts:efforts,default_effort:typeof model.defaultReasoningEffort==='string'?model.defaultReasoningEffort:null,supports_images:Array.isArray(model.inputModalities)&&model.inputModalities.includes('image')})
       }
       cursor=typeof result.nextCursor==='string'?result.nextCursor:undefined;if(!cursor)break
+    }}catch(error){
+      if(requireTurnChecks)throw error
+      // Account readback is authoritative for sign-in. Catalog failure must
+      // not hide it, and an incomplete catalog must not become a selection.
+      models.length=0
     }
     let limits:ProviderStatus['rate_limits']=null
-    if(authenticated&&!this.options.testProvider){
+    try{if(authenticated&&!this.options.testProvider){
       const result=object(await this.bounded('account/rateLimits/read',{},budget));const rate=object(result.rateLimits)
       const window=(value:unknown)=>{
         if(!value)return null;const v=object(value)
@@ -118,30 +135,81 @@ export class CodexBackend {
         return {used_percent:v.usedPercent,resets_at_ms:count(v.resetsAt)!==undefined?(v.resetsAt as number)*1000:null,window_minutes:count(v.windowDurationMins)??null}
       }
       limits={primary:window(rate.primary),secondary:window(rate.secondary)}
-    }
+    }}catch(error){if(requireTurnChecks)throw error} // null means unknown, never zero quota usage
+    // A closed child cannot confirm a current account, even if account/read
+    // answered before the connection was lost during catalog/quota discovery.
+    if(!this.alive)throw new Error('provider_unavailable')
+    this.expireAttempt()
     return {available:true,provider:'codex-app-server',authenticated,account_label:this.options.testProvider?'loopback test model':authenticated&&typeof identity?.email==='string'?identity.email:null,models,rate_limits:limits}
   }
-  /** Device-code sign-in: the person opens the verification page on any
-   * browser and enters the one-time code. No local callback port is opened. */
-  async startLogin():Promise<{login_id:string;auth_url:string;user_code:string;expires_at_ms:number}>{
-    if(this.login&&this.login.expires_at_ms>Date.now())return this.login
+  private expireAttempt():void{
+    if(this.attempt&&Date.now()>=this.attempt.expires_at_ms){
+      this.attempt.state='expired';this.login=undefined
+    }
+  }
+  loginResult(id:string,generation:number):ProviderLoginResult{
+    this.expireAttempt()
+    return {login_id:id,generation,state:this.alive&&this.attempt?.login_id===id?this.attempt.state:'unknown'}
+  }
+  loginReadback(id:string,generation:number):ProviderLoginReadback{
+    const result=this.loginResult(id,generation)
+    return {result,expires_at_ms:this.alive&&this.attempt?.login_id===id?this.attempt.expires_at_ms:null}
+  }
+  /** Device-code sign-in; no local callback port or alternate auth flow. */
+  async startLogin():Promise<ProviderLoginOutput>{
+    if(!this.alive)throw new Error('provider_unavailable')
+    this.expireAttempt()
+    if(this.login)return this.login
+    if(this.loginStart)return this.loginStart
+    const starting:NonNullable<CodexBackend['starting']>={}
+    this.starting=starting
+    const pending=this.beginLogin(starting).finally(()=>{
+      if(this.starting===starting)this.starting=undefined
+      if(this.loginStart===pending)this.loginStart=undefined
+    })
+    this.loginStart=pending
+    return pending
+  }
+  private async beginLogin(starting:NonNullable<CodexBackend['starting']>):Promise<ProviderLoginOutput>{
     const result=object(await this.peer.request('account/login/start',{type:'chatgptDeviceCode'}))
+    if(!this.alive||this.starting!==starting)throw new Error('provider_unavailable')
     if(result.type!=='chatgptDeviceCode')throw new Error('unsupported subscription login response')
     const url=new URL(string(result.verificationUrl))
     if(url.protocol!=='https:'||url.hostname!=='auth.openai.com'||url.username||url.password)throw new Error('invalid authentication destination')
-    const code=string(result.userCode)
+    const code=string(result.userCode),id=string(result.loginId)
     if(!/^[A-Z0-9-]{4,16}$/.test(code))throw new Error('invalid sign-in code')
-    // Device codes live 15 minutes upstream; Core accepts at most 10.
-    this.login={login_id:string(result.loginId),auth_url:url.href,user_code:code,expires_at_ms:Date.now()+540000}
-    return this.login
+    if(!id||id.length>256)throw new Error('invalid sign-in identity')
+    // Device codes live 15 minutes upstream; preserve the existing 9-minute UI bound.
+    const login={login_id:id,auth_url:url.href,user_code:code,expires_at_ms:Date.now()+540000}
+    this.attempt={login_id:id,expires_at_ms:login.expires_at_ms,
+      state:starting.completion?(starting.completion.loginId===id?starting.completion.state:'unknown'):'pending'}
+    this.login=this.attempt.state==='pending'?login:undefined
+    return login
   }
   async cancelLogin(id:string):Promise<{completed:boolean}>{
-    if(this.login?.login_id!==id)return {completed:false}
-    await this.peer.request('account/login/cancel',{loginId:id});this.login=undefined;return {completed:true}
+    this.expireAttempt()
+    const attempt=this.attempt
+    if(!this.alive||attempt?.login_id!==id||!['pending','expired'].includes(attempt.state))return {completed:false}
+    // Fence completion before awaiting ACK. Cancelling an attempt never logs out.
+    if(attempt.state!=='expired')attempt.state='unknown'
+    this.login=undefined
+    let result:ObjectValue
+    try{result=object(await this.peer.request('account/login/cancel',{loginId:id}))}
+    catch{throw new Error('provider_unavailable')}
+    this.expireAttempt()
+    if(result.status!=='canceled'&&result.status!=='notFound')throw new Error('invalid login cancellation')
+    if(!this.alive||this.attempt!==attempt||Date.now()>=attempt.expires_at_ms)return {completed:false}
+    attempt.state=result.status==='canceled'?'cancelled':'unknown'
+    return {completed:result.status==='canceled'}
   }
   async logout():Promise<{completed:boolean}>{
     if(this.busy)throw new Error('stop the active turn before logout')
-    await this.peer.request('account/logout',{});this.login=undefined;return {completed:true}
+    const attempt=this.attempt
+    if(attempt)attempt.state='unknown'
+    this.login=undefined
+    await this.peer.request('account/logout',{})
+    if(this.attempt===attempt)this.attempt=undefined
+    return {completed:true}
   }
   async run(text:string,history:string,settings:AgentPreferences,tools:DynamicTool[],execute:Active['execute'],signal:AbortSignal,onText:(delta:string)=>void=()=>{},contexts:ContextPayload[]=[]):Promise<ModelOutput>{
     if(!this.alive||this.busy)throw new Error('provider unavailable or busy')
@@ -152,7 +220,9 @@ export class CodexBackend {
     const deadline=Date.now()+settings.turn_timeout_ms
     if(signal.aborted)throw new Error('cancelled')
     const budget={deadline,signal}
-    const status=await this.status(budget)
+    // Starting a turn still requires catalog and quota checks to succeed;
+    // only the UI's read-only status can return missing auxiliary details.
+    const status=await this.readStatus(true,budget)
     if(signal.aborted)throw new Error('cancelled')
     if(Date.now()>=deadline)throw new Error('provider_timeout')
     if(!status.authenticated)throw new Error('provider_unavailable')
@@ -205,7 +275,20 @@ export class CodexBackend {
     }
   }
   private notification(method:string,raw:unknown):void{
-    if(method==='account/login/completed'){const p=object(raw);if(p.loginId===this.login?.login_id)this.login=undefined;return}
+    if(method==='account/login/completed'){
+      // Pinned native framing: project only id + boolean, never error.
+      if(!raw||typeof raw!=='object'||Array.isArray(raw))return
+      const p=raw as ObjectValue
+      if(typeof p.loginId!=='string'||p.loginId.length>256)return
+      const state:ProviderLoginState=typeof p.success==='boolean'?(p.success?'succeeded':'failed'):'unknown'
+      this.expireAttempt()
+      if(this.alive&&p.loginId===this.attempt?.login_id&&this.attempt.state==='pending'){
+        this.attempt.state=state;this.login=undefined
+      }else if(this.alive&&this.starting&&p.loginId!==this.attempt?.login_id){
+        this.starting.completion={loginId:p.loginId,state}
+      }
+      return
+    }
     const active=this.active;if(!active)return
     const p=object(raw)
     if(p.threadId!==active.threadId)return

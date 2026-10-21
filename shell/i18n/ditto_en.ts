@@ -1274,8 +1274,16 @@
         <translation>Stopped</translation>
     </message>
     <message>
+        <source>已取消這次登入。</source>
+        <translation>This sign-in was cancelled.</translation>
+    </message>
+    <message>
         <source>待命中</source>
         <translation>Idle</translation>
+    </message>
+    <message>
+        <source>授權已完成，仍待確認帳號連線。</source>
+        <translation>Authorization completed. The account connection still needs confirmation.</translation>
     </message>
     <message>
         <source>桌面服務未連線</source>
@@ -1338,6 +1346,14 @@
         <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
+        <source>登入未完成，請重新嘗試。</source>
+        <translation>Sign-in did not complete. Please try again.</translation>
+    </message>
+    <message>
+        <source>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</source>
+        <translation>This sign-in result is unknown. Account status still depends on the connection readback.</translation>
+    </message>
+    <message>
         <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>The Codex model list could not be read. Verify the supported Codex file and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
@@ -1352,6 +1368,10 @@
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>Subscription quota used up; try again after it resets</translation>
+    </message>
+    <message>
+        <source>這次登入已逾期，請重新開始。</source>
+        <translation>This sign-in expired. Please start again.</translation>
     </message>
     <message>
         <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>

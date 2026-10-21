@@ -21369,6 +21369,100 @@
       "availability": {
         "kind": "resolved_at_runtime"
       },
+      "cancellable": true,
+      "capability_id": "agent.providers.login_result",
+      "claimable": false,
+      "errors": [
+        "unsupported",
+        "invalid_params",
+        "not_found",
+        "permission_denied",
+        "timeout",
+        "cancelled",
+        "unavailable",
+        "protocol_version_unsupported",
+        "identity_rejected",
+        "internal"
+      ],
+      "idempotency": "none",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "description": "Readback of one ephemeral authorization attempt, never account authority.",
+        "properties": {
+          "generation": {
+            "description": "Core's runtime generation observed by the caller when login started.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "login_id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "login_id",
+          "generation"
+        ],
+        "title": "ProviderLoginResultInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ProviderLoginState": {
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed",
+              "cancelled",
+              "expired",
+              "unknown"
+            ],
+            "type": "string"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "generation": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "login_id": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/$defs/ProviderLoginState"
+          }
+        },
+        "required": [
+          "login_id",
+          "generation",
+          "state"
+        ],
+        "title": "ProviderLoginResult",
+        "type": "object"
+      },
+      "provider": "core",
+      "readback": null,
+      "resource_scope": [
+        "agent.settings.manage"
+      ],
+      "timeout_ms": {
+        "default_ms": 10000,
+        "max_ms": 30000
+      },
+      "version": "1.0.0"
+    },
+    {
+      "availability": {
+        "kind": "resolved_at_runtime"
+      },
       "cancellable": false,
       "capability_id": "agent.providers.login",
       "claimable": true,
@@ -28467,5 +28561,5 @@
       "version": "1.0.0"
     }
   ],
-  "catalog_revision": 6
+  "catalog_revision": 7
 }

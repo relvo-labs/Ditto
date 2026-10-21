@@ -204,6 +204,8 @@ TestCase {
         const old = last(data.kind === "turn" ? "agent.turns.get" : "agent.sessions.read");
         state.refreshSettings();
         last("agent.settings.describe").ok(prefs);
+        // #137 brackets the account query with current runtime readback.
+        last("agent.runtime.get").ok(snapshot(4, null));
         last("agent.providers.status").ok(account);
         state.setError({data: {reason_code: "backend_unsupported"}});
         last("agent.runtime.get").ok(snapshot(5, "isolation_unavailable", null));

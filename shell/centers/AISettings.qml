@@ -135,6 +135,15 @@ Flickable {
                 font.pixelSize: page.tokens.appFontBody
             }
             Text {
+                objectName: "aiLoginResult"
+                visible: (page.conversation.loginResultText || "").length > 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.conversation.loginResultText || ""
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontBody
+            }
+            Text {
                 visible: !!page.provider && page.provider.authenticated
                 width: parent.width
                 wrapMode: Text.WordWrap

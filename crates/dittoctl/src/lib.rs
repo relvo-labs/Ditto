@@ -108,6 +108,7 @@ pub const CONSUMED_CAPABILITIES: &[&str] = &[
     "agent.runtime.ensure",
     "agent.runtime.stop",
     "agent.providers.status",
+    "agent.providers.login_result",
     "agent.providers.login",
     "agent.providers.cancel_login",
     "agent.providers.logout",
