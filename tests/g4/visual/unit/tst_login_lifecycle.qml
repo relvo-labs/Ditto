@@ -17,12 +17,16 @@ TestCase {
         function capabilityAvailable(method) { return resultAvailable && method === "agent.providers.login_result"; }
         signal disconnected()
         function t(text) { return text; }
+        function newKey(prefix) { return prefix + "-fixture"; }
         function errorText(error) { return "safe fixture failure"; }
         function diagnosticText(error) { return "safe fixture diagnostic"; }
         function capability(method, params, ok, fail, options) {
-            requests = requests.concat([{ method: method, params: params, ok: ok, fail: fail }]);
-            if (method === "agent.runtime.get" && autoRuntime && ok)
-                ok({ generation: generation, phase: "ready", backend_pid: 42, isolation_verified: true });
+            const call = { method: method, params: params, done: false,
+                ok: function (result) { call.done = true; if (ok) ok(result); },
+                fail: function (error) { call.done = true; if (fail) fail(error); } };
+            requests = requests.concat([call]);
+            if (method === "agent.runtime.get" && autoRuntime)
+                call.ok({ generation: generation, phase: "ready", backend_pid: 42, isolation_verified: true });
         }
         function watchTopics(topics, onEvent, onResync, onReady, onError) {
             onReady({ subscription_id: "fixture-subscription" });
@@ -55,6 +59,171 @@ TestCase {
     function cleanup() {
         conversation.loginWatch.stop();
         conversation.providerRetry.stop();
+    }
+    // review4: deterministic synthetic RPC scheduling through the production
+    // settings/session/event path. These tests never call refreshProvider().
+    function r3Frame(generation, failed) {
+        return { generation: generation, phase: "ready", backend_pid: failed ? null : 42,
+            isolation_verified: !failed, failure_reason: failed ? "backend_exited" : null };
+    }
+    function r3Observe(kind, history) {
+        if (kind === "live-end") {
+            if (history) history.ok({ events: [] });
+            conversation.applyEvent({ type: "conversation_updated", session_id: conversation.sessionId,
+                turn_id: "fixture-turn", turn_state: "succeeded" });
+        } else {
+            if (!history) { conversation.readNew(); history = latest("agent.sessions.read"); }
+            history.ok({ events: [{ seq: 0, type: kind === "history-user" ? "user/message" : "turn/end",
+                data: { turn_id: "fixture-turn" } }] });
+        }
+    }
+    function r3Drain(authenticated, generation, failed) {
+        // Bound deterministic fixture replies, not a wall-clock polling loop.
+        // Exhaustion fails rather than hiding an accidental repeated-read loop.
+        for (let i = 0; i < 20; i++) {
+            const call = client.requests.find(r => !r.done && ["agent.runtime.get", "agent.providers.status", "agent.turns.get"].indexOf(r.method) >= 0);
+            if (call) {
+                if (call.method === "agent.runtime.get") call.ok(r3Frame(generation, failed));
+                else if (call.method === "agent.providers.status") call.ok(authenticated ? ready : signedOut);
+                else call.ok({ turn_id: "fixture-turn", state: "succeeded", created_at: "2026-10-21" });
+            } else if (conversation.providerRetry.running) {
+                conversation.providerRetry.stop(); conversation.providerRetry.triggered();
+            } else return;
+        }
+        fail("fixture did not settle within its finite response schedule");
+    }
+    function test_r3_history_account_data() {
+        const rows = [];
+        for (const event of ["history-user", "history-end", "live-end"])
+            for (const phase of ["pre-runtime", "status", "post-runtime"])
+                for (const authenticated of [false, true])
+                    rows.push({ tag: event + "-" + phase + "-" + authenticated, event: event, phase: phase, authenticated: authenticated });
+        return rows;
+    }
+    function test_r3_history_account(data) {
+        client.autoRuntime = false;
+        conversation.refreshSettings();
+        latest("agent.settings.describe").ok(on);
+        latest("agent.sessions.list").ok({ sessions: [{ session_id: "fixture-session", next_seq: 1, created_at: "2026-10-21" }] });
+        if (data.phase !== "pre-runtime") latest("agent.runtime.get").ok(r3Frame(1, false));
+        if (data.phase === "post-runtime") latest("agent.providers.status").ok(data.authenticated ? ready : signedOut);
+        r3Observe(data.event, latest("agent.sessions.read"));
+        r3Drain(data.authenticated, 1, false);
+        verify(conversation.provider !== null, "history abandoned the only account readback");
+        compare(conversation.provider.authenticated, data.authenticated);
+        compare(conversation.connected, data.authenticated);
+        compare(conversation.canLogin, !data.authenticated);
+        verify(!conversation.providerReading && !conversation.providerFailed && !conversation.providerRetry.running);
+        compare(calls("agent.providers.status").length, 1, "same-generation observations must not restart account reads");
+        compare(calls("agent.providers.login").length, 0);
+    }
+    function test_r3_observation_keeps_login_data() {
+        const rows = [];
+        for (const event of ["history-user", "history-end", "live-end"])
+            for (const phase of ["pre-runtime", "login", "post-runtime", "bound"])
+                rows.push({ tag: event + "-" + phase, event: event, phase: phase });
+        return rows;
+    }
+    function test_r3_observation_keeps_login(data) {
+        client.autoRuntime = false;
+        conversation.sessionId = "fixture-session";
+        conversation.startLogin();
+        if (data.phase !== "pre-runtime") latest("agent.runtime.get").ok(r3Frame(1, false));
+        const a = attempt(); a.login_id = "fixture-A";
+        if (["post-runtime", "bound"].indexOf(data.phase) >= 0) latest("agent.providers.login").ok(a);
+        if (data.phase === "bound") latest("agent.runtime.get").ok(r3Frame(1, false));
+        const token = conversation.loginStart;
+        r3Observe(data.event);
+        compare(conversation.loginStart, token, "a read-only observation released the start owner");
+        if (data.phase === "bound") compare(conversation.login, a);
+        compare(calls("agent.providers.cancel_login").length, 0);
+        r3Drain(false, 1, false);
+        if (["pre-runtime", "login"].indexOf(data.phase) >= 0) latest("agent.providers.login").ok(a);
+        r3Drain(false, 1, false);
+        compare(conversation.login.login_id, "fixture-A");
+        verify(conversation.loginWatch.running);
+        compare(calls("agent.providers.cancel_login").length, 0);
+    }
+    function test_r3_operation_account_data() {
+        const rows = [];
+        for (const operation of ["runtime", "submit", "generation", "runtime-failure", "logout-failure"])
+            for (const phase of ["pre-runtime", "status", "post-runtime"])
+                for (const authenticated of [false, true])
+                    rows.push({ tag: operation + "-" + phase + "-" + authenticated, operation: operation, phase: phase, authenticated: authenticated });
+        return rows;
+    }
+    function test_r3_operation_account(data) {
+        client.autoRuntime = false;
+        conversation.refreshSettings(); latest("agent.settings.describe").ok(on);
+        conversation.sessionId = "fixture-session";
+        if (data.phase !== "pre-runtime") latest("agent.runtime.get").ok(r3Frame(1, false));
+        if (data.phase === "post-runtime") latest("agent.providers.status").ok(data.authenticated ? ready : signedOut);
+        if (data.operation === "runtime") conversation.invalidateRuntime();
+        if (data.operation === "submit") {
+            conversation.draft = "fixture request"; conversation.send();
+            latest("agent.turns.submit").ok({ turn_id: "fixture-submit", state: "queued" });
+        }
+        if (data.operation === "generation" || data.operation === "runtime-failure") {
+            // A confirmed runtime projection is the generation/failure fact;
+            // pending reads below still pass through their request fences.
+            conversation.runtime = r3Frame(data.operation === "generation" ? 2 : 1, data.operation === "runtime-failure");
+        }
+        if (data.operation === "logout-failure") {
+            conversation.logout(); latest("agent.providers.logout").fail(failure);
+        }
+        r3Drain(data.authenticated, data.operation === "generation" ? 2 : 1, data.operation === "runtime-failure");
+        verify(conversation.provider !== null, "an operation dropped account readback without recovery");
+        compare(conversation.provider.authenticated, data.authenticated);
+        compare(conversation.connected, data.authenticated && data.operation !== "runtime-failure");
+        compare(conversation.canLogin, !data.authenticated && data.operation !== "runtime-failure");
+        verify(!conversation.providerReading && !conversation.providerRetry.running);
+        verify(calls("agent.providers.status").length <= (data.phase === "pre-runtime" ? 1 : 2), "overlapping recovery account reads");
+    }
+    function test_r3_terminal_account_data() {
+        const rows = [];
+        for (const outcome of ["failed", "cancelled", "expired"])
+            for (const phase of ["pre-runtime", "status", "post-runtime"])
+                for (const authenticated of [false, true])
+                    rows.push({ tag: outcome + "-" + phase + "-" + authenticated, outcome: outcome, phase: phase, authenticated: authenticated });
+        return rows;
+    }
+    function test_r3_terminal_account(data) {
+        client.autoRuntime = false;
+        conversation.refreshSettings(); latest("agent.settings.describe").ok(on);
+        conversation.login = attempt();
+        if (data.phase !== "pre-runtime") latest("agent.runtime.get").ok(r3Frame(1, false));
+        if (data.phase === "post-runtime") latest("agent.providers.status").ok(data.authenticated ? ready : signedOut);
+        conversation.refreshLoginResult();
+        latest("agent.providers.login_result").ok(resultReply(data.outcome));
+        r3Drain(data.authenticated, 1, false);
+        verify(conversation.provider !== null, "terminal attempt abandoned independent account readback");
+        compare(conversation.provider.authenticated, data.authenticated);
+        compare(conversation.connected, data.authenticated);
+        compare(conversation.canLogin, !data.authenticated);
+        compare(conversation.login, null);
+        verify(!conversation.providerReading && !conversation.providerRetry.running);
+        compare(calls("agent.providers.status").length, 1);
+    }
+    function test_r3_cancel_start_account_data() {
+        const rows = [];
+        for (const phase of ["pre-runtime", "login", "post-runtime"])
+            for (const authenticated of [false, true]) rows.push({ tag: phase + "-" + authenticated, phase: phase, authenticated: authenticated });
+        return rows;
+    }
+    function test_r3_cancel_start_account(data) {
+        client.autoRuntime = false; conversation.startLogin();
+        if (data.phase !== "pre-runtime") latest("agent.runtime.get").ok(r3Frame(1, false));
+        const a = attempt();
+        const pendingLogin = data.phase === "login" ? latest("agent.providers.login") : null;
+        if (data.phase === "post-runtime") latest("agent.providers.login").ok(a);
+        conversation.cancelLogin();
+        if (pendingLogin) pendingLogin.ok(a);
+        r3Drain(data.authenticated, 1, false);
+        verify(conversation.provider !== null, "cancelled start left no account readback");
+        compare(conversation.connected, data.authenticated);
+        compare(conversation.canLogin, !data.authenticated);
+        compare(conversation.login, null); compare(conversation.loginStart, null);
+        compare(calls("agent.providers.cancel_login").length, data.phase === "pre-runtime" ? 0 : 1);
     }
     // #134/#137 integration: availability evidence gates admission, and its
     // invalidation must finalize the same start owner as settings changes.
@@ -327,7 +496,7 @@ TestCase {
         if (data.kind === "disabled") conversation.settings = { enabled: false, provider: "codex-app-server" };
         if (data.kind === "provider") conversation.settings = { enabled: true, provider: "direct-model" };
         if (data.kind === "disconnect") { client.online = false; client.disconnected(); }
-        if (data.kind === "generation") { client.generation = 2; conversation.refreshRuntime(); }
+        if (data.kind === "generation") { client.generation = 2; conversation.runtime = r3Frame(2, false); }
         a.expires_at_ms = Date.now() - 1;
         oldAccount.ok(ready);
         verify(!conversation.connected, "a stale confirmation cannot publish account data");
@@ -401,9 +570,11 @@ TestCase {
         result.ok({ login_id: conversation.login.login_id, generation: 1, state: "failed" });
         compare(conversation.login, null);
         verify(!conversation.loginWatch.running);
-        verify(conversation.connected);
+        compare(conversation.provider, ready, "attempt failure preserves independent account data");
         compare(conversation.loginResultState, "failed");
         verify(conversation.loginResultText.length > 0);
+        latest("agent.providers.status").ok(ready);
+        verify(conversation.connected, "the pending official account read must still complete");
     }
     function resultReply(state, id) { return { login_id: id || "fixture-login", generation: 1, state: state }; }
     function test_terminal_result_data() {
@@ -498,7 +669,7 @@ TestCase {
         if (data.kind === "disabled") conversation.settings = { enabled: false, provider: "codex-app-server" };
         if (data.kind === "provider") conversation.settings = { enabled: true, provider: "direct-model" };
         if (data.kind === "disconnect") { client.online = false; client.disconnected(); }
-        if (data.kind === "generation") { client.generation = 2; conversation.refreshRuntime(); }
+        if (data.kind === "generation") { client.generation = 2; conversation.runtime = r3Frame(2, false); }
         if (data.kind === "confirmed-account") latest("agent.providers.status").ok(ready);
         if (data.fail) query.fail({ message: "SENSITIVE-LOGIN-SENTINEL" }); else query.ok(resultReply("failed"));
         verify(conversation.loginResultState !== "failed");
@@ -590,7 +761,7 @@ TestCase {
         if (data.kind === "disconnect") { client.online = false; client.disconnected(); }
         if (data.kind === "generation") {
             client.generation = 2;
-            conversation.refreshRuntime();
+            conversation.runtime = r3Frame(2, false);
         }
         if (data.fail) old.fail(failure); else old.ok(ready);
         compare(conversation.provider, data.kind === "generation" ? signedOut : null,

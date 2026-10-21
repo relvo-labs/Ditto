@@ -144,8 +144,11 @@ QtObject {
         // after onRuntimeChanged, too late to finalize its in-flight owner.
         if (runtime.failure_reason || (settings && settings.provider === "codex-app-server"
             && runtime.phase === "ready" && runtime.backend_pid === null)) {
+            const starting = !!loginStart;
             forgetLogin();
-            invalidateProvider(true);
+            // Fence a cancelled start, but let an account read confirm its
+            // result even when runtime evidence already makes it unusable.
+            if (starting) invalidateProvider(true);
         }
     }
 
@@ -403,14 +406,24 @@ QtObject {
         });
     }
 
-    function invalidateRuntime() {
-        // Operations which may change the serving runtime invalidate both
-        // account reads and the owner of any in-flight login start.
-        forgetLogin();
-        invalidateProvider(true);
+    function invalidateRuntimeRead() {
+        // Observations must not steal a start/account bracket's runtime read.
+        // Its existing before/after snapshots will supply current evidence.
+        if (!loginStart && !providerReading) runtimeRequest++;
         runtime = null;
         runtimePending = true;
         runtimeFailed = false;
+    }
+
+    function invalidateRuntime() {
+        const accountReading = providerReading;
+        forgetLogin();
+        invalidateProvider(true);
+        invalidateRuntimeRead();
+        // Settings/submit callbacks own their recovery read. Other runtime
+        // operations use the existing one-shot path when they drop a read.
+        if (accountReading && !settingsReading && !sending && client.online && wanted && enabled)
+            providerRetry.restart();
     }
 
     function invalidateSettings() {
@@ -454,6 +467,7 @@ QtObject {
     }
 
     function refreshRuntime(then, failed) {
+        if (!then && !failed && (loginStart || providerReading)) return;
         // A read replaces evidence, but does not abandon its own start. The
         // operation-level invalidateRuntime() handles external invalidations.
         const connection = connectionEpoch, request = ++runtimeRequest;
@@ -565,7 +579,7 @@ QtObject {
 
     property Timer providerRetry: Timer {
         interval: 1500
-        onTriggered: if (state.wanted && state.enabled && !state.connected && !state.providerReading && !state.loginStart) state.refreshProvider()
+        onTriggered: if (state.wanted && state.enabled && !state.providerReading && !state.loginStart) state.refreshProvider()
     }
 
     function setEnabled(on) {
@@ -658,7 +672,11 @@ QtObject {
         // Expiry fences only attempt replies, never a current account read.
         if (expired !== true) invalidateProvider();
         if (expired === true) loginResultState = "expired";
-        if (!attempt || !client.online) return;
+        if (!attempt || !client.online) {
+            if (!attempt && expired !== true && client.online && wanted && enabled && subscriptionSelected && !settingsReading)
+                providerRetry.restart();
+            return;
+        }
         const epoch = providerEpoch, request = loginRequest;
         const readback = function () {
             if (epoch === providerEpoch && client.online && enabled && settings.provider === "codex-app-server" && !providerReading)
@@ -711,9 +729,10 @@ QtObject {
             const outcome = result.state;
             if (outcome === "pending" || outcome === "unknown") { loginResultState = outcome; return; }
             forgetLogin();
-            invalidateProvider(true); // fence older reads, keep independently confirmed account
             loginResultState = outcome;
             if (outcome === "succeeded") {
+                invalidateProvider(true); // replace with this success confirmation read
+
                 // Retain only identity/deadline in this bounded confirmation
                 // callback. The code surface is already cleared by forgetLogin.
                 delete attempt.auth_url;
@@ -867,7 +886,7 @@ QtObject {
         client.capability("agent.providers.logout", { provider: "codex-app-server" }, function () {
             if (epoch === providerEpoch) refreshProvider();
         }, function (error) {
-            if (epoch === providerEpoch) setError(error);
+            if (epoch === providerEpoch) { setError(error); refreshProvider(); }
         }, { deadlineMs: 30000 });
     }
 
@@ -945,7 +964,7 @@ QtObject {
         if (!id) {
             return;
         }
-        invalidateRuntime();
+        invalidateRuntimeRead();
         const read = ++turnRead;
         const context = settingsRequest;
         const prefs = settings;
@@ -981,7 +1000,7 @@ QtObject {
             return;
         }
         if (payload.turn_id && payload.turn_state) {
-            invalidateRuntime();
+            invalidateRuntimeRead();
             if (turn && turn.turn_id === payload.turn_id) {
                 turn = Object.assign({}, turn, { state: payload.turn_state });
             } else {
@@ -1014,8 +1033,7 @@ QtObject {
         const context = settingsRequest;
         const submit = function () {
             if (context !== settingsRequest || !client.online) return;
-            providerRequest++;
-            providerReading = false;
+            const accountReading = providerReading;
             turnRead++;
             invalidateRuntime();
             const contexts = attached.map(item => item.context_id);
@@ -1032,11 +1050,13 @@ QtObject {
                 if (!turn || turn.turn_id !== result.turn_id || !["succeeded", "failed", "partial", "unknown", "cancelled"].includes(turn.state)) turn = result;
                 setError(null);
                 readNew();
+                if (accountReading) refreshProvider();
             }, function (error) {
                 if (context !== settingsRequest || !client.online) return;
                 refreshRuntime();
                 sending = false;
                 setError(error);
+                if (accountReading) refreshProvider();
             });
         };
         if (sessionId.length > 0) {
