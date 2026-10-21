@@ -13,15 +13,18 @@ python3 "$root/tests/shell-extensions/stage.py" "$evidence/staged"
 "$qt/bin/qmltestrunner" -import "$evidence/staged/stubs" -input "$evidence/staged/unit" > "$evidence/unit.log" 2>&1
 cat "$evidence/unit.log"
 # A real archive, unpacked separately from the source tree; no SDK import rewrite.
-mkdir -p "$evidence/real/package"
-tar --zstd -cf "$evidence/history.dittopkg" -C "$root/shell/providers/settings_history" manifest.json qml
-tar --zstd -xf "$evidence/history.dittopkg" -C "$evidence/real/package"
+package_dir="$evidence/package-store/ditto.settings.history/1.0.0"
+mkdir -p "$evidence/real" "$package_dir"
+tar --zstd -cf "$evidence/ditto.settings.history-1.0.0.dittopkg" -C "$root/shell/providers/settings_history" manifest.json qml
+tar --zstd -xf "$evidence/ditto.settings.history-1.0.0.dittopkg" -C "$package_dir"
+# Production loads by absolute file URL from a store outside the config root.
+page_url="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).as_uri())' "$package_dir/qml/HistoryPage.qml")"
 for directory in sdk ui change jelly; do
     ln -sfn "$root/shell/$directory" "$evidence/real/$directory"
 done
 cp "$root/tests/shell-extensions/real-load.qml" "$evidence/real/shell.qml"
 set +e
-LD_LIBRARY_PATH="${DITTO_QS_LD_LIBRARY_PATH:?source the runner environment first}" timeout 15 "$qt/bin/quickshell" -p "$evidence/real/shell.qml" > "$evidence/real-load.log" 2>&1
+DITTO_TEST_PAGE_URL="$page_url" LD_LIBRARY_PATH="${DITTO_QS_LD_LIBRARY_PATH:?source the runner environment first}" timeout 15 "$qt/bin/quickshell" -p "$evidence/real/shell.qml" > "$evidence/real-load.log" 2>&1
 code=$?
 set -e
 cat "$evidence/real-load.log"

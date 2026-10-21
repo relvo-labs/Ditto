@@ -17,14 +17,22 @@ ShellRoot {
     }
     Item { id: visualParent; width: 800; height: 600 }
     Component.onCompleted: {
-        component = Qt.createComponent(Qt.resolvedUrl("package/qml/HistoryPage.qml"));
+        const pageUrl = Quickshell.env("DITTO_TEST_PAGE_URL");
+        if (!pageUrl || pageUrl.indexOf("file://") !== 0) {
+            console.log("REAL_PAGE_FAILED missing absolute package URL");
+            return;
+        }
+        console.log("REAL_PAGE_SOURCE " + pageUrl);
+        component = Qt.createComponent(pageUrl);
         if (component.status !== Component.Ready) {
             console.log("REAL_PAGE_FAILED " + component.errorString());
             return;
         }
         heldPage = component.createObject(visualParent, {client: client, tokens: tokens,
-            config: {}, pageId: "history", entryId: "real-history"});
-        if (heldPage && heldPage.pageId === "history" && heldPage.flickable === heldPage && heldPage.changes.length === 0) {
+            config: {externalStore: true}, pageId: "history", entryId: "real-history"});
+        if (heldPage && heldPage.pageId === "history" && heldPage.entryId === "real-history"
+                && heldPage.config.externalStore === true && heldPage.client === client && heldPage.tokens === tokens
+                && heldPage.flickable === heldPage && heldPage.changes.length === 0) {
             console.log("REAL_PAGE_READY root:/sdk/Ditto/Ui packaged history");
         } else {
             console.log("REAL_PAGE_FAILED " + component.errorString());

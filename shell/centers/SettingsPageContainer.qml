@@ -55,7 +55,7 @@ Item {
     }
     Text {
         objectName: "settingsPageError"
-        visible: container.active && !container.embedded && !container.fallbackComponent
+        visible: container.active && !!container.registration && !container.embedded && !container.fallbackComponent
         anchors.fill: parent
         anchors.margins: container.tokens ? container.tokens.space : 12
         wrapMode: Text.WordWrap

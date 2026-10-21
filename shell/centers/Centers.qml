@@ -52,6 +52,12 @@ FloatingWindow {
         extra.sort((a, b) => a.order - b.order || (a.page_id < b.page_id ? -1 : a.page_id > b.page_id ? 1 : 0));
         return list.concat(extra.map(p => ({ id: p.page_id, label: p.title_key, translatedKey: true })));
     }
+    function ensurePage() {
+        if (!pages.some(candidate => candidate.id === page)) page = "composition";
+    }
+    onPagesChanged: Qt.callLater(ensurePage)
+    onPageChanged: Qt.callLater(ensurePage)
+    Component.onCompleted: Qt.callLater(ensurePage)
     readonly property var registration: registeredPages.find(p => p.page_id === page) || null
     readonly property var currentPageItem: content.item
     readonly property bool pageFallback: content.usingFallback
@@ -207,6 +213,7 @@ FloatingWindow {
 
                     Rectangle {
                         required property var modelData
+                        objectName: "settingsTab_" + modelData.id
                         readonly property bool current: window.page === modelData.id
                         width: parent.width
                         height: window.jelly ? window.tokens.uiControlHeight + 8 : window.tokens.controlHeight + 4

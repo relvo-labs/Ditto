@@ -110,7 +110,9 @@ pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjec
             return None;
         }
         Some(ShellSlotBinding {
-            settings_page: manifest.settings_page.clone(),
+            settings_page: (slot == "ui.settings_page")
+                .then(|| manifest.settings_page.clone())
+                .flatten(),
             slot: slot.into(),
             entry_id: entry.entry_id.clone(),
             package: entry.package.clone(),

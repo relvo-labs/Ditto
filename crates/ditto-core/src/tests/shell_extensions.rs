@@ -299,3 +299,46 @@ fn official_extensions_are_not_adopted_by_any_default_document() {
                 && entry.package != "ditto.background.default"));
     }
 }
+
+#[test]
+fn settings_metadata_is_projected_only_for_settings_page_bindings() {
+    let mut rows: Vec<_> = packages().rows().cloned().collect();
+    let metadata = rows
+        .iter()
+        .find(|row| row.summary.package_id == "ditto.test.history")
+        .unwrap()
+        .manifest
+        .settings_page
+        .clone();
+    for row in &mut rows {
+        row.manifest.settings_page = metadata.clone();
+    }
+    let packages = PackageSet::new(rows);
+    let mut doc = defaults::default_document(&packages);
+    for (slot, package, area) in [
+        ("ui.background", "ditto.test.background", None),
+        ("ui.dock", "ditto.test.dock", None),
+        (
+            "ui.settings_page",
+            "ditto.test.history",
+            Some("ui.settings_page"),
+        ),
+    ] {
+        doc.entries.push(entry(slot, package, area));
+        if area.is_none() {
+            doc.slots.insert(slot.into(), slot.into());
+        }
+    }
+    let projected = shell(&doc, &packages);
+    assert_eq!(projected.slots.len(), 3);
+    for binding in projected.slots {
+        assert_eq!(
+            binding.settings_page,
+            if binding.slot == "ui.settings_page" {
+                metadata.clone()
+            } else {
+                None
+            }
+        );
+    }
+}

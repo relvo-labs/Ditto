@@ -81,7 +81,6 @@ TestCase {
         s.host.commit("upgrade");
         compare(s.host.observation().mounts[0].version, "2.0.0");
         s.host.rollback("upgrade");
-        s.host.rollback("upgrade");
         compare(s.host.registeredPages.length, 1);
         compare(s.host.registeredPages[0].component, original);
         compare(s.host.observation().mounts[0].version, "1.0.0");
@@ -135,6 +134,43 @@ TestCase {
         prepare(s.host, "bad-extra", [page("alpha", "../fixtures/ExtraFailure.qml")]); s.host.commit("bad-extra");
         tryVerify(() => center.pageFallback && center.currentPageItem === null);
         verify(findChild(center, "settingsPageError").visible);
+    }
+    function test_sidebar_focus_survives_an_unrelated_slot_commit() {
+        const s = setup();
+        const binding = page("history");
+        prepare(s.host, "page", [binding]); s.host.commit("page");
+        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, page: "history"});
+        tryVerify(() => !!center.currentPageItem);
+        const tab = findChild(center, "settingsTab_history");
+        verify(tab !== null);
+        tab.forceActiveFocus(Qt.TabFocusReason);
+        verify(tab.activeFocus);
+        const registrations = s.host.registeredPages;
+        const unrelated = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: "1.0.0", config: {},
+            qml_url: Qt.resolvedUrl("../shell/providers/background_default/qml/Background.qml").toString()};
+        prepare(s.host, "unrelated-slot", [binding, unrelated]); s.host.commit("unrelated-slot");
+        wait(0);
+        verify(s.host.registeredPages === registrations);
+        compare(findChild(center, "settingsTab_history"), tab);
+        verify(tab.activeFocus);
+        center.destroy();
+        s.host.destroy();
+        wait(0);
+    }
+    function test_removed_or_restored_missing_extra_page_returns_to_composition() {
+        const s = setup();
+        prepare(s.host, "extra", [page("extra")]); s.host.commit("extra");
+        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, page: "extra"});
+        tryVerify(() => center.currentPageItem && center.currentPageItem.pageId === "extra");
+        prepare(s.host, "remove-extra", []); s.host.commit("remove-extra");
+        tryCompare(center, "page", "composition");
+        verify(!findChild(center, "settingsPageError").visible);
+        const restored = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, page: "missing_extra"});
+        tryCompare(restored, "page", "composition");
+        verify(!findChild(restored, "settingsPageError").visible);
+        center.destroy();
+        restored.destroy();
+        wait(0);
     }
     function test_packaged_history_uses_sdk_and_opt_in_flickable() {
         const s = setup();

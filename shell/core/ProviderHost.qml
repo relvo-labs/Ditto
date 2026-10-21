@@ -77,19 +77,23 @@ QtObject {
             const config = active.binding.config || {};
             const previous = registeredPages.find(page => page.entry_id === active.binding.entry_id);
             // Unrelated commits must not recreate an open page or its UI state.
-            if (previous && previous.component === active.component
+            if (previous && previous.component === active.component && previous.version === active.binding.version
                 && same(previous.config, config) && previous.page_id === metadata.page_id
                 && previous.title_key === metadata.title_key && previous.order === metadata.order
                 && previous.category === metadata.category) {
                 pages.push(previous);
             } else {
                 pages.push(Object.assign({}, metadata, {
-                    entry_id: active.binding.entry_id, component: active.component, config: config
+                    entry_id: active.binding.entry_id, version: active.binding.version, component: active.component, config: config
                 }));
             }
         }
         pages.sort((a, b) => a.order - b.order || (a.page_id < b.page_id ? -1 : a.page_id > b.page_id ? 1 : 0));
-        registeredPages = pages;
+        // Keep the array itself too: replacing an equal Repeater model would
+        // destroy sidebar tabs and discard keyboard focus on unrelated commits.
+        if (pages.length !== registeredPages.length || pages.some((page, index) => page !== registeredPages[index])) {
+            registeredPages = pages;
+        }
     }
 
     readonly property string devProviders: Quickshell.env("DITTO_SHELL_DEV_PROVIDERS") || ""
