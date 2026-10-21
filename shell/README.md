@@ -39,7 +39,7 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 | 套件 | 目錄 | slot | 形態 |
 | --- | --- | --- | --- |
 | `ditto.panel.top` | `panel_top` | `ui.panel_top` | 工作區、作用中視窗、音量（PipeWire）、網路（NetworkManager）、時鐘、Ditto 選單（四個中心、啟動器、鎖定與電源） |
-| `ditto.dock.bottom` | `dock_bottom` | `ui.dock` | Dock A：底部置中、執行中視窗列（`client.windows`） |
+| `ditto.dock.bottom` | `dock_bottom` | `ui.dock` | Dock A：底部置中、執行中視窗列（`client.windows`）；每個視窗顯示應用圖示與視窗標題（名稱、圖示取自 `desktop.launcher.list_apps`，找不到時用首字方塊），作用中視窗以底板＋粗體＋底線標示，最小化淡化、其他工作區加「工作區 N」標籤，關閉鈕只在滑鼠或鍵盤焦點停留時出現 |
 | `ditto.dock.pill` | `dock_pill` | `ui.dock` | Dock B：左側或底部的膠囊；釘選應用（`desktop.launcher.list_apps`）＋執行中指示；`config.pinned`、`config.position` |
 | `ditto.launcher.grid` | `launcher_grid` | `ui.launcher` | 啟動器 A：全螢幕網格、依類別分頁；方向鍵、PageUp／PageDown、Enter、Esc |
 | `ditto.launcher.search` | `launcher_search` | `ui.launcher` | 啟動器 B：中央搜尋框（`desktop.launcher.search`）；輸入即搜、上下、Enter、Esc |

@@ -169,9 +169,9 @@ TestCase {
             keyClick(Qt.Key_Space);
             compare(client.calls, ["A"]);
         }
-        if (data.change === "title") compare(original.Accessible.name, "A changed（作用中）");
+        if (data.change === "title") compare(original.Accessible.name, "fixture：A changed（作用中）");
         if (data.change === "geometry") compare(original.modelData.width, 900);
-        if (data.change === "focus") compare(original.Accessible.name, "A");
+        if (data.change === "focus") compare(original.Accessible.name, "fixture：A");
     }
     function test_move_keeps_delegate_and_keyboard_order_data() {
         return ["Pill", "Bottom"].map(kind => ({ tag: kind, kind: kind }));
