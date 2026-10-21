@@ -2166,6 +2166,30 @@
         <source>（作用中）</source>
         <translation>（作用中）</translation>
     </message>
+    <message>
+        <source>%1：%2</source>
+        <translation>%1：%2</translation>
+    </message>
+    <message>
+        <source>未命名應用程式</source>
+        <translation>未命名應用程式</translation>
+    </message>
+    <message>
+        <source>網頁應用程式</source>
+        <translation>網頁應用程式</translation>
+    </message>
+    <message>
+        <source>（已最小化）</source>
+        <translation>（已最小化）</translation>
+    </message>
+    <message>
+        <source>（工作區 %1）</source>
+        <translation>（工作區 %1）</translation>
+    </message>
+    <message>
+        <source>工作區 %1</source>
+        <translation>工作區 %1</translation>
+    </message>
 </context>
 <context>
     <name>DockPill</name>
