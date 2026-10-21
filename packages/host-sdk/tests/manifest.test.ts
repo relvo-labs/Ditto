@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +9,10 @@ import { validateManifest, type JsonSchema } from '../src/manifest/index.ts'
 import { packPackage, validatePackage } from '../src/package.ts'
 
 const packages = fileURLToPath(new URL('../../', import.meta.url))
+const root = join(packages, '..')
+const schema = JSON.parse(readFileSync(join(root, 'schema/manifest.json'), 'utf8')) as JsonSchema
+const manifestDirs = (parent: string) => readdirSync(parent).map(name => join(parent, name))
+  .filter(dir => existsSync(join(dir, 'manifest.json')))
 const counter = JSON.parse(readFileSync(join(packages, 'host-sdk/examples/counter/manifest.json'), 'utf8')) as Record<string, unknown>
 const scratch = mkdtempSync(join(tmpdir(), 'ditto-sdk-'))
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))
@@ -17,16 +21,25 @@ const codes = (manifest: unknown, options = {}) => validateManifest(manifest, op
 const withField = (patch: Record<string, unknown>) => ({ ...counter, ...patch })
 
 describe('manifest rules (docs/contracts/manifest.md)', () => {
-  it('accepts every manifest in the repository', () => {
+  it('accepts SDK examples/templates, plugin fixtures and every builtin manifest producer', () => {
+    // Keep all three producer roots from scripts/build-builtin-packages.sh in the inventory.
+    const builtins = ['shell/providers', 'packaging/builtin', 'packages/plugins'].flatMap(dir => manifestDirs(join(root, dir)))
+    const kinds = builtins.map(dir => JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).plugin_kind)
+    expect(builtins).toHaveLength(11)
+    expect(kinds.filter(kind => kind === 'qml_provider')).toHaveLength(7)
+    expect(kinds.filter(kind => kind === 'service')).toHaveLength(2)
+    expect(kinds.filter(kind => kind === 'declarative_bundle')).toHaveLength(2)
     const dirs = [
-      ...['cordis', 'qml', 'faults'].flatMap(group => readdirSync(join(packages, 'plugin-fixtures', group)).map(name => join(packages, 'plugin-fixtures', group, name))),
+      ...['cordis', 'qml', 'faults', 'stress'].flatMap(group => manifestDirs(join(packages, 'plugin-fixtures', group))),
       join(packages, 'host-sdk/examples/counter'), join(packages, 'host-sdk/templates/qml-provider'),
-      join(packages, 'plugins/svc-tasks'), join(packages, 'plugins/svc-notification-policy'),
+      ...builtins,
     ]
-    for (const dir of dirs) {
-      const result = validateManifest(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')))
-      expect({ dir, errors: result.errors }).toEqual({ dir, errors: [] })
-    }
+    // Validate the entire inventory before asserting, so one failure cannot hide later producers.
+    const results = dirs.flatMap(dir => [{}, { schema }].map((options, i) => ({
+      dir, schema: i === 1,
+      errors: validateManifest(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')), options).errors,
+    })))
+    expect(results).toEqual(results.map(({ dir, schema }) => ({ dir, schema, errors: [] })))
   })
 
   it.each([
