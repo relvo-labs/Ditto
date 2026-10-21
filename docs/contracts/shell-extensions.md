@@ -74,9 +74,9 @@
 | 宿主模式 | `plugin_kind`／`host_kind`、`EntrySpec.host`；`ui.*` 一律對應 `qml`（`projection.rs:59-77`）。surface 與 page 由 slot／area 區分 | 否 |
 | 權限 | `Manifest.permissions`，是請求不是事實 | 否（限制見第 6 節） |
 | 熱換等級 | `Manifest.hot_swap`；`hot_swap_level` 取觸及條目的最高值（`projection.rs:251-283`） | 否 |
-| 狀態 schema | `config_schema`（Profile 內 `config`，`set_entry_config`／`add_entry` 依它驗證）；`data_schema`（插件資料，記錄） | 否。UI 暫態不進 manifest，見第 7 節 |
+| 狀態 schema | `config_schema`（描述 Profile 內 `config`）；`data_schema`（插件資料，記錄）。限制：Core 目前**不**依 `config_schema` 驗證，`add_entry`／`set_entry_config` 只檢查 `config` 是物件（`crates/ditto-core/src/docops.rs:154-162`、`:225-230`）；`config_schema` 只由 SDK 在作者端檢查（`packages/host-sdk/src/manifest/rules.ts:202-209`） | 否。UI 暫態不進 manifest，見第 7 節；Core 端驗證是宣告式設定表單的前提，見第 6 節 |
 | 預設／備援供應者 | 新 store 的預設由 `crates/ditto-core/src/defaults.rs` 決定；背景與五個內建頁的備援是 Shell 內建實作 | 否 |
-| 設定頁 metadata | — | **新增** manifest 選用欄位 `settings_page`；`ShellSlotBinding.settings_page`（自 manifest 投影，無則省略）（P02） |
+| 設定頁 metadata | — | **新增** manifest 選用欄位 `settings_page`；`ShellSlotBinding.settings_page`（自 manifest 投影，無則省略）（P02）。圖示、可用條件與所需能力待定，屬 P03（第 4.1 節） |
 | 設定頁回讀狀態 | — | **新增** `PanelMount.page_state: registered | open`（P02） |
 
 新增欄位全部是選用欄位，依 D-39 相容規則與 `artifact_id` 同樣的方式加入：既有 manifest 與 Profile 不含它們，序列化結果與雜湊不變。
@@ -99,6 +99,11 @@
 | 重複 | 兩個**未停用**成員宣告同一 `page_id` → `schema_invalid`，`why: duplicate_page_id`；停用的成員不計 |
 | 排序 | 依 `(order, page_id)` 排序，確定性；不使用條目在 `entries` 中的順序 |
 | 既有 area 規則 | 沿用 `not_a_provider_for_area`、`wrong_host`、`unknown_area`、`placed_twice`（`preflight.rs:215-242`、`:488-510`）與 `diff.area.joined`／`left` |
+| 圖示（**待定**，P03） | 提案選用欄位，暫名 `icon`；格式與來源待定 |
+| 可用條件（**待定**，P03） | 提案選用欄位，暫名 `available_when`；決定頁面何時出現在導覽，條件語言待定 |
+| 所需能力（**待定**，P03） | 提案選用欄位，暫名 `required_capabilities`；列出頁面需要的能力 id。這是請求，是否可用由 Core 判定，宣告本身不授予任何權限 |
+
+後三項不屬於 P02 形狀：P02 的 `settings_page` 只有 `page_id`、`title_key`、`order`、`category`，欄位名稱與語意由 P03 定案。
 
 ### 4.2 內建頁與替換
 
@@ -144,7 +149,7 @@
 | 官方內建 QML（`source: builtin`、`trust_level: trusted`） | 可 | 可（唯一可嵌入的一類） | 經宿主給的 `client`，以 Shell 身分呼叫 Core，授權仍由 Core 判定。manifest 的 `permissions` 目前只對 Cordis 條目預檢（`preflight.rs:604-623`） | **無**：同程序，無逐插件故障隔離 | 現行預檢已允許 |
 | 社群 QML（非 `builtin` 或非 `trusted`） | 不可：預檢 `precondition_failed`（`why: trust_policy`，`preflight.rs:328-352`） | 不可 | — | 無 | #154 獨立宿主＋#155 |
 | 生成（固定模板） | 只以固定模板 `shell/generated/GeneratedPanel.qml` 呈現已核准且完整性相符的 artifact；位置限 `ui.generated_panel`（≤8） | 不可 | artifact 以描述資料傳入模板（`projection.rs:104-118`），不提供程式碼 | 模板是可信程式碼；生成內容是資料 | 任意生成 QML 依 #154／#155 |
-| 第三方設定擴充 | 不載入其 QML | 只以宣告式表單：可信宿主依條目的 `config_schema` 繪製，寫入經 `set_entry_config` ChangeSet（P03／P07 建置，不在 P02） | 讀寫 scope 分開；自填 `entry_id` 或 manifest 自述不取得身分 | 表單不執行其程式碼；獨立 surface 的隔離由 #155 定 | 獨立 surface 待 #154／#155 |
+| 第三方設定擴充 | 不載入其 QML | 只以宣告式表單：可信宿主依條目的 `config_schema` 繪製，寫入經 `set_entry_config` ChangeSet（P03／P07 建置，不在 P02）。前提：Core 須先在預檢依 `config_schema` 驗證寫入的 `config`；現行只檢查是物件（第 3 節），補上前表單不得啟用 | 讀寫 scope 分開；自填 `entry_id` 或 manifest 自述不取得身分 | 表單不執行其程式碼；獨立 surface 的隔離由 #155 定 | 表單待 Core 端 `config_schema` 驗證；獨立 surface 待 #154／#155 |
 | 佈景 token 套件 | 不載入程式碼，只有 token 值，經 `APPEARANCE_TOKENS` 預檢 | 不適用 | 無 | 不需要（無程式碼）；帶樣式程式碼的佈景依上方 QML 各列判斷 | P06；第三方樣式程式碼依 #155 |
 
 - 同程序的 facade 是 **API 與架構邊界，不是沙箱**。不得以「只給了 `client`」或隱藏方法宣稱權限隔離。
@@ -157,7 +162,7 @@
 | --- | --- | --- | --- |
 | Profile、revision、權限授予、已受理操作（`operation_id`）、會話與 turn | Core | 不受影響 | 不受影響（Core 持久化） |
 | 設定草稿（每頁序列化後 ≤64 KiB）、目前頁面 `page_id` | Shell facade（renderer 之外） | 保留 | 遺失 |
-| 聊天草稿、附件引用（內容在 Core）、串流事件游標、需要交還的焦點目標 | Shell facade（現行在 `shell/chat/ConversationState.qml`） | 保留 | 草稿遺失；附件與會話由 Core 重新讀取 |
+| 聊天草稿、未送出附件的引用、串流事件游標、需要交還的焦點目標 | Shell facade（現行在 `shell/chat/ConversationState.qml`） | 保留 | 草稿與未送出附件都遺失：附件內容雖在 Core，但 Shell 的連線結束時 Core 會釋放該連線持有、尚未綁定 turn 的 context（`crates/ditto-core/src/lib.rs:795-800`、`context.rs:459-464`）。已保存的會話與 turn，以及已綁定到已送出 turn 的 context，仍在 Core |
 | 捲動位置、hover、動畫插值、IME 組字中的文字 | renderer 本身 | 不保證；IME 組字未完成時延後交接（P05） | 遺失 |
 
 - UI 暫態只在 Shell 程序記憶體，**不寫入** Profile、revision 或匯出；本階段不新增 Core 儲存。
@@ -255,7 +260,7 @@
 | --- | --- |
 | §10 桌面與原生應用需求 | 背景為可替換供應者：每輸出實例、Background 圖層、輸入穿透、熱插拔 |
 | §11 柔光果凍與預設角色 | 助理入口與角色為供應者；與 Dock 對齊改用中立幾何（P04） |
-| §12／§12.1 插件中心與信任分級 | 設定頁擴充種類；第 6 節信任矩陣；第三方設定先採宣告式表單 |
+| §12／§12.1 插件中心與信任分級 | 設定頁擴充種類；第 6 節信任矩陣；第三方設定先採宣告式表單，前提是 Core 端依 `config_schema` 驗證 |
 | §13 組合配置、版本與狀態 | 新 slot／area；舊 Profile 的內建 fallback 投影；UI 暫態不進 Profile |
 | §14 變更交易、熱換與回復 | 已註冊／已掛載／允許顯示／實際可見；相同 `entry_id` 升版須讀回新版本；20 秒退休不等於任意時間撤銷 |
 | §15 架構與服務契約 | UI SDK 模組；Shell facade；以 `page_id` 路由的相容命令 |
@@ -267,7 +272,7 @@
 ## 14. 不在本契約範圍
 
 - 第三方或社群 QML 嵌入可信設定視窗（任何階段都不做；獨立 surface 待 #154／#155）。
-- 跨 Shell 崩潰保留 UI 暫態的儲存。
+- 跨 Shell 崩潰保留 UI 暫態的儲存，包括聊天草稿與未送出的附件。
 - 同程序內的逐插件故障隔離。
 - 受保護表面的替換：approval、鎖定、救援，以及試看列的保留／取消入口。
 - 第三方應用內部主題（依 #118）。

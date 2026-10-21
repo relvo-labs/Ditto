@@ -11,8 +11,8 @@
 ## 結論
 
 1. **設定頁採多條目 area，不另建 registry。** 新增 area `ui.settings_page`；頁面 metadata 為 manifest 的選用欄位 `settings_page: { page_id, title_key, order, category? }`。缺宣告與重複 `page_id` 在預檢以 `schema_invalid` 拒絕（`settings_page_missing`、`duplicate_page_id`），顯示順序固定為 `(order, page_id)`。`composition`、`plugins`、`history`、`personalization`、`ai` 五個內建 id 維持相容命令的目標；同 id 的套件頁取代內建頁，內建頁是可信備援。
-2. **跨信任設定擴充先採宣告式表單。** P02／P03 只把可信內建 QML 頁嵌入設定視窗；第三方設定由可信宿主依 `config_schema` 繪製表單，寫入走 `set_entry_config` ChangeSet，在 P03／P07 建置。第三方 QML 永不嵌入可信設定視窗；獨立 surface 等 #154／#155。
-3. **UI 暫態只在 Shell 程序記憶體。** 由 renderer 之外的 Shell facade 持有：受控切換時保留，Shell 崩潰或重啟後不保留。不寫入 Profile、revision 或匯出，本階段不新增 Core 儲存；每頁草稿序列化後 ≤64 KiB。
+2. **跨信任設定擴充先採宣告式表單。** P02／P03 只把可信內建 QML 頁嵌入設定視窗；第三方設定由可信宿主依 `config_schema` 繪製表單，寫入走 `set_entry_config` ChangeSet，在 P03／P07 建置。表單的前提是 Core 在預檢依 `config_schema` 驗證寫入的 `config`：現行 Core 只檢查 `config` 是物件（`crates/ditto-core/src/docops.rs:154-162`、`:225-230`），`config_schema` 只由 SDK 在作者端檢查；補上前表單不得啟用。第三方 QML 永不嵌入可信設定視窗；獨立 surface 等 #154／#155。
+3. **UI 暫態只在 Shell 程序記憶體。** 由 renderer 之外的 Shell facade 持有：受控切換時保留，Shell 崩潰或重啟後不保留；聊天草稿與未送出的附件一併遺失。不寫入 Profile、revision 或匯出，本階段不新增 Core 儲存；每頁草稿序列化後 ≤64 KiB。
 4. **UI SDK 是 Shell 擁有的 qmldir 模組。** 位置 `shell/sdk/Ditto/Ui/qmldir`，條目引用既有 `shell/ui`、`shell/change` 原始檔；套件以 `import "root:/sdk/Ditto/Ui"` 取得。主版本放在路徑，相容範圍暫以 `required_protocol_version` 表達。
 5. **舊 Profile 不遷移，走內建 fallback。** 沒有 `ui.background` 綁定或 `ui.settings_page` 成員時，Shell 顯示內建背景與內建頁，回報為 fallback。只有新 store 綁定官方套件；既有 Profile 經明確 ChangeSet 採用（P06）。
 
@@ -24,7 +24,7 @@ P02 的契約形狀（全部是選用欄位，依 D-39 相容規則加入，與 
 
 **第 2 項**：預檢只放行 `source: builtin` 且 `trusted` 的套件（`preflight.rs:328-352`），所有可信 QML 供應者同在 Shell 程序、無隔離（`shell/core/ProviderHost.qml:28-30`）。同程序沒有能擋住惡意程式碼的邊界，嵌入第三方 QML 等於把它當成可信程式碼。
 
-**第 3 項**：現行聊天草稿已只在記憶體（`shell/chat/ConversationState.qml:75`；[agent-0.3.md §3](../../../docs/contracts/agent-0.3.md)），附件內容留在 Core（`:77-80`）。跨崩潰保留需要另定保存期限與隱私政策，不能順手塞進 Profile（[ditto-authority-boundaries](../../skills/ditto-authority-boundaries/SKILL.md) 第 3 步：UI 暫態不進 Profile 匯出）。
+**第 3 項**：現行聊天草稿已只在記憶體（`shell/chat/ConversationState.qml:75`；[agent-0.3.md §3](../../../docs/contracts/agent-0.3.md)），附件內容留在 Core（`:77-80`），但未送出的附件跟著 Shell 的連線：連線結束時 Core 釋放該連線持有、尚未綁定 turn 的 context（`crates/ditto-core/src/lib.rs:795-800`、`context.rs:459-464`），所以 Shell 崩潰或重啟後未送出的附件也遺失；已保存的會話與 turn 仍在 Core。跨崩潰保留需要另定保存期限與隱私政策，不能順手塞進 Profile（[ditto-authority-boundaries](../../skills/ditto-authority-boundaries/SKILL.md) 第 3 步：UI 暫態不進 Profile 匯出）。
 
 **第 4 項**：Quickshell 多檔案解析 spike。環境：開發 VM 上的 Quickshell 0.3.1（rev `1a4716c`），offscreen，與執行中的工作階段分開；以 `Qt.createComponent("file:///…")` 載入，與 `ProviderHost` 相同。**只是開發證據**，不是登入工作階段或參考機證據。摘要由 coordinator 保存在執行紀錄，未進版控；下表即其摘要：
 
@@ -56,7 +56,7 @@ P02 的契約形狀（全部是選用欄位，依 D-39 相容規則加入，與 
 ## 影響
 
 - **P02（最小切片）**：Rust 型別、schema 與 TS 產物、SDK 規則、預檢兩個新原因、`check_shell` 比對 package／version、`ProviderHost`／`SlotHost` 的頁面註冊與只編譯的 prepare、`Centers` 改用 `flickable` 契約、內建背景的顯示切換、`shell/sdk/Ditto/Ui/qmldir`、修正 `shell/README.md` 的單一檔案規則。逐檔清單見契約第 12 節。
-- **P03**：五個官方頁套件化與外框替換；宣告式表單；新 store 綁定官方頁。
+- **P03**：五個官方頁套件化與外框替換；宣告式表單（前提是 Core 端 `config_schema` 驗證）；新 store 綁定官方頁；設定頁的圖示、可用條件與所需能力欄位定案（契約第 4.1 節，所需能力只是請求，不授予權限）。
 - **P06**：既有 Profile 的明確採用入口；token 套件形態。
 - **P07**：第三方設定擴充與信任矩陣延伸。
 - **#154／#155**：第三方 QML、獨立 surface 與能力代理仍是第三方接入的門檻；本決策不放寬 `trust_policy`。
