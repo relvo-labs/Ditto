@@ -34,13 +34,42 @@ FloatingWindow {
         return client ? client.t(source) : source;
     }
 
-    readonly property var pages: [
+    readonly property var builtinPages: [
         { id: "composition", label: qsTr("組合中心") },
         { id: "plugins", label: qsTr("插件中心") },
         { id: "history", label: qsTr("變更紀錄") },
         { id: "personalization", label: qsTr("個人化設定") },
         { id: "ai", label: qsTr("AI 設定") }
     ]
+
+    readonly property var registeredPages: providers ? providers.registeredPages || [] : []
+    readonly property var pages: {
+        const list = builtinPages.map(builtin => {
+            const page = registeredPages.find(p => p.page_id === builtin.id);
+            return page ? { id: builtin.id, label: page.title_key, translatedKey: true } : builtin;
+        });
+        const extra = registeredPages.filter(p => !builtinPages.some(b => b.id === p.page_id)).slice();
+        extra.sort((a, b) => a.order - b.order || (a.page_id < b.page_id ? -1 : a.page_id > b.page_id ? 1 : 0));
+        return list.concat(extra.map(p => ({ id: p.page_id, label: p.title_key, translatedKey: true })));
+    }
+    readonly property var registration: registeredPages.find(p => p.page_id === page) || null
+    readonly property var currentPageItem: content.item
+    readonly property bool pageFallback: content.usingFallback
+    function builtinComponent(id) {
+        switch (id) {
+        case "composition": return compositionPage;
+        case "plugins": return pluginsPage;
+        case "history": return historyPage;
+        case "personalization": return personalizationPage;
+        case "ai": return conversation ? aiPage : compositionPage;
+        default: return null;
+        }
+    }
+    function reportOpenPage() {
+        if (providers) providers.openPageEntry = visible && registration && !content.usingFallback && content.item ? registration.entry_id : "";
+    }
+    onVisibleChanged: reportOpenPage()
+    Component.onDestruction: { if (providers) providers.openPageEntry = ""; }
 
     title: t(qsTr("Ditto 設定"))
     implicitWidth: 1080
@@ -72,8 +101,8 @@ FloatingWindow {
     /// Tab to a control below (or above) the visible part of a page scrolls
     /// the page so the whole control shows, with a little room around it;
     /// a keyboard user can reach the last saved composition's actions.
-    /// The current page (every page is a Flickable).
-    readonly property Flickable pageFlick: content.item as Flickable
+    /// Embedded pages opt in; plain Items have no scrolling assumptions.
+    readonly property Flickable pageFlick: content.flickable
     function revealFocused() {
         FocusReveal.reveal(pageFlick, focusedItem, 16);
     }
@@ -223,7 +252,7 @@ FloatingWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
                             anchors.leftMargin: window.jelly ? window.tokens.uiPadCard + 14 : window.tokens.space
-                            text: window.t(modelData.label)
+                            text: modelData.translatedKey && window.client ? window.client.key(modelData.label, {}) : window.t(modelData.label)
                             color: window.jelly ? window.tokens.uiInk
                                 : parent.current ? window.tokens.accentForeground : window.tokens.foreground
                             font.pixelSize: window.jelly ? window.tokens.uiFontLabel : window.tokens.fontBody
@@ -260,18 +289,21 @@ FloatingWindow {
             }
         }
 
-        Loader {
+        SettingsPageContainer {
             id: content
             anchors.left: sidebar.right
             anchors.right: parent.right
             anchors.top: window.jelly ? header.bottom : parent.top
             anchors.bottom: parent.bottom
             anchors.bottomMargin: window.jelly ? window.tokens.uiGap : 0
-            sourceComponent: window.page === "plugins" ? pluginsPage
-                : window.page === "history" ? historyPage
-                : window.page === "personalization" ? personalizationPage
-                : window.page === "ai" && window.conversation ? aiPage
-                : compositionPage
+            client: window.client
+            tokens: window.tokens
+            pageId: window.page
+            registration: window.registration
+            fallbackComponent: window.builtinComponent(window.page)
+            active: window.visible
+            onItemChanged: window.reportOpenPage()
+            onUsingFallbackChanged: window.reportOpenPage()
         }
 
         /// Styled pages show how far they scroll: a slim bar at the right
@@ -280,7 +312,7 @@ FloatingWindow {
         Rectangle {
             id: scrollBar
             objectName: "centersScrollBar"
-            readonly property var flick: content.item
+            readonly property var flick: window.pageFlick
             readonly property bool overflow: !!flick && flick.contentHeight !== undefined && flick.contentHeight > flick.height + 1
             visible: window.jelly && overflow
             anchors.right: content.right

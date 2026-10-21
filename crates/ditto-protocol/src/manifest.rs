@@ -119,6 +119,25 @@ pub struct RescueDecl {
     pub disable_safe: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SettingsPageDecl {
+    #[schemars(regex(pattern = "^[a-z][a-z0-9_]{0,31}$"))]
+    pub page_id: String,
+    pub title_key: String,
+    pub order: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+}
+
+pub fn valid_page_id(id: &str) -> bool {
+    (1..=32).contains(&id.len())
+        && id.as_bytes()[0].is_ascii_lowercase()
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
@@ -142,6 +161,8 @@ pub struct Manifest {
     pub required_protocol_version: String,
     #[serde(default)]
     pub slots: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_page: Option<SettingsPageDecl>,
     #[serde(default)]
     pub provides: Vec<Item>,
     #[serde(default)]
@@ -249,6 +270,13 @@ impl Manifest {
                 }
             }
         }
+        if self
+            .settings_page
+            .as_ref()
+            .is_some_and(|page| !valid_page_id(&page.page_id))
+        {
+            problems.push("invalid settings_page page_id".into());
+        }
         for event in &self.events {
             if !event.schema.is_object() {
                 problems.push(format!("event {} needs a schema", event.name));
@@ -293,6 +321,50 @@ mod tests {
             "idle_policy": "resident"
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn settings_page_metadata_is_additive_and_structurally_checked() {
+        let old = manifest();
+        let wire = serde_json::to_value(&old).unwrap();
+        assert!(wire.get("settings_page").is_none());
+        assert_eq!(
+            serde_json::from_value::<Manifest>(wire.clone()).unwrap(),
+            old
+        );
+        assert_eq!(serde_json::to_value(old).unwrap(), wire);
+        for page_id in ["history", "a", "a_1", &"a".repeat(32)] {
+            let mut m = manifest();
+            m.settings_page = Some(SettingsPageDecl {
+                page_id: page_id.into(),
+                title_key: "title".into(),
+                order: -1,
+                category: None,
+            });
+            assert!(m.check().is_empty());
+            let value = serde_json::to_value(&m).unwrap();
+            assert!(value["settings_page"].get("category").is_none());
+            assert_eq!(serde_json::from_value::<Manifest>(value).unwrap(), m);
+        }
+        for id in ["", "History", "1a", "a-b", "é", &"a".repeat(33)] {
+            let mut m = manifest();
+            m.settings_page = Some(SettingsPageDecl {
+                page_id: id.into(),
+                title_key: "title".into(),
+                order: 0,
+                category: None,
+            });
+            assert!(m.check().iter().any(|p| p.contains("page_id")), "{id}");
+        }
+        for patch in [
+            serde_json::json!({"page_id":"a","title_key":1,"order":0}),
+            serde_json::json!({"page_id":"a","title_key":"t","order":1.1}),
+            serde_json::json!({"page_id":"a","title_key":"t","order":2147483648_i64}),
+        ] {
+            let mut wire = wire.clone();
+            wire["settings_page"] = patch;
+            assert!(serde_json::from_value::<Manifest>(wire).is_err());
+        }
     }
 
     #[test]

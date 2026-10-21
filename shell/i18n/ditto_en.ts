@@ -2151,6 +2151,14 @@
         <source>unavailable.system_unavailable</source>
         <translation>A system service is not answering</translation>
     </message>
+    <message>
+        <source>slot.ui.background</source>
+        <translation>Desktop background</translation>
+    </message>
+    <message>
+        <source>slot.ui.settings_page</source>
+        <translation>Settings pages</translation>
+    </message>
 </context>
 <context>
     <name>DockBottom</name>
@@ -3409,6 +3417,52 @@
     <message>
         <source>顯示診斷</source>
         <translation>Show diagnostics</translation>
+    </message>
+</context>
+<context>
+    <name>HistoryPage</name>
+    <message>
+        <source>保留</source>
+        <translation>Keep</translation>
+    </message>
+    <message>
+        <source>取消並回復</source>
+        <translation>Cancel and revert</translation>
+    </message>
+    <message>
+        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
+        <translation>Undone. The undo is recorded as a change of its own.</translation>
+    </message>
+    <message>
+        <source>撤銷這次變更</source>
+        <translation>Undo this change</translation>
+    </message>
+    <message>
+        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
+        <translation>Every change to the desktop is recorded here, including the ones that did not apply. Undo goes back one step at a time; newer changes have to be undone first.</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>Change history</translation>
+    </message>
+    <message>
+        <source>載入較早的紀錄</source>
+        <translation>Load older entries</translation>
+    </message>
+    <message>
+        <source>還沒有任何變更。</source>
+        <translation>No changes yet.</translation>
+    </message>
+</context>
+<context>
+    <name>SettingsPageContainer</name>
+    <message>
+        <source>這個頁面無法載入。請在插件中心停用它，或稍後再試。</source>
+        <translation>This page could not load. Disable it in the plugin center, or try again later.</translation>
     </message>
 </context>
 </TS>

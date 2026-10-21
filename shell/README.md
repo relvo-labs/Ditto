@@ -73,7 +73,13 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 
 所有表面的 `visible` 與 `exclusiveZone` 都要綁 `shown`。資料訂閱在 `shown` 變成 `true` 才開始，所以候選載入不發請求、不佔輸入區、不影響幀時。
 
-限制：供應者從套件庫以絕對路徑載入，**不能 import Shell 內部的相對路徑**，而且目前必須是**單一檔案**——Quickshell 0.3.1 對設定資料夾以外的目錄只解析得到第一個型別。
+供應者以絕對 `file://` URL 載入。Quickshell 0.3.1 的離屏實測可解析同目錄型別、套件內相對子目錄與絕對目錄 import；跨出設定目錄的相對 import 與沒有 qmldir 的 `root:/` 目錄解析不完整。不得 import Shell 私有相對路徑；共用元件使用 `import "root:/sdk/Ditto/Ui"`（Shell 擁有的 `qmldir`，引用原始 ui/change 元件，不複製）。真實登入與同 URL 改檔後熱換尚待驗證。
+
+`ui.settings_page` 是多條目 area：manifest 的 `settings_page` 宣告 `page_id`、`title_key`、`order`、可選 `category`。prepare 只編譯，commit 登錄導覽，按 `(order, page_id)` 排序。同 id 取代內建頁，額外 id 附加；建立失敗時回到同 id 內建頁，沒有內建頁則顯示錯誤。根為 `Item`，只在設定視窗開啟時建立，接收 `client`、`tokens`、`config`、`pageId`、`entryId`；可選 `flickable` 提供捲動與焦點揭露。`mounted && visible` 表示已登錄，`page_state` 的 `registered/open` 只供觀測。`ditto.settings.history` 示範此契約，內建 HistoryCenter 保留為可信備援。
+
+`ui.background` 是單供應者 slot，根為 `Scope`，每輸出建立 Background layer 視窗，`exclusionMode: Ignore`、空輸入區，`visible` 綁定 `shown`。`ditto.background.default` 使用現有 Backdrop。沿用 SlotHost 的交接順序：舊實例先 release，再顯示候選並設為 active；內建背景在沒有 active+shown provider 時顯示，commit 後隱藏，release/rollback 後恢復。同一同步呼叫內完成路由變更，盡量避免空白；這不是合成器逐幀呈現的保證。兩種新掛載回報實際持有的 package/version。
+
+本切片不在任何預設文件加入新綁定；舊 Profile 與未採用新套件的桌面繼續使用內建背景／頁面，備援不冒充套件已載入。採用由後續明確 ChangeSet 處理。可信內建 QML 與 Shell 同程序，沒有逐插件強隔離。
 
 ### 交易（ProviderHost）
 
@@ -169,4 +175,3 @@ Quickshell 會監看設定目錄，改了 `shell/` 下的 QML 就整個重新載
 - 快捷鍵「Super＋數字聚焦第 N 個視窗」：沒有對應的命令，未實作。
 - 音量與網路只顯示與簡單調整（PipeWire、NetworkManager）；headless 開發環境兩者都不可用，只驗到「不可用」的顯示。
 - 螢幕閱讀（Orca）的人工走查、中文輸入法在命名欄位的實測，屬人工驗收清單，尚未執行。
-- 供應者必須是單一 QML 檔（見上）。

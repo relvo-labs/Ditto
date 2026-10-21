@@ -11,6 +11,9 @@ import QtQuick
 /// input region, so loading it cannot take a click or a frame from the
 /// desktop. Incubation is asynchronous for the same reason.
 ///
+/// Settings-page units hold a compiled Component instead of an object: prepare
+/// never instantiates a page; commit registers it for Centers to open later.
+///
 /// After a commit the old provider is released (surfaces, zone and input
 /// gone) but kept as `retired` until the next prepare or for `retireMs`, so
 /// that a rollback restores that same instance instead of building a new one
@@ -27,6 +30,7 @@ QtObject {
     /// The key of this unit's prepare/commit/rollback items: the slot, or the
     /// member's entry id.
     property string itemKey: name
+    readonly property bool settingsPage: reportedSlot === "ui.settings_page"
     readonly property bool inArea: reportedSlot !== name
 
     /// { object, binding } — binding is the ShellSlotBinding it was built from.
@@ -52,7 +56,8 @@ QtObject {
         }
         return left.entry_id === right.entry_id && left.qml_url === right.qml_url
             && left.package === right.package && left.version === right.version
-            && JSON.stringify(left.config) === JSON.stringify(right.config);
+            && JSON.stringify(left.config) === JSON.stringify(right.config)
+            && JSON.stringify(left.settings_page) === JSON.stringify(right.settings_page);
     }
 
     function needsChange(binding) {
@@ -197,7 +202,12 @@ QtObject {
                 return;
             }
             if (component.status === Component.Ready) {
-                incubate(component, binding);
+                if (settingsPage) {
+                    candidate.component = component;
+                    finishPrepare("ready", "");
+                } else {
+                    incubate(component, binding);
+                }
             } else if (component.status === Component.Error) {
                 console.log("ditto-shell " + name + " candidate did not load: " + component.errorString().trim());
                 finishPrepare("failed", "the provider's QML did not load");
@@ -226,11 +236,11 @@ QtObject {
             releaseObject(old.object);
         }
         dropRetired();
-        retired = old ? { object: old.object, binding: old.binding, changeId: changeId } : { object: null, binding: null, changeId: changeId };
+        retired = old ? { object: old.object, component: old.component, binding: old.binding, changeId: changeId } : { object: null, binding: null, changeId: changeId };
         if (candidate.object) {
             candidate.object.shown = true;
         }
-        active = candidate.binding ? { object: candidate.object, binding: candidate.binding } : null;
+        active = candidate.binding ? { object: candidate.object, component: candidate.component, binding: candidate.binding } : null;
         candidate = null;
         retireTimer.restart();
         return { key: itemKey, status: "applied" };
@@ -256,7 +266,7 @@ QtObject {
         if (back.object) {
             back.object.shown = true;
         }
-        active = back.binding ? { object: back.object, binding: back.binding } : null;
+        active = back.binding ? { object: back.object, component: back.component, binding: back.binding } : null;
         return { key: itemKey, status: "restored" };
     }
 
@@ -291,6 +301,14 @@ QtObject {
             return null;
         }
         const object = active.object;
+        if (settingsPage) {
+            // Registration survives a later page-open failure; open is separate.
+            const registered = !!active.component;
+            return { slot: reportedSlot, entry_id: active.binding.entry_id,
+                package: active.binding.package, version: active.binding.version,
+                mounted: registered, visible: registered,
+                page_state: host.openPageEntry === active.binding.entry_id ? "open" : "registered" };
+        }
         const mount = {
             slot: reportedSlot,
             entry_id: active.binding.entry_id,
@@ -299,6 +317,10 @@ QtObject {
             // on screen, not merely shown.
             visible: !!object && object.shown === true && (!inArea || host.isPlaced(object))
         };
+        if (reportedSlot === "ui.background") {
+            mount.package = active.binding.package;
+            mount.version = active.binding.version;
+        }
         if (active.binding.qml_url === "ditto-generated:fixed") {
             mount.artifact_id = object && object.config ? object.config.artifact_id || null : null;
         }

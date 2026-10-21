@@ -612,6 +612,16 @@
           "$ref": "#/$defs/RuntimeRequirement",
           "default": {}
         },
+        "settings_page": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettingsPageDecl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "shortcuts": {
           "default": [],
           "items": {
@@ -768,6 +778,34 @@
           ]
         }
       },
+      "type": "object"
+    },
+    "SettingsPageDecl": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "order": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "page_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+          "type": "string"
+        },
+        "title_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_id",
+        "title_key",
+        "order"
+      ],
       "type": "object"
     },
     "ShortcutDecl": {

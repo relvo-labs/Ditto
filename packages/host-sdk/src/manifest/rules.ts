@@ -46,7 +46,7 @@ const known = new Set([
   'manifest_version', 'id', 'version', 'name', 'author', 'license', 'source', 'description', 'plugin_kind', 'host_kind',
   'trust_level', 'runtime', 'platform', 'required_protocol_version', 'slots', 'provides', 'requires', 'optional',
   'conflicts', 'entry', 'qml_entry', 'config_schema', 'data_schema', 'commands', 'shortcuts', 'events', 'permissions',
-  'hot_swap', 'health', 'cleanup', 'migrations', 'activation_events', 'idle_policy', 'resource_budget', 'rescue',
+  'hot_swap', 'health', 'cleanup', 'migrations', 'activation_events', 'idle_policy', 'resource_budget', 'rescue', 'settings_page',
 ])
 
 type Obj = Record<string, unknown>
@@ -152,6 +152,18 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
 
   const slots = array('slots')
   slots?.forEach((slot, i) => { if (typeof slot !== 'string' || !slotPattern.test(slot)) error(`/slots/${i}`, 'schema_invalid', 'must be a slot id such as ui.dock') })
+
+  const page = m['settings_page']
+  if (page !== undefined && page !== null) {
+    if (!isObject(page)) error('/settings_page', 'schema_invalid', 'must be a settings page declaration')
+    else {
+      for (const key of Object.keys(page)) if (!['page_id', 'title_key', 'order', 'category'].includes(key)) error(`/settings_page/${key}`, 'schema_invalid', 'is not a settings page field')
+      if (typeof page['page_id'] !== 'string' || !/^[a-z][a-z0-9_]{0,31}$/.test(page['page_id'])) error('/settings_page/page_id', 'schema_invalid', 'must match ^[a-z][a-z0-9_]{0,31}$')
+      if (typeof page['title_key'] !== 'string') error('/settings_page/title_key', 'schema_invalid', 'must be a string')
+      if (typeof page['order'] !== 'number' || !Number.isInteger(page['order']) || page['order'] < -2_147_483_648 || page['order'] > 2_147_483_647) error('/settings_page/order', 'schema_invalid', 'must be a signed 32-bit integer')
+      if (page['category'] !== undefined && page['category'] !== null && typeof page['category'] !== 'string') error('/settings_page/category', 'schema_invalid', 'must be a string or null')
+    }
+  }
 
   const provides = array('provides') ?? []
   const provided: string[] = []

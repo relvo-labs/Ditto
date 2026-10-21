@@ -273,6 +273,7 @@ export interface Manifest {
   rescue?: RescueDecl;
   resource_budget?: ResourceBudget;
   runtime?: RuntimeRequirement;
+  settings_page?: SettingsPageDecl | null;
   shortcuts?: ShortcutDecl[];
   slots?: string[];
   source: string;
@@ -313,6 +314,12 @@ export interface ResourceBudget {
 export interface RuntimeRequirement {
   node?: string | null;
   qt?: string | null;
+}
+export interface SettingsPageDecl {
+  category?: string | null;
+  order: number;
+  page_id: string;
+  title_key: string;
 }
 export interface ShortcutDecl {
   chord: string;

@@ -47,7 +47,7 @@ QtObject {
     /// unit name (slot, or `<area>#<entry_id>`) → SlotHost
     property var slots: ({})
     /// Multi-entry areas; every other `ui.*` name is a single-provider slot.
-    readonly property var areas: ["ui.status_item", "ui.generated_panel"]
+    readonly property var areas: ["ui.status_item", "ui.generated_panel", "ui.settings_page"]
     /// area → unit names of its committed members, in Profile order.
     property var areaOrder: ({})
     /// change id → { phase, slots: [names], appearance: previous, avatar: previous, target }
@@ -58,7 +58,39 @@ QtObject {
     /// url → Component, so a swap back and forth reuses the compiled type.
     property var components: ({})
 
+    /// Shell-owned observations, never a second Profile or persistent registry.
+    property var registeredPages: []
+    property string openPageEntry: ""
+    onOpenPageEntryChanged: sendReport()
+    readonly property bool backgroundShown: {
+        const unit = slots["ui.background"];
+        return !!unit && !!unit.activeItem && unit.activeItem.shown === true;
+    }
     signal mountsChanged()
+
+    function refreshPages() {
+        const pages = [];
+        for (const name of (areaOrder["ui.settings_page"] || [])) {
+            const active = slots[name] ? slots[name].active : null;
+            if (!active || !active.component || !active.binding.settings_page) continue;
+            const metadata = active.binding.settings_page;
+            const config = active.binding.config || {};
+            const previous = registeredPages.find(page => page.entry_id === active.binding.entry_id);
+            // Unrelated commits must not recreate an open page or its UI state.
+            if (previous && previous.component === active.component
+                && same(previous.config, config) && previous.page_id === metadata.page_id
+                && previous.title_key === metadata.title_key && previous.order === metadata.order
+                && previous.category === metadata.category) {
+                pages.push(previous);
+            } else {
+                pages.push(Object.assign({}, metadata, {
+                    entry_id: active.binding.entry_id, component: active.component, config: config
+                }));
+            }
+        }
+        pages.sort((a, b) => a.order - b.order || (a.page_id < b.page_id ? -1 : a.page_id > b.page_id ? 1 : 0));
+        registeredPages = pages;
+    }
 
     readonly property string devProviders: Quickshell.env("DITTO_SHELL_DEV_PROVIDERS") || ""
     /// Development only: package id → source directory under shell/providers.
@@ -69,7 +101,9 @@ QtObject {
         "ditto.launcher.grid": "launcher_grid",
         "ditto.launcher.search": "launcher_search",
         "ditto.tasks.panel": "tasks_panel",
-        "ditto.notifications.area": "notifications"
+        "ditto.notifications.area": "notifications",
+        "ditto.settings.history": "settings_history",
+        "ditto.background.default": "background_default"
     })
 
     property Component slotComponent: Component {
@@ -218,6 +252,7 @@ QtObject {
     }
 
     function reportMounts() {
+        refreshPages();
         mountsChanged();
         sendReport();
     }

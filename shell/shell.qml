@@ -349,28 +349,9 @@ ShellRoot {
         onTriggered: providers.reportPlacement()
     }
 
-    Variants {
-        model: Quickshell.screens
-
-        PanelWindow {
-            required property var modelData
-            screen: modelData
-            anchors { top: true; bottom: true; left: true; right: true }
-            exclusionMode: ExclusionMode.Ignore
-            aboveWindows: false
-            color: tokens.background
-            WlrLayershell.layer: WlrLayer.Background
-            WlrLayershell.namespace: "ditto-background"
-
-            /// The canvas, with the light recipe's default wallpaper on top
-            /// once it has loaded. A per-Profile wallpaper field is still
-            /// Core's (docs/design/default-desktop/component-sheet.md H2).
-            Backdrop {
-                anchors.fill: parent
-                tokens: root.shellTokens
-                wallpaperSource: root.shellTokens.wallpaper
-            }
-        }
+    BackgroundFallback {
+        providers: root.shellProviders
+        tokens: root.shellTokens
     }
 
     /// The four centers share one window, loaded only while open: closed

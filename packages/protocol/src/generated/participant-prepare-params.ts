@@ -87,8 +87,15 @@ export interface ShellSlotBinding {
    * `file://` URL of the provider's `qml_entry` inside the package store.
    */
   qml_url: string;
+  settings_page?: SettingsPageDecl | null;
   slot: string;
   version: string;
+}
+export interface SettingsPageDecl {
+  category?: string | null;
+  order: number;
+  page_id: string;
+  title_key: string;
 }
 export interface HostEntryProjection {
   cleanup_timeout_ms: number;

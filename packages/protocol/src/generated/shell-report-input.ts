@@ -8,6 +8,7 @@ export type AvatarPresentation = 'assistant';
  * Where on its output the character sits.
  */
 export type AvatarCorner = 'bottom_right' | 'bottom_left' | 'top_right' | 'top_left';
+export type PageState = 'registered' | 'open';
 
 export interface ShellObservation {
   appearance?: Appearance | null;
@@ -96,6 +97,9 @@ export interface PanelMount {
   artifact_id?: string | null;
   entry_id: string;
   mounted: boolean;
+  package?: string | null;
+  page_state?: PageState | null;
   slot: string;
+  version?: string | null;
   visible: boolean;
 }

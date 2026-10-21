@@ -25,8 +25,8 @@ describe('manifest rules (docs/contracts/manifest.md)', () => {
     // Keep all three producer roots from scripts/build-builtin-packages.sh in the inventory.
     const builtins = ['shell/providers', 'packaging/builtin', 'packages/plugins'].flatMap(dir => manifestDirs(join(root, dir)))
     const kinds = builtins.map(dir => JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).plugin_kind)
-    expect(builtins).toHaveLength(11)
-    expect(kinds.filter(kind => kind === 'qml_provider')).toHaveLength(7)
+    expect(builtins).toHaveLength(13)
+    expect(kinds.filter(kind => kind === 'qml_provider')).toHaveLength(9)
     expect(kinds.filter(kind => kind === 'service')).toHaveLength(2)
     expect(kinds.filter(kind => kind === 'declarative_bundle')).toHaveLength(2)
     const dirs = [
@@ -68,6 +68,23 @@ describe('manifest rules (docs/contracts/manifest.md)', () => {
     ['conflicting with itself', { conflicts: ['ditto.example.counter'] }, 'declared_conflict'],
   ])('rejects %s', (_label, patch, code) => {
     expect(codes(withField(patch))).toContain(code)
+  })
+
+  it('accepts additive settings metadata with or without the generated schema', () => {
+    for (const options of [{}, { schema }]) {
+      for (const settings_page of [undefined, null, { page_id: 'history', title_key: 'command.history.open', order: 30 }, { page_id: 'a_1', title_key: '', order: -2147483648, category: 'general' }]) {
+        const result = validateManifest(settings_page === undefined ? counter : withField({ settings_page }), options)
+        expect(result.errors).toEqual([])
+        expect(result.warnings.some(w => w.path === '/settings_page')).toBe(false)
+      }
+    }
+  })
+
+  it.each([
+    { page_id: 'History' }, { page_id: '' }, { page_id: 'a'.repeat(33) }, { page_id: 'a-b' },
+    { title_key: 1 }, { order: 1.2 }, { order: 2147483648 }, { category: 4 }, { extra: true },
+  ])('rejects malformed settings metadata %j', patch => {
+    for (const options of [{}, { schema }]) expect(codes(withField({ settings_page: { page_id: 'history', title_key: 'history', order: 30, ...patch } }), options)).toContain('schema_invalid')
   })
 
   it('warns, without failing, where only Core policy can decide', () => {
