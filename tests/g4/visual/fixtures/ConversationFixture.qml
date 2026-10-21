@@ -21,6 +21,16 @@ QtObject {
         models: [{ id: "fixture-model", label: "Fixture model", reasoning_efforts: ["low", "medium"], default_effort: "low" }] }) : null
     property bool settingsFailed: false
     property bool providerFailed: false
+    // Availability projection consumed by the merged chat/settings surfaces.
+    readonly property bool subscriptionSelected: settings.provider === "codex-app-server"
+    readonly property bool subscriptionUnavailable: false
+    readonly property string subscriptionUnavailableText: ""
+    readonly property bool canLogin: false
+    readonly property bool runtimeControllerUnavailable: false
+    readonly property bool runtimePending: false
+    readonly property bool runtimeFailed: false
+    readonly property string runtimeFailureText: ""
+    readonly property string runtimeStatusText: ""
     property var login: null
     readonly property string taskState: active ? "awaiting" : "offline"
     readonly property string stateText: active ? "需要你的確認" : "AI 對話已關閉；桌面仍可照常操作"

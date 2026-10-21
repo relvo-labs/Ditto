@@ -669,6 +669,10 @@
         <translation>AI 設定</translation>
     </message>
     <message>
+        <source>API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。</source>
+        <translation>API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。</translation>
+    </message>
+    <message>
         <source>Ditto 對話</source>
         <translation>Ditto 對話</translation>
     </message>
@@ -707,6 +711,10 @@
     <message>
         <source>刪除這段對話（桌面維持原樣）</source>
         <translation>刪除這段對話（桌面維持原樣）</translation>
+    </message>
+    <message>
+        <source>前往 AI 設定</source>
+        <translation>前往 AI 設定</translation>
     </message>
     <message>
         <source>剪貼簿</source>
@@ -1226,6 +1234,30 @@
         <translation>AI 對話已關閉；桌面仍可照常操作</translation>
     </message>
     <message>
+        <source>AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。</source>
+        <translation>AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>Codex 訂閱無法使用</source>
+        <translation>Codex 訂閱無法使用</translation>
+    </message>
+    <message>
+        <source>Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
         <source>只完成了一部分；請查看變更卡</source>
         <translation>只完成了一部分；請查看變更卡</translation>
     </message>
@@ -1274,6 +1306,10 @@
         <translation>模型沒有回應；桌面沒有被改動，可以再試一次</translation>
     </message>
     <message>
+        <source>模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。</source>
+        <translation>模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。</translation>
+    </message>
+    <message>
         <source>正在停止</source>
         <translation>正在停止</translation>
     </message>
@@ -1288,6 +1324,10 @@
     <message>
         <source>正在理解需求；可停止</source>
         <translation>正在理解需求；可停止</translation>
+    </message>
+    <message>
+        <source>正在讀取模型連線狀態…</source>
+        <translation>正在讀取模型連線狀態…</translation>
     </message>
     <message>
         <source>正在重新連線；將查詢實際結果</source>
@@ -1314,6 +1354,14 @@
         <translation>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</translation>
     </message>
     <message>
+        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
+        <translation>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</translation>
+    </message>
+    <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
         <translation>結果尚未確認；不要重複送出，請查看變更紀錄</translation>
     </message>
@@ -1324,6 +1372,18 @@
     <message>
         <source>這次登入已逾期，請重新開始。</source>
         <translation>這次登入已逾期，請重新開始。</translation>
+    </message>
+    <message>
+        <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>這台電腦的 Codex 檔案不符合 Ditto 支援的版本；請依安裝說明核對檔案後重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>這台電腦的 Codex 檔案不符合 Ditto 支援的版本；請依安裝說明核對檔案後重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
     <message>
         <source>需要你的確認</source>

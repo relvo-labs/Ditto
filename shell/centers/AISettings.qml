@@ -118,11 +118,16 @@ Flickable {
                 objectName: "aiProviderStatus"
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: !page.provider
+                text: page.conversation.enabled && page.conversation.subscriptionUnavailable
+                    ? page.conversation.subscriptionUnavailableText
+                    : !page.provider
                     ? (!page.settings ? page.t(qsTr("讀取 AI 設定後才能確認模型連線。"))
                         : !page.conversation.enabled ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
                         : page.conversation.providerFailed ? page.t(qsTr("無法讀取模型連線狀態；目前無法確認是否已登入。"))
                         : page.t(qsTr("正在讀取模型連線狀態…")))
+                    : page.conversation.subscriptionUnavailable ? page.conversation.subscriptionUnavailableText
+                    : page.conversation.enabled && page.provider.authenticated && !page.conversation.connected
+                        ? page.conversation.runtimeStatusText
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
                         : page.conversation.login ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg(page.conversation.login.auth_url).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
@@ -156,7 +161,7 @@ Flickable {
             Row {
                 spacing: page.tokens.space
                 Button {
-                    visible: !!page.provider && !page.provider.authenticated && !page.conversation.login
+                    visible: page.conversation.canLogin && !page.conversation.login
                     tokens: page.tokens
                     kind: "primary"
                     text: page.t(qsTr("使用 Codex 訂閱登入"))
@@ -221,6 +226,17 @@ Flickable {
             visible: page.direct
             title: page.t(qsTr("API 金鑰連線"))
             note: page.t(qsTr("金鑰直接存進系統鑰匙圈，設定裡只留它的代號；端點必須是 HTTPS（本機除外）。費用依供應商計價，Ditto 尚無費率資料。"))
+
+            Text {
+                objectName: "aiRuntimeStatus"
+                visible: page.conversation.enabled && (page.conversation.runtimeControllerUnavailable
+                    || page.conversation.runtimePending || page.conversation.runtimeFailed)
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.conversation.runtimeControllerUnavailable ? page.conversation.runtimeFailureText : page.conversation.runtimeStatusText
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
+            }
 
             TextField {
                 id: endpoint

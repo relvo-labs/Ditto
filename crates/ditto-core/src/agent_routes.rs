@@ -418,12 +418,7 @@ pub fn dispatch(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
                 call.remaining().min(Duration::from_secs(30)),
             );
             core.agent.activity(&key, false);
-            let value = result.map_err(|_| {
-                CoreError::unavailable(
-                    UnavailableReason::SystemUnavailable,
-                    "model provider did not answer",
-                )
-            })?;
+            let value = result.map_err(provider_error)?;
             match method {
                 "agent.providers.status" => ok(serde_json::from_value::<ProviderStatus>(value)
                     .map_err(|_| CoreError::internal("invalid provider status"))?),
@@ -691,4 +686,77 @@ fn approval_target(
         .to_string();
     let profile = core.read(move |c| ditto_store::profiles::get(c, &profile_id))?;
     Ok(Some(profile.name))
+}
+
+/// Keep only known provider reasons in the existing RPC error data. Neither
+/// remote diagnostics nor arbitrary data (which may contain secrets) cross it.
+fn provider_error(error: crate::peers::PeerError) -> CoreError {
+    let mut mapped = CoreError::unavailable(
+        UnavailableReason::SystemUnavailable,
+        "model provider request failed",
+    );
+    if let crate::peers::PeerError::Remote(remote) = error {
+        if let Some(
+            reason @ ("backend_unsupported"
+            | "provider_unavailable"
+            | "provider_timeout"
+            | "rate_limited"),
+        ) = remote
+            .data
+            .as_ref()
+            .and_then(|data| data.get("reason_code"))
+            .and_then(serde_json::Value::as_str)
+        {
+            mapped.data = Some(
+                json!({"reason": UnavailableReason::SystemUnavailable, "reason_code": reason}),
+            );
+        }
+    }
+    mapped
+}
+
+#[cfg(test)]
+mod provider_error_tests {
+    use super::*;
+    use crate::peers::PeerError;
+    use ditto_protocol::rpc::RpcError;
+
+    #[test]
+    fn provider_route_preserves_closed_reason_codes() {
+        for reason in [
+            "backend_unsupported",
+            "provider_unavailable",
+            "provider_timeout",
+            "rate_limited",
+        ] {
+            let error = provider_error(PeerError::Remote(RpcError {
+                code: ErrorName::Unavailable.code(),
+                name: ErrorName::Unavailable,
+                message: "private provider diagnostic".into(),
+                outcome: None,
+                data: Some(
+                    json!({"reason":"system_unavailable", "reason_code":reason, "secret":"never forward"}),
+                ),
+            }));
+            assert_eq!(error.name, ErrorName::Unavailable);
+            assert_eq!(
+                error.data,
+                Some(json!({"reason":"system_unavailable", "reason_code":reason}))
+            );
+            assert!(!error.message.contains("private"));
+        }
+    }
+
+    #[test]
+    fn provider_route_does_not_forward_unknown_remote_data() {
+        let error = provider_error(PeerError::Remote(RpcError {
+            code: ErrorName::Internal.code(),
+            name: ErrorName::Internal,
+            message: "private provider diagnostic".into(),
+            outcome: None,
+            data: Some(json!({"reason_code":"untrusted text", "secret":"never forward"})),
+        }));
+        assert_eq!(error.data, Some(json!({"reason":"system_unavailable"})));
+        assert!(!error.message.contains("private"));
+    }
 }

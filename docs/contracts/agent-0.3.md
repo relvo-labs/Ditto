@@ -25,7 +25,7 @@
 
 ## 3. Shell 對話（最小入口）
 
-`shell/chat/ConversationState.qml` 是唯一的對話投影：開啟聊天後才訂閱、才讓 Core 啟動 Agent。草稿只在記憶體；送出用固定 `client_message_id`，失敗時保留文字、重試不會被 Core 接受兩次。角色七態由 Core turn 狀態與工具紀錄導出，`starting` 是 Core 生命週期狀態。登入只把官方授權網址交給系統瀏覽器；Shell 從不接觸 token。登入等待期間每 3 秒以單一 in-flight 讀取 provider 狀態與可用的登入結果，直到完成或到期；原生完成事件由 adapter 投影為第 6 節的唯讀結果。
+`shell/chat/ConversationState.qml` 是唯一的對話投影：開啟聊天後才訂閱、才讓 Core 啟動 Agent。草稿只在記憶體；送出用固定 `client_message_id`，失敗時保留文字、重試不會被 Core 接受兩次。角色七態由 Core turn 狀態與工具紀錄導出，`starting` 是 Core 生命週期狀態。登入只把官方授權網址交給系統瀏覽器；Shell 從不接觸 token。登入等待期間每 3 秒以單一 in-flight 讀取 provider 狀態與可用的登入結果，直到完成或到期；原生完成事件由 adapter 投影為第 7 節的唯讀結果。
 
 Shell 控制 socket 新增：`chat`（唯讀 JSON：狀態、事件種類、變更 id、最後回答）、`chat-send <text>`（等同在欄位輸入並按 Enter）。
 
@@ -47,7 +47,30 @@ G3 固定模板由 Shell **實際掛載物件的 config** 回報 artifact id。C
 
 舊 Core 的 strict schema 不接受此新增欄位，故新增欄位只由配對的 G3 Core／Shell build 使用；混用舊 Core 會明確拒絕，不忽略欄位。新 Core 配舊 Shell 可以維持普通桌面；生成啟用因缺少版本證據而失敗，不宣告成功。此增補不新增事件、錯誤列舉或 approval 類型。三個共用向量涵蓋舊格式、新格式及錯誤型別拒絕。
 
-## 6. 登入結果回讀 v1.0.0（catalog revision 7）
+## 6. Codex 訂閱可用性與錯誤原因
+
+`agent.providers.status` 的 `available: false` 表示這次執行無法提供 Codex 訂閱連線，可能未配置支援版本，也可能初始化失敗；不能據此宣稱只是尚未登入。Shell 只在 `available: true` 且未登入時提供訂閱登入入口。AI 設定仍保留 API 金鑰選項；API 連線以 `agent.credentials.status` 確認金鑰引用可用，不要求 Codex 登入，也不讀取金鑰值。這是本機配置就緒狀態，不代表遠端模型已通過網路驗證。桌面啟動不要求 Codex。
+
+Shell 也讀取 `agent.runtime.get`：已確認的啟動故障或 ready 世代的空 `backend_pid` 會優先於過時的 provider 狀態，阻止登入。只有回讀到存在且隔離已驗證的 backend，`backend_unsupported` 才提示改選模型；其他情況顯示可用性或復原步驟。
+
+`failure_reason` 在 wire schema 是選用字串；目前 Core 的封閉產生值為 `backend_binary_mismatch`、`backend_catalog_unavailable`、`isolation_unavailable`、`backend_launch_failed`、`launch_failed`、`backend_exited`、`startup_timeout`、`drain_timeout`。Shell 分別提示核對檔案、核對模型清單、檢查核心與隔離、重新登入或重新開啟對話；對話程序本身的啟動／停止故障不承諾改用 API 金鑰即可恢復。未知值沿用通用文案，不顯示原始字串。runtime 回覆也以讀取序號作廢晚到訊息，斷線或設定讀取失敗會清除舊世代投影。
+
+登入等 provider 請求沿用既有 `unavailable` 錯誤及 `data.reason: system_unavailable`，在選用的 `data` 物件內帶 `reason_code`；不新增 `UnavailableReason` 或 schema 欄位。Runtime 與 Core 僅傳遞以下原因碼：
+
+| reason_code | 意義 |
+| --- | --- |
+| `backend_unsupported` | 訂閱連線無法提供所需操作 |
+| `provider_unavailable` | 模型連線不可用 |
+| `provider_timeout` | 模型連線逾時 |
+| `rate_limited` | 訂閱額度限制 |
+
+Core 不轉送任意遠端錯誤資料或原始訊息。Shell 用原因碼選擇 i18n 文案，診斷另行呈現；有明確原因碼的失敗不當作啟動中自動重試。
+
+參考工作階段安裝程式會在找不到釘選 Codex 時提示安裝、重新安裝工作階段與重新登入，或改用 API 金鑰。登入後的 `$XDG_RUNTIME_DIR/ditto/session.env` 有 `DITTO_CODEX_STATUS=available|backend_unsupported|isolation_unavailable` 與 `DITTO_CODEX_LANDLOCK_ABI`，只記錄安裝時是否配置釘選檔案與當時的 ABI 相容性，不代表執行期健康；執行期以 `agent.providers.status` 回讀為準。
+
+開發回歸入口：`python3 tests/g4/codex-availability/test.py`（設 `TMPDIR` 為 lane scratch）、`cargo test -p ditto-core provider_route`、`corepack pnpm --filter @ditto/agent-runtime test`、`tests/g4/visual/run.sh <evidence-dir>`。安裝測試只執行原安裝程式的選擇與 session 環境區段，不執行安裝或啟動桌面。
+
+## 7. 登入結果回讀 v1.0.0（catalog revision 7）
 
 `agent.providers.login_result` 是獨立唯讀能力，沿用 `agent.settings.manage`（與 provider status 相同），不新增授予、事件或錯誤列舉。輸入 `{ provider, login_id, generation }`；輸出僅 `{ login_id, generation, state }`，state 封閉為 `pending/succeeded/failed/cancelled/expired/unknown`。既有 strict `ProviderStatus`、`ProviderLoginOutput` 不變。Shell 經目錄發現；CLI 為 generic consumer。
 

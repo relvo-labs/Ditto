@@ -18,8 +18,8 @@ QtObject {
     /// `settings` and `provider` hold only readback confirmed on the current
     /// connection; null is the one meaning of "not confirmed" for every
     /// status, text and control. A lost connection or a failed settings read
-    /// clears both, a failed provider read clears `provider`. A re-read on the
-    /// same connection keeps the confirmed value until it answers.
+    /// clears both, a failed provider read clears `provider`. Runtime evidence
+    /// is invalidated before reads and operations which may start a generation.
     property var settings: null
     property var provider: null
     property var runtime: null
@@ -51,12 +51,25 @@ QtObject {
     /// The last error, in product language; diagnostics separately.
     property string errorText: ""
     property string errorDiagnostic: ""
+    property string errorReasonCode: ""
     /// The latest settings or provider status read ended in an error (other
     /// than "the Agent is still starting", which is read again). Nothing was
     /// confirmed by it: neither ready, nor off, nor offline. A new read
     /// clears it until its answer.
     property bool settingsFailed: false
     property bool providerFailed: false
+    property int providerRequest: 0
+    property int runtimeRequest: 0
+    property int settingsRequest: 0
+    property int turnRead: 0
+    property int sessionRead: 0
+    property bool settingsReading: false
+    property bool providerReading: false
+    property bool runtimePending: false
+    property bool runtimeFailed: false
+    // Highest generation observed on this Core connection, even while a new
+    // read is pending. Request identity and generation both fence readback.
+    property double runtimeGeneration: -1
 
     // ---- what the user has not sent -------------------------------------------------
     property string draft: ""
@@ -76,15 +89,10 @@ QtObject {
     property bool readAgain: false
     // Request identities belong to this projection, never to Core policy.
     property int connectionEpoch: 0
-    property int settingsRequest: 0
     property int providerEpoch: 0
-    property int providerRequest: 0
-    property int runtimeRequest: 0
     property int loginRequest: 0
-    property bool providerReading: false
     property var loginStart: null
     property string settingsContext: ""
-    property var runtimeGeneration: null
     readonly property int pageSize: 50
 
     function invalidateProvider(keepReadback) {
@@ -120,21 +128,79 @@ QtObject {
 
     onRuntimeChanged: {
         if (!runtime || runtime.generation === undefined) return;
-        const changed = runtimeGeneration !== null && runtimeGeneration !== runtime.generation;
+        const changed = runtimeGeneration >= 0 && runtimeGeneration !== runtime.generation;
         runtimeGeneration = runtime.generation;
         if (changed) {
             // Bound attempts belong to the generation that served their start.
             // A preflight has not issued login yet; its fresh generation
             // must not invalidate the new start it is about to serve.
-            if (login || !loginStart || loginStart.generation !== undefined) forgetLogin();
-            invalidateProvider();
+            const preflight = loginStart && loginStart.generation === undefined;
+            if (!preflight) forgetLogin();
+            invalidateProvider(true);
             if (!loginStart && client.online && wanted && enabled && settings.provider === "codex-app-server")
                 providerRetry.restart();
+        }
+        // Read this snapshot directly: dependent QML bindings can update
+        // after onRuntimeChanged, too late to finalize its in-flight owner.
+        if (runtime.failure_reason || (settings && settings.provider === "codex-app-server"
+            && runtime.phase === "ready" && runtime.backend_pid === null)) {
+            forgetLogin();
+            invalidateProvider(true);
         }
     }
 
     readonly property bool enabled: !!settings && settings.enabled === true
-    readonly property bool connected: !!provider && provider.available === true && provider.authenticated === true
+    readonly property bool subscriptionSelected: !!settings && settings.provider === "codex-app-server"
+    readonly property bool runtimeHasFailure: !!runtime && !!runtime.failure_reason
+    readonly property bool runtimeControllerUnavailable: runtimeHasFailure
+        && ["isolation_unavailable", "backend_binary_mismatch", "backend_catalog_unavailable",
+            "backend_launch_failed", "backend_exited"].indexOf(runtime.failure_reason) < 0
+    readonly property bool runtimeBackendUnavailable: subscriptionSelected && !!runtime
+        && (runtimeHasFailure || (runtime.phase === "ready" && runtime.backend_pid === null))
+    readonly property bool runtimeHealthy: !sending && !settingsReading && !providerReading && !!runtime
+        && runtime.phase === "ready" && !runtimeControllerUnavailable && (!subscriptionSelected || !runtimeHasFailure)
+        && (!subscriptionSelected || (runtime.backend_pid > 0 && runtime.isolation_verified === true))
+    readonly property bool connected: client.online && enabled && !sending && !settingsReading && !providerReading
+        && !!provider && provider.available === true && provider.authenticated === true
+        && (subscriptionSelected ? runtimeHealthy : !runtimeControllerUnavailable && !runtimePending && !runtimeFailed)
+    readonly property string runtimeFailureText: runtimeHasFailure ? backendFailureText(runtime.failure_reason) : ""
+    readonly property bool subscriptionUnavailable: subscriptionSelected
+        && ((!!provider && provider.available === false) || runtimeBackendUnavailable)
+    readonly property bool canLogin: subscriptionSelected && runtimeHealthy && !!provider && provider.available === true && !provider.authenticated && !subscriptionUnavailable
+    readonly property string runtimeStatusText: runtimeFailed || providerFailed
+        ? client.t(qsTr("無法確認模型連線；重新開啟會再讀取"))
+        : client.t(qsTr("正在讀取模型連線狀態…"))
+    readonly property string subscriptionUnavailableText: runtimeFailureText || client.t(qsTr("這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。"))
+    readonly property string backendUnsupportedText: connected && runtimeHealthy && !subscriptionUnavailable
+        ? client.t(qsTr("目前選的模型或思考深度不支援；請在 AI 設定改選後再試。"))
+        : runtimeControllerUnavailable ? runtimeFailureText
+        : subscriptionUnavailable ? subscriptionUnavailableText : runtimeStatusText
+    onBackendUnsupportedTextChanged: {
+        if (errorReasonCode === "backend_unsupported") errorText = backendUnsupportedText;
+    }
+    /// Known Core failure reasons select recovery steps, never availability;
+    /// unknown codes retain the general message, never raw diagnostics.
+    function backendFailureText(reason) {
+        switch (reason) {
+        case "isolation_unavailable":
+            return client.t(qsTr("這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_binary_mismatch":
+            return client.t(qsTr("這台電腦的 Codex 檔案不符合 Ditto 支援的版本；請依安裝說明核對檔案後重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_catalog_unavailable":
+            return client.t(qsTr("無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "backend_launch_failed":
+            return client.t(qsTr("AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "launch_failed":
+        case "startup_timeout":
+            return client.t(qsTr("AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。"));
+        case "backend_exited":
+            return client.t(qsTr("Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。"));
+        case "drain_timeout":
+            return client.t(qsTr("AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。"));
+        }
+        return client.t(qsTr("AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。"));
+    }
+
     readonly property bool turnActive: !!turn && ["queued", "running", "awaiting_approval", "cancelling"].indexOf(turn.state) >= 0
 
     /// idle | thinking | executing | awaiting | done | failed | offline
@@ -149,6 +215,7 @@ QtObject {
             }
             return toolOpen ? "executing" : "thinking";
         }
+        if (subscriptionUnavailable) return "offline";
         if (runtime && runtime.phase === "starting") {
             return "starting";
         }
@@ -191,6 +258,10 @@ QtObject {
         : !settings ? (settingsFailed ? "failed" : "pending")
         : settings.enabled !== true ? "disabled"
         : connected ? "ready"
+        : runtimeControllerUnavailable ? "model_offline"
+        : subscriptionUnavailable ? "model_offline"
+        : runtimeFailed ? "failed"
+        : settingsReading || providerReading || (provider && provider.authenticated && subscriptionSelected && !runtimeHealthy) ? "pending"
         : provider ? "model_offline"
         : providerFailed ? "failed" : "pending"
 
@@ -208,17 +279,18 @@ QtObject {
         ? client.t(qsTr("桌面服務未連線"))
         : settings && settings.enabled === false
             ? client.t(qsTr("AI 對話已關閉；桌面仍可照常操作"))
-            : settings && settings.enabled === true && provider && !connected
-                ? client.t(qsTr("模型尚未連接；桌面仍可照常操作")) : ""
+            : runtimeControllerUnavailable ? runtimeFailureText
+            : settings && settings.enabled === true && (subscriptionUnavailable || (provider && !provider.authenticated))
+                ? (subscriptionUnavailable ? client.t(qsTr("Codex 訂閱無法使用")) : client.t(qsTr("模型尚未連接；桌面仍可照常操作"))) : ""
 
     readonly property string stateText: {
-        const result = turn && ["partial", "unknown", "cancelled"].indexOf(turn.state) >= 0
+        const result = turn && ["failed", "partial", "unknown", "cancelled"].indexOf(turn.state) >= 0
             ? failureText(turn) : "";
         if (taskState === "offline") {
             // Keep both the known terminal outcome and the current readback.
             const reason = offlineReason || readFailureText;
             if (result) return result + (reason ? " · " + reason : "");
-            return reason || client.t(qsTr("待命中"));
+            return reason || (provider && provider.authenticated ? runtimeStatusText : client.t(qsTr("待命中")));
         }
         if (result) return result;
         if (turn && turn.state === "cancelling") return client.t(qsTr("正在停止"));
@@ -258,7 +330,7 @@ QtObject {
         case "provider_timeout":
             return client.t(qsTr("模型沒有回應；桌面沒有被改動，可以再試一次"));
         case "backend_unsupported":
-            return client.t(qsTr("模型後端無法使用"));
+            return backendUnsupportedText;
         case "tool_error":
             return client.t(qsTr("桌面變更沒有完成；請查看變更卡"));
         }
@@ -274,12 +346,27 @@ QtObject {
             ai_status: aiStatus,
             text: stateText,
             enabled: settings ? enabled : null,
-            connected: provider ? connected : null
+            connected: subscriptionUnavailable || runtimeControllerUnavailable ? false
+                : settingsReading || providerReading || runtimeFailed || (subscriptionSelected && !runtimeHealthy) ? null
+                : provider ? connected : null
         };
     }
 
     function setError(error) {
-        errorText = error ? client.errorText(error) : "";
+        const reason = error && error.data ? error.data.reason_code : "";
+        errorReasonCode = reason || "";
+        switch (reason) {
+        case "backend_unsupported":
+            // Provider actions can ensure a new generation too. Classify an
+            // RPC error only after readback made after that error.
+            refreshRuntime();
+            errorText = backendUnsupportedText;
+            break;
+        case "provider_unavailable":
+        case "provider_timeout": errorText = client.t(qsTr("模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。")); break;
+        case "rate_limited": errorText = client.t(qsTr("訂閱額度已用完；等額度重設後再試")); break;
+        default: errorText = error ? client.errorText(error) : "";
+        }
         errorDiagnostic = error ? client.diagnosticText(error) : "";
     }
 
@@ -316,22 +403,49 @@ QtObject {
         });
     }
 
+    function invalidateRuntime() {
+        // Operations which may change the serving runtime invalidate both
+        // account reads and the owner of any in-flight login start.
+        forgetLogin();
+        invalidateProvider(true);
+        runtime = null;
+        runtimePending = true;
+        runtimeFailed = false;
+    }
+
+    function invalidateSettings() {
+        settingsRequest++;
+        turnRead++;
+        sessionRead++;
+        reading = false;
+        readAgain = false;
+        sending = false;
+        settingsReading = true;
+        invalidateRuntime();
+        provider = null;
+        return settingsRequest;
+    }
+
     function refreshSettings() {
+        const read = invalidateSettings();
         settingsFailed = false;
-        const connection = connectionEpoch, request = ++settingsRequest;
-        const current = () => connection === connectionEpoch && request === settingsRequest && client.online;
         client.capability("agent.settings.describe", {}, function (result) {
-            if (!current()) return;
+            if (read !== settingsRequest || !client.online) return;
+            settingsReading = false;
             settings = result;
             settingsFailed = false;
             if (settings.enabled) {
                 refreshProvider();
                 loadSession();
+            } else {
+                provider = null;
             }
         }, function (error) {
-            if (!current()) return;
+            if (read !== settingsRequest || !client.online) return;
+            settingsReading = false;
             // Unconfirmed settings: the provider status under them is not
             // shown as confirmed either (it is read again after settings).
+            invalidateRuntime();
             settings = null;
             provider = null;
             settingsFailed = true;
@@ -340,23 +454,73 @@ QtObject {
     }
 
     function refreshRuntime(then, failed) {
+        // A read replaces evidence, but does not abandon its own start. The
+        // operation-level invalidateRuntime() handles external invalidations.
         const connection = connectionEpoch, request = ++runtimeRequest;
+        const context = settingsRequest, prefs = settings;
+        const current = () => connection === connectionEpoch && request === runtimeRequest
+            && context === settingsRequest && prefs === settings && client.online;
+        runtime = null;
+        runtimePending = true;
+        runtimeFailed = false;
         client.capability("agent.runtime.get", {}, function (result) {
-            if (connection !== connectionEpoch || request !== runtimeRequest || !client.online) return;
+            if (!current()) return;
+            runtimePending = false;
+            if (result.generation < runtimeGeneration) {
+                runtimeFailed = true;
+                forgetLogin();
+                if (failed) failed({ name: "unavailable" });
+                return;
+            }
             runtime = result;
             if (then) then(result);
         }, function (error) {
-            if (connection !== connectionEpoch || request !== runtimeRequest || !client.online) return;
+            if (!current()) return;
+            runtimeFailed = true;
+            runtimePending = false;
             if (failed) failed(error);
         });
     }
 
     function refreshProvider(then, confirmation) {
-        if (loginStart || !client.online || !enabled || settings.provider === "direct-model") return;
+        if (loginStart || !client.online || !enabled) return;
         const epoch = providerEpoch, request = ++providerRequest;
         const current = () => epoch === providerEpoch && request === providerRequest && client.online;
         providerFailed = false;
         providerReading = true;
+        providerRetry.stop();
+        if (settings && settings.provider === "direct-model") {
+            provider = null;
+            forgetLogin();
+            const directSettings = settings;
+            const auth = directSettings.auth;
+            // A configured API connection needs a usable key reference, not
+            // a Codex login. This does not probe the remote model or read a key.
+            function showDirect(usable) {
+                if (!current()) return;
+                providerReading = false;
+                refreshRuntime();
+                provider = { provider: "direct-model", available: true,
+                    authenticated: usable && !!directSettings.endpoint,
+                    account_label: directSettings.model || directSettings.endpoint,
+                    models: [], rate_limits: null };
+                if (then) then(provider);
+            }
+            if (!auth || auth.kind !== "api_key" || !auth.credential_ref) {
+                showDirect(false);
+            } else {
+                client.capability("agent.credentials.status", { credential_ref: auth.credential_ref }, function (result) {
+                    showDirect(result.available === true);
+                }, function (error) {
+                    if (!current()) return;
+                    providerReading = false;
+                    provider = null;
+                    providerFailed = true;
+                    setError(error);
+                });
+            }
+            return;
+        }
         const expireUnconfirmed = function () {
             const attempt = confirmation || login;
             if (!attempt || Date.now() < attempt.expires_at_ms) return;
@@ -371,7 +535,8 @@ QtObject {
             if (!current()) return;
             // Retain the existing startup retry. A read failure is unknown,
             // not proof of sign-out or of a failed device-code exchange.
-            providerFailed = !(error.name === "unavailable" && wanted);
+            refreshRuntime();
+            providerFailed = !(error.name === "unavailable" && !(error.data && error.data.reason_code) && wanted);
             if (!providerFailed) providerRetry.restart();
             else setError(error);
         };
@@ -390,7 +555,7 @@ QtObject {
                     // readback. Only an unconfirmed account keeps its deadline.
                     provider = result;
                     providerFailed = false;
-                    if (result.authenticated) forgetLogin();
+                    if (!result.available || result.authenticated) forgetLogin();
                     else expireUnconfirmed();
                     if (then) then(result);
                 }, failed);
@@ -414,10 +579,10 @@ QtObject {
             }
         }
         next.enabled = on;
-        const connection = connectionEpoch, request = ++settingsRequest;
-        const current = () => connection === connectionEpoch && request === settingsRequest && client.online;
+        const read = invalidateSettings();
         client.capability("agent.settings.patch", { expected_revision: settings.revision, settings: next }, function (result) {
-            if (!current()) return;
+            if (read !== settingsRequest || !client.online) return;
+            settingsReading = false;
             settings = result;
             setError(null);
             if (on) {
@@ -425,7 +590,7 @@ QtObject {
                 loadSession();
             }
         }, function (error) {
-            if (!current()) return;
+            if (read !== settingsRequest || !client.online) return;
             setError(error);
             refreshSettings(); // another surface changed it: show the current one
         });
@@ -436,7 +601,7 @@ QtObject {
     /// browser gets the verification page and the person types the one-time
     /// code shown here; no token ever reaches the Shell.
     function startLogin() {
-        if (!client.online || !enabled || settings.provider !== "codex-app-server" || login || loginStart) return;
+        if (!client.online || !enabled || !canLogin || login || loginStart) return;
         // Keep the last account read visible while the code is displayed.
         // Starting authorization does not itself change that readback.
         invalidateProvider(true);
@@ -464,14 +629,14 @@ QtObject {
             if (current()) setError(error);
         };
         refreshRuntime(function (before) {
-            if (!current()) { release(); return; }
+            if (!current() || !canLogin) { release(); return; }
             token.generation = before.generation;
             client.capability("agent.providers.login", { provider: "codex-app-server" }, function (result) {
                 unbound = result;
                 if (!current()) { token(); return; }
                 refreshRuntime(function (after) {
                     release();
-                    if (!current() || before.generation !== after.generation || Date.now() >= result.expires_at_ms) {
+                    if (!current() || !canLogin || before.generation !== after.generation || Date.now() >= result.expires_at_ms) {
                         if (current() && Date.now() >= result.expires_at_ms) loginResultState = "expired";
                         cleanup();
                         return;
@@ -582,7 +747,9 @@ QtObject {
             readNew();
             return;
         }
+        const context = settingsRequest;
         client.capability("agent.sessions.list", {}, function (result) {
+            if (context !== settingsRequest || !client.online) return;
             const sessions = result.sessions || [];
             if (sessions.length === 0) {
                 return;
@@ -590,6 +757,7 @@ QtObject {
             const latest = sessions.slice().sort((a, b) => a.created_at < b.created_at ? 1 : -1)[0];
             selectSession(latest.session_id, latest.next_seq);
         }, function (error) {
+            if (context !== settingsRequest || !client.online) return;
             setError(error);
         });
     }
@@ -602,6 +770,10 @@ QtObject {
 
     /// Show another conversation: its last page, then live updates.
     function selectSession(id, nextSeq) {
+        sessionRead++;
+        turnRead++;
+        reading = false;
+        readAgain = false;
         sessionId = id;
         events = [];
         turn = null;
@@ -617,13 +789,17 @@ QtObject {
         if (!hasOlder || sessionId.length === 0) {
             return;
         }
+        const context = settingsRequest;
+        const session = sessionId;
         const from = Math.max(0, firstSeq - pageSize);
         const count = firstSeq - from;
         client.capability("agent.sessions.read", { session_id: sessionId, offset: from, limit: count }, function (result) {
+            if (context !== settingsRequest || session !== sessionId || !client.online) return;
             const older = (result.events || []).filter(event => event.seq < firstSeq);
             events = older.concat(events);
             firstSeq = from;
         }, function (error) {
+            if (context !== settingsRequest || session !== sessionId || !client.online) return;
             setError(error);
         });
     }
@@ -659,17 +835,18 @@ QtObject {
             }
         }
         Object.assign(next, fields);
-        const connection = connectionEpoch, request = ++settingsRequest;
-        const current = () => connection === connectionEpoch && request === settingsRequest && client.online;
+        const read = invalidateSettings();
         client.capability("agent.settings.patch", { expected_revision: settings.revision, settings: next }, function (result) {
-            if (!current()) return;
+            if (read !== settingsRequest || !client.online) return;
+            settingsReading = false;
             settings = result;
             setError(null);
+            if (enabled) refreshProvider();
             if (then) {
                 then(result);
             }
         }, function (error) {
-            if (!current()) return;
+            if (read !== settingsRequest || !client.online) return;
             setError(error);
             refreshSettings();
         });
@@ -710,6 +887,10 @@ QtObject {
     }
 
     function newConversation() {
+        sessionRead++;
+        turnRead++;
+        reading = false;
+        readAgain = false;
         sessionId = "";
         events = [];
         loadedSeq = 0;
@@ -729,7 +910,11 @@ QtObject {
             return;
         }
         reading = true;
+        const read = ++sessionRead;
+        const context = settingsRequest;
+        const session = sessionId;
         client.capability("agent.sessions.read", { session_id: sessionId, offset: loadedSeq, limit: pageSize }, function (result) {
+            if (read !== sessionRead || context !== settingsRequest || session !== sessionId || !client.online) return;
             reading = false;
             const fresh = (result.events || []).filter(event => event.seq >= loadedSeq);
             if (fresh.length > 0) {
@@ -749,6 +934,7 @@ QtObject {
                 readNew();
             }
         }, function (error) {
+            if (read !== sessionRead || context !== settingsRequest || session !== sessionId || !client.online) return;
             reading = false;
             setError(error);
         });
@@ -759,7 +945,14 @@ QtObject {
         if (!id) {
             return;
         }
+        invalidateRuntime();
+        const read = ++turnRead;
+        const context = settingsRequest;
+        const prefs = settings;
+        const session = sessionId;
         client.capability("agent.turns.get", { turn_id: id }, function (result) {
+            if (read !== turnRead || context !== settingsRequest || prefs !== settings || session !== sessionId || !client.online) return;
+            refreshRuntime();
             if (!turn || turn.turn_id === result.turn_id || result.created_at >= turn.created_at) {
                 turn = result;
             }
@@ -788,6 +981,7 @@ QtObject {
             return;
         }
         if (payload.turn_id && payload.turn_state) {
+            invalidateRuntime();
             if (turn && turn.turn_id === payload.turn_id) {
                 turn = Object.assign({}, turn, { state: payload.turn_state });
             } else {
@@ -795,6 +989,8 @@ QtObject {
             }
             if (["succeeded", "failed", "partial", "unknown", "cancelled"].indexOf(payload.turn_state) >= 0) {
                 refreshTurnFrom({ data: { turn_id: payload.turn_id } });
+            } else {
+                refreshRuntime();
             }
         }
         if (payload.next_seq > loadedSeq) {
@@ -815,18 +1011,30 @@ QtObject {
             pendingKey = client.newKey("chat");
         }
         sending = true;
+        const context = settingsRequest;
         const submit = function () {
+            if (context !== settingsRequest || !client.online) return;
+            providerRequest++;
+            providerReading = false;
+            turnRead++;
+            invalidateRuntime();
             const contexts = attached.map(item => item.context_id);
             client.capability("agent.turns.submit", { session_id: sessionId, client_message_id: pendingKey, text: text, contexts: contexts }, function (result) {
+                if (context !== settingsRequest || !client.online) return;
+                refreshRuntime();
                 sending = false;
                 pendingKey = "";
                 draft = "";
                 attached = [];
                 previews = {};
-                turn = result;
+                // An event/readback can precede the submit response. Do not
+                // replace its terminal result with the earlier queued reply.
+                if (!turn || turn.turn_id !== result.turn_id || !["succeeded", "failed", "partial", "unknown", "cancelled"].includes(turn.state)) turn = result;
                 setError(null);
                 readNew();
             }, function (error) {
+                if (context !== settingsRequest || !client.online) return;
+                refreshRuntime();
                 sending = false;
                 setError(error);
             });
@@ -836,11 +1044,13 @@ QtObject {
             return;
         }
         client.capability("agent.sessions.create", { title: text.slice(0, 40), idempotency_key: pendingKey + "-session" }, function (result) {
+            if (context !== settingsRequest || !client.online) return;
             sessionId = result.session_id;
             loadedSeq = 0;
             events = [];
             submit();
         }, function (error) {
+            if (context !== settingsRequest || !client.online) return;
             sending = false;
             setError(error);
         });
@@ -907,11 +1117,10 @@ QtObject {
         target: state.client
         function onDisconnected() {
             state.connectionEpoch++;
-            state.settingsRequest++;
-            state.forgetLogin();
-            state.invalidateProvider();
-            state.runtime = null;
-            state.runtimeGeneration = null;
+            state.invalidateSettings();
+            state.settingsReading = false;
+            state.sending = false;
+            state.runtimeGeneration = -1;
             state.reconnecting = state.wanted;
             state.subscriptionId = "";
             // Readback from the lost connection is not confirmed any more.

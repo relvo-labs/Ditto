@@ -9,6 +9,7 @@ import {CoreSessionHandle} from './session.ts'
 import {DesktopTools} from './tools.ts'
 import type {CodexBackend} from './codex.ts'
 import {DirectModelBackend} from './direct.ts'
+import {DittoError} from '../../host-runtime/src/errors.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {agentSessions:AgentSessions;agentTools:AgentTools;agentModels:AgentModels}
@@ -169,14 +170,22 @@ export class AgentRuntime {
     }
     if(!this.backend){
       if(method.endsWith('.status'))return {available:false,provider:'codex-app-server',authenticated:false,account_label:null,models:[],rate_limits:null} satisfies ProviderStatus
-      throw new Error('backend_unsupported')
+      throw new DittoError('unavailable','Codex subscription is unavailable',{reason:'system_unavailable',reason_code:'backend_unsupported'})
     }
-    switch(method){
-      case 'agent.controller.provider.status':return this.backend.status()
-      case 'agent.controller.provider.login':return this.backend.startLogin()
-      case 'agent.controller.provider.cancel_login':if(typeof p.login_id!=='string')throw new Error('invalid login');return this.backend.cancelLogin(p.login_id)
-      case 'agent.controller.provider.logout':return this.backend.logout()
-      default:throw new Error('unsupported controller request')
+    try{
+      switch(method){
+        case 'agent.controller.provider.status':return await this.backend.status()
+        case 'agent.controller.provider.login':return await this.backend.startLogin()
+        case 'agent.controller.provider.cancel_login':if(typeof p.login_id!=='string')throw new Error('invalid login');return await this.backend.cancelLogin(p.login_id)
+        case 'agent.controller.provider.logout':return await this.backend.logout()
+        default:throw new Error('unsupported controller request')
+      }
+    }catch(error){
+      const message=error instanceof Error?error.message:''
+      if(['backend_unsupported','provider_unavailable','provider_timeout','rate_limited'].includes(message)){
+        throw new DittoError('unavailable','Codex subscription request failed',{reason:'system_unavailable',reason_code:message})
+      }
+      throw error
     }
   }
   async stop():Promise<void>{

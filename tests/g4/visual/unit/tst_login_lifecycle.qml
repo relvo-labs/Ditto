@@ -22,7 +22,7 @@ TestCase {
         function capability(method, params, ok, fail, options) {
             requests = requests.concat([{ method: method, params: params, ok: ok, fail: fail }]);
             if (method === "agent.runtime.get" && autoRuntime && ok)
-                ok({ generation: generation, phase: "ready", isolation_verified: true });
+                ok({ generation: generation, phase: "ready", backend_pid: 42, isolation_verified: true });
         }
         function watchTopics(topics, onEvent, onResync, onReady, onError) {
             onReady({ subscription_id: "fixture-subscription" });
@@ -48,12 +48,77 @@ TestCase {
         conversation = createTemporaryObject(component, testCase, { client: client });
         verify(conversation !== null);
         conversation.settings = on;
-        conversation.runtime = { generation: 1, phase: "ready" };
+        conversation.runtime = { generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true };
+        conversation.provider = signedOut;
         conversation.wanted = true;
     }
     function cleanup() {
         conversation.loginWatch.stop();
         conversation.providerRetry.stop();
+    }
+    // #134/#137 integration: availability evidence gates admission, and its
+    // invalidation must finalize the same start owner as settings changes.
+    function test_merge_login_admission_data() {
+        return ["unavailable", "runtime-failure", "missing-backend", "signed-in", "unknown-account"]
+            .map(kind => ({ tag: kind, kind: kind }));
+    }
+    function test_merge_login_admission(data) {
+        if (data.kind === "unavailable") conversation.provider = { available: false, authenticated: false };
+        if (data.kind === "runtime-failure") conversation.runtime = { generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: "backend_exited" };
+        if (data.kind === "missing-backend") conversation.runtime = { generation: 1, phase: "ready", backend_pid: null, isolation_verified: false };
+        if (data.kind === "signed-in") conversation.provider = ready;
+        if (data.kind === "unknown-account") conversation.provider = null;
+        verify(!conversation.canLogin);
+        conversation.startLogin();
+        compare(calls("agent.providers.login").length, 0, "canLogin=false must not issue authorization");
+        compare(conversation.loginStart, null);
+    }
+    function test_merge_runtime_invalidation_data() {
+        const rows = [];
+        for (const phase of ["preflight", "login", "verification"])
+            for (const source of ["runtime-failure", "missing-backend", "runtime-operation", "disconnect"])
+                rows.push({ tag: phase + "-" + source, phase: phase, source: source });
+        return rows;
+    }
+    function test_merge_runtime_invalidation(data) {
+        client.autoRuntime = false;
+        conversation.startLogin();
+        let old = latest("agent.runtime.get");
+        if (data.phase !== "preflight") {
+            old.ok({ generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
+            old = latest("agent.providers.login");
+        }
+        const a = attempt(); a.login_id = "fixture-A";
+        if (data.phase === "verification") {
+            old.ok(a);
+            old = latest("agent.runtime.get");
+        }
+        if (data.source === "runtime-failure") conversation.runtime = { generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: "backend_exited" };
+        if (data.source === "missing-backend") conversation.runtime = { generation: 1, phase: "ready", backend_pid: null, isolation_verified: false };
+        if (data.source === "runtime-operation") conversation.invalidateRuntime();
+        if (data.source === "disconnect") { client.online = false; client.disconnected(); }
+        compare(conversation.loginStart, null, "new runtime evidence must release the start synchronously");
+        compare(conversation.login, null);
+        compare(calls("agent.providers.cancel_login").length, data.phase === "verification" && data.source !== "disconnect" ? 1 : 0);
+        client.autoRuntime = true;
+        if (data.source === "disconnect") {
+            client.online = true;
+            latest("agent.settings.describe").ok(on);
+        } else conversation.refreshProvider();
+        latest("agent.providers.status").ok(signedOut);
+        conversation.startLogin();
+        const bStart = latest("agent.providers.login"), bToken = conversation.loginStart;
+        verify(bToken !== null);
+        old.ok(data.phase === "login" ? a : { generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
+        compare(conversation.loginStart, bToken);
+        compare(conversation.login, null);
+        const cancels = calls("agent.providers.cancel_login");
+        compare(cancels.length, data.source !== "disconnect" && data.phase !== "preflight" ? 1 : 0);
+        if (cancels.length) compare(cancels[0].params.login_id, "fixture-A");
+        const b = attempt(); b.login_id = "fixture-B";
+        bStart.ok(b);
+        compare(conversation.login.login_id, "fixture-B");
+        verify(conversation.loginWatch.running);
     }
     // review2: settings invalidation at each start await must release its owner,
     // even when refreshRuntime intentionally discards that owner's callback.
@@ -72,7 +137,7 @@ TestCase {
         const a = attempt(); a.login_id = "fixture-A";
         let start = null, verification = null;
         if (data.phase !== "preflight") {
-            preflight.ok({ generation: 1, phase: "ready" });
+            preflight.ok({ generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
             start = latest("agent.providers.login");
         }
         if (data.phase === "verification") {
@@ -99,7 +164,7 @@ TestCase {
         // release B's token nor rebind A; returned A ids are cancelled once.
         const old = data.phase === "preflight" ? preflight : data.phase === "login" ? start : verification;
         if (data.fail) old.fail(failure);
-        else old.ok(data.phase === "login" ? a : { generation: 1, phase: "ready" });
+        else old.ok(data.phase === "login" ? a : { generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
         compare(conversation.loginStart, bToken);
         compare(conversation.login, null);
         const cancels = calls("agent.providers.cancel_login");
@@ -125,7 +190,7 @@ TestCase {
     function test_review2_cancel_disconnect_release(data) {
         client.autoRuntime = false;
         conversation.startLogin();
-        if (data.phase !== "preflight") latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+        if (data.phase !== "preflight") latest("agent.runtime.get").ok({ generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
         if (data.phase === "verification") latest("agent.providers.login").ok(attempt());
         const old = latest(data.phase === "login" ? "agent.providers.login" : "agent.runtime.get");
         if (data.exit === "cancel") conversation.cancelLogin();
@@ -135,8 +200,11 @@ TestCase {
             data.phase === "verification" && data.exit === "cancel" ? 1 : 0,
             "never replay an old connection's cancel into a new controller");
         client.autoRuntime = true;
-        client.online = true;
-        conversation.settings = on;
+        if (data.exit === "disconnect") {
+            client.online = true;
+            latest("agent.settings.describe").ok(on);
+        } else conversation.refreshProvider();
+        latest("agent.providers.status").ok(signedOut);
         conversation.startLogin();
         const bStart = latest("agent.providers.login"), bToken = conversation.loginStart;
         verify(bToken !== null);
@@ -196,10 +264,10 @@ TestCase {
         const a = attempt(); conversation.login = a;
         conversation.refreshProvider();
         a.expires_at_ms = Date.now() - 1;
-        latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+        latest("agent.runtime.get").ok({ generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
         compare(conversation.login, null, "clear expired code before awaiting the account");
         latest("agent.providers.status").ok(data.authenticated ? ready : signedOut);
-        latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+        latest("agent.runtime.get").ok({ generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
         compare(conversation.connected, data.authenticated); compare(conversation.login, null);
         compare(conversation.loginResultState, data.authenticated ? "" : "expired");
     }
@@ -252,6 +320,7 @@ TestCase {
         conversation.refreshLoginResult(); latest("agent.providers.login_result").ok(resultReply("succeeded"));
         const oldAccount = latest("agent.providers.status");
         if (data.kind === "new-attempt") {
+            conversation.refreshProvider(); latest("agent.providers.status").ok(signedOut);
             conversation.startLogin(); const b = attempt(); b.login_id = "fixture-B";
             latest("agent.providers.login").ok(b);
         }
@@ -275,14 +344,14 @@ TestCase {
         const preflightCount = calls("agent.runtime.get").length;
         // Accept both old/new request sequences to expose observable behavior,
         // not a missing helper or an assertion that merely demands a new call.
-        if (preflightCount) latest("agent.runtime.get").ok({ generation: data.stale ? 2 : 1, phase: "ready" });
+        if (preflightCount) latest("agent.runtime.get").ok({ generation: data.stale ? 2 : 1, phase: "ready", backend_pid: 42, isolation_verified: true });
         latest("agent.providers.login").ok(attempt());
         if (!data.stale) compare(conversation.login, null, "do not display a code before generation is verified");
         if (calls("agent.runtime.get").length > preflightCount)
-            latest("agent.runtime.get").ok({ generation: 2, phase: "ready" });
+            latest("agent.runtime.get").ok({ generation: 2, phase: "ready", backend_pid: 42, isolation_verified: true });
         if (data.stale) {
             conversation.refreshRuntime();
-            latest("agent.runtime.get").ok({ generation: 2, phase: "ready" });
+            latest("agent.runtime.get").ok({ generation: 2, phase: "ready", backend_pid: 42, isolation_verified: true });
             verify(conversation.login !== null, "same serving generation must keep its new attempt");
             verify(conversation.loginWatch.running);
             conversation.refreshLoginResult();
@@ -300,7 +369,7 @@ TestCase {
         client.autoRuntime = false;
         conversation.startLogin();
         if (data.after) {
-            latest("agent.runtime.get").ok({ generation: 1, phase: "ready" });
+            latest("agent.runtime.get").ok({ generation: 1, phase: "ready", backend_pid: 42, isolation_verified: true });
             latest("agent.providers.login").ok(attempt());
         }
         latest("agent.runtime.get").fail(failure);
@@ -315,12 +384,12 @@ TestCase {
         const before = latest("agent.runtime.get");
         conversation.refreshProvider(); conversation.providerRetry.triggered();
         compare(calls("agent.runtime.get").length, 1);
-        before.ok({ generation: 2, phase: "ready" });
+        before.ok({ generation: 2, phase: "ready", backend_pid: 42, isolation_verified: true });
         latest("agent.providers.login").ok(attempt());
         const after = latest("agent.runtime.get");
         conversation.refreshProvider(); conversation.providerRetry.triggered();
         compare(calls("agent.runtime.get").length, 2);
-        after.ok({ generation: 2, phase: "ready" });
+        after.ok({ generation: 2, phase: "ready", backend_pid: 42, isolation_verified: true });
         verify(conversation.login !== null); verify(conversation.loginWatch.running);
     }
     function test_failed_completion_stops_waiting_and_preserves_confirmed_account() {
@@ -371,9 +440,11 @@ TestCase {
         latest("agent.providers.login_result").ok(data.value);
         compare(conversation.loginResultState, data.state);
         verify(conversation.login !== null); verify(conversation.loginWatch.running);
-        verify(conversation.connected);
+        compare(conversation.provider, ready, "pending result preserves the independently confirmed account data");
         verify(conversation.loginResultText.indexOf("SENSITIVE-LOGIN-SENTINEL") < 0);
         verify(conversation.errorDiagnostic.indexOf("SENSITIVE-LOGIN-SENTINEL") < 0);
+        latest("agent.providers.status").ok(ready);
+        verify(conversation.connected, "a fresh authoritative account still confirms the preserved session");
     }
     function test_result_read_failure_and_old_catalog_preserve_existing_flow_data() { return [{ tag: "failed-read", old: false }, { tag: "old-catalog", old: true }]; }
     function test_result_read_failure_and_old_catalog_preserve_existing_flow(data) {
@@ -382,11 +453,14 @@ TestCase {
         conversation.loginWatch.start(); conversation.loginWatch.triggered();
         if (!data.old) latest("agent.providers.login_result").fail({ message: "SENSITIVE-LOGIN-SENTINEL", name: "unsupported" });
         else compare(calls("agent.providers.login_result").length, 0);
-        compare(conversation.loginResultState, "unknown"); verify(conversation.connected);
+        compare(conversation.loginResultState, "unknown");
+        compare(conversation.provider, ready, "unknown result does not erase account data during a fresh runtime read");
         verify(conversation.login !== null); verify(conversation.loginWatch.running);
         compare(calls("agent.providers.login").length, 0);
         compare(calls("agent.providers.status").length, 1);
         verify(conversation.errorDiagnostic.indexOf("SENSITIVE-LOGIN-SENTINEL") < 0);
+        latest("agent.providers.status").ok(ready);
+        verify(conversation.connected, "a fresh authoritative account still confirms the preserved session");
     }
     function test_result_poll_is_single_inflight() {
         conversation.login = attempt();
@@ -416,6 +490,7 @@ TestCase {
         if (data.kind === "cancel" || data.kind === "new-attempt") {
             conversation.cancelLogin();
             if (data.kind === "new-attempt") {
+                conversation.refreshProvider(); latest("agent.providers.status").ok(signedOut);
                 conversation.startLogin(); const b = attempt(); b.login_id = "fixture-B";
                 latest("agent.providers.login").ok(b);
             }
@@ -518,17 +593,20 @@ TestCase {
             conversation.refreshRuntime();
         }
         if (data.fail) old.fail(failure); else old.ok(ready);
-        compare(conversation.provider, null);
+        compare(conversation.provider, data.kind === "generation" ? signedOut : null,
+            "a late callback cannot replace the retained signed-out readback");
+        verify(!conversation.connected);
         compare(conversation.login, null);
         verify(!conversation.loginWatch.running);
         compare(conversation.providerFailed, false, "stale error became current failure");
     }
     function test_status_waits_for_matching_runtime_readback() {
+        conversation.provider = null;
         conversation.refreshProvider();
         client.autoRuntime = false;
         latest("agent.providers.status").ok(ready);
         compare(conversation.provider, null, "account accepted before generation readback");
-        latest("agent.runtime.get").ok({ generation: 2, phase: "ready" });
+        latest("agent.runtime.get").ok({ generation: 2, phase: "ready", backend_pid: 42, isolation_verified: true });
         compare(conversation.provider, null);
         compare(conversation.runtime.generation, 2);
     }
@@ -539,7 +617,7 @@ TestCase {
         compare(conversation.login, null);
         compare(calls("agent.providers.cancel_login").length, 1);
         compare(latest("agent.providers.cancel_login").params.login_id, expired.login_id);
-        compare(conversation.provider, null);
+        compare(conversation.provider, signedOut, "expiry does not erase the account readback");
     }
     function test_inactive_poll_does_not_call_provider_data() {
         return ["disabled", "provider", "disconnect"].map(kind => ({ tag: kind, kind: kind }));

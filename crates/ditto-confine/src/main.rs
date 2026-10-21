@@ -43,7 +43,8 @@ compile_error!("ditto-confine's seccomp filter is written for x86_64 only");
 const USAGE: &str = "usage: ditto-confine [--status-fd N] [--read PATH]... [--write PATH]...\n\
     \x20      [--tcp PORT]... [--tcp-loopback PORT]... [--bind-tcp PORT]... [--udp-dns]\n\
     \x20      [--unix PATH]... [--dbus-proxy EXECUTABLE SOCKET] [--env KEY=VALUE]...\n\
-    \x20      [--cwd DIR] -- PROGRAM [ARGS...]";
+    \x20      [--cwd DIR] -- PROGRAM [ARGS...]\n\
+    \x20  or: ditto-confine --landlock-abi";
 
 #[derive(Default)]
 struct Policy {
@@ -593,6 +594,12 @@ fn start_proxy(executable: &Path, socket: &Path) -> io::Result<(Child, UnixStrea
 }
 
 fn main() {
+    // A read-only kernel query for installers, including development installs.
+    // It creates no ruleset, confined child, socket, or status channel.
+    if std::env::args().skip(1).eq(["--landlock-abi"]) {
+        println!("{}", landlock::abi());
+        return;
+    }
     let policy = match parse() {
         Ok(policy) => policy,
         Err(error) => {

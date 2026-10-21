@@ -35,7 +35,10 @@ Item {
     readonly property bool aiOff: client.online && !!conversation.settings && !conversation.enabled
     /// Why the composer does not take input, in words (candidate style).
     readonly property string composerReason: !conversation.enabled ? t(qsTr("開啟 AI 對話後才能輸入。"))
-        : !conversation.connected ? t(qsTr("登入模型後才能輸入。")) : ""
+        : conversation.connected ? ""
+        : conversation.subscriptionUnavailable ? conversation.subscriptionUnavailableText
+        : conversation.runtimeControllerUnavailable ? conversation.runtimeFailureText
+        : conversation.canLogin ? t(qsTr("登入模型後才能輸入。")) : conversation.stateText
     signal closeRequested()
     signal expandRequested()
     signal collapseRequested()
@@ -296,17 +299,41 @@ Item {
                 }
             }
 
+            Column {
+                visible: window.conversation.enabled && !!window.conversation.settings
+                    && window.conversation.settings.provider === "direct-model"
+                    && !!window.conversation.provider && !window.conversation.provider.authenticated
+                width: parent.width
+                spacing: window.tokens.spaceTight
+                Text {
+                    objectName: "apiKeyStatus"
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: window.t(qsTr("API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。"))
+                    color: window.tokens.appInkMuted
+                    font.pixelSize: window.tokens.appFontBody
+                }
+                Button {
+                    objectName: "apiKeySettings"
+                    tokens: window.tokens
+                    text: window.t(qsTr("前往 AI 設定"))
+                    onClicked: window.settingsRequested()
+                }
+            }
+
             // Signed out: the official device-code sign-in of the Codex
             // subscription. No API key field on this path.
             Column {
-                visible: window.conversation.enabled && !window.conversation.connected
+                visible: window.conversation.enabled && window.conversation.subscriptionSelected && !window.conversation.connected
                     && window.conversation.taskState !== "starting"
                 width: parent.width
                 spacing: window.tokens.spaceTight
                 Text {
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: window.conversation.login
+                    text: window.conversation.subscriptionUnavailable ? window.conversation.subscriptionUnavailableText
+                        : !window.conversation.canLogin ? window.conversation.runtimeStatusText
+                        : window.conversation.login
                         ? window.t(qsTr("在瀏覽器開啟的頁面登入，並輸入下方代碼。完成後這裡會自動更新。"))
                         : window.t(qsTr("使用你的 Codex 訂閱登入後即可對話。不會改用付費 API。"))
                     color: window.tokens.appInkMuted
@@ -349,7 +376,7 @@ Item {
                 Row {
                     spacing: window.tokens.space
                     Button {
-                        visible: !window.conversation.login
+                        visible: window.conversation.canLogin && !window.conversation.login
                         tokens: window.tokens
                         kind: "primary"
                         text: window.t(qsTr("使用 Codex 訂閱登入"))
