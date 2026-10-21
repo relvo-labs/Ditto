@@ -61,6 +61,12 @@ Qt／Wayfire 使用凍結的私有前綴，不用 Ubuntu 內建 Qt 6.4.2 代替�
 
 舊開發 VM（kernel 5.15、Landlock ABI 1、CPU 控制器未委派、無 Secret Service）保留在[工具配額基線](resource-quota-baseline.md)作差異對照，不再是參考候選。這個差異也是「可以在其他機器開發，但不能混用出口數字」的實證理由。
 
+### Codex 訂閱連線的開發環境相容性
+
+這是 G2 起 Codex 連線的條件，不變更上表 G0 凍結的參考平台：需要 **Landlock ABI ≥6**，且系統允許安全隔離。以 `cargo build --locked --release -p ditto-confine` 建置後，執行 `./target/release/ditto-confine --landlock-abi` 查詢實際 ABI；負值或低於 6 不能使用 Codex 訂閱連線。ABI 足夠不代表其他隔離檢查已通過。
+
+Coordinator 的 Ubuntu 24.04 kernel 6.8 VM 為 ABI 4。可安裝 `linux-generic-hwe-24.04`，重新開機後再探測；HWE 套件名稱與核心版本字串本身不保證 ABI 或安全設定。完整操作見[Codex 安裝與隔離相容性](../../packaging/reference-image/README.md#codex-隔離相容性)。開發安裝的 `--development` 不略過 ABI 警告；無法提供隔離時，桌面及 API 金鑰路徑仍可使用，Codex 不降級為未隔離執行。
+
 ## 5. 尚未形成的出口證據
 
 平台與工具鏈已凍結不表示 G0 已出口。以下仍須依原判準取得：

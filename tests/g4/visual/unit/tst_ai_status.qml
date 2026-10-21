@@ -20,7 +20,7 @@ TestCase {
     /// Reads the open flow already makes. Anything else would be a new
     /// capability or a business action resent by a status read.
     readonly property var readCapabilities: ["agent.settings.describe", "agent.sessions.list",
-        "agent.runtime.get", "agent.providers.status", "agent.sessions.read", "agent.turns.get"]
+        "agent.runtime.get", "agent.providers.status", "agent.credentials.status", "agent.sessions.read", "agent.turns.get"]
 
     QtObject {
         id: client
@@ -28,6 +28,8 @@ TestCase {
         property var calls: []
         /// method -> { ok: result } | { fail: error }; absent = no answer yet.
         property var replies: ({})
+        property var pending: ({})
+        signal changeUpdated(var change)
         signal disconnected()
         function t(text) { return text; }
         function key(text) { return text; }
@@ -39,6 +41,7 @@ TestCase {
             calls = calls.concat([method]);
             const reply = replies[method];
             if (!reply) {
+                pending[method] = { ok: ok, fail: fail };
                 return;
             }
             if (reply.fail) {
@@ -52,9 +55,11 @@ TestCase {
         }
     }
     Jelly.Tokens { id: tokens }
+    Rectangle { id: captureCanvas; anchors.fill: parent; z: -1; visible: false; color: tokens.background }
 
     Component { id: conversationComponent; Chat.ConversationState {} }
     Component { id: entryComponent; Assistant.AssistantEntry {} }
+    Component { id: chatComponent; Chat.ChatBody {} }
     Component { id: settingsComponent; Centers.AISettings {} }
 
     readonly property var settingsOn: ({ enabled: true, revision: "fixture-r1", provider: "codex-app-server", approval_mode: "ask", model: null })
@@ -72,13 +77,15 @@ TestCase {
         client.online = true;
         client.calls = [];
         client.replies = {};
+        client.pending = {};
         conversation = createTemporaryObject(conversationComponent, testCase, { client: client });
         entry = createTemporaryObject(entryComponent, testCase, { client: client, tokens: tokens, conversation: conversation });
         verify(conversation !== null && entry !== null);
     }
 
     function answer(table) {
-        client.replies = Object.assign({ "agent.sessions.list": { ok: { sessions: [] } } }, table);
+        client.replies = Object.assign({ "agent.sessions.list": { ok: { sessions: [] } },
+            "agent.runtime.get": { ok: { generation: 4, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null } } }, table);
     }
     function count(method) {
         return client.calls.filter(name => name === method).length;
@@ -343,10 +350,9 @@ TestCase {
         compare(report().connected, null);
     }
 
-    /// Reopening on the same live connection keeps what this connection
-    /// confirmed until the new read answers, so a running turn does not
-    /// flash offline (legacy avatar and entry unchanged). A failure clears it.
-    function test_reopen_keeps_confirmed_until_answer() {
+    /// A running turn still drives the avatar while status is reread. Its
+    /// earlier runtime cannot authorize a ready connection on this new read.
+    function test_reopen_revalidates_runtime_without_stopping_turn() {
         answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready } });
         conversation.open();
         conversation.turn = { turn_id: "fixture-turn", state: "running" };
@@ -354,7 +360,8 @@ TestCase {
         answer({});
         reread("reopen");
         compare(conversation.taskState, "thinking");
-        compare(conversation.aiStatus, "ready");
+        compare(conversation.aiStatus, "pending");
+        compare(conversation.connected, false);
         readsOnly();
     }
 
@@ -377,11 +384,272 @@ TestCase {
         readsOnly();
     }
 
+    function test_missing_backend_surfaces() {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
+        const page = settingsPage();
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        verify(named(page, "aiProviderStatus").text.indexOf("無法使用 Codex 訂閱") >= 0);
+        verify(conversation.stateText.indexOf(data.noApi ? "AI 對話" : "Codex 訂閱無法使用") >= 0, conversation.stateText);
+        for (const surface of [page, chat]) {
+            const signIn = find(surface, item => item.text === "使用 Codex 訂閱登入");
+            verify(signIn && !signIn.visible, "missing backend still offers sign-in");
+        }
+        verify(find(chat, item => item.visible && item.text && item.text.indexOf("API 金鑰") >= 0));
+        // Isolated production surfaces on the existing light theme; fixture
+        // data only. Hide sibling surfaces before grabbing their native pixels.
+        const appearance = tokens.appearance;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        captureCanvas.visible = true;
+        entry.visible = false;
+        chat.visible = false;
+        waitForRendering(page, 250);
+        grabImage(page).save(Qt.resolvedUrl("../.staged/out/ai-settings-no-codex.png").toString().replace("file://", ""));
+        page.visible = false;
+        chat.visible = true;
+        waitForRendering(chat, 250);
+        grabImage(chat).save(Qt.resolvedUrl("../.staged/out/ai-chat-no-codex.png").toString().replace("file://", ""));
+        page.visible = true;
+        entry.visible = true;
+        captureCanvas.visible = false;
+        tokens.appearance = appearance;
+        conversation.startLogin();
+        compare(count("agent.providers.login"), 0);
+        readsOnly();
+    }
+
+    function test_provider_reason_is_product_copy() {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { fail: { name: "unavailable", code: -32007,
+                message: "private diagnostic", data: { reason: "system_unavailable", reason_code: "backend_unsupported" } } } });
+        conversation.open();
+        compare(conversation.aiStatus, "failed");
+        verify(conversation.errorText.indexOf("無法確認模型連線") >= 0);
+        verify(conversation.errorText.indexOf("安裝") < 0);
+        verify(conversation.errorText.indexOf("private") < 0);
+        verify(conversation.errorDiagnostic.indexOf("private") >= 0);
+        wait(1800);
+        compare(count("agent.providers.status"), 1);
+    }
+
+    function test_available_subscription_still_offers_login() {
+        answer({ "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: { available: true, provider: "codex-app-server", authenticated: false, models: [] } } });
+        const page = settingsPage();
+        verify(find(page, item => item.text === "使用 Codex 訂閱登入").visible);
+    }
+
+    function test_direct_model_ignores_missing_codex() {
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn, {provider: "direct-model"}) },
+            "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
+        const page = settingsPage();
+        verify(find(page, item => item.visible && item.text === "儲存並使用"));
+        verify(!find(page, item => item.text === "使用 Codex 訂閱登入").visible);
+    }
+
+    function test_api_key_chat_without_codex_data() {
+        return [{ tag: "ready", available: true }, { tag: "locked-or-missing", available: false }];
+    }
+    function test_api_key_chat_without_codex(data) {
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn,
+                { provider: "direct-model", endpoint: "https://api.example.com/v1", auth: { kind: "api_key", credential_ref: "fixture-key" } }) },
+            "agent.credentials.status": { ok: { credential_ref: "fixture-key", available: data.available } },
+            "agent.providers.status": { ok: { available: false, provider: "codex-app-server", authenticated: false, models: [] } } });
+        conversation.open();
+        compare(count("agent.providers.status"), 0);
+        compare(count("agent.credentials.status"), 1);
+        compare(conversation.connected, data.available);
+        compare(conversation.canLogin, false);
+        compare(conversation.subscriptionUnavailable, false);
+        conversation.draft = "fixture draft";
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        compare(find(chat, item => item.text === "送出").enabled, data.available);
+        readsOnly();
+    }
+
+    function test_subscription_reply_cannot_replace_api_key_status() {
+        answer({ "agent.settings.describe": { ok: settingsOn } });
+        conversation.open();
+        const old = client.pending["agent.providers.status"];
+        verify(old && old.ok);
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn,
+                { provider: "direct-model", endpoint: "https://api.example.com/v1", auth: { kind: "api_key", credential_ref: "fixture-key" } }) },
+            "agent.credentials.status": { ok: { available: true } } });
+        conversation.refreshSettings();
+        compare(conversation.provider.provider, "direct-model");
+        old.ok(ready);
+        compare(conversation.provider.provider, "direct-model");
+        compare(conversation.connected, true);
+        readsOnly();
+    }
+
+    function test_unsupported_model_does_not_suggest_installing_codex() {
+        answer({ "agent.settings.describe": { ok: settingsOn }, "agent.providers.status": { ok: ready },
+            "agent.runtime.get": { ok: { generation: 4, phase: "ready", backend_pid: 42, isolation_verified: true, failure_reason: null } } });
+        conversation.open();
+        verify(conversation.connected);
+        conversation.turn = { turn_id: "fixture-turn", state: "failed", error_reason: "backend_unsupported" };
+        verify(conversation.stateText.indexOf("模型或思考深度") >= 0, conversation.stateText);
+        verify(conversation.stateText.indexOf("AI 設定") >= 0);
+        verify(conversation.stateText.indexOf("安裝") < 0);
+        conversation.provider = Object.assign({}, ready, { available: false, authenticated: false });
+        compare(conversation.failureText(conversation.turn), conversation.subscriptionUnavailableText);
+        readsOnly();
+    }
+
+    function test_failed_settings_fences_pending_provider_data() {
+        return [{ tag: "codex", direct: false }, { tag: "api-key", direct: true }];
+    }
+    function test_failed_settings_fences_pending_provider(data) {
+        const prefs = data.direct ? Object.assign({}, settingsOn, { provider: "direct-model",
+            endpoint: "https://api.example.com/v1", auth: { kind: "api_key", credential_ref: "fixture-key" } }) : settingsOn;
+        answer({ "agent.settings.describe": { ok: prefs } });
+        conversation.open();
+        const pending = client.pending[data.direct ? "agent.credentials.status" : "agent.providers.status"];
+        verify(pending && pending.ok && pending.fail);
+        answer({ "agent.settings.describe": { fail: error("internal") } });
+        conversation.refreshSettings();
+        compare(conversation.provider, null);
+        const diagnostic = conversation.errorDiagnostic;
+        pending.ok(data.direct ? { available: true } : ready);
+        compare(conversation.provider, null);
+        compare(report().connected, null);
+        pending.fail(error("timeout"));
+        compare(conversation.errorDiagnostic, diagnostic);
+        compare(conversation.providerFailed, false);
+        readsOnly();
+    }
+
+    function test_api_key_unavailable_has_settings_action_data() {
+        return [{ tag: "missing", auth: null }, { tag: "locked", auth: { kind: "api_key", credential_ref: "fixture-key" } }];
+    }
+    function test_api_key_unavailable_has_settings_action(data) {
+        answer({ "agent.settings.describe": { ok: Object.assign({}, settingsOn,
+            { provider: "direct-model", endpoint: "https://api.example.com/v1", auth: data.auth }) },
+            "agent.credentials.status": { ok: { available: false } } });
+        conversation.open();
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        const notice = named(chat, "apiKeyStatus");
+        verify(notice && notice.visible, "missing API key next step");
+        verify(notice.text.indexOf("金鑰") >= 0 && notice.text.indexOf("解鎖") >= 0);
+        const action = named(chat, "apiKeySettings");
+        verify(action && action.visible && action.enabled);
+        const spy = Qt.createQmlObject('import QtTest; SignalSpy { signalName: "settingsRequested" }', testCase);
+        spy.target = chat;
+        action.clicked();
+        compare(spy.count, 1);
+        spy.destroy();
+        compare(find(chat, item => item.text === "送出").enabled, false);
+        compare(count("agent.providers.login"), 0);
+        const appearance = tokens.appearance;
+        tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+        captureCanvas.visible = true;
+        entry.visible = false;
+        waitForRendering(chat, 250);
+        grabImage(chat).save(Qt.resolvedUrl("../.staged/out/ai-api-key-" + data.tag + ".png").toString().replace("file://", ""));
+        entry.visible = true;
+        captureCanvas.visible = false;
+        tokens.appearance = appearance;
+        readsOnly();
+    }
+
+    function test_runtime_failures_have_correct_next_steps_data() {
+        return [
+            { tag: "isolation", reason: "isolation_unavailable", text: "安全隔離", noInstall: true },
+            { tag: "isolation-unread", reason: "isolation_unavailable", text: "安全隔離", noInstall: true, unread: true },
+            { tag: "isolation-stale", reason: "isolation_unavailable", text: "安全隔離", noInstall: true, stale: true },
+            { tag: "binary", reason: "backend_binary_mismatch", text: "檔案不符合", noInstall: false },
+            { tag: "catalog", reason: "backend_catalog_unavailable", text: "模型清單", noInstall: false },
+            { tag: "backend-launch", reason: "backend_launch_failed", text: "啟動成功", noInstall: true },
+            { tag: "controller-launch", reason: "launch_failed", text: "AI 對話", noInstall: false, noApi: true },
+            { tag: "startup", reason: "startup_timeout", text: "AI 對話", noInstall: false, noApi: true },
+            { tag: "exited", reason: "backend_exited", text: "已中斷", noInstall: true },
+            { tag: "drain", reason: "drain_timeout", text: "正常停止", noInstall: true, noApi: true },
+            { tag: "unknown", reason: "future-unrecognised-code", text: "AI 對話目前無法使用", noInstall: true, noApi: true }
+        ];
+    }
+    function test_runtime_failures_have_correct_next_steps(data) {
+        const replies = { "agent.settings.describe": { ok: settingsOn },
+            "agent.providers.status": { ok: data.stale ? ready : { provider: "codex-app-server", available: false, authenticated: false, models: [] } },
+            "agent.runtime.get": { ok: { generation: 4, phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: data.reason } } };
+        if (data.unread) delete replies["agent.providers.status"];
+        answer(replies);
+        const page = settingsPage();
+        const chat = createTemporaryObject(chatComponent, testCase,
+            { width: 440, height: 800, client: client, tokens: tokens, conversation: conversation });
+        verify(chat !== null);
+        const text = named(page, "aiProviderStatus").text;
+        verify(text.indexOf(data.text) >= 0, text);
+        verify(find(chat, item => item.visible && item.text === text), "chat/settings mismatch");
+        if (data.noInstall) verify(text.indexOf("安裝") < 0, text);
+        if (data.noApi) verify(text.indexOf("API 金鑰") < 0, text);
+        if (data.reason === "isolation_unavailable") verify(text.indexOf("系統核心") >= 0, text);
+        verify(!conversation.canLogin);
+        compare(conversation.aiStatus, "model_offline");
+        compare(report().connected, false);
+        verify(conversation.stateText.indexOf(data.noApi ? "AI 對話" : "Codex 訂閱無法使用") >= 0, conversation.stateText);
+        for (const surface of [page, chat]) verify(!find(surface, item => item.text === "使用 Codex 訂閱登入").visible);
+        if (data.tag === "isolation") {
+            const appearance = tokens.appearance;
+            tokens.appearance = { theme: "soft-jelly-light", tokens: {} };
+            captureCanvas.visible = true;
+            entry.visible = false;
+            chat.visible = false;
+            waitForRendering(page, 250);
+            grabImage(page).save(Qt.resolvedUrl("../.staged/out/ai-settings-isolation.png").toString().replace("file://", ""));
+            page.visible = false;
+            chat.visible = true;
+            waitForRendering(chat, 250);
+            grabImage(chat).save(Qt.resolvedUrl("../.staged/out/ai-chat-isolation.png").toString().replace("file://", ""));
+            page.visible = true;
+            entry.visible = true;
+            captureCanvas.visible = false;
+            tokens.appearance = appearance;
+        }
+        readsOnly();
+    }
+
+    function test_runtime_readback_corrects_an_earlier_backend_error() {
+        conversation.settings = settingsOn;
+        conversation.setError({ name: "unavailable", code: -32007, message: "backend unavailable",
+            data: { reason: "system_unavailable", reason_code: "backend_unsupported" } });
+        conversation.runtime = { phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: "isolation_unavailable" };
+        compare(conversation.errorText, conversation.subscriptionUnavailableText);
+        verify(conversation.errorText.indexOf("安全隔離") >= 0);
+        verify(conversation.errorText.indexOf("安裝") < 0);
+    }
+
+    function test_missing_backend_turn_does_not_blame_model_data() {
+        const rows = [];
+        for (const provider of [null, ready]) {
+            for (const reason of ["isolation_unavailable", "backend_binary_mismatch", null]) {
+                rows.push({ tag: (provider ? "stale" : "unread") + "-" + (reason || "no-pid"), provider: provider, reason: reason });
+            }
+        }
+        return rows;
+    }
+    function test_missing_backend_turn_does_not_blame_model(data) {
+        conversation.settings = settingsOn;
+        conversation.provider = data.provider;
+        conversation.runtime = { phase: "ready", backend_pid: null, isolation_verified: false, failure_reason: data.reason };
+        const text = conversation.failureText({ state: "failed", error_reason: "backend_unsupported" });
+        verify(text.indexOf("目前選的模型") < 0, text);
+        compare(conversation.connected, false);
+        compare(conversation.canLogin, false);
+        verify(text.indexOf(data.reason === "isolation_unavailable" ? "安全隔離" : "Codex") >= 0, text);
+    }
+
     /// Readback that says the model cannot be used now: confirmed, not a
     /// read failure.
     function test_provider_closed_data() {
         return [
-            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "模型尚未連接" },
+            { tag: "unavailable-model", provider: { available: false, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "Codex 訂閱無法使用" },
             { tag: "signed-out", provider: { available: true, provider: "codex-app-server", authenticated: false, account_label: null, models: [], rate_limits: null }, status: "model_offline", text: "模型尚未連接" },
             { tag: "core-disconnected", provider: null, status: "core_offline", text: "桌面服務未連線" },
             { tag: "ai-off", provider: null, status: "disabled", text: "AI 對話已關閉" }
@@ -394,7 +662,7 @@ TestCase {
         if (data.tag === "core-disconnected") client.online = false;
         compare(conversation.aiStatus, data.status);
         verify(conversation.stateText.indexOf(data.text) >= 0, conversation.stateText);
-        verify(conversation.stateText.indexOf("無法") < 0);
+        if (data.tag !== "unavailable-model") verify(conversation.stateText.indexOf("無法") < 0);
         compare(entry.Accessible.description, conversation.stateText);
         compare(conversation.taskState, "offline");
         const r = report();

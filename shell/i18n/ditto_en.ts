@@ -669,6 +669,10 @@
         <translation>AI settings</translation>
     </message>
     <message>
+        <source>API 金鑰目前無法使用。請在 AI 設定補上金鑰，或解鎖系統鑰匙圈後再開啟 AI 設定。</source>
+        <translation>The API key is unavailable. Add a key in AI settings, or unlock the system keyring and reopen AI settings.</translation>
+    </message>
+    <message>
         <source>Ditto 對話</source>
         <translation>Ditto chat</translation>
     </message>
@@ -707,6 +711,10 @@
     <message>
         <source>刪除這段對話（桌面維持原樣）</source>
         <translation>Delete this conversation (the desktop stays as it is)</translation>
+    </message>
+    <message>
+        <source>前往 AI 設定</source>
+        <translation>Open AI settings</translation>
     </message>
     <message>
         <source>剪貼簿</source>
@@ -1226,6 +1234,30 @@
         <translation>AI chat is off; the desktop works as usual</translation>
     </message>
     <message>
+        <source>AI 對話沒有啟動成功；請重新登入桌面後再試，仍無法使用時請重新執行 Ditto 安裝程式或查看診斷。桌面仍可照常操作。</source>
+        <translation>AI conversations could not start. Sign in to the desktop again and retry. If the problem persists, rerun the Ditto installer or check diagnostics. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>AI 對話沒有正常停止；請重新登入桌面後再試，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI conversations did not stop normally. Sign in to the desktop again and retry. If the problem persists, check diagnostics. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>AI 對話目前無法使用；請重新開啟 AI 設定確認連線，仍無法使用時請查看診斷。桌面仍可照常操作。</source>
+        <translation>AI chat is unavailable. Reopen AI settings to check the connection; if it is still unavailable, view diagnostics. The desktop still works as usual.</translation>
+    </message>
+    <message>
+        <source>AI 連線沒有啟動成功；請重新登入桌面後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The AI connection could not start. Sign in to the desktop again and retry, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>Codex 訂閱無法使用</source>
+        <translation>Codex subscription unavailable</translation>
+    </message>
+    <message>
+        <source>Codex 連線已中斷；請重新開啟對話後再試，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex connection stopped. Reopen the conversation and try again, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
         <source>只完成了一部分；請查看變更卡</source>
         <translation>Only partly done; see the change card</translation>
     </message>
@@ -1266,6 +1298,10 @@
         <translation>The model did not answer; nothing on the desktop changed. You can try again</translation>
     </message>
     <message>
+        <source>模型連線暫時無法使用；請檢查網路後重試。桌面仍可照常操作。</source>
+        <translation>The model connection is temporarily unavailable. Check your network and try again. You can keep using the desktop.</translation>
+    </message>
+    <message>
         <source>正在停止</source>
         <translation>Stopping</translation>
     </message>
@@ -1280,6 +1316,10 @@
     <message>
         <source>正在理解需求；可停止</source>
         <translation>Working out what you asked; you can stop it</translation>
+    </message>
+    <message>
+        <source>正在讀取模型連線狀態…</source>
+        <translation>Reading the model connection status…</translation>
     </message>
     <message>
         <source>正在重新連線；將查詢實際結果</source>
@@ -1298,12 +1338,32 @@
         <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
+        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex model list could not be read. Verify the supported Codex file and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
+        <translation>The selected model or reasoning effort is not supported. Choose another option in AI settings and try again.</translation>
+    </message>
+    <message>
         <source>結果尚未確認；不要重複送出，請查看變更紀錄</source>
         <translation>The result is not confirmed yet; do not send it again — see the change history</translation>
     </message>
     <message>
         <source>訂閱額度已用完；等額度重設後再試</source>
         <translation>Subscription quota used up; try again after it resets</translation>
+    </message>
+    <message>
+        <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>This computer cannot safely isolate Codex. Upgrade the system kernel or adjust its isolation settings, then sign in again, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>這台電腦的 Codex 檔案不符合 Ditto 支援的版本；請依安裝說明核對檔案後重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex file on this computer does not match a version supported by Ditto. Verify it using the installation instructions and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair Codex, rerun the Ditto installer, then sign in to the desktop again, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>需要你的確認</source>
