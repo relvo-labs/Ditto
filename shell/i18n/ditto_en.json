@@ -422,6 +422,7 @@
   "結果尚未確認；不要重複送出，請查看變更紀錄": "The result is not confirmed yet; do not send it again — see the change history",
   "網路不可用": "Network unavailable",
   "網路已連線": "Network connected",
+  "網路已連線（網際網路狀態未知）": "Network connected (Internet status unknown)",
   "網路未連線": "Network disconnected",
   "網路狀態未知": "Network status unknown",
   "縮小視窗": "Minimize window",

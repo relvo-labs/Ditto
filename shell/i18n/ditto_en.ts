@@ -2492,6 +2492,10 @@
         <translation>Network connected</translation>
     </message>
     <message>
+        <source>網路已連線（網際網路狀態未知）</source>
+        <translation>Network connected (Internet status unknown)</translation>
+    </message>
+    <message>
         <source>網路未連線</source>
         <translation>Network disconnected</translation>
     </message>
