@@ -4,6 +4,50 @@
 
 G0 的主要參考機識別為 `ditto-ref-ws-rtx4060-01`。同一項三次重複量測不得混用不同機器；新增參考機時要給新的穩定識別並另存指紋，不能把不同硬體的數字合併。
 
+## Codex 訂閱連線
+
+Codex 是選用項目；沒有安裝或無法隔離時，桌面仍可使用，也可在 AI 設定改用 API 金鑰。訂閱連線需要 [`tools/codex/pin.json`](../../tools/codex/pin.json) 指定的 `0.160.0`、`x86_64-unknown-linux-musl` 二進位；不要用官方安裝程式目前自動取得的最新版代替。
+
+從倉庫根目錄下載 GitHub release `rust-v0.160.0` 的資產 `codex-x86_64-unknown-linux-musl.tar.gz`。Coordinator 已核對解出的單一檔案 `codex-x86_64-unknown-linux-musl` 與 pin 的 SHA-256 一致；以下步驟仍會在本機重新核對。檔案放在 Ditto 專用資料夾，不覆蓋終端使用的 Codex CLI：
+
+```sh
+set -eu
+codex_download="$(mktemp -d)"
+codex_dir="$HOME/.local/share/ditto/codex/0.160.0"
+curl --fail --location --output "$codex_download/codex.tar.gz" \
+  https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-x86_64-unknown-linux-musl.tar.gz
+tar --extract --gzip --file "$codex_download/codex.tar.gz" --directory "$codex_download" \
+  codex-x86_64-unknown-linux-musl
+codex_candidate="$codex_download/codex-x86_64-unknown-linux-musl"
+printf '%s  %s\n' "$(jq -r .sha256 tools/codex/pin.json)" "$codex_candidate" | sha256sum --check -
+install -D -m 0755 "$codex_candidate" "$codex_dir/codex"
+DITTO_CODEX_BINARY="$codex_dir/codex" bash packaging/reference-image/install-session.sh
+```
+
+SHA-256 必須核對 pin 的 `12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad`；核對失敗就停止，不跳過檢查。同 release 另有 `.sigstore` 資產。安裝後登出桌面，再選擇 Ditto 登入；只換檔案而不重跑安裝程式，不會更新原工作階段的路徑。開發 VM 在上述安裝指令末端加上原本的 `--development`；它只略過參考機指紋檢查，仍會探測隔離相容性。
+
+安裝程式也支援未設定 `DITTO_CODEX_BINARY` 時讀取 `~/.local/bin/codex`，但這是次要選項：該位置可能是官方安裝程式管理的自動更新連結。覆寫會改變使用者在終端執行的版本；後續自動更新又可能令 SHA-256 不符。建議持續使用上述 Ditto 專用位置與 `DITTO_CODEX_BINARY`。
+
+### Codex 隔離相容性
+
+Codex 訂閱連線需要 **Landlock ABI ≥6**，且 Landlock 必須可用；版本門檻來自 `crates/ditto-confine/src/main.rs` 的 `MINIMUM_ABI`。核心版本字串不能取代實際 ABI 探測，也不能只因 ABI 足夠就宣稱其他隔離機制均可用。建置後可查詢：
+
+```sh
+cargo build --locked --release -p ditto-confine
+./target/release/ditto-confine --landlock-abi
+```
+
+輸出為 ABI 整數；低於 6 或負值表示這台電腦尚不能提供所需隔離。查詢本身不啟動 Codex、不建立隔離程序。安裝程式即使加了 `--development` 也會印英文警告，並把查詢結果放入登入後的 `$XDG_RUNTIME_DIR/ditto/session.env`：`DITTO_CODEX_LANDLOCK_ABI`，符合 pin 但隔離不足時的 `DITTO_CODEX_STATUS` 為 `isolation_unavailable`。這是安裝時的相容性結果；執行期仍以 Core 回讀為準。
+
+Coordinator 在 Ubuntu 24.04 預設 kernel 6.8 的 VM 實測為 ABI 4。可先安裝 HWE 核心，再重新開機、重跑上述查詢；仍須 ABI ≥6 並確認 Landlock 已啟用：
+
+```sh
+sudo apt-get update
+sudo apt-get install linux-generic-hwe-24.04
+```
+
+確認可用後重跑 Ditto 安裝程式並重新登入。不能升級或系統仍不允許安全隔離時，改用 API 金鑰；不降低隔離要求，也不阻擋桌面使用。
+
 ## 凍結內容
 
 - Ubuntu 24.04.2 LTS、kernel `6.17.0-40-generic`。
