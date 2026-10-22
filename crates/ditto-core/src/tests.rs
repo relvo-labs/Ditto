@@ -5,6 +5,7 @@
 
 mod builtin_profiles;
 mod generation_transactions;
+mod shell_extensions;
 
 use super::*;
 use crate::{

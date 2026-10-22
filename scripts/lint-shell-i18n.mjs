@@ -77,7 +77,7 @@ const REQUIRED_KEYS = [
   'shortcut.command_failed',
   // slot names (Tr.slotName)
   ...['ui.panel_top', 'ui.dock', 'ui.launcher', 'ui.tasks_panel', 'ui.notifications', 'layout.strategy', 'svc.tasks',
-    'svc.notification_policy', 'ui.status_item', 'ui.generated_panel'].map((slot) => `slot.${slot}`),
+    'svc.notification_policy', 'ui.status_item', 'ui.generated_panel', 'ui.background', 'ui.settings_page'].map((slot) => `slot.${slot}`),
   // error names and reasons (DittoClient.errorText)
   ...['unsupported', 'invalid_params', 'not_found', 'permission_denied', 'timeout', 'cancelled', 'conflict', 'unavailable',
     'protocol_version_unsupported', 'identity_rejected', 'preflight_rejected', 'internal'].map((name) => `error.${name}`),

@@ -91,7 +91,7 @@ impl Resolver<'_> {
 }
 
 /// One binding per single-provider `ui.*` slot, then one per enabled member
-/// of each area, in entry order (the order the Shell lays them out in).
+/// of each area, in entry order except settings pages, sorted by metadata.
 pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjection {
     let binding = |slot: &str, entry: &EntrySpec| -> Option<ShellSlotBinding> {
         if entry.disabled || entry.host != HostKind::Qml {
@@ -110,6 +110,9 @@ pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjec
             return None;
         }
         Some(ShellSlotBinding {
+            settings_page: (slot == "ui.settings_page")
+                .then(|| manifest.settings_page.clone())
+                .flatten(),
             slot: slot.into(),
             entry_id: entry.entry_id.clone(),
             package: entry.package.clone(),
@@ -134,11 +137,19 @@ pub fn shell(document: &ProfileDocument, resolver: &Resolver<'_>) -> ShellProjec
         if slot_role(area) != Some(ParticipantRole::Shell) {
             continue;
         }
-        slots.extend(
-            document
-                .area_members(area)
-                .filter_map(|entry| binding(area, entry)),
-        );
+        let mut members: Vec<_> = document
+            .area_members(area)
+            .filter_map(|entry| binding(area, entry))
+            .collect();
+        if *area == "ui.settings_page" {
+            members.sort_by(|a, b| {
+                a.settings_page
+                    .as_ref()
+                    .map(|p| (p.order, &p.page_id))
+                    .cmp(&b.settings_page.as_ref().map(|p| (p.order, &p.page_id)))
+            });
+        }
+        slots.extend(members);
     }
     ShellProjection {
         appearance: document.appearance.clone(),
@@ -320,6 +331,16 @@ pub fn check_shell(
             .iter()
             .find(|mount| mount.slot == binding.slot && mount.entry_id == binding.entry_id);
         let mounted = mount.is_some_and(|mount| mount.mounted && mount.visible);
+        let identity_required =
+            matches!(binding.slot.as_str(), "ui.background" | "ui.settings_page");
+        let correct_identity = mount.is_some_and(|m| {
+            m.package
+                .as_ref()
+                .map_or(!identity_required, |p| p == &binding.package)
+                && m.version
+                    .as_ref()
+                    .map_or(!identity_required, |v| v == &binding.version)
+        });
         let correct_artifact = binding.qml_url != "ditto-generated:fixed"
             || binding.config["artifact_id"]
                 .as_str()
@@ -328,8 +349,10 @@ pub fn check_shell(
                 });
         verdicts.push(verdict(
             &key(&binding.slot, &binding.entry_id),
-            mounted && correct_artifact,
-            if mounted && !correct_artifact {
+            mounted && correct_artifact && correct_identity,
+            if mounted && !correct_identity {
+                "the mounted package or version differs from the requested binding"
+            } else if mounted && !correct_artifact {
                 "the mounted generated artifact differs from the requested version"
             } else {
                 "the provider is not mounted and visible"
@@ -505,6 +528,7 @@ mod tests {
         ShellSlotBinding {
             slot: slot.into(),
             entry_id: entry_id.into(),
+            settings_page: None,
             package: format!("pkg-{entry_id}"),
             version: "1.0.0".into(),
             qml_url: "file:///x.qml".into(),
@@ -519,6 +543,9 @@ mod tests {
             mounted: true,
             visible,
             artifact_id: None,
+            package: None,
+            version: None,
+            page_state: None,
         }
     }
 

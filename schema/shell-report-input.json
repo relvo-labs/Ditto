@@ -153,6 +153,13 @@
       ],
       "type": "object"
     },
+    "PageState": {
+      "enum": [
+        "registered",
+        "open"
+      ],
+      "type": "string"
+    },
     "PanelMount": {
       "additionalProperties": false,
       "properties": {
@@ -169,8 +176,30 @@
         "mounted": {
           "type": "boolean"
         },
+        "package": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "page_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PageState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "slot": {
           "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "visible": {
           "type": "boolean"
