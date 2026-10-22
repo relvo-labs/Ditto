@@ -2151,6 +2151,14 @@
         <source>unavailable.system_unavailable</source>
         <translation>系統服務沒有回應</translation>
     </message>
+    <message>
+        <source>slot.ui.background</source>
+        <translation>桌面背景</translation>
+    </message>
+    <message>
+        <source>slot.ui.settings_page</source>
+        <translation>設定頁面</translation>
+    </message>
 </context>
 <context>
     <name>DockBottom</name>
@@ -3409,6 +3417,52 @@
     <message>
         <source>顯示診斷</source>
         <translation>顯示診斷</translation>
+    </message>
+</context>
+<context>
+    <name>HistoryPage</name>
+    <message>
+        <source>保留</source>
+        <translation>保留</translation>
+    </message>
+    <message>
+        <source>取消並回復</source>
+        <translation>取消並回復</translation>
+    </message>
+    <message>
+        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
+        <translation>已撤銷。撤銷本身也記錄成一筆變更。</translation>
+    </message>
+    <message>
+        <source>撤銷這次變更</source>
+        <translation>撤銷這次變更</translation>
+    </message>
+    <message>
+        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
+        <translation>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>變更紀錄</translation>
+    </message>
+    <message>
+        <source>載入較早的紀錄</source>
+        <translation>載入較早的紀錄</translation>
+    </message>
+    <message>
+        <source>還沒有任何變更。</source>
+        <translation>還沒有任何變更。</translation>
+    </message>
+</context>
+<context>
+    <name>SettingsPageContainer</name>
+    <message>
+        <source>這個頁面無法載入。請在插件中心停用它，或稍後再試。</source>
+        <translation>這個頁面無法載入。請在插件中心停用它，或稍後再試。</translation>
     </message>
 </context>
 </TS>

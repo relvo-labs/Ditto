@@ -385,6 +385,34 @@
       ],
       "type": "object"
     },
+    "SettingsPageDecl": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "order": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "page_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,31}$",
+          "type": "string"
+        },
+        "title_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_id",
+        "title_key",
+        "order"
+      ],
+      "type": "object"
+    },
     "ShellSlotBinding": {
       "additionalProperties": false,
       "properties": {
@@ -398,6 +426,16 @@
         "qml_url": {
           "description": "`file://` URL of the provider's `qml_entry` inside the package store.",
           "type": "string"
+        },
+        "settings_page": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettingsPageDecl"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "slot": {
           "type": "string"

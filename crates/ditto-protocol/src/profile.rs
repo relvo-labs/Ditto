@@ -18,16 +18,18 @@ pub const SLOTS: &[&str] = &[
     "ui.launcher",
     "ui.tasks_panel",
     "ui.notifications",
+    "ui.background",
     "layout.strategy",
     "svc.tasks",
     "svc.notification_policy",
 ];
 
 /// Multi-entry areas: any number of entries may be members, and every
-/// enabled member is mounted, in the order of `entries`. Membership is the
+/// enabled member is mounted, in entry order (settings pages use manifest
+/// `(order, page_id)` instead). Membership is the
 /// entry's own `area` field, set when the entry is added (`add_entry` with
 /// `slot` naming the area); it is not part of the single-provider `slots` map.
-pub const AREAS: &[&str] = &["ui.status_item", "ui.generated_panel"];
+pub const AREAS: &[&str] = &["ui.status_item", "ui.generated_panel", "ui.settings_page"];
 
 pub fn is_area(name: &str) -> bool {
     AREAS.contains(&name)

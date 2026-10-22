@@ -53,6 +53,8 @@ pub struct ShellSlotBinding {
     /// `file://` URL of the provider's `qml_entry` inside the package store.
     pub qml_url: String,
     pub config: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_page: Option<crate::manifest::SettingsPageDecl>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -191,9 +193,22 @@ pub struct ChangePhase {
     pub phase: ParticipantPhase,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PageState {
+    Registered,
+    Open,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PanelMount {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_state: Option<PageState>,
     pub slot: String,
     pub entry_id: String,
     pub mounted: bool,
@@ -348,6 +363,25 @@ pub struct ShellCommandParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_mount_wire_is_unchanged_and_new_identity_round_trips() {
+        let old =
+            serde_json::json!({"slot":"ui.dock","entry_id":"dock","mounted":true,"visible":true});
+        let mount: PanelMount = serde_json::from_value(old.clone()).unwrap();
+        assert_eq!(serde_json::to_value(mount).unwrap(), old);
+        for state in ["registered", "open"] {
+            let mut wire = old.clone();
+            wire["package"] = serde_json::json!("ditto.settings.history");
+            wire["version"] = serde_json::json!("1.0.0");
+            wire["page_state"] = serde_json::json!(state);
+            assert_eq!(
+                serde_json::to_value(serde_json::from_value::<PanelMount>(wire.clone()).unwrap())
+                    .unwrap(),
+                wire
+            );
+        }
+    }
 
     #[test]
     fn projections_carry_their_role_on_the_wire() {

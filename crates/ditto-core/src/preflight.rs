@@ -292,6 +292,29 @@ fn check_all(
             }
         }
     }
+    let mut page_ids = BTreeSet::new();
+    for entry in &target.entries {
+        if entry.area.as_deref() != Some("ui.settings_page") {
+            continue;
+        }
+        let Some(manifest) = manifests.get(entry.entry_id.as_str()) else {
+            continue;
+        };
+        let why = match &manifest.settings_page {
+            None => Some("settings_page_missing"),
+            Some(page) if !entry.disabled && !page_ids.insert(&page.page_id) => {
+                Some("duplicate_page_id")
+            }
+            _ => None,
+        };
+        if let Some(why) = why {
+            reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                None,
+                json!({"entry_id": entry.entry_id, "why": why}),
+            ));
+        }
+    }
     // 4. protocol and runtime compatibility
     for entry in &enabled {
         let Some(manifest) = manifests.get(entry.entry_id.as_str()) else {

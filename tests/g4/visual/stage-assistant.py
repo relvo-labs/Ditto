@@ -112,6 +112,67 @@ added = [line for line in filter(decisive, approval_now) if line not in approval
 assert all('decided("rejected")' in line for line in added), added
 report.append({'oracle': 'ApprovalWindow decision/focus/Escape lines match 25c0b72 verbatim; added decisions only refuse',
                'added': [line.strip() for line in added]})
+# UI-P02 moves only the background block out of shell.qml. Reconstruct the
+# exact d063f03 text before applying the original 366f174 oracle below.
+P02_BASE = 'd063f0357bfd3dc96e707072fe9e74c8722e3c98'
+p02_shell = subprocess.check_output(['git', 'show', f'{P02_BASE}:shell/shell.qml'], cwd=ROOT).decode()
+background_pattern = r'    Variants \{\n        model: Quickshell\.screens\n\n        PanelWindow \{.*?\n        \}\n    \}'
+old_backgrounds = re.findall(background_pattern, p02_shell, re.S)
+assert len(old_backgrounds) == 1, 'expected exactly one base background block'
+old_background = old_backgrounds[0]
+fallback_instance = '''    BackgroundFallback {
+        providers: root.shellProviders
+        tokens: root.shellTokens
+    }'''
+assert current_shell.count(fallback_instance) == 1, 'background fallback instance changed'
+reconstructed_shell = current_shell.replace(fallback_instance, old_background, 1)
+assert reconstructed_shell == p02_shell, 'shell.qml changed outside the pinned background extraction'
+
+# Check the extracted implementation independently: no arbitrary new behavior
+# can be hidden by replacing its instance with the old text above.
+fallback_source = source('shell/core/BackgroundFallback.qml')
+substitutions = [
+    ('color: tokens.background', 'color: fallback.tokens.background'),
+    ('root.shellTokens', 'fallback.tokens'),
+]
+additions = [
+    '            visible: fallback.shown',
+    '            mask: Region {}',
+    '            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None',
+]
+expected_background = old_background
+for before, after in substitutions:
+    assert before in expected_background, 'base background substitution target missing'
+    expected_background = expected_background.replace(before, after)
+namespace_line = '            WlrLayershell.namespace: "ditto-background"'
+expected_background = expected_background.replace(namespace_line, namespace_line + '\n' + '\n'.join(additions), 1)
+fallback_backgrounds = re.findall(background_pattern, fallback_source, re.S)
+assert fallback_backgrounds == [expected_background], 'extracted background body changed beyond the allowed adaptations'
+expected_header = '''import QtQuick
+import Quickshell
+import Quickshell.Wayland
+import "../jelly"
+
+/// Trusted compatibility background; never reported as a loaded package.
+Scope {
+    id: fallback
+    required property var providers
+    required property var tokens
+    readonly property bool shown: !providers.backgroundShown
+'''
+assert fallback_source == expected_header + expected_background + '\n}\n', 'background fallback wrapper changed'
+report.append({
+    'oracle': 'UI-P02 reconstruction equals d063f03 shell.qml byte for byte; extracted background matches the base with only these adaptations',
+    'base': P02_BASE,
+    'reconstructed_sha256': hashlib.sha256(reconstructed_shell.encode()).hexdigest(),
+    'component': 'shell/core/BackgroundFallback.qml',
+    'component_sha256': hashlib.sha256(fallback_source.encode()).hexdigest(),
+    'substitutions': [{'from': before, 'to': after} for before, after in substitutions],
+    'additions': additions,
+    'wrapper': 'Scope with providers/tokens and shown: !providers.backgroundShown, pinned verbatim',
+})
+current_shell = reconstructed_shell
+
 # Owner adoption may change only the AssistantSurface instance in shell.qml.
 pre_choice = subprocess.check_output(['git', 'show', '366f1743e3b165df0c210f89e7b9e671176e25a8:shell/shell.qml'], cwd=ROOT).decode()
 pattern = r'        AssistantSurface \{.*?\n        \}'

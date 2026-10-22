@@ -82,6 +82,7 @@
 | D-47 | **G3 出口依開發 VM 證據通過** | **2026-10-17 owner 裁定**：接受 `17f5d76` VM 15/15，未涵蓋項轉 G4；G4 從合併後 main 開始（[紀錄](../../.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md)） | G3 出口 | owner |
 | D-48 | **新預設右下改助理入口** | **2026-10-17 owner 要求**：新 store 預設右下改有標籤的助理入口，不再放重複 Ditto；optional avatar 與舊 Profile 保留。助理符號待 owner 定；`soft-jelly-light`／`dock_pill` 為可逆交接（[紀錄](../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)） | G4 預設呈現 | owner |
 | D-49 | **owner 判定 MVP 可接受** | **2026-10-21 owner 判斷**：MVP 接受；六項出口證據未補者列缺口、不改列通過；D-11 由 owner 處理；D-18 改走完整發行版（[紀錄](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md)） | G4 出口 | owner |
+| D-50 | **#159 Shell 擴充契約（UI-P01）** | **2026-10-22 已決定（安全預設，待 owner 檢視）**：設定頁用多條目 area `ui.settings_page`；跨信任設定先採宣告式表單（前提是 Core 端 `config_schema` 驗證）；UI 暫態只在 Shell 記憶體；UI SDK 為 `root:/sdk/Ditto/Ui` qmldir 模組；舊 Profile 不遷移、走內建 fallback。D-49 由 PR #147 保留（[紀錄](../../.agents/notes/decisions/2026-10-22-d50-shell-extension-contracts.md)） | UI-P02 開工 | coordinator（owner 事先授權安全預設） |
 
 ## 2.1 G4 開工時的既有決策盤點
 
