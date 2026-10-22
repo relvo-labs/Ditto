@@ -43,6 +43,15 @@ TestCase {
         conversation.turn = null;
         conversation.events = [];
         conversation.reconnecting = false;
+        // The fixture client never answers capability(): a row that brings
+        // client.online back (disconnect) starts a settings/runtime read that
+        // would otherwise stay pending into the next row and clear
+        // `connected`, so the working cue never starts (#164).
+        conversation.settingsReading = false;
+        conversation.providerReading = false;
+        conversation.sending = false;
+        conversation.runtimePending = false;
+        conversation.runtimeFailed = false;
         other.forceActiveFocus();
         mouseMove(other, 20, 20, 10, Qt.NoButton);
         activated.clear();
