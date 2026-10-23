@@ -4907,7 +4907,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -5798,7 +5798,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -7117,7 +7117,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -8010,7 +8010,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -8902,7 +8902,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -12551,7 +12551,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -16624,7 +16624,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -17517,7 +17517,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -18473,7 +18473,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"
@@ -29013,7 +29013,7 @@
                 "type": "null"
               }
             ],
-            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record, including ones written before it."
+            "description": "Present only when the change was committed without anything being\napplied to the desktop because its Profile was not active (#169).\nAbsent on every other record and on every record written before\nstore schema 6; absence alone does not mean the change was applied,\n`state` and `result` still say what happened."
           },
           "state": {
             "$ref": "#/$defs/ChangeState"

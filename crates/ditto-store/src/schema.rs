@@ -375,8 +375,9 @@ fn apply(transaction: &Transaction<'_>, version: u32) -> StoreResult<()> {
             "ALTER TABLE generated_data_snapshots ADD COLUMN lineage_proven INTEGER NOT NULL DEFAULT 0 CHECK(lineage_proven IN (0,1));",
         )?,
         // #169: a change committed to a Profile that was not active wrote
-        // its revision and applied nothing to the desktop. NULL on every
-        // other change, including all written before: those were applied.
+        // its revision and applied nothing to the desktop. No backfill:
+        // rows written before stay NULL, which only means "no marker", not
+        // "applied"; state and result still say what happened.
         6 => transaction.execute_batch(
             "ALTER TABLE changesets ADD COLUMN saved_only TEXT CHECK(saved_only IS NULL OR saved_only IN ('inactive_profile'));",
         )?,
@@ -522,9 +523,10 @@ pub(crate) mod tests {
         drop(lock);
         std::fs::remove_dir_all(root).unwrap();
     }
-    /// #169: v6 adds `changesets.saved_only`. Changes written before it were
-    /// all applied to the desktop, so they keep no value and read back
-    /// without the field; only the one known reason can be stored.
+    /// #169: v6 adds `changesets.saved_only` without a backfill. Changes
+    /// written before it keep no value and read back without the field
+    /// (their state and result are unchanged); only the one known reason
+    /// can be stored.
     #[test]
     fn v6_saved_only_migration_leaves_earlier_changes_unmarked() {
         let mut db = Connection::open_in_memory().unwrap();

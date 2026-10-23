@@ -453,7 +453,9 @@ pub struct ChangeRecord {
     pub failure_key: Option<String>,
     /// Present only when the change was committed without anything being
     /// applied to the desktop because its Profile was not active (#169).
-    /// Absent on every other record, including ones written before it.
+    /// Absent on every other record and on every record written before
+    /// store schema 6; absence alone does not mean the change was applied,
+    /// `state` and `result` still say what happened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub saved_only: Option<SavedOnly>,
     pub created_at: String,

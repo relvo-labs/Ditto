@@ -181,7 +181,7 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 
 回應與歷史**永遠同時帶** `state` 與 `result`。`result = partial` 時，`items[]` 逐項列出 `applied`、`not_restored` 與原因。
 
-`saved_only = { "reason": "inactive_profile", "profile_name": "<名稱>" }`：只出現在「寫進非作用中的 Profile、沒有套用到桌面」的已提交變更（§8.1），`ChangeRecord` 與 `ChangeSummary`（`changes.list`、`change_updated`）都帶；其他紀錄省略這個欄位，包括它出現之前的所有紀錄，因為那些都已套用到桌面。`result` 仍是 `succeeded`：對那個 Profile 的編輯已完成，`saved_only` 說的是它去了哪裡。`reason` 是封閉集合，目前只有 `inactive_profile`；`profile_name` 是讀取紀錄時該 Profile 的名稱（改名後跟著變）。介面不得把它寫成「已套用」，要說已存到哪個組合、桌面沒有改變、切換到該組合時才會套用；這種變更照常可以撤銷（§8.6）。這是選用的新增欄位，不新增結果類別或原因碼（store schema 6 的 `changesets.saved_only`）。
+`saved_only = { "reason": "inactive_profile", "profile_name": "<名稱>" }`：只出現在「寫進非作用中的 Profile、沒有套用到桌面」的已提交變更（§8.1），`ChangeRecord` 與 `ChangeSummary`（`changes.list`、`change_updated`）都帶；其他紀錄省略這個欄位。store schema 6 之前寫入的紀錄都不會有它；沒有 `saved_only` 並不代表變更已套用到桌面，仍要照舊看 `state` 與 `result`。`result` 仍是 `succeeded`：對那個 Profile 的編輯已完成，`saved_only` 說的是它去了哪裡。`reason` 是封閉集合，目前只有 `inactive_profile`；`profile_name` 是讀取紀錄時該 Profile 的名稱（改名後跟著變）。介面不得把它寫成「已套用」，要說已存到哪個組合、桌面沒有改變、切換到該組合時才會套用；這種變更照常可以撤銷（§8.6）。這是選用的新增欄位，不新增結果類別或原因碼（store schema 6 的 `changesets.saved_only`）。
 
 `result = scheduled`：變更已存成 revision（`state = committed`、head 已移動），但**還沒有任何東西生效**——`items[]` 全部是 `scheduled`，原因 `next_login`（§8.4 的 `session_restart`）或 `rescue_mode`（救援模式下只動到 hostd 的變更，回到一般模式時生效）。介面只能呈現為「待下次登入套用」或「回到一般模式後套用」，不得寫成已套用。判定規則在 `ditto_protocol::change::result_of`，store 的 `result_kind` 欄與回應用同一條。
 

@@ -40,7 +40,7 @@
 
 `changesets.request_operation_id` 保存呼叫者自己的 `_meta.operation_id`，斷線後可用 `desktop.changes.get {operation_id}` 找回自己送出的變更（CHG-07）。
 
-`changesets.saved_only`（schema 6，可為 NULL，只接受 `inactive_profile`）：變更寫進非作用中的 Profile、沒有套用到桌面時，在提交的同一交易寫入（[protocol-0.2 §8.2](protocol-0.2.md#82-狀態與結果類別)）。遷移只加欄位，舊列維持 NULL；它們在 #169 之前都已套用到桌面，所以 NULL 是正確的。與先前各版相同，v5 build 不能開啟 v6，遷移前的整庫備份照常保留。
+`changesets.saved_only`（schema 6，可為 NULL，只接受 `inactive_profile`）：變更寫進非作用中的 Profile、沒有套用到桌面時，在提交的同一交易寫入（[protocol-0.2 §8.2](protocol-0.2.md#82-狀態與結果類別)）。遷移只加欄位，不回填：schema 6 之前寫入的列一律是 NULL。NULL 只表示沒有這個標記，不代表變更已套用到桌面（舊列中也有被拒絕、已排程等結果），變更的結果仍以 `state` 與 `result` 為準。與先前各版相同，v5 build 不能開啟 v6，遷移前的整庫備份照常保留。
 
 ## 3. 寫入順序與故障語意
 

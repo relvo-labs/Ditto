@@ -194,7 +194,9 @@ export interface ChangeRecord {
   /**
    * Present only when the change was committed without anything being
    * applied to the desktop because its Profile was not active (#169).
-   * Absent on every other record, including ones written before it.
+   * Absent on every other record and on every record written before
+   * store schema 6; absence alone does not mean the change was applied,
+   * `state` and `result` still say what happened.
    */
   saved_only?: SavedOnly | null;
   state: ChangeState;

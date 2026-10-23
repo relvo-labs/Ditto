@@ -30,6 +30,7 @@ fn desktop(label: &str) -> Desktop {
     let host_peer = fake_host(&harness.core, Arc::clone(&host));
     let cli = TestPeer::connect(&harness.core, "dittoctl", None);
     wait_for_boot_sync(&shell);
+    wait_for_host_boot_sync(&host);
     Desktop {
         harness,
         cli,
@@ -37,6 +38,29 @@ fn desktop(label: &str) -> Desktop {
         host,
         _peers: vec![shell_peer, host_peer],
     }
+}
+
+/// Core pushes hostd's boot sync when hostd reports ready (`host_ready`),
+/// as coordinator work queued after `host.hello` has answered, so it can
+/// land after `fake_host` returns. Wait until hostd has prepared that sync
+/// and committed what it prepared, or a test that snapshots what hostd
+/// runs races it.
+fn wait_for_host_boot_sync(host: &Arc<Mutex<HostState>>) {
+    let synced = || {
+        let host = host.lock().unwrap();
+        host.candidates
+            .iter()
+            .any(|(change_id, entries)| change_id.starts_with("boot-") && host.entries == *entries)
+    };
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !synced() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(synced(), "the boot sync never reached the fake hostd");
+    assert!(
+        !host.lock().unwrap().entries.is_empty(),
+        "the active Profile's services were not committed to the fake hostd"
+    );
 }
 
 impl Desktop {
