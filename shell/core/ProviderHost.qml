@@ -106,6 +106,8 @@ QtObject {
         "ditto.launcher.search": "launcher_search",
         "ditto.tasks.panel": "tasks_panel",
         "ditto.notifications.area": "notifications",
+        "ditto.settings.composition": "settings_composition",
+        "ditto.settings.plugins": "settings_plugins",
         "ditto.settings.history": "settings_history",
         "ditto.background.default": "background_default"
     })
