@@ -100,7 +100,7 @@ TestCase {
 
     // ---- Class A: the page shows and judges by the committed appearance ---------
     function personalization(tokens) {
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, aiSettings: offConversation,
             page: "personalization", screen: { width: 1600, height: 900 } });
         tryVerify(() => one(centers, "uiStylePicker") !== null, 3000);
         waitForRendering(desktop);
@@ -164,7 +164,7 @@ TestCase {
                 { tag: "personalization", page: "personalization", read: "desktop.appearance.get" }];
     }
     function test_composition_and_history_reload_after_resync(row) {
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokensWith(light()), conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokensWith(light()), aiSettings: offConversation,
             page: row.page, screen: { width: 1600, height: 900 } });
         waitForRendering(desktop);
         verify(client.reads.indexOf(row.read) >= 0);

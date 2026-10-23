@@ -116,7 +116,7 @@ TestCase {
     }
     function settingsPage() {
         const page = createTemporaryObject(settingsComponent, testCase,
-            { y: 80, width: 800, height: 800, client: client, tokens: tokens, conversation: conversation });
+            { y: 80, width: 800, height: 800, client: client, tokens: tokens, aiSettings: conversation.aiSettings });
         verify(page !== null);
         return page;
     }

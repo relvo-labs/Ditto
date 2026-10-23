@@ -25,8 +25,8 @@ describe('manifest rules (docs/contracts/manifest.md)', () => {
     // Keep all three producer roots from scripts/build-builtin-packages.sh in the inventory.
     const builtins = ['shell/providers', 'packaging/builtin', 'packages/plugins'].flatMap(dir => manifestDirs(join(root, dir)))
     const kinds = builtins.map(dir => JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).plugin_kind)
-    expect(builtins).toHaveLength(15)
-    expect(kinds.filter(kind => kind === 'qml_provider')).toHaveLength(11)
+    expect(builtins).toHaveLength(17)
+    expect(kinds.filter(kind => kind === 'qml_provider')).toHaveLength(13)
     expect(kinds.filter(kind => kind === 'service')).toHaveLength(2)
     expect(kinds.filter(kind => kind === 'declarative_bundle')).toHaveLength(2)
     const dirs = [

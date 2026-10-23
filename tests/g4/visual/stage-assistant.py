@@ -126,7 +126,16 @@ fallback_instance = '''    BackgroundFallback {
     }'''
 assert current_shell.count(fallback_instance) == 1, 'background fallback instance changed'
 reconstructed_shell = current_shell.replace(fallback_instance, old_background, 1)
+# UI-P03b changes only the Centers input from the controller to its facade.
+# Reverse that exact line before the pinned whole-file comparison; all other
+# Shell wiring and the extracted background oracle remain byte-for-byte checks.
+settings_input = '            aiSettings: root.shellConversation.aiSettings'
+legacy_settings_input = '            conversation: root.shellConversation'
+assert reconstructed_shell.count(settings_input) == 1, 'AI settings facade input changed'
+reconstructed_shell = reconstructed_shell.replace(settings_input, legacy_settings_input, 1)
 assert reconstructed_shell == p02_shell, 'shell.qml changed outside the pinned background extraction'
+report.append({'oracle': 'UI-P03b changes only the Centers input to ConversationState.aiSettings',
+               'from': legacy_settings_input, 'to': settings_input})
 
 # Check the extracted implementation independently: no arbitrary new behavior
 # can be hidden by replacing its instance with the old text above.

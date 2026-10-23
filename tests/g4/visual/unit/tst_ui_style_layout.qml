@@ -111,7 +111,7 @@ TestCase {
     // row must be below 90 px and its bottom above the Dock.
     function test_settings_title_clears_the_top_panels_data() { return styleRows(); }
     function test_settings_title_clears_the_top_panels(row) {
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokensFor(row.style), conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokensFor(row.style), aiSettings: offConversation,
             page: "composition", screen: { width: 1600, height: 900 } });
         waitForRendering(desktop);
         const height = centers.implicitHeight;
@@ -135,7 +135,7 @@ TestCase {
     // Scrolled to the end, the last saved composition is whole.
     function test_last_saved_composition_scrolls_fully_into_view_data() { return styleRows(); }
     function test_last_saved_composition_scrolls_fully_into_view(row) {
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokensFor(row.style), conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokensFor(row.style), aiSettings: offConversation,
             page: "composition", screen: { width: 1600, height: 900 } });
         tryVerify(() => all(centers, item => item.Accessible.role === Accessible.Grouping && item.Accessible.name === "簡報").length > 0, 3000);
         waitForRendering(desktop);
@@ -175,7 +175,7 @@ TestCase {
         verify(contrast(tokens.uiInkMuted, tokens.withAlpha(tokens.uiCanvas, 1)) >= 4.5);
         verify(contrast(tokens.uiInkMuted, tokens.withAlpha(tokens.uiSidebar, 1)) >= 4.5);
         verify(contrast(tokens.uiInkDisabled, tokens.withAlpha(tokens.uiCanvas, 1)) >= 4.5, "disabled labels stay readable");
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, aiSettings: offConversation,
             page: "composition", screen: { width: 1600, height: 900 } });
         waitForRendering(desktop);
         const faces = all(centers, item => item.objectName === "beadFace");
@@ -238,7 +238,7 @@ TestCase {
     // ---- personalization: the style choice ------------------------------------------
     function picker(style, extra) {
         const tokens = tokensFor(style, extra);
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, aiSettings: offConversation,
             page: "personalization", screen: { width: 1600, height: 900 } });
         tryVerify(() => one(centers, "uiStylePicker") !== null, 3000);
         waitForRendering(desktop);
@@ -312,7 +312,7 @@ TestCase {
 
     function test_style_picker_only_with_the_light_theme() {
         const tokens = make("shell/jelly/Tokens.qml", { appearance: { theme: "soft-jelly", tokens: { ui_style: "j2" }, locale: "zh-TW" } }, "current");
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, conversation: offConversation, page: "personalization" });
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, aiSettings: offConversation, page: "personalization" });
         waitForRendering(desktop);
         const found = one(centers, "uiStylePicker");
         verify(!found || !shown(found), "the dark theme has no styles to choose");
@@ -321,7 +321,7 @@ TestCase {
     // A committed change (Core's projection) restyles open windows at once.
     function test_open_windows_follow_a_committed_style() {
         const tokens = tokensFor(undefined);
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, conversation: offConversation,
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens, aiSettings: offConversation,
             page: "composition", screen: { width: 1600, height: 900 } });
         waitForRendering(desktop);
         const frame = () => one(centers, "centersFrame");

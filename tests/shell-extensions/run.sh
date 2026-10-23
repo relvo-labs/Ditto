@@ -14,12 +14,12 @@ python3 "$root/tests/shell-extensions/stage.py" "$evidence/staged"
 cat "$evidence/unit.log"
 # Real archives, unpacked separately from the source tree; no SDK import rewrite.
 mkdir -p "$evidence/real"
-for directory in sdk ui change jelly centers; do
+for directory in sdk ui change jelly centers chat; do
     ln -sfn "$root/shell/$directory" "$evidence/real/$directory"
 done
 cp "$root/tests/shell-extensions/real-load.qml" "$evidence/real/shell.qml"
 : > "$evidence/real-load.log"
-for page in history composition plugins; do
+for page in history composition plugins personalization ai; do
     source_dir="$root/shell/providers/settings_$page"
     package_dir="$evidence/package-store/ditto.settings.$page/1.0.0"
     mkdir -p "$package_dir"

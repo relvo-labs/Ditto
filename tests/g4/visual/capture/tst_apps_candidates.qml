@@ -160,7 +160,7 @@ TestCase {
     function centers(style, page, mode, openMenu) {
         const dock = shell(style, mode);
         client.windows = [];
-        const window = mount("centers/Centers.qml", { client: client, tokens: sceneTokens, conversation: offConversation, page: page,
+        const window = mount("centers/Centers.qml", { client: client, tokens: sceneTokens, aiSettings: offConversation, page: page,
                                                        screen: { width: 1280, height: 800 } });
         // Where Wayfire's `place` would centre a window of its own height in
         // the work area; the stub has no real placement.

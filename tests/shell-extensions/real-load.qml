@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import "jelly"
+import "chat" as Chat
 
 ShellRoot {
     id: root
@@ -10,6 +11,7 @@ ShellRoot {
     QtObject {
         id: client
         property var capabilityCalls: []
+        property bool online: true
         property var tr: QtObject {
             function slotName(slot) { return slot; }
             function packageName(id) { return id; }
@@ -20,11 +22,20 @@ ShellRoot {
         signal profileChanged(var profile)
         signal panelsReported(var panels)
         signal jobUpdated(var job)
+        signal disconnected()
+        function watchTopics(topics, event, resync, ready, fail) {}
         function t(source) { return source; }
         function key(source, args) { return source; }
         function capability(name, args, done, fail) {
             capabilityCalls = capabilityCalls.concat([name]);
-            if (name === "desktop.changes.list") done({changes: []});
+            if (name === "agent.settings.describe") done({enabled: false, revision: "fixture", provider: "codex-app-server", approval_mode: "ask"});
+            else if (name === "agent.sessions.list") done({sessions: []});
+            else if (name === "desktop.appearance.get") done({appearance: {theme: "soft-jelly-light", tokens: {}}, avatar: {enabled: false}});
+            else if (name === "desktop.shortcuts.list") done({shortcuts: []});
+            else if (name === "desktop.commands.list") done({commands: []});
+            else if (name === "desktop.outputs.list") done({outputs: []});
+            else if (name === "desktop.panels.list") done({avatar: null});
+            else if (name === "desktop.changes.list") done({changes: []});
             else if (name === "desktop.profiles.list") done({profiles: []});
             else if (name === "desktop.profiles.get") done({profile: {profile_id: "test", name: "Test"}, document: {entries: [], slots: {}}, history: []});
             else if (name === "desktop.plugins.list") done({entries: [], packages: []});
@@ -35,6 +46,7 @@ ShellRoot {
             else if (name === "desktop.jobs.list") done({jobs: []});
         }
     }
+    Chat.ConversationState { id: conversation; client: client }
     Item { id: visualParent; width: 800; height: 600 }
     Component.onCompleted: {
         const pageUrl = Quickshell.env("DITTO_TEST_PAGE_URL");
@@ -51,14 +63,20 @@ ShellRoot {
         }
         heldPage = component.createObject(visualParent, {client: client, tokens: tokens,
             config: {externalStore: true}, pageId: pageId, entryId: "real-" + pageId});
+        if (heldPage && heldPage.aiSettings !== undefined) heldPage.aiSettings = conversation.aiSettings;
         const expectedCalls = {
             history: ["desktop.changes.list"],
             composition: ["desktop.profiles.list", "desktop.profiles.get", "desktop.plugins.list", "desktop.layout.get"],
-            plugins: ["desktop.plugins.list", "desktop.plugins.diagnostics", "desktop.permissions.list", "desktop.plugins.development.list", "desktop.jobs.list"]
+            plugins: ["desktop.plugins.list", "desktop.plugins.diagnostics", "desktop.permissions.list", "desktop.plugins.development.list", "desktop.jobs.list"],
+            personalization: ["desktop.appearance.get", "desktop.profiles.get", "desktop.shortcuts.list", "desktop.commands.list", "desktop.outputs.list", "desktop.panels.list"],
+            ai: ["agent.settings.describe", "agent.sessions.list"]
         };
         const expected = expectedCalls[pageId];
         const stateRead = heldPage && (pageId === "history" ? heldPage.changes.length === 0
             : pageId === "composition" ? heldPage.active.profile.profile_id === "test" && heldPage.profiles.length === 0
+            : pageId === "personalization" ? heldPage.appearance.theme === "soft-jelly-light" && heldPage.outputs.length === 0 && heldPage.providers === undefined
+            : pageId === "ai" ? heldPage.aiSettings === conversation.aiSettings && heldPage.settings.enabled === false
+                && heldPage.conversation === undefined && heldPage.aiSettings.draft === undefined && heldPage.aiSettings.sessions === undefined
             : heldPage.packages.length === 0 && heldPage.grants.length === 0);
         if (heldPage && heldPage.pageId === pageId && heldPage.entryId === "real-" + pageId
                 && heldPage.config.externalStore === true && heldPage.client === client && heldPage.tokens === tokens

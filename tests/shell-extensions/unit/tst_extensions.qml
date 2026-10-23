@@ -5,6 +5,7 @@ import DittoStub
 import "../shell/core" as Core
 import "../shell/centers" as Centers
 import "../shell/jelly" as Jelly
+import "../shell/chat" as Chat
 
 TestCase {
     id: testCase
@@ -23,6 +24,7 @@ TestCase {
             property int pageDestructions: 0
             property var reports: []
             property var capabilityCalls: []
+            property var requests: []
             property bool online: true
             property string status: ""
             property var tr: QtObject {
@@ -35,12 +37,25 @@ TestCase {
             signal profileChanged(var profile)
             signal panelsReported(var panels)
             signal jobUpdated(var job)
+            signal disconnected()
+            function watchTopics(topics, event, resync, ready, fail) {}
+            function newKey(prefix) { return prefix + "-fixture"; }
             function report(observation) { reports = reports.concat([observation]); }
             function t(source) { return source; }
             function key(source, args) { return source; }
             function capability(name, args, done, fail) {
                 capabilityCalls = capabilityCalls.concat([name]);
-                if (name === "desktop.changes.list") done({changes: []});
+                requests = requests.concat([{method: name, args: args}]);
+                if (name === "agent.credentials.create") done({credential_ref: "fixture-ref"});
+                else if (name === "agent.settings.patch") done(Object.assign({}, args.settings, {revision: "patched"}));
+                else if (name === "agent.settings.describe") done({enabled: false, revision: "fixture", provider: "codex-app-server", approval_mode: "ask"});
+                else if (name === "agent.sessions.list") done({sessions: []});
+                else if (name === "desktop.appearance.get") done({appearance: {theme: "soft-jelly-light", tokens: {}}, avatar: {enabled: false}});
+                else if (name === "desktop.shortcuts.list") done({shortcuts: []});
+                else if (name === "desktop.commands.list") done({commands: []});
+                else if (name === "desktop.outputs.list") done({outputs: []});
+                else if (name === "desktop.panels.list") done({avatar: null});
+                else if (name === "desktop.changes.list") done({changes: []});
                 else if (name === "desktop.profiles.list") done({profiles: []});
                 else if (name === "desktop.profiles.get") done({profile: {profile_id: "test", name: "Test"}, document: {entries: [], slots: {}}, history: []});
                 else if (name === "desktop.plugins.list") done({entries: [], packages: []});
@@ -53,6 +68,7 @@ TestCase {
         }
     }
     Component { id: tokenFactory; Jelly.Tokens { readsSystemPreference: false } }
+    Component { id: conversationFactory; Chat.ConversationState {} }
     Component { id: hostFactory; Core.ProviderHost {} }
     Component { id: centerFactory; Centers.Centers {} }
     Component { id: fallbackFactory; Core.BackgroundFallback {} }
@@ -191,20 +207,23 @@ TestCase {
         return [
             {tag: "history", id: "history", file: "HistoryPage", calls: ["desktop.changes.list"]},
             {tag: "composition", id: "composition", file: "CompositionCenter", calls: ["desktop.profiles.list", "desktop.profiles.get", "desktop.plugins.list", "desktop.layout.get"]},
-            {tag: "plugins", id: "plugins", file: "PluginCenter", calls: ["desktop.plugins.list", "desktop.plugins.diagnostics", "desktop.permissions.list", "desktop.plugins.development.list", "desktop.jobs.list"]}
+            {tag: "plugins", id: "plugins", file: "PluginCenter", calls: ["desktop.plugins.list", "desktop.plugins.diagnostics", "desktop.permissions.list", "desktop.plugins.development.list", "desktop.jobs.list"]},
+            {tag: "personalization", id: "personalization", file: "PersonalizationCenter", calls: ["desktop.appearance.get", "desktop.profiles.get", "desktop.shortcuts.list", "desktop.commands.list", "desktop.outputs.list", "desktop.panels.list"]},
+            {tag: "ai", id: "ai", file: "AISettings", calls: ["agent.settings.describe", "agent.sessions.list"]}
         ];
     }
     function test_packaged_page_uses_sdk_and_opt_in_flickable(data) {
         const s = setup();
         const binding = page(data.id, "../shell/providers/settings_" + data.id + "/qml/" + data.file + ".qml");
         binding.package = "ditto.settings." + data.id;
-        binding.settings_page.title_key = "command." + data.id + ".open";
+        binding.settings_page.title_key = "command." + (data.id === "ai" ? "ai_settings" : data.id) + ".open";
         binding.config = {check: true};
         compare(prepare(s.host, "sdk-page", [binding]).items.filter(i => i.key === data.id)[0].status, "ready");
         compare(s.client.capabilityCalls.length, 0);
         s.host.commit("sdk-page");
         compare(s.client.capabilityCalls.length, 0);
-        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, page: data.id});
+        const conversation = createTemporaryObject(conversationFactory, testCase, {client: s.client});
+        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, aiSettings: conversation.aiSettings, page: data.id});
         tryVerify(() => !!center.currentPageItem);
         verify(!center.pageFallback);
         compare(center.pages.map(p => p.id), ["composition", "plugins", "history", "personalization", "ai"]);
@@ -214,6 +233,18 @@ TestCase {
         compare(center.currentPageItem.entryId, data.id);
         compare(center.currentPageItem.config.check, true);
         compare(center.pageFlick, center.currentPageItem);
+        if (data.id === "ai") {
+            compare(center.currentPageItem.aiSettings, conversation.aiSettings);
+            verify(center.currentPageItem.aiSettings !== conversation);
+            compare(center.currentPageItem.conversation, undefined);
+            assertSettingsOnly(conversation.aiSettings);
+            compare(center.currentPageItem.settings.enabled, false);
+            conversation.settings = Object.assign({}, conversation.settings, {model: "live-model"});
+            compare(center.currentPageItem.settings.model, "live-model");
+        } else {
+            compare(center.currentPageItem.aiSettings, undefined);
+            if (data.id === "personalization") compare(center.currentPageItem.providers, undefined);
+        }
         const expectedCalls = data.calls.slice().sort();
         compare(s.client.capabilityCalls.slice().sort(), expectedCalls);
         const mount = s.host.observation().mounts.find(m => m.entry_id === data.id);
@@ -248,6 +279,10 @@ TestCase {
         tryVerify(() => center.pageFallback && !!center.currentPageItem);
         verify(center.pageFlick !== null);
         compare(center.currentPageItem.entryId, undefined);
+        if (data.id === "ai") {
+            compare(center.currentPageItem.aiSettings, conversation.aiSettings);
+            compare(center.currentPageItem.conversation, undefined);
+        }
         compare(center.pages.filter(p => p.id === data.id).length, 1);
         compare(s.host.openPageEntry, "");
         compare(s.host.observation().mounts.find(m => m.entry_id === data.id).page_state, "registered");
@@ -259,6 +294,117 @@ TestCase {
         center.destroy();
         s.host.destroy();
         wait(0);
+    }
+    function assertSettingsOnly(facade) {
+        for (const member of ["conversation", "state", "source", "controller", "owner", "client", "aiSettings", "draft", "events", "sessions",
+                "turn", "sessionId", "attached", "attachments", "previews", "streamText", "send", "newConversation"])
+            compare(facade[member], undefined, "facade must not expose " + member);
+        for (const member of ["open", "setEnabled", "refreshSettings", "useSubscription", "startLogin", "cancelLogin",
+                "logout", "refreshProvider", "chooseModel", "saveApiKey", "setApprovalMode"])
+            compare(typeof facade[member], "function", member);
+    }
+    function test_optional_facade_input_tracks_owner_without_recreating_page() {
+        const s = setup();
+        const first = createTemporaryObject(conversationFactory, testCase, {client: s.client});
+        const second = createTemporaryObject(conversationFactory, testCase, {client: s.client});
+        first.settings = {enabled: false, model: "first-owner"};
+        second.settings = {enabled: false, model: "second-owner"};
+        compare(first.aiSettings.settings.model, "first-owner");
+        compare(second.aiSettings.settings.model, "second-owner");
+        assertSettingsOnly(first.aiSettings);
+        assertSettingsOnly(second.aiSettings);
+        prepare(s.host, "optional-input", [page("extra", "../fixtures/AiSettingsInput.qml")]);
+        s.host.commit("optional-input");
+        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens,
+            providers: s.host, aiSettings: first.aiSettings, page: "extra"});
+        tryVerify(() => !!center.currentPageItem && !center.pageFallback);
+        const instance = center.currentPageItem;
+        compare(instance.aiSettings, first.aiSettings);
+        center.aiSettings = second.aiSettings;
+        compare(instance.aiSettings, second.aiSettings);
+        first.settings = {enabled: false, model: "changed-first-owner"};
+        compare(first.aiSettings.settings.model, "changed-first-owner");
+        compare(instance.aiSettings.settings.model, "second-owner");
+        compare(center.currentPageItem, instance);
+        assertSettingsOnly(instance.aiSettings);
+    }
+    function test_ai_actions_without_facade_data() {
+        return [
+            {tag: "builtin", file: "../shell/centers/AISettings.qml"},
+            {tag: "package", file: "../shell/providers/settings_ai/qml/AISettings.qml"}
+        ];
+    }
+    function test_ai_actions_without_facade(data) {
+        failOnWarning(/TypeError|ReferenceError/);
+        const s = setup();
+        const component = Qt.createComponent(Qt.resolvedUrl(data.file));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: s.client, tokens: s.tokens, width: 800, height: 600});
+        verify(page !== null);
+        compare(page.aiSettings, null);
+        const controls = {buttons: [], choices: [], toggles: []};
+        function collect(item) {
+            if (typeof item.chosen === "function") { controls.choices.push(item); return; }
+            if (typeof item.toggled === "function") { controls.toggles.push(item); return; }
+            if (typeof item.clicked === "function" && item.kind !== undefined) { controls.buttons.push(item); return; }
+            for (const child of item.children || []) collect(child);
+        }
+        collect(page);
+        compare(controls.buttons.length, 6);
+        compare(controls.choices.length, 4);
+        compare(controls.toggles.length, 1);
+        for (const button of controls.buttons) button.clicked();
+        for (const choice of controls.choices) {
+            choice.chosen("codex-app-server");
+            choice.chosen("direct-model");
+        }
+        controls.toggles[0].toggled(true);
+        compare(s.client.capabilityCalls.length, 0);
+        compare(page.keyNotice, "");
+        compare(page.settings, null);
+        page.destroy();
+        wait(0);
+    }
+    function test_facade_readonly_actions_and_key_reference() {
+        const s = setup();
+        const conversation = createTemporaryObject(conversationFactory, testCase, {client: s.client});
+        const facade = conversation.aiSettings;
+        assertSettingsOnly(facade);
+        facade.open();
+        compare(facade.settings, conversation.settings);
+        let refused = false;
+        try { facade.settings = {enabled: true}; } catch (error) { refused = true; }
+        verify(refused, "settings projection must be read-only");
+        compare(conversation.settings.enabled, false);
+        facade.setEnabled(false);
+        facade.chooseModel("fixture-model", "medium");
+        compare(conversation.settings.model, "fixture-model");
+        compare(facade.settings.reasoning_effort, "medium");
+        facade.setApprovalMode("never");
+        compare(facade.settings.approval_mode, "never");
+        let completed = 0;
+        const key = "FAKE-KEY-FACADE-TEST";
+        facade.saveApiKey("https://example.invalid/v1", "direct-fixture", key, () => completed++);
+        compare(completed, 1);
+        const credential = s.client.requests.find(request => request.method === "agent.credentials.create");
+        compare(credential.args.secret, key);
+        compare(facade.settings.provider, "direct-model");
+        compare(facade.settings.endpoint, "https://example.invalid/v1");
+        compare(facade.settings.auth.credential_ref, "fixture-ref");
+        compare(facade.key, undefined);
+        compare(facade.secret, undefined);
+        for (const member of ["settings", "provider", "login", "errorText", "errorDiagnostic"])
+            verify(JSON.stringify(facade[member]).indexOf(key) < 0, member + " must not retain a key value");
+        facade.useSubscription();
+        compare(facade.settings.provider, "codex-app-server");
+        compare(facade.settings.auth, null);
+        conversation.login = {auth_url: "https://example.invalid/login", user_code: "FIXTURE-CODE"};
+        compare(facade.login.user_code, "FIXTURE-CODE");
+        conversation.login = null;
+        compare(facade.login, null);
+        facade.refreshSettings();
+        verify(s.client.capabilityCalls.filter(name => name === "agent.settings.describe").length >= 2);
+        assertSettingsOnly(facade);
     }
     function test_background_fallback_commit_release_and_rollback() {
         const s = setup();

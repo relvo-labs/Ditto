@@ -15,7 +15,7 @@ FloatingWindow {
     property var client: null
     property var tokens: null
     property var providers: null
-    property var conversation: null
+    property var aiSettings: null
     property string page: "composition"
     signal closeRequested()
 
@@ -67,7 +67,7 @@ FloatingWindow {
         case "plugins": return pluginsPage;
         case "history": return historyPage;
         case "personalization": return personalizationPage;
-        case "ai": return conversation ? aiPage : compositionPage;
+        case "ai": return aiSettings ? aiPage : compositionPage;
         default: return null;
         }
     }
@@ -305,6 +305,7 @@ FloatingWindow {
             anchors.bottomMargin: window.jelly ? window.tokens.uiGap : 0
             client: window.client
             tokens: window.tokens
+            aiSettings: window.aiSettings
             pageId: window.page
             registration: window.registration
             fallbackComponent: window.builtinComponent(window.page)
@@ -362,7 +363,7 @@ FloatingWindow {
         AISettings {
             client: window.client
             tokens: window.tokens
-            conversation: window.conversation
+            aiSettings: window.aiSettings
         }
     }
 

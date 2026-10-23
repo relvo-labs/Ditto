@@ -109,6 +109,8 @@ QtObject {
         "ditto.settings.composition": "settings_composition",
         "ditto.settings.plugins": "settings_plugins",
         "ditto.settings.history": "settings_history",
+        "ditto.settings.personalization": "settings_personalization",
+        "ditto.settings.ai": "settings_ai",
         "ditto.background.default": "background_default"
     })
 

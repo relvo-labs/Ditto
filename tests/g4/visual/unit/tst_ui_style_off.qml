@@ -149,7 +149,8 @@ TestCase {
     function test_centers_match_base(row) {
         same("centers " + row.tag, tree => {
             const tokens = tokensOf(tree, row.appearance);
-            make(tree, "shell/centers/Centers.qml", { client: client, tokens: tokens, conversation: offConversation, page: row.page });
+            make(tree, "shell/centers/Centers.qml", Object.assign({ client: client, tokens: tokens, page: row.page },
+                tree === "base" ? {conversation: offConversation} : {aiSettings: offConversation}));
             return snapshot();
         });
     }

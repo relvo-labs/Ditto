@@ -75,7 +75,7 @@ TestCase {
         return ["j1", "j2", "j3"].map(style => ({ tag: style, style: style }));
     }
     function test_composition_cards_have_two_main_actions_and_a_fixed_menu(row) {
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens(row.style), conversation: offConversation, page: "composition" });
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens(row.style), aiSettings: offConversation, page: "composition" });
         tryVerify(() => all(centers, item => item.Accessible.role === Accessible.Grouping && item.Accessible.name === "開發").length > 0, 3000);
         waitForRendering(desktop);
         const menuX = [];
@@ -101,7 +101,7 @@ TestCase {
     }
 
     function test_centers_window_stays_clear_of_the_dock() {
-        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens("j1"), conversation: offConversation, screen: { height: 720 } });
+        const centers = make("shell/centers/Centers.qml", { client: client, tokens: tokens("j1"), aiSettings: offConversation, screen: { height: 720 } });
         verify(centers.implicitHeight <= 720 - 148, "height " + centers.implicitHeight);
     }
 

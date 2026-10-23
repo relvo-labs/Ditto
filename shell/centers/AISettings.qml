@@ -14,7 +14,7 @@ Flickable {
     required property var tokens
     /// #116 application style (Profile `ui_style`, light recipe); false keeps the existing page.
     readonly property bool jelly: tokens.uiCandidate === true
-    required property var conversation
+    property var aiSettings: null
 
     contentWidth: width
     contentHeight: column.implicitHeight + tokens.appPagePad * 2
@@ -25,12 +25,14 @@ Flickable {
         return client.t(source);
     }
 
-    readonly property var settings: conversation.settings
-    readonly property var provider: conversation.provider
+    readonly property var settings: aiSettings ? aiSettings.settings : null
+    readonly property var provider: aiSettings ? aiSettings.provider : null
     readonly property bool direct: !!settings && settings.provider === "direct-model"
     property string keyNotice: ""
 
-    Component.onCompleted: conversation.open()
+    // Centers.qml binds the facade for the built-in page; the container
+    // supplies it after creation for registered packages.
+    onAiSettingsChanged: { if (aiSettings) aiSettings.open(); }
 
     Column {
         id: column
@@ -58,9 +60,9 @@ Flickable {
                 text: page.t(qsTr("啟用 AI 對話"))
                 labelOn: page.t(qsTr("開"))
                 labelOff: page.t(qsTr("關"))
-                checked: page.conversation.enabled
+                checked: (page.aiSettings ? page.aiSettings.enabled : false)
                 enabled: !!page.settings
-                onToggled: value => page.conversation.setEnabled(value)
+                onToggled: value => page.aiSettings && page.aiSettings.setEnabled(value)
             }
             Row {
                 visible: !page.settings
@@ -73,7 +75,7 @@ Flickable {
                     wrapMode: Text.WordWrap
                     text: page.client.online === false
                         ? page.t(qsTr("桌面服務未連線；連線後會再讀取 AI 設定。"))
-                        : page.conversation.settingsFailed
+                        : (page.aiSettings ? page.aiSettings.settingsFailed : false)
                             ? page.t(qsTr("無法讀取 AI 設定，目前無法確認開或關。"))
                             : page.t(qsTr("正在讀取 AI 設定…"))
                     color: page.tokens.appInk
@@ -84,10 +86,10 @@ Flickable {
                 Button {
                     id: settingsRetry
                     objectName: "aiSettingsRetry"
-                    visible: page.client.online !== false && page.conversation.settingsFailed
+                    visible: page.client.online !== false && (page.aiSettings ? page.aiSettings.settingsFailed : false)
                     tokens: page.tokens
                     text: page.t(qsTr("重新讀取"))
-                    onClicked: page.conversation.refreshSettings()
+                    onClicked: page.aiSettings && page.aiSettings.refreshSettings()
                 }
             }
         }
@@ -103,7 +105,7 @@ Flickable {
                     { value: "direct-model", label: page.t(qsTr("API 金鑰")) }
                 ]
                 value: page.settings ? page.settings.provider : "codex-app-server"
-                onChosen: v => { if (v === "codex-app-server") page.conversation.useSubscription(); else apiForm.visible = true; }
+                onChosen: v => { if (!page.aiSettings) return; if (v === "codex-app-server") page.aiSettings.useSubscription(); else apiForm.visible = true; }
             }
         }
 
@@ -118,28 +120,28 @@ Flickable {
                 objectName: "aiProviderStatus"
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: page.conversation.enabled && page.conversation.subscriptionUnavailable
-                    ? page.conversation.subscriptionUnavailableText
+                text: (page.aiSettings ? page.aiSettings.enabled : false) && (page.aiSettings ? page.aiSettings.subscriptionUnavailable : false)
+                    ? (page.aiSettings ? page.aiSettings.subscriptionUnavailableText : "")
                     : !page.provider
                     ? (!page.settings ? page.t(qsTr("讀取 AI 設定後才能確認模型連線。"))
-                        : !page.conversation.enabled ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
-                        : page.conversation.providerFailed ? page.t(qsTr("無法讀取模型連線狀態；目前無法確認是否已登入。"))
+                        : !(page.aiSettings ? page.aiSettings.enabled : false) ? page.t(qsTr("尚未連線；開啟 AI 對話後會在需要時啟動。"))
+                        : (page.aiSettings ? page.aiSettings.providerFailed : false) ? page.t(qsTr("無法讀取模型連線狀態；目前無法確認是否已登入。"))
                         : page.t(qsTr("正在讀取模型連線狀態…")))
-                    : page.conversation.subscriptionUnavailable ? page.conversation.subscriptionUnavailableText
-                    : page.conversation.enabled && page.provider.authenticated && !page.conversation.connected
-                        ? page.conversation.runtimeStatusText
+                    : (page.aiSettings ? page.aiSettings.subscriptionUnavailable : false) ? (page.aiSettings ? page.aiSettings.subscriptionUnavailableText : "")
+                    : (page.aiSettings ? page.aiSettings.enabled : false) && page.provider.authenticated && !(page.aiSettings ? page.aiSettings.connected : false)
+                        ? (page.aiSettings ? page.aiSettings.runtimeStatusText : "")
                     : page.provider.authenticated
                         ? page.t(qsTr("已登入：%1")).arg(page.provider.account_label || page.t(qsTr("（未提供帳號名稱）")))
-                        : page.conversation.login ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg(page.conversation.login.auth_url).arg(page.conversation.login.user_code) : page.t(qsTr("尚未登入"))
+                        : (page.aiSettings ? page.aiSettings.login : null) ? page.t(qsTr("在瀏覽器開啟 %1 登入，並輸入代碼：%2")).arg((page.aiSettings ? page.aiSettings.login : null).auth_url).arg((page.aiSettings ? page.aiSettings.login : null).user_code) : page.t(qsTr("尚未登入"))
                 color: page.tokens.appInk
                 font.pixelSize: page.tokens.appFontBody
             }
             Text {
                 objectName: "aiLoginResult"
-                visible: (page.conversation.loginResultText || "").length > 0
+                visible: ((page.aiSettings ? page.aiSettings.loginResultText : "") || "").length > 0
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: page.conversation.loginResultText || ""
+                text: (page.aiSettings ? page.aiSettings.loginResultText : "") || ""
                 color: page.tokens.appInkMuted
                 font.pixelSize: page.tokens.appFontBody
             }
@@ -161,31 +163,31 @@ Flickable {
             Row {
                 spacing: page.tokens.space
                 Button {
-                    visible: page.conversation.canLogin && !page.conversation.login
+                    visible: (page.aiSettings ? page.aiSettings.canLogin : false) && !(page.aiSettings ? page.aiSettings.login : null)
                     tokens: page.tokens
                     kind: "primary"
                     text: page.t(qsTr("使用 Codex 訂閱登入"))
-                    onClicked: page.conversation.startLogin()
+                    onClicked: page.aiSettings && page.aiSettings.startLogin()
                 }
                 Button {
-                    visible: !!page.conversation.login
+                    visible: !!(page.aiSettings ? page.aiSettings.login : null)
                     tokens: page.tokens
                     text: page.t(qsTr("取消登入"))
-                    onClicked: page.conversation.cancelLogin()
+                    onClicked: page.aiSettings && page.aiSettings.cancelLogin()
                 }
                 Button {
                     visible: !!page.provider && page.provider.authenticated
                     tokens: page.tokens
                     kind: "subtle"
                     text: page.t(qsTr("登出"))
-                    onClicked: page.conversation.logout()
+                    onClicked: page.aiSettings && page.aiSettings.logout()
                 }
                 Button {
                     objectName: "aiProviderRetry"
-                    visible: !page.provider && page.conversation.enabled && page.conversation.providerFailed
+                    visible: !page.provider && (page.aiSettings ? page.aiSettings.enabled : false) && (page.aiSettings ? page.aiSettings.providerFailed : false)
                     tokens: page.tokens
                     text: page.t(qsTr("重新讀取"))
-                    onClicked: page.conversation.refreshProvider()
+                    onClicked: page.aiSettings && page.aiSettings.refreshProvider()
                 }
             }
             Text {
@@ -202,8 +204,9 @@ Flickable {
                 options: (page.provider && page.provider.models ? page.provider.models : []).map(m => ({ value: m.id, label: m.label }))
                 value: page.settings ? page.settings.model : null
                 onChosen: v => {
+                    if (!page.aiSettings) return;
                     const model = page.provider.models.find(m => m.id === v);
-                    page.conversation.chooseModel(v, model && model.reasoning_efforts.indexOf("low") >= 0 ? "low" : (model ? model.default_effort : null));
+                    page.aiSettings.chooseModel(v, model && model.reasoning_efforts.indexOf("low") >= 0 ? "low" : (model ? model.default_effort : null));
                 }
             }
             Choice {
@@ -215,7 +218,7 @@ Flickable {
                     return model ? model.reasoning_efforts.map(e => ({ value: e, label: e })) : [];
                 }
                 value: page.settings ? page.settings.reasoning_effort : null
-                onChosen: v => page.conversation.chooseModel(page.settings.model, v)
+                onChosen: v => page.aiSettings && page.aiSettings.chooseModel(page.settings.model, v)
             }
         }
 
@@ -229,11 +232,11 @@ Flickable {
 
             Text {
                 objectName: "aiRuntimeStatus"
-                visible: page.conversation.enabled && (page.conversation.runtimeControllerUnavailable
-                    || page.conversation.runtimePending || page.conversation.runtimeFailed)
+                visible: (page.aiSettings ? page.aiSettings.enabled : false) && ((page.aiSettings ? page.aiSettings.runtimeControllerUnavailable : false)
+                    || (page.aiSettings ? page.aiSettings.runtimePending : false) || (page.aiSettings ? page.aiSettings.runtimeFailed : false))
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: page.conversation.runtimeControllerUnavailable ? page.conversation.runtimeFailureText : page.conversation.runtimeStatusText
+                text: (page.aiSettings ? page.aiSettings.runtimeControllerUnavailable : false) ? (page.aiSettings ? page.aiSettings.runtimeFailureText : "") : (page.aiSettings ? page.aiSettings.runtimeStatusText : "")
                 color: page.tokens.appInk
                 font.pixelSize: page.tokens.appFontBody
             }
@@ -270,9 +273,10 @@ Flickable {
                     text: page.t(qsTr("儲存並使用"))
                     enabled: endpoint.text.length > 0 && key.text.length > 0
                     onClicked: {
+                        if (!page.aiSettings) return;
                         const secret = key.text;
                         key.text = "";
-                        page.conversation.saveApiKey(endpoint.text, model.text, secret, function () {
+                        page.aiSettings.saveApiKey(endpoint.text, model.text, secret, function () {
                             page.keyNotice = page.t(qsTr("已存入鑰匙圈。"));
                         });
                     }
@@ -298,15 +302,15 @@ Flickable {
                     { value: "never", label: page.t(qsTr("不要詢問，直接拒絕")) }
                 ]
                 value: page.settings ? page.settings.approval_mode : "ask"
-                onChosen: v => page.conversation.setApprovalMode(v)
+                onChosen: v => page.aiSettings && page.aiSettings.setApprovalMode(v)
             }
         }
 
         Text {
-            visible: page.conversation.errorText.length > 0
+            visible: (page.aiSettings ? page.aiSettings.errorText : "").length > 0
             width: parent.width
             wrapMode: Text.WordWrap
-            text: page.conversation.errorText
+            text: (page.aiSettings ? page.aiSettings.errorText : "")
             color: page.tokens.appDanger
             font.pixelSize: page.tokens.appFontCaption
         }
@@ -314,7 +318,7 @@ Flickable {
             width: parent.width
             tokens: page.tokens
             title: page.t(qsTr("診斷"))
-            text: page.conversation.errorDiagnostic
+            text: (page.aiSettings ? page.aiSettings.errorDiagnostic : "")
         }
     }
 }
