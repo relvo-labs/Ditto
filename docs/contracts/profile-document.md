@@ -29,9 +29,9 @@
 
 ## revision 與完整性
 
-Core 將完整文件寫入不可變的 `revisions.document_json`，以文件的 JCS 正規化表示計算 `document_sha256`（`sha256:<hex>`）。鍵順序不同而內容相同時雜湊相同。`Profile` 的 head 與新 revision 在同一 SQLite 交易中更新；失敗時 head 保持原值。每個 Profile 另保有受保護的 `last_known_good`，提交後經觀察期才可更新。保存期限規則見 [store-schema.md](store-schema.md#4-保存期限cfg-07)。
+Core 將完整文件寫入不可變的 `revisions.document_json`，以文件的 JCS 正規化表示計算 `document_sha256`（`sha256:<hex>`）。鍵順序不同而內容相同時雜湊相同。`Profile` 的 head 與新 revision 在同一 SQLite 交易中更新；失敗時 head 保持原值。每個 Profile 另保有受保護的 `last_known_good`，提交後經觀察期才可更新；觀察期只在 revision 實際顯示在桌面上時開始，所以非作用中 Profile 的變更不會更新它。保存期限規則見 [store-schema.md](store-schema.md#4-保存期限cfg-07)。
 
-建立與複製 Profile 會產生第一個 revision；重新命名不改文件。已套用的設定變更由 ChangeSet 產生 revision，切換 Profile 亦走 ChangeSet。比較回傳結構化差異；撤銷產生新 revision，不修改舊 revision。
+建立與複製 Profile 會產生第一個 revision；重新命名不改文件。已套用的設定變更由 ChangeSet 產生 revision，切換 Profile 亦走 ChangeSet。只有作用中的 Profile 會投影到 Shell、hostd 與合成器。編輯非作用中的 Profile 只會寫入它的 revision；切換到它時才會套用到桌面（[protocol-0.2 §8.1](protocol-0.2.md#81-changeset-與-op)）。比較回傳結構化差異；撤銷產生新 revision，不修改舊 revision。
 
 ## 匯出與匯入
 
