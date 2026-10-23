@@ -106,7 +106,12 @@ pub fn unpack(
     }
     let target = paths.package_dir(&sha256);
     if target.join("manifest.json").exists() {
+        // The same checks as a fresh unpack: the tree may be left by an
+        // install that never reached the index, from a Core whose checks
+        // were weaker (#161: config_schema). A refusal here changes nothing
+        // in the index; a package already indexed keeps its row.
         let manifest = read_manifest(&target)?;
+        check_tree(&manifest, &target)?;
         return Ok(Unpacked {
             tree_sha256: tree_digest(&target)?,
             sha256,
@@ -137,20 +142,7 @@ pub fn unpack(
         }
         crate::fault::during_unpack()?;
         let manifest = read_manifest(&staging)?;
-        let problems = manifest.check();
-        if !problems.is_empty() {
-            return Err(StoreError::Invalid(format!(
-                "manifest: {}",
-                problems.join("; ")
-            )));
-        }
-        for relative in manifest.entry.iter().chain(manifest.qml_entry.iter()) {
-            if !staging.join(relative).is_file() {
-                return Err(StoreError::Invalid(format!(
-                    "entry file {relative} is missing"
-                )));
-            }
-        }
+        check_tree(&manifest, &staging)?;
         let tree_sha256 = tree_digest(&staging)?;
         fs::copy(archive, staging.join(ARCHIVE_NAME))?;
         fs::create_dir_all(target.parent().expect("package dir has a parent"))?;
@@ -171,6 +163,27 @@ pub fn unpack(
         let _ = fs::remove_dir_all(&staging);
     }
     outcome
+}
+
+/// What a package tree must pass before it is indexed: `Manifest::check`
+/// and the entry files it names. One rule, with one reason, for a fresh
+/// unpack and for a tree already in the content store.
+fn check_tree(manifest: &Manifest, directory: &Path) -> StoreResult<()> {
+    let problems = manifest.check();
+    if !problems.is_empty() {
+        return Err(StoreError::Invalid(format!(
+            "manifest: {}",
+            problems.join("; ")
+        )));
+    }
+    for relative in manifest.entry.iter().chain(manifest.qml_entry.iter()) {
+        if !directory.join(relative).is_file() {
+            return Err(StoreError::Invalid(format!(
+                "entry file {relative} is missing"
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub fn read_manifest(directory: &Path) -> StoreResult<Manifest> {
@@ -494,6 +507,26 @@ mod tests {
         assert!(get(temp.store.connection(), "ditto.test.cached", "1.0.0")
             .unwrap()
             .is_some());
+
+        // The rest of the fresh-install rule applies to a cached tree too: a
+        // tree without the entry file its manifest names is refused.
+        let hollow = build_archive(&temp.root, &manifest("ditto.test.hollow"), &[]);
+        let fresh = unpack(&paths, &hollow, None, "job-hollow").unwrap_err();
+        let cached = paths.package_dir(&sha256_file(&hollow).unwrap());
+        fs::create_dir_all(&cached).unwrap();
+        assert!(Command::new("tar")
+            .args(["--zstd", "-xf"])
+            .arg(&hollow)
+            .arg("-C")
+            .arg(&cached)
+            .status()
+            .unwrap()
+            .success());
+        let again = unpack(&paths, &hollow, None, "job-hollow-cached").unwrap_err();
+        assert_eq!(again.to_string(), fresh.to_string());
+        assert!(get(temp.store.connection(), "ditto.test.hollow", "1.0.0")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

@@ -218,8 +218,12 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
     const support = configSchemaIssues(configSchema)
     for (const issue of support) error(issue.path, 'schema_invalid', issue.message)
     if (support.length === 0) {
-      const defaults = Object.fromEntries(Object.entries((configSchema['properties'] ?? {}) as Obj)
-        .filter(([, sub]) => isObject(sub) && 'default' in sub).map(([key, sub]) => [key, (sub as Obj)['default']]))
+      // Own keys only, as in json-schema.ts: a property named `toString` or a `default` on the prototype
+      // is not a default.
+      const own = (object: Obj, key: string) => Object.prototype.hasOwnProperty.call(object, key)
+      const properties = own(configSchema, 'properties') ? configSchema['properties'] : undefined
+      const defaults = Object.fromEntries(Object.entries((properties ?? {}) as Obj)
+        .filter(([, sub]) => isObject(sub) && own(sub, 'default')).map(([key, sub]) => [key, (sub as Obj)['default']]))
       for (const issue of validateJsonSchema({ ...configSchema, required: [] }, defaults)) error(`/config_schema${issue.path}`, 'schema_invalid', `default ${issue.message}`)
     }
   }

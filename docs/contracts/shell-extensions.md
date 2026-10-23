@@ -74,7 +74,7 @@
 | 宿主模式 | `plugin_kind`／`host_kind`、`EntrySpec.host`；`ui.*` 一律對應 `qml`（`projection.rs:59-77`）。surface 與 page 由 slot／area 區分 | 否 |
 | 權限 | `Manifest.permissions`，是請求不是事實 | 否（限制見第 6 節） |
 | 熱換等級 | `Manifest.hot_swap`；`hot_swap_level` 取觸及條目的最高值（`projection.rs:251-283`） | 否 |
-| 狀態 schema | `config_schema`（描述 Profile 內 `config`）；`data_schema`（插件資料，記錄）。限制：Core 目前**不**依 `config_schema` 驗證，`add_entry`／`set_entry_config` 只檢查 `config` 是物件（`crates/ditto-core/src/docops.rs:154-162`、`:225-230`）；`config_schema` 只由 SDK 在作者端檢查（`packages/host-sdk/src/manifest/rules.ts:202-209`） | 否。UI 暫態不進 manifest，見第 7 節；Core 端驗證是宣告式設定表單的前提，見第 6 節 |
+| 狀態 schema | `config_schema`（描述 Profile 內 `config`）；`data_schema`（插件資料，記錄）。Core 在預檢依 `config_schema` 檢查 ChangeSet 寫入的 `config`（`add_entry`、`set_entry_config`，以及 `upgrade_entry` 後沿用的 `config`），安裝套件時拒絕無法判定的 schema；SDK 在作者端用同一規則（#161，見 [manifest.md「config 的檢查」](manifest.md#config-的檢查)）。變更沒碰到的已保存條目不重新檢查 | 否。UI 暫態不進 manifest，見第 7 節；宣告式設定表單的其餘前提見第 6 節 |
 | 預設／備援供應者 | 新 store 的預設由 `crates/ditto-core/src/defaults.rs` 決定；背景與五個內建頁的備援是 Shell 內建實作 | 否 |
 | 設定頁 metadata | — | **新增** manifest 選用欄位 `settings_page`；`ShellSlotBinding.settings_page`（自 manifest 投影，無則省略）（P02）。圖示、可用條件與所需能力待定，屬 P03（第 4.1 節） |
 | 設定頁回讀狀態 | — | **新增** `PanelMount.page_state: registered | open`（P02） |
@@ -149,7 +149,7 @@
 | 官方內建 QML（`source: builtin`、`trust_level: trusted`） | 可 | 可（唯一可嵌入的一類） | 經宿主給的 `client`，以 Shell 身分呼叫 Core，授權仍由 Core 判定。manifest 的 `permissions` 目前只對 Cordis 條目預檢（`preflight.rs:604-623`） | **無**：同程序，無逐插件故障隔離 | 現行預檢已允許 |
 | 社群 QML（非 `builtin` 或非 `trusted`） | 不可：預檢 `precondition_failed`（`why: trust_policy`，`preflight.rs:328-352`） | 不可 | — | 無 | #154 獨立宿主＋#155 |
 | 生成（固定模板） | 只以固定模板 `shell/generated/GeneratedPanel.qml` 呈現已核准且完整性相符的 artifact；位置限 `ui.generated_panel`（≤8） | 不可 | artifact 以描述資料傳入模板（`projection.rs:104-118`），不提供程式碼 | 模板是可信程式碼；生成內容是資料 | 任意生成 QML 依 #154／#155 |
-| 第三方設定擴充 | 不載入其 QML | 只以宣告式表單：可信宿主依條目的 `config_schema` 繪製，寫入經 `set_entry_config` ChangeSet（P03／P07 建置，不在 P02）。前提：Core 須先在預檢依 `config_schema` 驗證寫入的 `config`；現行只檢查是物件（第 3 節），補上前表單不得啟用 | 讀寫 scope 分開；自填 `entry_id` 或 manifest 自述不取得身分 | 表單不執行其程式碼；獨立 surface 的隔離由 #155 定 | 表單待 Core 端 `config_schema` 驗證；獨立 surface 待 #154／#155 |
+| 第三方設定擴充 | 不載入其 QML | 只以宣告式表單：可信宿主依條目的 `config_schema` 繪製，寫入經 `set_entry_config` ChangeSet（P03／P07 建置，不在 P02）。Core 在預檢依 `config_schema` 檢查寫入的 `config`，不符即拒絕整筆變更（#161，見 [manifest.md「config 的檢查」](manifest.md#config-的檢查)）；表單本身尚未建置，P03／P07 完成前不得啟用 | 讀寫 scope 分開；自填 `entry_id` 或 manifest 自述不取得身分 | 表單不執行其程式碼；獨立 surface 的隔離由 #155 定 | 表單待 P03／P07 建置；獨立 surface 待 #154／#155 |
 | 佈景 token 套件 | 不載入程式碼，只有 token 值，經 `APPEARANCE_TOKENS` 預檢 | 不適用 | 無 | 不需要（無程式碼）；帶樣式程式碼的佈景依上方 QML 各列判斷 | P06；第三方樣式程式碼依 #155 |
 
 - 同程序的 facade 是 **API 與架構邊界，不是沙箱**。不得以「只給了 `client`」或隱藏方法宣稱權限隔離。

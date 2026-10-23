@@ -26,24 +26,37 @@ function matchesType(value: unknown, type: string): boolean {
   return actual === type || (type === 'number' && actual === 'integer')
 }
 
+/**
+ * Own keys only, everywhere: a schema keyword, a `$ref` step, a property of a value or of an `enum`
+ * member is read only when the object itself has it, never through the prototype. `toString`,
+ * `constructor`, `hasOwnProperty` and `__proto__` (an own key after `JSON.parse`) are ordinary names,
+ * as they are for Core (crates/ditto-protocol/src/config_schema.rs).
+ */
+function hasOwn(object: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key)
+}
+
+function own(object: unknown, key: string): unknown {
+  return typeof object === 'object' && object !== null && hasOwn(object, key)
+    ? (object as Record<string, unknown>)[key]
+    : undefined
+}
+
+/** JSON equality: same type, numbers by value, arrays item by item, objects by their own keys. */
 function equal(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
   if (Array.isArray(a) !== Array.isArray(b)) return false
   const ka = Object.keys(a)
   const kb = Object.keys(b)
-  return ka.length === kb.length && ka.every(key => equal((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
-}
-
-function hasOwn(object: object, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(object, key)
+  return ka.length === kb.length && ka.every(key => hasOwn(b, key) && equal(own(a, key), own(b, key)))
 }
 
 function resolveRef(root: JsonSchema, ref: string): JsonSchema {
   if (!ref.startsWith('#')) throw new Error(`only local $ref is supported: ${ref}`)
   let node: unknown = root
   for (const part of ref.slice(1).split('/').filter(Boolean)) {
-    node = (node as Record<string, unknown>)?.[part.replace(/~1/g, '/').replace(/~0/g, '~')]
+    node = own(node, part.replace(/~1/g, '/').replace(/~0/g, '~'))
   }
   if (node === undefined) throw new Error(`unresolved $ref ${ref}`)
   return node as JsonSchema
@@ -54,11 +67,12 @@ export function validateJsonSchema(schema: JsonSchema, value: unknown, root: Jso
   if (schema === false) return [{ path: path || '/', message: 'no value is allowed here' }]
   const issues: SchemaIssue[] = []
   const at = path || '/'
-  const s = schema as Record<string, unknown>
+  const keyword = (name: string) => own(schema, name)
 
-  if (typeof s['$ref'] === 'string') issues.push(...validateJsonSchema(resolveRef(root, s['$ref']), value, root, path))
+  const ref = keyword('$ref')
+  if (typeof ref === 'string') issues.push(...validateJsonSchema(resolveRef(root, ref), value, root, path))
 
-  const type = s['type']
+  const type = keyword('type')
   if (type !== undefined) {
     const types = Array.isArray(type) ? type as string[] : [type as string]
     if (!types.some(t => matchesType(value, t))) {
@@ -66,52 +80,60 @@ export function validateJsonSchema(schema: JsonSchema, value: unknown, root: Jso
       return issues
     }
   }
-  if ('const' in s && !equal(value, s['const'])) issues.push({ path: at, message: `must equal ${JSON.stringify(s['const'])}` })
-  if (Array.isArray(s['enum']) && !s['enum'].some(item => equal(item, value))) {
-    issues.push({ path: at, message: `must be one of ${s['enum'].map(item => JSON.stringify(item)).join(', ')}` })
+  if (hasOwn(schema, 'const') && !equal(value, keyword('const'))) issues.push({ path: at, message: `must equal ${JSON.stringify(keyword('const'))}` })
+  const choices = keyword('enum')
+  if (Array.isArray(choices) && !choices.some(item => equal(item, value))) {
+    issues.push({ path: at, message: `must be one of ${choices.map(item => JSON.stringify(item)).join(', ')}` })
   }
 
+  const bound = (name: string) => { const n = keyword(name); return typeof n === 'number' ? n : undefined }
   if (typeof value === 'number') {
-    if (typeof s['minimum'] === 'number' && value < s['minimum']) issues.push({ path: at, message: `must be ≥ ${s['minimum']}` })
-    if (typeof s['maximum'] === 'number' && value > s['maximum']) issues.push({ path: at, message: `must be ≤ ${s['maximum']}` })
-    if (typeof s['exclusiveMinimum'] === 'number' && value <= s['exclusiveMinimum']) issues.push({ path: at, message: `must be > ${s['exclusiveMinimum']}` })
-    if (typeof s['exclusiveMaximum'] === 'number' && value >= s['exclusiveMaximum']) issues.push({ path: at, message: `must be < ${s['exclusiveMaximum']}` })
+    const minimum = bound('minimum'), maximum = bound('maximum')
+    const exclusiveMinimum = bound('exclusiveMinimum'), exclusiveMaximum = bound('exclusiveMaximum')
+    if (minimum !== undefined && value < minimum) issues.push({ path: at, message: `must be ≥ ${minimum}` })
+    if (maximum !== undefined && value > maximum) issues.push({ path: at, message: `must be ≤ ${maximum}` })
+    if (exclusiveMinimum !== undefined && value <= exclusiveMinimum) issues.push({ path: at, message: `must be > ${exclusiveMinimum}` })
+    if (exclusiveMaximum !== undefined && value >= exclusiveMaximum) issues.push({ path: at, message: `must be < ${exclusiveMaximum}` })
   }
   if (typeof value === 'string') {
-    if (typeof s['minLength'] === 'number' && [...value].length < s['minLength']) issues.push({ path: at, message: `must be at least ${s['minLength']} characters` })
-    if (typeof s['maxLength'] === 'number' && [...value].length > s['maxLength']) issues.push({ path: at, message: `must be at most ${s['maxLength']} characters` })
-    if (typeof s['pattern'] === 'string' && !new RegExp(s['pattern'], 'u').test(value)) issues.push({ path: at, message: `must match ${s['pattern']}` })
+    const minLength = bound('minLength'), maxLength = bound('maxLength'), pattern = keyword('pattern')
+    if (minLength !== undefined && [...value].length < minLength) issues.push({ path: at, message: `must be at least ${minLength} characters` })
+    if (maxLength !== undefined && [...value].length > maxLength) issues.push({ path: at, message: `must be at most ${maxLength} characters` })
+    if (typeof pattern === 'string' && !new RegExp(pattern, 'u').test(value)) issues.push({ path: at, message: `must match ${pattern}` })
   }
   if (Array.isArray(value)) {
-    if (typeof s['minItems'] === 'number' && value.length < s['minItems']) issues.push({ path: at, message: `needs at least ${s['minItems']} items` })
-    if (typeof s['maxItems'] === 'number' && value.length > s['maxItems']) issues.push({ path: at, message: `allows at most ${s['maxItems']} items` })
-    if (s['uniqueItems'] === true && value.some((item, i) => value.findIndex(other => equal(other, item)) !== i)) issues.push({ path: at, message: 'items must be unique' })
-    const prefix = Array.isArray(s['prefixItems']) ? s['prefixItems'] as JsonSchema[] : []
+    const minItems = bound('minItems'), maxItems = bound('maxItems')
+    if (minItems !== undefined && value.length < minItems) issues.push({ path: at, message: `needs at least ${minItems} items` })
+    if (maxItems !== undefined && value.length > maxItems) issues.push({ path: at, message: `allows at most ${maxItems} items` })
+    if (keyword('uniqueItems') === true && value.some((item, i) => value.findIndex(other => equal(other, item)) !== i)) issues.push({ path: at, message: 'items must be unique' })
+    const prefixItems = keyword('prefixItems')
+    const prefix = Array.isArray(prefixItems) ? prefixItems as JsonSchema[] : []
+    const items = keyword('items')
     value.forEach((item, i) => {
-      const itemSchema = i < prefix.length ? prefix[i] : s['items']
+      const itemSchema = i < prefix.length ? prefix[i] : items
       if (itemSchema !== undefined) issues.push(...validateJsonSchema(itemSchema as JsonSchema, item, root, `${path}/${i}`))
     })
   }
   if (typeOf(value) === 'object') {
     const object = value as Record<string, unknown>
-    const properties = (s['properties'] ?? {}) as Record<string, JsonSchema>
-    // Own keys only: `toString`, `constructor` and `__proto__` are ordinary
-    // names, as they are for Core (crates/ditto-protocol/src/config_schema.rs).
-    for (const key of (s['required'] as string[] | undefined) ?? []) {
+    const properties = keyword('properties') ?? {}
+    const additional = keyword('additionalProperties')
+    for (const key of (keyword('required') as string[] | undefined) ?? []) {
       if (!hasOwn(object, key)) issues.push({ path: `${path}/${key}`, message: 'is required' })
     }
     for (const [key, item] of Object.entries(object)) {
-      if (hasOwn(properties, key)) issues.push(...validateJsonSchema(properties[key]!, item, root, `${path}/${key}`))
-      else if (s['additionalProperties'] !== undefined) issues.push(...validateJsonSchema(s['additionalProperties'] as JsonSchema, item, root, `${path}/${key}`))
+      if (hasOwn(properties as object, key)) issues.push(...validateJsonSchema(own(properties, key) as JsonSchema, item, root, `${path}/${key}`))
+      else if (additional !== undefined) issues.push(...validateJsonSchema(additional as JsonSchema, item, root, `${path}/${key}`))
     }
   }
 
-  if (Array.isArray(s['allOf'])) for (const sub of s['allOf'] as JsonSchema[]) issues.push(...validateJsonSchema(sub, value, root, path))
-  if (Array.isArray(s['anyOf']) && !(s['anyOf'] as JsonSchema[]).some(sub => validateJsonSchema(sub, value, root, path).length === 0)) {
+  const allOf = keyword('allOf'), anyOf = keyword('anyOf'), oneOf = keyword('oneOf')
+  if (Array.isArray(allOf)) for (const sub of allOf as JsonSchema[]) issues.push(...validateJsonSchema(sub, value, root, path))
+  if (Array.isArray(anyOf) && !(anyOf as JsonSchema[]).some(sub => validateJsonSchema(sub, value, root, path).length === 0)) {
     issues.push({ path: at, message: 'matches none of the allowed shapes (anyOf)' })
   }
-  if (Array.isArray(s['oneOf'])) {
-    const matches = (s['oneOf'] as JsonSchema[]).filter(sub => validateJsonSchema(sub, value, root, path).length === 0).length
+  if (Array.isArray(oneOf)) {
+    const matches = (oneOf as JsonSchema[]).filter(sub => validateJsonSchema(sub, value, root, path).length === 0).length
     if (matches !== 1) issues.push({ path: at, message: `must match exactly one shape (oneOf), matched ${matches}` })
   }
   return issues
@@ -140,7 +162,7 @@ const isSchemaObject = (value: unknown): value is Record<string, unknown> =>
  */
 export function configSchemaIssues(schema: unknown, path = '/config_schema'): SchemaIssue[] {
   if (!isSchemaObject(schema)) return [{ path, message: 'config_schema must be a JSON Schema object' }]
-  if (schema['type'] !== 'object') return [{ path: `${path}/type`, message: 'the top level must be an object schema' }]
+  if (own(schema, 'type') !== 'object') return [{ path: `${path}/type`, message: 'the top level must be an object schema' }]
   return subschemaIssues(schema, path)
 }
 
