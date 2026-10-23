@@ -1,0 +1,11 @@
+{"kind": "shape", "description": "#161：config 不符 manifest 的 config_schema 時，預檢以 schema_invalid 拒絕，原因的 why 是 config_schema_violation，並帶 JSON pointer", "type": "change-record", "valid": true,
+ "value": {"change_id": "chg-01M3H4J7EEWXXD01TR98PCQE7A", "profile_id": "prf-01M3H4J7EEWXXD01TR98PCQE7B", "base_revision": "rev-01M3H4J7EEWXXD01TR98PCQE7C",
+   "committed_revision": null, "state": "rejected", "result": "failed", "hot_swap_level": "instant", "origin": {"kind": "cli"}, "idempotency_key": null,
+   "ops": [{"op": "set_entry_config", "entry_id": "ent-01M3H4J7EEWXXD01TR98PCQE7D", "before": {}, "after": {"position": "top"}}],
+   "card": {"kind": "mixed", "title_key": "change.title.mixed", "title_args": {"count": 1}, "items": []},
+   "reasons": [{"code": "schema_invalid", "op_index": 0, "detail_key": "preflight.schema_invalid",
+     "detail": {"why": "config_schema_violation", "entry_id": "ent-01M3H4J7EEWXXD01TR98PCQE7D", "package": "ditto.dock.pill", "version": "1.0.0",
+       "pointer": "/position", "violation_count": 1,
+       "violations": [{"pointer": "/position", "keyword": "enum", "message": "must be one of \"bottom\", \"left\""}]}}],
+   "items": [], "confirmation": {"state": "not_required"}, "operations": [],
+   "created_at": "2026-10-23T00:00:00.000Z", "updated_at": "2026-10-23T00:00:00.000Z"}}

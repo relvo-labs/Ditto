@@ -8,6 +8,7 @@ pub mod agent_backend;
 pub mod agent_manager;
 pub mod agent_routes;
 pub mod authz;
+pub use ditto_protocol::config_schema;
 pub mod context;
 pub mod coordinator;
 pub mod core;

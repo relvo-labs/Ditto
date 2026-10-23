@@ -106,7 +106,12 @@ pub fn unpack(
     }
     let target = paths.package_dir(&sha256);
     if target.join("manifest.json").exists() {
+        // The same checks as a fresh unpack: the tree may be left by an
+        // install that never reached the index, from a Core whose checks
+        // were weaker (#161: config_schema). A refusal here changes nothing
+        // in the index; a package already indexed keeps its row.
         let manifest = read_manifest(&target)?;
+        check_tree(&manifest, &target)?;
         return Ok(Unpacked {
             tree_sha256: tree_digest(&target)?,
             sha256,
@@ -137,20 +142,7 @@ pub fn unpack(
         }
         crate::fault::during_unpack()?;
         let manifest = read_manifest(&staging)?;
-        let problems = manifest.check();
-        if !problems.is_empty() {
-            return Err(StoreError::Invalid(format!(
-                "manifest: {}",
-                problems.join("; ")
-            )));
-        }
-        for relative in manifest.entry.iter().chain(manifest.qml_entry.iter()) {
-            if !staging.join(relative).is_file() {
-                return Err(StoreError::Invalid(format!(
-                    "entry file {relative} is missing"
-                )));
-            }
-        }
+        check_tree(&manifest, &staging)?;
         let tree_sha256 = tree_digest(&staging)?;
         fs::copy(archive, staging.join(ARCHIVE_NAME))?;
         fs::create_dir_all(target.parent().expect("package dir has a parent"))?;
@@ -171,6 +163,27 @@ pub fn unpack(
         let _ = fs::remove_dir_all(&staging);
     }
     outcome
+}
+
+/// What a package tree must pass before it is indexed: `Manifest::check`
+/// and the entry files it names. One rule, with one reason, for a fresh
+/// unpack and for a tree already in the content store.
+fn check_tree(manifest: &Manifest, directory: &Path) -> StoreResult<()> {
+    let problems = manifest.check();
+    if !problems.is_empty() {
+        return Err(StoreError::Invalid(format!(
+            "manifest: {}",
+            problems.join("; ")
+        )));
+    }
+    for relative in manifest.entry.iter().chain(manifest.qml_entry.iter()) {
+        if !directory.join(relative).is_file() {
+            return Err(StoreError::Invalid(format!(
+                "entry file {relative} is missing"
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub fn read_manifest(directory: &Path) -> StoreResult<Manifest> {
@@ -442,6 +455,78 @@ mod tests {
         make_writable(&unpacked.directory).unwrap();
         fs::write(unpacked.directory.join("qml/Dock.qml"), "Item { id: evil }").unwrap();
         assert_ne!(tree_digest(&unpacked.directory).unwrap(), row.tree_sha256);
+    }
+
+    /// #161 repair 2: a complete tree already in the content store but not
+    /// indexed (an install interrupted before the subset check existed) is
+    /// checked like a fresh install before anything indexes it.
+    #[test]
+    fn a_cached_tree_with_an_unsupported_config_schema_is_refused_like_a_fresh_install() {
+        let mut temp = testing::open("package-cached-schema");
+        let paths = temp.store.paths().clone();
+        let mut bad = manifest("ditto.test.cached");
+        bad["config_schema"] = serde_json::json!({"type": "object", "properties": {"x": 3}});
+        let archive = build_archive(&temp.root, &bad, &[("qml/Dock.qml", "Item {}")]);
+        let fresh = match unpack(&paths, &archive, None, "job-fresh") {
+            Err(StoreError::Invalid(message)) => message,
+            other => panic!("a fresh install must refuse it: {other:?}"),
+        };
+        assert!(fresh.contains("config_schema/properties/x"), "{fresh}");
+        // The tree an older Core left behind, complete but never indexed.
+        let cached = paths.package_dir(&sha256_file(&archive).unwrap());
+        fs::create_dir_all(&cached).unwrap();
+        let status = Command::new("tar")
+            .arg("--zstd")
+            .arg("-xf")
+            .arg(&archive)
+            .arg("-C")
+            .arg(&cached)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(cached.join("manifest.json").is_file());
+        match unpack(&paths, &archive, None, "job-cached") {
+            Err(StoreError::Invalid(message)) => assert_eq!(message, fresh),
+            other => panic!("the cached tree must be refused the same way: {other:?}"),
+        }
+        assert!(list(temp.store.connection()).unwrap().is_empty());
+
+        // A package indexed before the check keeps its row: reinstalling it
+        // is refused, but nothing is removed from the index.
+        let legacy = Unpacked {
+            sha256: sha256_file(&archive).unwrap(),
+            tree_sha256: tree_digest(&cached).unwrap(),
+            manifest: serde_json::from_value(bad).unwrap(),
+            directory: cached.clone(),
+            already_present: true,
+        };
+        temp.store
+            .write(|tx| insert(tx, &legacy, "builtin", None))
+            .unwrap();
+        assert!(unpack(&paths, &archive, None, "job-again").is_err());
+        assert!(get(temp.store.connection(), "ditto.test.cached", "1.0.0")
+            .unwrap()
+            .is_some());
+
+        // The rest of the fresh-install rule applies to a cached tree too: a
+        // tree without the entry file its manifest names is refused.
+        let hollow = build_archive(&temp.root, &manifest("ditto.test.hollow"), &[]);
+        let fresh = unpack(&paths, &hollow, None, "job-hollow").unwrap_err();
+        let cached = paths.package_dir(&sha256_file(&hollow).unwrap());
+        fs::create_dir_all(&cached).unwrap();
+        assert!(Command::new("tar")
+            .args(["--zstd", "-xf"])
+            .arg(&hollow)
+            .arg("-C")
+            .arg(&cached)
+            .status()
+            .unwrap()
+            .success());
+        let again = unpack(&paths, &hollow, None, "job-hollow-cached").unwrap_err();
+        assert_eq!(again.to_string(), fresh.to_string());
+        assert!(get(temp.store.connection(), "ditto.test.hollow", "1.0.0")
+            .unwrap()
+            .is_none());
     }
 
     #[test]

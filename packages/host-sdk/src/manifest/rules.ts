@@ -1,4 +1,4 @@
-import { unsupportedKeywords, validateJsonSchema, type JsonSchema } from './json-schema.ts'
+import { configSchemaIssues, validateJsonSchema, type JsonSchema } from './json-schema.ts'
 import { parseRange, parseVersion } from './semver.ts'
 
 /**
@@ -214,11 +214,18 @@ export function validateManifest(manifest: unknown, options: ValidateOptions = {
   const configSchema = m['config_schema']
   if (!isObject(configSchema)) error('/config_schema', 'schema_invalid', 'is required (use { "type": "object", "properties": {} } for none)')
   else {
-    if (configSchema['type'] !== 'object') error('/config_schema/type', 'schema_invalid', 'the top level must be an object schema')
-    for (const issue of unsupportedKeywords(configSchema)) error(issue.path, 'schema_invalid', issue.message)
-    const defaults = Object.fromEntries(Object.entries((configSchema['properties'] ?? {}) as Obj)
-      .filter(([, sub]) => isObject(sub) && 'default' in sub).map(([key, sub]) => [key, (sub as Obj)['default']]))
-    for (const issue of validateJsonSchema({ ...configSchema, required: [] }, defaults)) error(`/config_schema${issue.path}`, 'schema_invalid', `default ${issue.message}`)
+    // The same support rule Core applies at install (#161), whatever defaults the schema declares.
+    const support = configSchemaIssues(configSchema)
+    for (const issue of support) error(issue.path, 'schema_invalid', issue.message)
+    if (support.length === 0) {
+      // Own keys only, as in json-schema.ts: a property named `toString` or a `default` on the prototype
+      // is not a default.
+      const own = (object: Obj, key: string) => Object.prototype.hasOwnProperty.call(object, key)
+      const properties = own(configSchema, 'properties') ? configSchema['properties'] : undefined
+      const defaults = Object.fromEntries(Object.entries((properties ?? {}) as Obj)
+        .filter(([, sub]) => isObject(sub) && own(sub, 'default')).map(([key, sub]) => [key, (sub as Obj)['default']]))
+      for (const issue of validateJsonSchema({ ...configSchema, required: [] }, defaults)) error(`/config_schema${issue.path}`, 'schema_invalid', `default ${issue.message}`)
+    }
   }
   if (m['data_schema'] !== undefined && !isObject(m['data_schema'])) error('/data_schema', 'schema_invalid', 'must be a JSON Schema object')
 

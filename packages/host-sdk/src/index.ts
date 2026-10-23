@@ -28,7 +28,11 @@ export interface DittoPluginDefinition<C = unknown> {
   services?: string[]
   /** Default coalesce policy per event; must match the manifest `events`. */
   events?: DeclaredEvent[]
-  /** Config schema (Schemastery or any Standard Schema). Core validates against manifest `config_schema` first. */
+  /**
+   * Config schema (Schemastery or any Standard Schema). Core first checks every config a ChangeSet
+   * writes against the manifest `config_schema` (docs/contracts/manifest.md); entries stored before
+   * that check are not checked again, so this schema still sees them.
+   */
   Config?: StandardSchemaV1<unknown, C>
   apply(ctx: Context, config: C): void | Promise<void>
 }

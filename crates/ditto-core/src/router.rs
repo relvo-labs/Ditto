@@ -571,6 +571,7 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
                 return Err(CoreError::invalid("this profile needs no protocol upgrade"));
             }
             let proposal = Proposal {
+                restored_from: None,
                 profile_id: Some(id),
                 base_revision: input.base_revision,
                 ops,
@@ -602,6 +603,7 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
         catalog::CHANGES_PROPOSE => {
             let input: ChangesProposeInput = call.input()?;
             let proposal = Proposal {
+                restored_from: None,
                 profile_id: input.profile_id,
                 base_revision: input.base_revision,
                 ops: input.ops,
@@ -677,6 +679,7 @@ fn dispatch_authorized(core: &Arc<Core>, caller: &Caller, call: Call<'_>) -> Han
                 return Err(CoreError::invalid("nothing to change"));
             }
             let proposal = Proposal {
+                restored_from: None,
                 profile_id: None,
                 base_revision: input.base_revision,
                 ops,

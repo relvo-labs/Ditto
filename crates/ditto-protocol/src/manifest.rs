@@ -282,6 +282,14 @@ impl Manifest {
                 problems.push(format!("event {} needs a schema", event.name));
             }
         }
+        // #161: refuse a config_schema Core cannot judge before the package
+        // is stored, not at the first add_entry. Same rule as the SDK.
+        if let Err(unsupported) = crate::config_schema::supported(&self.config_schema) {
+            problems.push(format!(
+                "config_schema{}: {}",
+                unsupported.schema_pointer, unsupported.message
+            ));
+        }
         problems
     }
 }
@@ -381,6 +389,42 @@ mod tests {
         assert!(problems.iter().any(|p| p.contains("do not match")));
         assert!(problems.iter().any(|p| p.contains("inside the package")));
         assert!(problems.iter().any(|p| p.contains("needs entry")));
+    }
+
+    /// #161 (P2): a config_schema Core cannot judge is refused when the
+    /// package is checked, before it is stored, not at the first add_entry.
+    #[test]
+    fn a_config_schema_outside_the_subset_is_a_manifest_problem() {
+        for (schema, at) in [
+            (
+                serde_json::json!({"type": "object", "properties": {"x": 3}}),
+                "/properties/x",
+            ),
+            (
+                serde_json::json!({"type": "object", "x-widget": "slider"}),
+                "/x-widget",
+            ),
+            (
+                serde_json::json!({"type": "object", "properties": {"a": {"pattern": "^a"}}}),
+                "/properties/a/pattern",
+            ),
+            (serde_json::json!({"type": "array"}), "/type"),
+        ] {
+            let mut m = manifest();
+            m.config_schema = schema.clone();
+            let problems = m.check();
+            assert!(
+                problems
+                    .iter()
+                    .any(|p| p.starts_with(&format!("config_schema{at}:"))),
+                "{schema}: {problems:?}"
+            );
+        }
+        let mut m = manifest();
+        m.config_schema = serde_json::json!({"type": "object",
+            "properties": {"a": {"type": "integer", "minimum": 1, "default": 1}},
+            "required": ["a"], "additionalProperties": false});
+        assert!(m.check().is_empty(), "{:?}", m.check());
     }
 
     #[test]

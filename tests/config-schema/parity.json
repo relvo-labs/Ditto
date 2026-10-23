@@ -1,0 +1,656 @@
+{
+ "description": "#161: one set of config_schema cases judged by both the SDK (packages/host-sdk/src/manifest/json-schema.ts) and Core (crates/ditto-protocol/src/config_schema.rs). Pointers are RFC 6901 with \"\" for the whole config; keys here need no escaping, so the SDK's unescaped paths compare equal. A case has either `violations` (pointers, in order) or `unsupported` (pointer into the schema). Object keys are written in sorted order, so the SDK's insertion order and Core's sorted order agree.",
+ "cases": [
+  {
+   "name": "valid config",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+     },
+     "b": {
+      "type": "array",
+      "items": {
+       "enum": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    },
+    "required": [
+     "a"
+    ],
+    "additionalProperties": false
+   },
+   "value": {
+    "a": 2,
+    "b": [
+     "x",
+     "y"
+    ]
+   },
+   "violations": []
+  },
+  {
+   "name": "every keyword failing",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+     },
+     "b": {
+      "type": "array",
+      "items": {
+       "enum": [
+        "x",
+        "y"
+       ]
+      }
+     },
+     "c": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "a",
+     "d"
+    ],
+    "additionalProperties": false
+   },
+   "value": {
+    "a": 9,
+    "b": [
+     "z"
+    ],
+    "c": 1,
+    "e": true
+   },
+   "violations": [
+    "/d",
+    "/a",
+    "/b/0",
+    "/c",
+    "/e"
+   ]
+  },
+  {
+   "name": "required toString on an empty object",
+   "schema": {
+    "type": "object",
+    "required": [
+     "toString"
+    ]
+   },
+   "value": {},
+   "violations": [
+    "/toString"
+   ]
+  },
+  {
+   "name": "required constructor on an empty object",
+   "schema": {
+    "type": "object",
+    "required": [
+     "constructor"
+    ]
+   },
+   "value": {},
+   "violations": [
+    "/constructor"
+   ]
+  },
+  {
+   "name": "required __proto__ on an empty object",
+   "schema": {
+    "type": "object",
+    "required": [
+     "__proto__"
+    ]
+   },
+   "value": {},
+   "violations": [
+    "/__proto__"
+   ]
+  },
+  {
+   "name": "own __proto__ satisfies required",
+   "schema": {
+    "type": "object",
+    "required": [
+     "__proto__"
+    ]
+   },
+   "value": {
+    "__proto__": 1
+   },
+   "violations": []
+  },
+  {
+   "name": "constructor is not a declared property",
+   "schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "value": {
+    "constructor": 1
+   },
+   "violations": [
+    "/constructor"
+   ]
+  },
+  {
+   "name": "toString is not a declared property",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": {
+     "type": "string"
+    }
+   },
+   "value": {
+    "toString": 1
+   },
+   "violations": [
+    "/toString"
+   ]
+  },
+  {
+   "name": "a declared constructor property is judged by its schema",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "constructor": {
+      "type": "string"
+     }
+    }
+   },
+   "value": {
+    "constructor": 1
+   },
+   "violations": [
+    "/constructor"
+   ]
+  },
+  {
+   "name": "a declared __proto__ property is judged by its schema",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "__proto__": {
+      "type": "integer"
+     }
+    },
+    "additionalProperties": false
+   },
+   "value": {
+    "__proto__": "x"
+   },
+   "violations": [
+    "/__proto__"
+   ]
+  },
+  {
+   "name": "malformed values the SDK ignores",
+   "schema": {
+    "type": "object",
+    "required": null,
+    "properties": {
+     "v": {
+      "minimum": "5",
+      "maximum": null,
+      "enum": "x"
+     }
+    }
+   },
+   "value": {
+    "v": 0
+   },
+   "violations": []
+  },
+  {
+   "name": "null properties",
+   "schema": {
+    "type": "object",
+    "properties": null
+   },
+   "value": {
+    "v": 0
+   },
+   "violations": []
+  },
+  {
+   "name": "top level not an object schema",
+   "schema": {
+    "type": "array"
+   },
+   "value": {},
+   "unsupported": "/type"
+  },
+  {
+   "name": "keyword outside the subset",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "string",
+      "pattern": "^a"
+     }
+    }
+   },
+   "value": {},
+   "unsupported": "/properties/a/pattern"
+  },
+  {
+   "name": "unknown keyword",
+   "schema": {
+    "type": "object",
+    "x-widget": "slider"
+   },
+   "value": {},
+   "unsupported": "/x-widget"
+  },
+  {
+   "name": "a property schema that is a number",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "x": 3
+    }
+   },
+   "value": {},
+   "unsupported": "/properties/x"
+  },
+  {
+   "name": "properties as an array",
+   "schema": {
+    "type": "object",
+    "properties": []
+   },
+   "value": {},
+   "unsupported": "/properties"
+  },
+  {
+   "name": "required as a string",
+   "schema": {
+    "type": "object",
+    "required": "a"
+   },
+   "value": {},
+   "unsupported": "/required"
+  },
+  {
+   "name": "required with a number",
+   "schema": {
+    "type": "object",
+    "required": [
+     1
+    ]
+   },
+   "value": {},
+   "unsupported": "/required"
+  },
+  {
+   "name": "null items",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "l": {
+      "type": "array",
+      "items": null
+     }
+    }
+   },
+   "value": {},
+   "unsupported": "/properties/l/items"
+  },
+  {
+   "name": "tuple items",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "l": {
+      "type": "array",
+      "items": [
+       {
+        "type": "string"
+       }
+      ]
+     }
+    }
+   },
+   "value": {},
+   "unsupported": "/properties/l/items"
+  },
+  {
+   "name": "additionalProperties as a number",
+   "schema": {
+    "type": "object",
+    "additionalProperties": 3
+   },
+   "value": {},
+   "unsupported": "/additionalProperties"
+  },
+  {
+   "name": "enum object with an own __proto__ key does not match an object without it",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "__proto__": {}
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": {
+     "x": 1
+    }
+   },
+   "violations": [
+    "/v"
+   ]
+  },
+  {
+   "name": "enum object with an own __proto__ key matches the same object",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "__proto__": {}
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": {
+     "__proto__": {}
+    }
+   },
+   "violations": []
+  },
+  {
+   "name": "value with an own __proto__ key does not match an enum object without it",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "x": {}
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": {
+     "__proto__": {}
+    }
+   },
+   "violations": [
+    "/v"
+   ]
+  },
+  {
+   "name": "enum object with constructor and toString keys",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "constructor": {},
+        "toString": {}
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": {
+     "a": {},
+     "b": {}
+    }
+   },
+   "violations": [
+    "/v"
+   ]
+  },
+  {
+   "name": "enum object with hasOwnProperty and valueOf keys matches itself",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "hasOwnProperty": 1,
+        "valueOf": []
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": {
+     "hasOwnProperty": 1,
+     "valueOf": []
+    }
+   },
+   "violations": []
+  },
+  {
+   "name": "nested enum object with an own __proto__ key",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "a": {
+         "__proto__": {}
+        }
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": {
+     "a": {
+      "y": 2
+     }
+    }
+   },
+   "violations": [
+    "/v"
+   ]
+  },
+  {
+   "name": "enum array of objects with an own __proto__ key",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       [
+        {
+         "__proto__": {}
+        }
+       ]
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": [
+     {
+      "z": 0
+     }
+    ]
+   },
+   "violations": [
+    "/v"
+   ]
+  },
+  {
+   "name": "enum array of objects matches the same array",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       [
+        {
+         "__proto__": {}
+        },
+        {
+         "constructor": 1
+        }
+       ]
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": [
+     {
+      "__proto__": {}
+     },
+     {
+      "constructor": 1
+     }
+    ]
+   },
+   "violations": []
+  },
+  {
+   "name": "enum object does not match an array with the same indices",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "enum": [
+       {
+        "0": "a"
+       }
+      ]
+     }
+    }
+   },
+   "value": {
+    "v": [
+     "a"
+    ]
+   },
+   "violations": [
+    "/v"
+   ]
+  },
+  {
+   "name": "a property named hasOwnProperty is judged by its schema",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "hasOwnProperty": {
+      "type": "string"
+     }
+    }
+   },
+   "value": {
+    "hasOwnProperty": 1
+   },
+   "violations": [
+    "/hasOwnProperty"
+   ]
+  },
+  {
+   "name": "an own __proto__ key is an additional property",
+   "schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "value": {
+    "__proto__": 1
+   },
+   "violations": [
+    "/__proto__"
+   ]
+  },
+  {
+   "name": "an own __proto__ key inside an array item",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "l": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "__proto__"
+       ],
+       "properties": {
+        "__proto__": {
+         "type": "integer"
+        }
+       }
+      }
+     }
+    }
+   },
+   "value": {
+    "l": [
+     {
+      "__proto__": "x"
+     },
+     {}
+    ]
+   },
+   "violations": [
+    "/l/0/__proto__",
+    "/l/1/__proto__"
+   ]
+  },
+  {
+   "name": "a property schema named valueOf is judged",
+   "schema": {
+    "type": "object",
+    "properties": {
+     "valueOf": {
+      "enum": [
+       1
+      ]
+     }
+    },
+    "additionalProperties": false
+   },
+   "value": {
+    "toString": 3,
+    "valueOf": 2
+   },
+   "violations": [
+    "/toString",
+    "/valueOf"
+   ]
+  }
+ ]
+}

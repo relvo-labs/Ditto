@@ -464,6 +464,7 @@ fn activate(core: &Arc<Core>, caller: &Caller, call: &Call<'_>) -> Handled {
         return Err(CoreError::invalid("this version is already active"));
     }
     let proposal = Proposal {
+        restored_from: None,
         profile_id: None,
         base_revision: input.base_revision,
         ops,

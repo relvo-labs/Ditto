@@ -152,6 +152,7 @@
 
 - `before` 是**意圖比對**：Core 在 `validated` 時以基底 revision 的實際值重填；呼叫方給了 `before` 且與實際值不同 → `stale_intent`。
 - `add_entry` 的 `entry_id` 由 Core 產生（`ent-<ULID>`），跨 revision 穩定；`slot` 選填，給了就在同一個 op 裡綁定。`slot` 若是多條目區域（`ui.status_item`），條目改為加入該區域（記在條目的 `area`），不綁定 `slots`；`bind_slot` 不接受區域（`schema_invalid`，`area_is_not_a_slot`）。區域語意見 [profile-document.md](profile-document.md#多條目區域uistatus_item)。
+- `switch_profile` 必須單獨出現，並從作用中的 Profile 提出：`profile_id` 省略或等於作用中的 Profile，`base_revision` 是它的 head。切換改變的是桌面，預檢以作用中的 Profile 為基準；指名其他 Profile 時以 `precondition_failed`（`switch_not_from_active_profile`，`detail` 有 `profile_id` 與 `active_profile`）拒絕，紀錄留在被指名的 Profile 下。
 - 主體與來源由連線決定：`shell` → `gui{surface}`、`cli` → `cli`、`agent` → `agent_standin`（G1）、救援 → `rescue`、監督 → `supervisor`、計時回復 → `timed_revert`、撤銷 → `undo`、匯入 → `import`。呼叫方不能指定來源。
 
 寫入配置的能力（`appearance.set` 等）**都是 ChangeSet 的包裝**：Core 在內部建立只有一個 op 的 ChangeSet，回傳同一種 `ChangeRecord`。
@@ -192,6 +193,16 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 
 原因碼（封閉）：`base_revision_stale`、`schema_invalid`、`stale_intent`、`package_missing`、`integrity_mismatch`、`protocol_incompatible`、`dependency_missing`、`dependency_cycle`、`version_conflict`、`declared_conflict`、`single_provider_violation`、`shortcut_conflict`、`command_conflict`、`permission_required`、`precondition_failed`、`budget_exceeded`。
 
+條目 `config` 的 `schema_invalid` 以 `detail.why` 區分（規則見 [manifest.md「config 的檢查」](manifest.md#config-的檢查)）：
+
+| `why` | 意思 | `detail` 的其他欄位 |
+| --- | --- | --- |
+| `config_not_object` | `config` 不是 JSON 物件 | 由 `add_entry`／`set_entry_config` 產生時無；切換 Profile 時有 `entry_id` |
+| `config_schema_violation` | `config` 不符該套件版本的 `config_schema` | `entry_id`、`package`、`version`；`pointer` 是第一處不符的 JSON pointer（RFC 6901，`""` 為整個 `config`）；`violations[]` 依序列出最多 16 項 `{pointer, keyword, message}`，`violation_count` 為總數。`message` 是診斷用的英文，不是產品文案 |
+| `config_schema_unsupported` | `config_schema` 超出 SDK 允許的子集，Core 不據以判定。安裝時已會拒絕這種套件，只有之前安裝的才會走到這裡 | `entry_id`、`package`、`version`；`schema_pointer` 指向 `config_schema` 中出問題的位置；`message` |
+
+`op_index` 指向寫入該 `config` 的 op：新條目是它的 `add_entry`，既有條目是最後一個 `set_entry_config` 或 `upgrade_entry`；切換 Profile 時沒有 `op_index`。
+
 預檢**不呼叫任何模型，也不呼叫任何參與者的副作用方法**。被拒絕的 ChangeSet 仍然寫入歷史（`rejected`），所以「原配置未改變」有紀錄可查（AT-05）。
 
 ### 8.4 熱換等級
@@ -219,6 +230,8 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 - 被撤銷的是該 Profile 最新一筆已提交的變更 → 目標 = 它的父 revision。
 - 不是最新，且後續變更碰過同樣的路徑 → `conflict`（`undo_blocked_by_newer_change`），產品語言為「請先撤銷較新的變更」。
 - 不是最新，但沒有路徑重疊 → 以反向 op 套用到目前的 head。
+
+撤銷放回的條目 `config` 若與所放回的 revision 中的套件、版本與 `config` 完全相同，預檢不再依 `config_schema` 檢查（[manifest.md「config 的檢查」](manifest.md#config-的檢查)）；限時回復與救援還原相同。
 
 ### 8.7 查詢與冪等
 

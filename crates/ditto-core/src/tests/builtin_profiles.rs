@@ -5,7 +5,7 @@ use super::*;
 use ditto_protocol::profile::{ProfileDocument, RevisionOrigin};
 use ditto_store::profiles;
 
-fn shipped_harness(label: &str) -> Harness {
+pub(super) fn shipped_harness(label: &str) -> Harness {
     let root = root(label);
     let builtin = root.join("builtin");
     std::fs::create_dir_all(&builtin).unwrap();
@@ -426,6 +426,7 @@ fn builtin_compositions_pass_preflight_with_shipped_config_schemas() {
                 packages: &packages,
                 resolver: &resolver,
                 origin: &origin,
+                restored_from: None,
                 session_locked: false,
                 free_bytes: None,
                 node_version: Some("22.23.2"),
@@ -503,6 +504,7 @@ fn switch_undo_restores_profile_identity_and_refuses_newer_edits_without_ipc() {
             let propose_switch = |co: &mut crate::coordinator::Coordinator| {
                 co.propose(
                     Proposal {
+                        restored_from: None,
                         profile_id: Some(source.clone()),
                         base_revision: source_revision.revision_id.clone(),
                         ops: vec![ChangeOp::SwitchProfile {
@@ -688,4 +690,168 @@ fn assistant_and_legacy_survive_core_boot_from_a_closed_store() {
             1
         );
     }
+}
+
+/// #161 (D): the three first-login compositions, preflighted from an empty
+/// Profile so that every entry counts as new and its config is checked
+/// against the shipped `config_schema`.
+#[test]
+fn builtin_compositions_pass_the_config_schema_check_from_an_empty_profile() {
+    let harness = shipped_harness("builtin-config-schema");
+    let paths = Paths::under(&harness.root.join("store"));
+    harness
+        .core
+        .coordinate(Duration::from_secs(10), move |co| {
+            let packages = co.packages();
+            let resolver = crate::projection::Resolver {
+                packages: &packages,
+                paths: &paths,
+                grants: &[],
+            };
+            let origin = ditto_protocol::change::ChangeOrigin::Cli;
+            let context = crate::preflight::Context {
+                head_revision: "head",
+                base_revision: "head",
+                packages: &packages,
+                resolver: &resolver,
+                origin: &origin,
+                restored_from: None,
+                session_locked: false,
+                free_bytes: None,
+                node_version: Some("22.23.2"),
+                verify_trees: true,
+            };
+            let empty = crate::defaults::empty_document();
+            for (name, doc) in crate::defaults::builtin_documents(&packages) {
+                assert_eq!(doc.entries.len(), 8);
+                for entry in &doc.entries {
+                    let row = packages.get(&entry.package, &entry.version).unwrap();
+                    let violations =
+                        crate::config_schema::check(&row.manifest.config_schema, &entry.config)
+                            .unwrap();
+                    assert!(
+                        violations.is_empty(),
+                        "{name} {}: {violations:?}",
+                        entry.package
+                    );
+                }
+                let validation = crate::preflight::run_target(&empty, doc, vec![], &context);
+                assert!(
+                    validation.reasons.is_empty(),
+                    "{name}: {:?}",
+                    validation.reasons
+                );
+            }
+        })
+        .unwrap();
+}
+
+/// #161 end to end through the coordinator: a config the shipped schema
+/// refuses is a rejected change with the reason recorded, and the Profile
+/// head, its document and the active Profile stay as they were. A switch to
+/// an imported Profile holding such a config is refused the same way.
+#[test]
+fn a_config_the_shipped_schema_refuses_is_rejected_and_nothing_is_written() {
+    use crate::coordinator::Proposal;
+    use ditto_protocol::change::{ChangeMode, ChangeOp, ChangeOrigin, PreflightCode};
+    let harness = shipped_harness("config-schema-reject");
+    harness
+        .core
+        .coordinate(Duration::from_secs(10), |co| {
+            let connection = co.store_ref().connection();
+            let active = profiles::active_profile(connection).unwrap().unwrap();
+            let (_, head, doc) = profiles::head_document(connection, &active).unwrap();
+            let dock = doc.slot_entry("ui.dock").unwrap().clone();
+            assert_eq!(dock.package, "ditto.dock.pill");
+            let proposal = |ops: Vec<ChangeOp>, base: &str| Proposal {
+                restored_from: None,
+                profile_id: None,
+                base_revision: base.into(),
+                ops,
+                mode: ChangeMode::Apply,
+                idempotency_key: None,
+                request_operation_id: None,
+                origin: ChangeOrigin::Cli,
+                subject: "cli".into(),
+                target: None,
+            };
+            let record = co
+                .propose(
+                    proposal(
+                        vec![ChangeOp::SetEntryConfig {
+                            entry_id: dock.entry_id.clone(),
+                            before: None,
+                            after: json!({"position": "top"}),
+                        }],
+                        &head.revision_id,
+                    ),
+                    None,
+                )
+                .unwrap();
+            assert_eq!(record.state, ChangeState::Rejected);
+            assert_eq!(record.result, Some(ResultKind::Failed));
+            let reason = record
+                .reasons
+                .iter()
+                .find(|r| r.detail.get("why") == Some(&json!("config_schema_violation")))
+                .unwrap_or_else(|| panic!("{:?}", record.reasons));
+            assert_eq!(reason.code, PreflightCode::SchemaInvalid);
+            assert_eq!(reason.op_index, Some(0));
+            assert_eq!(reason.detail["pointer"], json!("/position"));
+            assert_eq!(reason.detail["entry_id"], json!(dock.entry_id));
+
+            let connection = co.store_ref().connection();
+            let stored = ditto_store::changes::get(connection, &record.change_id).unwrap();
+            assert_eq!(stored.record.state, ChangeState::Rejected);
+            assert_eq!(stored.record.reasons, record.reasons);
+            let (_, after, after_doc) = profiles::head_document(connection, &active).unwrap();
+            assert_eq!(after.revision_id, head.revision_id);
+            assert_eq!(after_doc, doc);
+
+            // An imported Profile whose dock config the schema refuses.
+            let mut imported = doc.clone();
+            imported.entry_mut(&dock.entry_id).unwrap().config = json!({"position": 3});
+            for entry in &mut imported.entries {
+                entry.entry_id = ditto_protocol::ids::new(ditto_protocol::ids::ENTRY);
+            }
+            imported.slots = imported
+                .entries
+                .iter()
+                .zip(&doc.entries)
+                .filter_map(|(new, old)| {
+                    doc.slots
+                        .iter()
+                        .find(|(_, id)| *id == &old.entry_id)
+                        .map(|(slot, _)| (slot.clone(), new.entry_id.clone()))
+                })
+                .collect();
+            let (target, _) = co
+                .store()
+                .write(|tx| profiles::create(tx, "匯入", &imported, &RevisionOrigin::Import))
+                .unwrap();
+            let record = co
+                .propose(
+                    proposal(
+                        vec![ChangeOp::SwitchProfile {
+                            to_profile: target.profile_id.clone(),
+                            to_revision: None,
+                        }],
+                        &head.revision_id,
+                    ),
+                    None,
+                )
+                .unwrap();
+            assert_eq!(record.state, ChangeState::Rejected, "{:?}", record.reasons);
+            assert!(record.reasons.iter().any(|r| r.detail.get("why")
+                == Some(&json!("config_schema_violation"))
+                && r.detail["pointer"] == json!("/position")));
+            let connection = co.store_ref().connection();
+            assert_eq!(
+                profiles::active_profile(connection).unwrap().unwrap(),
+                active
+            );
+            let (_, after, _) = profiles::head_document(connection, &active).unwrap();
+            assert_eq!(after.revision_id, head.revision_id);
+        })
+        .unwrap();
 }
