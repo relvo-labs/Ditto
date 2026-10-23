@@ -315,7 +315,7 @@
 
 ## G4｜MVP 整合
 
-執行計畫見 [plan/06](../../plan/06/README.md)，主追蹤 [#42](https://github.com/relvo-labs/Ditto/issues/42)。
+執行計畫見 [plan/06](../../plan/06/README.md)，主追蹤 [#42](https://github.com/relvo-labs/Ditto/issues/42)。2026-10-21 owner 依 [D-49](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 判定 MVP 可接受；下列出口核取框只反映實際證據，未勾者為已知缺口。
 
 **目標**：把三條路徑、預設體驗、系統整合、效能與診斷收斂成可安裝、可發行的產品。
 

@@ -43,14 +43,14 @@
 | D-08 | 生成執行隔離實作 | 先受限模板與隔離試載入，不直接啟用任意程式；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 前 | Runtime＋安全 |
 | D-09 | 模型、預算與憑證儲存 | **2026-10-07 部分已決 D-09a**：支援 Codex 個人訂閱登入，以 app-server 為必要且優先後端（[紀錄](../../.agents/notes/decisions/2026-10-07-d09a-codex-subscription-app-server.md)）；API 可替換。模型／effort、quota、keyring 實測仍待定；不核定預算放寬 | G2 M1 真請求前 | Agent＋產品 |
 | D-10 | 套件格式與發布來源 | 核可來源＋本機包，固定版本與雜湊；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 | Runtime |
-| D-11 | 商業授權與角色素材 | 以實際發行包完成審查 | 公開發布前 | 產品＋法務 |
+| D-11 | 商業授權與角色素材 | **2026-10-21 依 D-49**：由 owner 處理，Agent 不列為阻擋；#51 盤點僅作工程輸出（[紀錄](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md)） | 公開發布前 | 產品＋法務 |
 | D-12 | 團隊、owner 與工期 | G0 結果後估算 | G0 結束 | 管理 |
 | D-13 | **契約型別方向**（Rust-first schemars vs TS-first） | **2026-09-22 已決定**：Rust-first schemars → JSON Schema → TS（[紀錄](../../.agents/notes/decisions/2026-09-22-d13-rust-first-contracts.md)） | G0 | Core |
 | D-14 | **IPC 傳輸細節**（Unix socket 路徑、認證方式、事件佇列上限） | **2026-09-22 已決定**：Unix socket 0600、受控啟動器綁定身分、佇列 1024（[紀錄](../../.agents/notes/decisions/2026-09-22-d14-ipc-transport.md)） | G0 | Core |
 | D-15 | **Profile 儲存格式**（SQLite 結構與匯出文字格式） | SQLite 為權威，匯出採可審查文字格式；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 | Core |
 | D-16 | **兩個非 AI Cordis 服務插件的具體選型** | 任務／待辦資料服務 ＋ 通知策略服務；**2026-10-17 盤點：待 owner 核定**（[實作與處置來源](../../plan/06/02-handoff.md#4-既有未核定決策盤點)） | G1 早期 | Host＋產品 |
 | D-17 | **兩種受限生成插件的具體選型** | **2026-10-14 已決定**：待辦摘要面板＋工作區快捷動作面板（[補錄](../../.agents/notes/decisions/2026-10-14-d17-g3-generated-plugin-selection.md)） | G3 前 | owner |
-| D-18 | **安裝與發行形態**（原生套件 vs Flatpak vs tarball） | 工作階段安裝包＋systemd user units | G4 前 | 平台工程 |
+| D-18 | **安裝與發行形態**（原生套件 vs Flatpak vs tarball） | **2026-10-21 依 D-49**：不採工作階段安裝包，改做完整 Linux 發行版，另立主規劃（[紀錄](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md)） | G4 前 | owner |
 | D-19 | **真機 CI runner 的取得方式** | **2026-09-22 已決定並註冊**：主要參考機以 user systemd service 提供 `ditto-refmachine`／`ditto-ci`（[紀錄](../../.agents/notes/decisions/2026-09-22-d19-reference-runner.md)） | G0 | 管理＋QA |
 | D-20 | **語意任務集的模型版本固定策略** | 固定版本＋保留集；模型更新時重跑並記錄 | G2 | QA＋Agent |
 | D-21 | **G0 估算修正（26 → 31 人週）** | 提案：納入 [G0 執行計畫的增補與加嚴](../../plan/02/README.md#4-對-milestones01-的增補與加嚴登記)；未核定前仍以 26 人週為上位計畫建議值 | G0 啟動評審 | 管理＋產品 |
@@ -81,6 +81,7 @@
 | D-46 | **G2 功能接受與完整 G3 整合** | **2026-10-13 owner 裁定**：「G2 目前功能已經算完成，你繼續實完G3」；取代 D-45 接線等待條件，未執行量測仍追蹤（[紀錄](../../.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md)） | G3 正式接線 | 使用者／專案 owner |
 | D-47 | **G3 出口依開發 VM 證據通過** | **2026-10-17 owner 裁定**：接受 `17f5d76` VM 15/15，未涵蓋項轉 G4；G4 從合併後 main 開始（[紀錄](../../.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md)） | G3 出口 | owner |
 | D-48 | **新預設右下改助理入口** | **2026-10-17 owner 要求**：新 store 預設右下改有標籤的助理入口，不再放重複 Ditto；optional avatar 與舊 Profile 保留。助理符號待 owner 定；`soft-jelly-light`／`dock_pill` 為可逆交接（[紀錄](../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)） | G4 預設呈現 | owner |
+| D-49 | **owner 判定 MVP 可接受** | **2026-10-21 owner 判斷**：MVP 接受；六項出口證據未補者列缺口、不改列通過；D-11 由 owner 處理；D-18 改走完整發行版（[紀錄](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md)） | G4 出口 | owner |
 | D-50 | **#159 Shell 擴充契約（UI-P01）** | **2026-10-22 已決定（安全預設，待 owner 檢視）**：設定頁用多條目 area `ui.settings_page`；跨信任設定先採宣告式表單（前提是 Core 端 `config_schema` 驗證）；UI 暫態只在 Shell 記憶體；UI SDK 為 `root:/sdk/Ditto/Ui` qmldir 模組；舊 Profile 不遷移、走內建 fallback。D-49 由 PR #147 保留（[紀錄](../../.agents/notes/decisions/2026-10-22-d50-shell-extension-contracts.md)） | UI-P02 開工 | coordinator（owner 事先授權安全預設） |
 
 ## 2.1 G4 開工時的既有決策盤點
