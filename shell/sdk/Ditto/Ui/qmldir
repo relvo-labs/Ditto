@@ -8,6 +8,7 @@ Choice 1.0 ../../../ui/Choice.qml
 Diagnostics 1.0 ../../../ui/Diagnostics.qml
 EmptyState 1.0 ../../../ui/EmptyState.qml
 GroupedList 1.0 ../../../ui/GroupedList.qml
+GeneratedArtifacts 1.0 ../../../centers/GeneratedArtifacts.qml
 JellySurface 1.0 ../../../ui/JellySurface.qml
 ListRow 1.0 ../../../ui/ListRow.qml
 OverflowMenu 1.0 ../../../ui/OverflowMenu.qml
