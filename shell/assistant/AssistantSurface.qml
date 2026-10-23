@@ -17,15 +17,19 @@ PanelWindow {
     property string symbolVariant: "neutral"
     property var dockMount: null
     readonly property int fabSize: 56
-    // Read only the mounted bottom DockPill's existing presentation geometry.
-    // Other providers do not promise these dimensions; use the fixed margin.
-    readonly property var dock: dockMount ? dockMount.object : null
+    // Optional public presentation hint; no provider identity or private fields.
+    readonly property var dockGeometry: dockMount && dockMount.object
+        && typeof dockMount.object.edgeGeometry !== "undefined"
+        ? dockMount.object.edgeGeometry : null
     readonly property real dockCentreInset: entryStyle === "fab" && tokens.lightRecipe
-        && corner.indexOf("bottom") === 0 && dockMount
-        && dockMount.binding.package === "ditto.dock.pill" && dock && dock.shown
-        && dock.reservedEdge === "bottom" && dock.screen && screen
-        && dock.screen.name === screen.name
-        ? dock.edgeGap + dock.pillThickness / 2 : -1
+        && corner.indexOf("bottom") === 0 && dockGeometry
+        && dockGeometry.version === 1 && dockGeometry.visible === true
+        && dockGeometry.edge === "bottom" && screen
+        && typeof dockGeometry.output === "string" && dockGeometry.output.length > 0
+        && dockGeometry.output === screen.name
+        && typeof dockGeometry.centreInset === "number" && isFinite(dockGeometry.centreInset)
+        && dockGeometry.centreInset >= 0
+        ? dockGeometry.centreInset : -1
     // If the scaled FAB cannot fit at the Dock centre, fall back completely.
     // Clamping to zero would put it between alignment and the fixed margin.
     readonly property real bottomMargin: dockCentreInset >= implicitHeight / 2

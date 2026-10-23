@@ -95,8 +95,8 @@ TestCase {
     // Non-desktop scenes use a geometry fixture; the desktop scene below
     // replaces it with the actual staged provider, just like the Shell mount.
     function defaultDockMount(output) {
-        return { binding: { package: "ditto.dock.pill" }, object: { shown: true,
-            reservedEdge: "bottom", screen: output, edgeGap: 12, pillThickness: 68 } };
+        return { object: { edgeGeometry: { version: 1, output: output.name,
+            edge: "bottom", visible: true, centreInset: 46 } } };
     }
     function test_selected_data() {
         return ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"]
