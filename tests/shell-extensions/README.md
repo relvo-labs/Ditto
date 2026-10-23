@@ -30,3 +30,6 @@ Orca、效能與長跑、插件中心自我升版時已受理操作的對帳與�
 
 G4 視覺 fixture 的 Centers 輸入同樣改為 `aiSettings`；舊版像素對照仍用舊的 `conversation` 輸入。
 `stage-assistant.py` 只逆轉 Shell 中那一行 facade 接線後，再與原先固定的整份 Shell 比對，保留其他結構斷言。
+
+R1 修正另驗證兩個控制器的 inline facade 各自綁定擁有者；AI 內建頁與套件在未提供 facade 時，
+逐一觸發所有按鈕、選項與開關，不產生動作或 TypeError／ReferenceError。

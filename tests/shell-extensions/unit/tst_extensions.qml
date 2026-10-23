@@ -296,7 +296,7 @@ TestCase {
         wait(0);
     }
     function assertSettingsOnly(facade) {
-        for (const member of ["conversation", "state", "source", "client", "aiSettings", "draft", "events", "sessions",
+        for (const member of ["conversation", "state", "source", "controller", "owner", "client", "aiSettings", "draft", "events", "sessions",
                 "turn", "sessionId", "attached", "attachments", "previews", "streamText", "send", "newConversation"])
             compare(facade[member], undefined, "facade must not expose " + member);
         for (const member of ["open", "setEnabled", "refreshSettings", "useSubscription", "startLogin", "cancelLogin",
@@ -307,6 +307,12 @@ TestCase {
         const s = setup();
         const first = createTemporaryObject(conversationFactory, testCase, {client: s.client});
         const second = createTemporaryObject(conversationFactory, testCase, {client: s.client});
+        first.settings = {enabled: false, model: "first-owner"};
+        second.settings = {enabled: false, model: "second-owner"};
+        compare(first.aiSettings.settings.model, "first-owner");
+        compare(second.aiSettings.settings.model, "second-owner");
+        assertSettingsOnly(first.aiSettings);
+        assertSettingsOnly(second.aiSettings);
         prepare(s.host, "optional-input", [page("extra", "../fixtures/AiSettingsInput.qml")]);
         s.host.commit("optional-input");
         const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens,
@@ -316,8 +322,48 @@ TestCase {
         compare(instance.aiSettings, first.aiSettings);
         center.aiSettings = second.aiSettings;
         compare(instance.aiSettings, second.aiSettings);
+        first.settings = {enabled: false, model: "changed-first-owner"};
+        compare(first.aiSettings.settings.model, "changed-first-owner");
+        compare(instance.aiSettings.settings.model, "second-owner");
         compare(center.currentPageItem, instance);
         assertSettingsOnly(instance.aiSettings);
+    }
+    function test_ai_actions_without_facade_data() {
+        return [
+            {tag: "builtin", file: "../shell/centers/AISettings.qml"},
+            {tag: "package", file: "../shell/providers/settings_ai/qml/AISettings.qml"}
+        ];
+    }
+    function test_ai_actions_without_facade(data) {
+        failOnWarning(/TypeError|ReferenceError/);
+        const s = setup();
+        const component = Qt.createComponent(Qt.resolvedUrl(data.file));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: s.client, tokens: s.tokens, width: 800, height: 600});
+        verify(page !== null);
+        compare(page.aiSettings, null);
+        const controls = {buttons: [], choices: [], toggles: []};
+        function collect(item) {
+            if (typeof item.chosen === "function") { controls.choices.push(item); return; }
+            if (typeof item.toggled === "function") { controls.toggles.push(item); return; }
+            if (typeof item.clicked === "function" && item.kind !== undefined) { controls.buttons.push(item); return; }
+            for (const child of item.children || []) collect(child);
+        }
+        collect(page);
+        compare(controls.buttons.length, 6);
+        compare(controls.choices.length, 4);
+        compare(controls.toggles.length, 1);
+        for (const button of controls.buttons) button.clicked();
+        for (const choice of controls.choices) {
+            choice.chosen("codex-app-server");
+            choice.chosen("direct-model");
+        }
+        controls.toggles[0].toggled(true);
+        compare(s.client.capabilityCalls.length, 0);
+        compare(page.keyNotice, "");
+        compare(page.settings, null);
+        page.destroy();
+        wait(0);
     }
     function test_facade_readonly_actions_and_key_reference() {
         const s = setup();

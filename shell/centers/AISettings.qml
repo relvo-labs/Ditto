@@ -30,7 +30,8 @@ Flickable {
     readonly property bool direct: !!settings && settings.provider === "direct-model"
     property string keyNotice: ""
 
-    // The container supplies optional inputs after creating the page.
+    // Centers.qml binds the facade for the built-in page; the container
+    // supplies it after creation for registered packages.
     onAiSettingsChanged: { if (aiSettings) aiSettings.open(); }
 
     Column {
@@ -61,7 +62,7 @@ Flickable {
                 labelOff: page.t(qsTr("關"))
                 checked: (page.aiSettings ? page.aiSettings.enabled : false)
                 enabled: !!page.settings
-                onToggled: value => page.aiSettings.setEnabled(value)
+                onToggled: value => page.aiSettings && page.aiSettings.setEnabled(value)
             }
             Row {
                 visible: !page.settings
@@ -88,7 +89,7 @@ Flickable {
                     visible: page.client.online !== false && (page.aiSettings ? page.aiSettings.settingsFailed : false)
                     tokens: page.tokens
                     text: page.t(qsTr("重新讀取"))
-                    onClicked: page.aiSettings.refreshSettings()
+                    onClicked: page.aiSettings && page.aiSettings.refreshSettings()
                 }
             }
         }
@@ -104,7 +105,7 @@ Flickable {
                     { value: "direct-model", label: page.t(qsTr("API 金鑰")) }
                 ]
                 value: page.settings ? page.settings.provider : "codex-app-server"
-                onChosen: v => { if (v === "codex-app-server") page.aiSettings.useSubscription(); else apiForm.visible = true; }
+                onChosen: v => { if (!page.aiSettings) return; if (v === "codex-app-server") page.aiSettings.useSubscription(); else apiForm.visible = true; }
             }
         }
 
@@ -166,27 +167,27 @@ Flickable {
                     tokens: page.tokens
                     kind: "primary"
                     text: page.t(qsTr("使用 Codex 訂閱登入"))
-                    onClicked: page.aiSettings.startLogin()
+                    onClicked: page.aiSettings && page.aiSettings.startLogin()
                 }
                 Button {
                     visible: !!(page.aiSettings ? page.aiSettings.login : null)
                     tokens: page.tokens
                     text: page.t(qsTr("取消登入"))
-                    onClicked: page.aiSettings.cancelLogin()
+                    onClicked: page.aiSettings && page.aiSettings.cancelLogin()
                 }
                 Button {
                     visible: !!page.provider && page.provider.authenticated
                     tokens: page.tokens
                     kind: "subtle"
                     text: page.t(qsTr("登出"))
-                    onClicked: page.aiSettings.logout()
+                    onClicked: page.aiSettings && page.aiSettings.logout()
                 }
                 Button {
                     objectName: "aiProviderRetry"
                     visible: !page.provider && (page.aiSettings ? page.aiSettings.enabled : false) && (page.aiSettings ? page.aiSettings.providerFailed : false)
                     tokens: page.tokens
                     text: page.t(qsTr("重新讀取"))
-                    onClicked: page.aiSettings.refreshProvider()
+                    onClicked: page.aiSettings && page.aiSettings.refreshProvider()
                 }
             }
             Text {
@@ -203,6 +204,7 @@ Flickable {
                 options: (page.provider && page.provider.models ? page.provider.models : []).map(m => ({ value: m.id, label: m.label }))
                 value: page.settings ? page.settings.model : null
                 onChosen: v => {
+                    if (!page.aiSettings) return;
                     const model = page.provider.models.find(m => m.id === v);
                     page.aiSettings.chooseModel(v, model && model.reasoning_efforts.indexOf("low") >= 0 ? "low" : (model ? model.default_effort : null));
                 }
@@ -216,7 +218,7 @@ Flickable {
                     return model ? model.reasoning_efforts.map(e => ({ value: e, label: e })) : [];
                 }
                 value: page.settings ? page.settings.reasoning_effort : null
-                onChosen: v => page.aiSettings.chooseModel(page.settings.model, v)
+                onChosen: v => page.aiSettings && page.aiSettings.chooseModel(page.settings.model, v)
             }
         }
 
@@ -271,6 +273,7 @@ Flickable {
                     text: page.t(qsTr("儲存並使用"))
                     enabled: endpoint.text.length > 0 && key.text.length > 0
                     onClicked: {
+                        if (!page.aiSettings) return;
                         const secret = key.text;
                         key.text = "";
                         page.aiSettings.saveApiKey(endpoint.text, model.text, secret, function () {
@@ -299,7 +302,7 @@ Flickable {
                     { value: "never", label: page.t(qsTr("不要詢問，直接拒絕")) }
                 ]
                 value: page.settings ? page.settings.approval_mode : "ask"
-                onChosen: v => page.aiSettings.setApprovalMode(v)
+                onChosen: v => page.aiSettings && page.aiSettings.setApprovalMode(v)
             }
         }
 
