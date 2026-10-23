@@ -628,7 +628,6 @@ impl Coordinator {
         resolver: &'a Resolver<'a>,
         origin: &'a ChangeOrigin,
         node_version: Option<&'a str>,
-        restored_from: Option<&'a ProfileDocument>,
     ) -> preflight::Context<'a> {
         preflight::Context {
             head_revision,
@@ -636,7 +635,7 @@ impl Coordinator {
             packages,
             resolver,
             origin,
-            restored_from,
+            restored_from: None,
             session_locked: self.core.session_locked(),
             free_bytes: self.store.free_bytes().ok(),
             node_version,
@@ -699,15 +698,16 @@ impl Coordinator {
             grants: &grants,
         };
         let node = self.core.hosts.node_version();
-        let context = self.preflight_context(
+        let mut context = self.preflight_context(
             &head.revision_id,
             &proposal.base_revision,
             &packages,
             &resolver,
             &proposal.origin,
             node.as_deref(),
-            proposal.restored_from.as_ref(),
         );
+        // Only Core's own restore paths fill this in (see `Proposal`).
+        context.restored_from = proposal.restored_from.as_ref();
         let mut validation = match &proposal.target {
             Some(target) => preflight::run_target(
                 &head_document,
