@@ -352,7 +352,8 @@ fn undo_on_an_inactive_profile_edits_only_its_document() {
 
 /// The history list as `changes.list` gives it, every Profile.
 fn listed_ids(desk: &Desktop) -> Vec<Value> {
-    desk.cli.result(catalog::CHANGES_LIST, json!({"limit": 100}))["changes"]
+    desk.cli
+        .result(catalog::CHANGES_LIST, json!({"limit": 100}))["changes"]
         .as_array()
         .unwrap()
         .iter()
@@ -398,7 +399,8 @@ fn a_saved_only_change_whose_profile_is_deleted_says_so_and_cannot_be_undone() {
 
     desk.cli
         .result(catalog::PROFILES_DELETE, json!({"profile_id": other}));
-    let expected = json!({"reason": "inactive_profile", "profile_name": "開發", "profile_deleted": true});
+    let expected =
+        json!({"reason": "inactive_profile", "profile_name": "開發", "profile_deleted": true});
     let got = desk
         .cli
         .result(catalog::CHANGES_GET, json!({"change_id": edit.change_id}));
