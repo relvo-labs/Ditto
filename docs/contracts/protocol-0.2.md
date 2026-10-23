@@ -192,6 +192,16 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 
 原因碼（封閉）：`base_revision_stale`、`schema_invalid`、`stale_intent`、`package_missing`、`integrity_mismatch`、`protocol_incompatible`、`dependency_missing`、`dependency_cycle`、`version_conflict`、`declared_conflict`、`single_provider_violation`、`shortcut_conflict`、`command_conflict`、`permission_required`、`precondition_failed`、`budget_exceeded`。
 
+條目 `config` 的 `schema_invalid` 以 `detail.why` 區分（規則見 [manifest.md「config 的檢查」](manifest.md#config-的檢查)）：
+
+| `why` | 意思 | `detail` 的其他欄位 |
+| --- | --- | --- |
+| `config_not_object` | `config` 不是 JSON 物件 | 由 `add_entry`／`set_entry_config` 產生時無；切換 Profile 時有 `entry_id` |
+| `config_schema_violation` | `config` 不符該套件版本的 `config_schema` | `entry_id`、`package`、`version`；`pointer` 是第一處不符的 JSON pointer（RFC 6901，`""` 為整個 `config`）；`violations[]` 依序列出最多 16 項 `{pointer, keyword, message}`，`violation_count` 為總數。`message` 是診斷用的英文，不是產品文案 |
+| `config_schema_unsupported` | `config_schema` 超出 SDK 允許的子集，Core 不據以判定 | `entry_id`、`package`、`version`；`schema_pointer` 指向 `config_schema` 中出問題的位置；`message` |
+
+`op_index` 指向寫入該 `config` 的 op：新條目是它的 `add_entry`，既有條目是最後一個 `set_entry_config` 或 `upgrade_entry`；切換 Profile 時沒有 `op_index`。
+
 預檢**不呼叫任何模型，也不呼叫任何參與者的副作用方法**。被拒絕的 ChangeSet 仍然寫入歷史（`rejected`），所以「原配置未改變」有紀錄可查（AT-05）。
 
 ### 8.4 熱換等級

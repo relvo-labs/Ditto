@@ -1,0 +1,9 @@
+{"kind": "shape", "description": "#161：config_schema_violation 是 schema_invalid 的 why，不是新的原因碼；原因碼仍是封閉集合", "type": "change-record", "valid": false,
+ "value": {"change_id": "chg-01M3H4J7EEWXXD01TR98PCQE7A", "profile_id": "prf-01M3H4J7EEWXXD01TR98PCQE7B", "base_revision": "rev-01M3H4J7EEWXXD01TR98PCQE7C",
+   "committed_revision": null, "state": "rejected", "result": "failed", "hot_swap_level": "instant", "origin": {"kind": "cli"}, "idempotency_key": null,
+   "ops": [{"op": "set_entry_config", "entry_id": "ent-01M3H4J7EEWXXD01TR98PCQE7D", "before": {}, "after": {"position": "top"}}],
+   "card": {"kind": "mixed", "title_key": "change.title.mixed", "title_args": {"count": 1}, "items": []},
+   "reasons": [{"code": "config_schema_violation", "op_index": 0, "detail_key": "preflight.config_schema_violation",
+     "detail": {"entry_id": "ent-01M3H4J7EEWXXD01TR98PCQE7D", "pointer": "/position"}}],
+   "items": [], "confirmation": {"state": "not_required"}, "operations": [],
+   "created_at": "2026-10-23T00:00:00.000Z", "updated_at": "2026-10-23T00:00:00.000Z"}}

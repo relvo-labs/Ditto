@@ -111,7 +111,11 @@ export function validateJsonSchema(schema: JsonSchema, value: unknown, root: Jso
   return issues
 }
 
-/** Keywords manifest.md allows inside a plugin's `config_schema`. */
+/**
+ * Keywords manifest.md allows inside a plugin's `config_schema`. Core checks entry configs with the
+ * same subset and the same judgement as `validateJsonSchema` (crates/ditto-core/src/config_schema.rs);
+ * change both together.
+ */
 export const configSchemaKeywords = new Set([
   'type', 'properties', 'required', 'enum', 'items', 'default', 'minimum', 'maximum', 'additionalProperties',
   // Annotations that change nothing about validation.
