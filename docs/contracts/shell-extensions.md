@@ -81,7 +81,7 @@
 
 新增欄位全部是選用欄位，依 D-39 相容規則與 `artifact_id` 同樣的方式加入：既有 manifest 與 Profile 不含它們，序列化結果與雜湊不變。
 
-## 4. 設定頁契約（P02 實作中）
+## 4. 設定頁契約（P02 基礎宿主；P03a 官方頁套件）
 
 ### 4.1 宣告
 
@@ -107,13 +107,18 @@
 
 ### 4.2 內建頁與替換
 
-| `page_id` | 內建實作（現行） | 相容命令 |
-| --- | --- | --- |
-| `composition` | `CompositionCenter` | `composition.open` |
-| `plugins` | `PluginCenter` | `plugins.open` |
-| `history` | `HistoryCenter` | `history.open` |
-| `personalization` | `PersonalizationCenter` | `personalization.open` |
-| `ai` | `AISettings` | `ai_settings.open` |
+| `page_id` | 官方套件 | 可信內建備援 | 相容命令 |
+| --- | --- | --- | --- |
+| `composition` | `ditto.settings.composition`（order 10） | `CompositionCenter` | `composition.open` |
+| `plugins` | `ditto.settings.plugins`（order 20） | `PluginCenter` | `plugins.open` |
+| `history` | `ditto.settings.history`（order 30） | `HistoryCenter` | `history.open` |
+| `personalization` | 尚無；仍為內建頁 | `PersonalizationCenter` | `personalization.open` |
+| `ai` | 尚無；仍為內建頁 | `AISettings` | `ai_settings.open` |
+
+- P03a 沿用 History 的套件形態抽出組合與插件頁；行為、字串與布局保持相同。三個套件皆為 `source: builtin`、`trust_level: trusted` 的 `qml_provider`，共用 `ui.settings_page` 契約，不依套件名稱增加掛載分支。
+- 個人化與 AI 頁分別依賴 `providers`／`conversation`；須先拆分 facade，留待 P03b。設定外框替換、草稿／焦點交接與中心自我升版的整組驗收不在 P03a。
+- `GeneratedArtifacts` 由 Shell 擁有，SDK qmldir 以 `../../../centers/GeneratedArtifacts.qml` 引用原檔，供插件套件與內建備援共用，不複製元件。
+- P03a 不在新 store 預設文件或既有 Profile 加入綁定；套件採用留待 P06 的明確 ChangeSet。
 
 - 已註冊的套件頁若 `page_id` 等於內建 id，就取代該內建頁；同一 id 只會有一個可見頁。
 - 沒有成員提供該 id，或成員載入失敗時，內建頁是可信備援。這是相容投影，回報為 fallback，不回報為套件已載入。
@@ -246,8 +251,10 @@
 | P02 | `shell/shell.qml` | 內建背景的顯示／隱藏；`runCommand` 以 `page_id` 解析 |
 | P02 | `shell/centers/Centers.qml` | 導覽來自註冊表；`flickable` 契約 |
 | P02 | `shell/sdk/Ditto/Ui/qmldir`（新）、`shell/README.md` | UI SDK；修正單一檔案規則 |
-| P03 | `shell/centers/CompositionCenter.qml`、`PluginCenter.qml`、`HistoryCenter.qml`、`PersonalizationCenter.qml`、`AISettings.qml` | 官方頁套件化；外框可替換 |
-| P03 | `scripts/build-builtin-packages.sh`、`crates/ditto-core/src/defaults.rs` | 打包官方頁；新 store 綁定 |
+| P03a | `shell/providers/settings_composition/`、`settings_plugins/`；既有 `settings_history/` | 組合、插件、歷史頁已提供官方套件；對應 `centers/` 原頁保留為可信備援 |
+| P03a | `shell/sdk/Ditto/Ui/qmldir`、`shell/core/ProviderHost.qml`、`tests/shell-extensions/` | SDK 引用 Shell 自有 `GeneratedArtifacts`；開發目錄映射；三頁註冊、備援與外部套件庫真實載入測試 |
+| P03a | `scripts/build-builtin-packages.sh`（沿用目錄探索） | 自動打包上述套件，不改預設文件或 store；綁定採用留待 P06 |
+| P03b／後續 P03 | `shell/centers/PersonalizationCenter.qml`、`AISettings.qml`、`Centers.qml` | 個人化／AI 仍僅內建，先拆 `providers`／`conversation` facade；外框替換與自我升版／回復另行驗收 |
 | P04 | `shell/shell.qml`（背景、`assistantLoader`）、`shell/jelly/Backdrop.qml` | 背景供應者化 |
 | P04 | `shell/assistant/AssistantSurface.qml` | 移除 `ditto.dock.pill` 判斷與私有 `dockMount.object`（`:18-25`），改中立幾何 |
 | P05 | `shell/chat/ConversationState.qml`、`ChatWindow.qml`、`ChatPanel.qml`、`ChatBody.qml`、`ChatInput.qml` | 單一會話 facade；草稿、串流、IME 交接 |
