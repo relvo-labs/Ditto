@@ -444,6 +444,58 @@ mod tests {
         assert_ne!(tree_digest(&unpacked.directory).unwrap(), row.tree_sha256);
     }
 
+    /// #161 repair 2: a complete tree already in the content store but not
+    /// indexed (an install interrupted before the subset check existed) is
+    /// checked like a fresh install before anything indexes it.
+    #[test]
+    fn a_cached_tree_with_an_unsupported_config_schema_is_refused_like_a_fresh_install() {
+        let mut temp = testing::open("package-cached-schema");
+        let paths = temp.store.paths().clone();
+        let mut bad = manifest("ditto.test.cached");
+        bad["config_schema"] = serde_json::json!({"type": "object", "properties": {"x": 3}});
+        let archive = build_archive(&temp.root, &bad, &[("qml/Dock.qml", "Item {}")]);
+        let fresh = match unpack(&paths, &archive, None, "job-fresh") {
+            Err(StoreError::Invalid(message)) => message,
+            other => panic!("a fresh install must refuse it: {other:?}"),
+        };
+        assert!(fresh.contains("config_schema/properties/x"), "{fresh}");
+        // The tree an older Core left behind, complete but never indexed.
+        let cached = paths.package_dir(&sha256_file(&archive).unwrap());
+        fs::create_dir_all(&cached).unwrap();
+        let status = Command::new("tar")
+            .arg("--zstd")
+            .arg("-xf")
+            .arg(&archive)
+            .arg("-C")
+            .arg(&cached)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(cached.join("manifest.json").is_file());
+        match unpack(&paths, &archive, None, "job-cached") {
+            Err(StoreError::Invalid(message)) => assert_eq!(message, fresh),
+            other => panic!("the cached tree must be refused the same way: {other:?}"),
+        }
+        assert!(list(temp.store.connection()).unwrap().is_empty());
+
+        // A package indexed before the check keeps its row: reinstalling it
+        // is refused, but nothing is removed from the index.
+        let legacy = Unpacked {
+            sha256: sha256_file(&archive).unwrap(),
+            tree_sha256: tree_digest(&cached).unwrap(),
+            manifest: serde_json::from_value(bad).unwrap(),
+            directory: cached.clone(),
+            already_present: true,
+        };
+        temp.store
+            .write(|tx| insert(tx, &legacy, "builtin", None))
+            .unwrap();
+        assert!(unpack(&paths, &archive, None, "job-again").is_err());
+        assert!(get(temp.store.connection(), "ditto.test.cached", "1.0.0")
+            .unwrap()
+            .is_some());
+    }
+
     #[test]
     fn a_hash_mismatch_or_a_bad_manifest_leaves_no_half_package() {
         let temp = testing::open("package-fail");
