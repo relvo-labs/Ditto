@@ -294,7 +294,7 @@ TestCase {
     function test_sibling_surfaces(data) {
         client.replies = Object.assign({}, client.replies, {"agent.settings.describe": prefs, "agent.providers.status": account});
         if (data.reason) client.replies["agent.runtime.get"] = snapshot(5, data.reason);
-        const page = createTemporaryObject(settingsComponent, suite, {client: client, tokens: tokens, conversation: state, width: 800, height: 800});
+        const page = createTemporaryObject(settingsComponent, suite, {client: client, tokens: tokens, aiSettings: state.aiSettings, width: 800, height: 800});
         const chat = createTemporaryObject(chatComponent, suite, {client: client, tokens: tokens, conversation: state, width: 440, height: 800});
         const entry = createTemporaryObject(entryComponent, suite, {client: client, tokens: tokens, conversation: state});
         verify(page !== null && chat !== null && entry !== null);

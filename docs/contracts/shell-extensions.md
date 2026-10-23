@@ -92,7 +92,7 @@ surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [S
 - 無 Dock、缺屬性／無效欄位、未知版本、隱藏、其他邊緣／輸出、輸出消失或 FAB 放不下，一律回到固定 32 px 底距。capsule／舊主題仍採原布局。
 - 這是供應者持有、Shell 程序內的呈現提示；不新增 Core／協定／manifest 欄位，不持久化、不作 ChangeSet 回讀或成功判準。第三 Dock 可依此提示加入對齊，但不因此取得執行第三方 QML 的權限。此切片不建立 `ui.assistant` slot；UI-AT01 的完整替換與 UI-AT11 的實體雙螢幕證據仍另行驗證。
 
-## 4. 設定頁契約（P02 基礎宿主；P03a 官方頁套件）
+## 4. 設定頁契約（P02 基礎宿主；P03a／P03b 官方頁套件）
 
 ### 4.1 宣告
 
@@ -123,17 +123,35 @@ surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [S
 | `composition` | `ditto.settings.composition`（order 10） | `CompositionCenter` | `composition.open` |
 | `plugins` | `ditto.settings.plugins`（order 20） | `PluginCenter` | `plugins.open` |
 | `history` | `ditto.settings.history`（order 30） | `HistoryCenter` | `history.open` |
-| `personalization` | 尚無；仍為內建頁 | `PersonalizationCenter` | `personalization.open` |
-| `ai` | 尚無；仍為內建頁 | `AISettings` | `ai_settings.open` |
+| `personalization` | `ditto.settings.personalization`（order 40） | `PersonalizationCenter` | `personalization.open` |
+| `ai` | `ditto.settings.ai`（order 50） | `AISettings` | `ai_settings.open` |
 
 - P03a 沿用 History 的套件形態抽出組合與插件頁；行為、字串與布局保持相同。三個套件皆為 `source: builtin`、`trust_level: trusted` 的 `qml_provider`，共用 `ui.settings_page` 契約，不依套件名稱增加掛載分支。
-- 個人化與 AI 頁分別依賴 `providers`／`conversation`；須先拆分 facade，留待 P03b。設定外框替換、草稿／焦點交接與中心自我升版的整組驗收不在 P03a。
+- P03b 加入個人化與 AI 套件，同樣使用 `source: builtin`、`trust_level: trusted`。個人化原頁的 `providers` 只有宣告、沒有讀取，套件省略它，不增加替代輸入。AI 套件與可信備援都只讀下述 `aiSettings` facade。設定外框替換、草稿／焦點交接與中心自我升版的整組驗收仍另行處理。
 - `GeneratedArtifacts` 由 Shell 擁有，SDK qmldir 以 `../../../centers/GeneratedArtifacts.qml` 引用原檔，供插件套件與內建備援共用，不複製元件。
-- P03a 不在新 store 預設文件或既有 Profile 加入綁定；套件採用留待 P06 的明確 ChangeSet。
+- P03a／P03b 不在新 store 預設文件或既有 Profile 加入綁定；套件採用留待 P06 的明確 ChangeSet。
 
 - 已註冊的套件頁若 `page_id` 等於內建 id，就取代該內建頁；同一 id 只會有一個可見頁。
 - 沒有成員提供該 id，或成員載入失敗時，內建頁是可信備援。這是相容投影，回報為 fallback，不回報為套件已載入。
 - 內建頁以固定的 `order` 參與同一排序；數值由 P02 以常數定義，現行相對順序（`shell/centers/Centers.qml:37-43`）不變。
+
+### 4.2.1 選用的 AI 設定輸入（P03b）
+
+所有頁面仍以 `client`、`tokens`、`config`、`pageId`、`entryId` 建立。`SettingsPageContainer` 只在實例宣告 `aiSettings` 時，額外綁定 Shell 提供的 facade；其他頁面不被注入未知屬性。這不是 manifest／能力欄位，也不把 facade 放進 `config`。
+AI 頁宣告 `property var aiSettings: null`，以 `onAiSettingsChanged` 在輸入到達時呼叫 `open()`；建立至注入之間的讀取有 null 防護。可信內建頁使用同一輸入與開啟路徑。
+
+`ConversationState.aiSettings` 在控制器建立時建立 `AiSettingsFacade`（`QtObject`），存活與頁面 renderer 分離。它透過建立範圍的 `state` id 委派，不宣告可讀的來源物件屬性，不複製狀態或搬動控制器邏輯。公開成員僅為：
+
+| 類別 | 成員 |
+| --- | --- |
+| 唯讀回讀 | `settings`、`provider`、`login` |
+| 唯讀布林 | `enabled`、`settingsFailed`、`providerFailed`、`connected`、`canLogin`、`subscriptionUnavailable`、`runtimeControllerUnavailable`、`runtimePending`、`runtimeFailed` |
+| 唯讀文字 | `subscriptionUnavailableText`、`runtimeStatusText`、`runtimeFailureText`、`loginResultText`、`errorText`、`errorDiagnostic` |
+| 委派動作 | `open()`、`refreshSettings()`、`refreshProvider()`、`setEnabled(on)`、`useSubscription()`、`startLogin()`、`cancelLogin()`、`logout()`、`chooseModel(model, effort)`、`setApprovalMode(mode)`、`saveApiKey(endpoint, model, key, onDone)` |
+
+不提供 `ConversationState`／`client` 來源引用、聊天草稿、事件、會話、turn、附件或送出動作。唯讀表示 QML 屬性不可重新指派；同程序 facade 並非不可變資料沙箱。`open()` 保持原行為，包含控制器既有的會話讀取與訂閱，但不把結果暴露給設定頁。
+
+兩個套件與對應可信備援的 QML 差異只有 SDK imports、`config/pageId/entryId/flickable` 頁面屬性，以及省略未使用的 `providers`；AI facade 的 null 防護與輸入到達時開啟同時用於兩份頁面，字串、布局與操作相同。
 
 ### 4.3 捲動、焦點與尺寸
 
@@ -168,6 +186,7 @@ surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [S
 | 第三方設定擴充 | 不載入其 QML | 只以宣告式表單：可信宿主依條目的 `config_schema` 繪製，寫入經 `set_entry_config` ChangeSet（P03／P07 建置，不在 P02）。Core 在預檢依 `config_schema` 檢查寫入的 `config`，不符即拒絕整筆變更（#161，見 [manifest.md「config 的檢查」](manifest.md#config-的檢查)）；表單本身尚未建置，P03／P07 完成前不得啟用 | 讀寫 scope 分開；自填 `entry_id` 或 manifest 自述不取得身分 | 表單不執行其程式碼；獨立 surface 的隔離由 #155 定 | 表單待 P03／P07 建置；獨立 surface 待 #154／#155 |
 | 佈景 token 套件 | 不載入程式碼，只有 token 值，經 `APPEARANCE_TOKENS` 預檢 | 不適用 | 無 | 不需要（無程式碼）；帶樣式程式碼的佈景依上方 QML 各列判斷 | P06；第三方樣式程式碼依 #155 |
 
+- AI 頁會顯示短期登入代碼，`saveApiKey` 將表單參數直接委派給既有控制器；表單送出前清空金鑰欄位，facade 不儲存金鑰值、不提供可讀金鑰屬性，`settings.auth` 仍只有憑證引用。此輸入只供現有政策允許的可信內建 QML 使用；沒有新增能力、秘密讀取者或第三方權限，未放寬 `trust_policy`。
 - 同程序的 facade 是 **API 與架構邊界，不是沙箱**。不得以「只給了 `client`」或隱藏方法宣稱權限隔離。
 - 同程序 QML 卡死會阻塞 Shell；`Timer` 不是強制中斷。故障由獨立 supervisor 處理（`ping` 存活檢查），不宣稱逐插件故障隔離。
 - 受保護表面不載入一般插件或佈景提供的 QML：approval 視窗、鎖定、救援、試看列的保留／取消入口。
@@ -184,7 +203,7 @@ surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [S
 - UI 暫態只在 Shell 程序記憶體，**不寫入** Profile、revision 或匯出；本階段不新增 Core 儲存。
 - 跨崩潰保留需要 Core 管理的 UI 暫態儲存與保存期限、隱私政策，列為後續工作，不在 P02。
 - 跨程序只傳可序列化資料，不傳 QObject、Context 或函式。
-- `ConversationState` 目前也持有 AI 設定回讀（`settings`、`provider`）；設定頁不應取得整個聊天物件，facade 拆分屬 P03／P05。
+- `ConversationState` 保留 AI 設定回讀與動作邏輯；P03b 的 `AiSettingsFacade` 只做唯讀 binding 與動作委派，設定頁不取得整個聊天物件。facade 隨 Shell 控制器存活，不新增持久化或第二份權威；聊天 renderer 的 facade 與交接仍屬 P05。設定表單尚未送出的金鑰、端點等 renderer 暫態不因本切片取得跨替換保存保證。
 
 ## 8. 命令路由與相容入口
 
@@ -265,7 +284,8 @@ surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [S
 | P03a | `shell/providers/settings_composition/`、`settings_plugins/`；既有 `settings_history/` | 組合、插件、歷史頁已提供官方套件；對應 `centers/` 原頁保留為可信備援 |
 | P03a | `shell/sdk/Ditto/Ui/qmldir`、`shell/core/ProviderHost.qml`、`tests/shell-extensions/` | SDK 引用 Shell 自有 `GeneratedArtifacts`；開發目錄映射；三頁註冊、備援與外部套件庫真實載入測試 |
 | P03a | `scripts/build-builtin-packages.sh`（沿用目錄探索） | 自動打包上述套件，不改預設文件或 store；綁定採用留待 P06 |
-| P03b／後續 P03 | `shell/centers/PersonalizationCenter.qml`、`AISettings.qml`、`Centers.qml` | 個人化／AI 仍僅內建，先拆 `providers`／`conversation` facade；外框替換與自我升版／回復另行驗收 |
+| P03b | `shell/providers/settings_personalization/`、`settings_ai/`、`shell/chat/AiSettingsFacade.qml`、`ConversationState.qml`、`shell/centers/{AISettings,Centers,SettingsPageContainer}.qml`、`shell/shell.qml`、`shell/core/ProviderHost.qml` | 個人化／AI 官方套件、選用 AI 設定輸入、內建備援共用 facade、開發目錄映射；不綁定預設、不改 Core 或信任政策 |
+| P03b | `tests/shell-extensions/`、`tests/g4/visual/`、`shell/README.md` | 五頁註冊／備援／外部套件庫真實載入，AI facade 無聊天來源與資料、原 AI 狀態斷言保留；外框替換與自我升版另行驗收 |
 | P04 | `shell/shell.qml`（背景、`assistantLoader`）、`shell/jelly/Backdrop.qml` | 背景供應者化 |
 | P04a | `shell/assistant/AssistantSurface.qml`、兩個 `shell/providers/dock_*/qml/` 與 manifest、`shell/README.md`、`tests/g4/visual/assistant/` 與 capture fixture | 以選用 `edgeGeometry` v1 取代套件名稱與私有尺寸；無有效提示時固定 32 px；兩個 Dock patch 升版；不改宿主或 Core |
 | P05 | `shell/chat/ConversationState.qml`、`ChatWindow.qml`、`ChatPanel.qml`、`ChatBody.qml`、`ChatInput.qml` | 單一會話 facade；草稿、串流、IME 交接 |

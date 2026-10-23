@@ -62,7 +62,7 @@ TestCase {
     // "closed" or "refused" recorded: a change of style is neither.
     readonly property var windows: [
         { tag: "centers", path: "shell/centers/Centers.qml", signal: "closeRequested",
-          properties: () => ({ client: client, conversation: conversation, page: "personalization" }) },
+          properties: () => ({ client: client, aiSettings: conversation, page: "personalization" }) },
         { tag: "chat", path: "shell/chat/ChatWindow.qml", signal: "closeRequested",
           properties: () => ({ client: client, conversation: conversation }) },
         { tag: "approval", path: "shell/chat/ApprovalWindow.qml", signal: "decided",
