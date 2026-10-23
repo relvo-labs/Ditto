@@ -55,10 +55,12 @@ propose_dock_swap_while_locked() {
   profile="$(g1_call desktop.profiles.get '{}')"
   before_head="$(jq -r .result.profile.head_revision <<<"$profile")"
   before_hash="$(jq -r .result.revision.document_sha256 <<<"$profile")"
-  ops="$(jq -c '.result.document as $d | ($d.slots["ui.dock"]) as $dock
+  ops="$(jq -c --arg pill_version "$(jq -r .version "$WORKSPACE/shell/providers/dock_pill/manifest.json")" \
+    --arg bottom_version "$(jq -r .version "$WORKSPACE/shell/providers/dock_bottom/manifest.json")" \
+    '.result.document as $d | ($d.slots["ui.dock"]) as $dock
     | ([$d.entries[] | select(.entry_id == $dock) | .package][0]) as $current
     | (if $current == "ditto.dock.pill" then "ditto.dock.bottom" else "ditto.dock.pill" end) as $other
-    | [{op: "add_entry", entry: {package: $other, version: "1.1.0", host: "qml"}, slot: "ui.dock"},
+    | [{op: "add_entry", entry: {package: $other, version: (if $other == "ditto.dock.pill" then $pill_version else $bottom_version end), host: "qml"}, slot: "ui.dock"},
        {op: "remove_entry", entry_id: $dock}]' <<<"$profile")"
   local work lock_pid_before lock_pid_after changed
   work="$(g1_evidence_dir)"

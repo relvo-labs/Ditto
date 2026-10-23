@@ -95,9 +95,11 @@ propose_locked() {
 }
 profile="$(g1_call desktop.profiles.get '{}')"
 dock="$(jq -r '.result.document.slots["ui.dock"]' <<< "$profile")"
-ops="$(jq -c --arg dock "$dock" '.result.document.entries[] | select(.entry_id == $dock)
+ops="$(jq -c --arg dock "$dock" --arg pill_version "$(jq -r .version "$WORKSPACE/shell/providers/dock_pill/manifest.json")" \
+  --arg bottom_version "$(jq -r .version "$WORKSPACE/shell/providers/dock_bottom/manifest.json")" \
+  '.result.document.entries[] | select(.entry_id == $dock)
   | (if .package == "ditto.dock.pill" then "ditto.dock.bottom" else "ditto.dock.pill" end) as $other
-  | [{op:"add_entry",entry:{package:$other,version:"1.1.0",host:"qml"},slot:"ui.dock"},{op:"remove_entry",entry_id:$dock}]' <<< "$profile")"
+  | [{op:"add_entry",entry:{package:$other,version:(if $other == "ditto.dock.pill" then $pill_version else $bottom_version end),host:"qml"},slot:"ui.dock"},{op:"remove_entry",entry_id:$dock}]' <<< "$profile")"
 propose_locked replace-ui "$ops"
 # An explicit version-change attempt must be refused even if the target
 # package has not been installed; it must include the lock rejection reason.

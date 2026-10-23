@@ -25,8 +25,16 @@ TestCase {
             property var capabilityCalls: []
             property bool online: true
             property string status: ""
+            property var tr: QtObject {
+                function slotName(slot) { return slot; }
+                function packageName(id) { return id; }
+                function has(key) { return false; }
+            }
             signal capabilitiesReloaded()
             signal changeUpdated(var change)
+            signal profileChanged(var profile)
+            signal panelsReported(var panels)
+            signal jobUpdated(var job)
             function report(observation) { reports = reports.concat([observation]); }
             function t(source) { return source; }
             function key(source, args) { return source; }
@@ -34,6 +42,13 @@ TestCase {
                 capabilityCalls = capabilityCalls.concat([name]);
                 if (name === "desktop.changes.list") done({changes: []});
                 else if (name === "desktop.profiles.list") done({profiles: []});
+                else if (name === "desktop.profiles.get") done({profile: {profile_id: "test", name: "Test"}, document: {entries: [], slots: {}}, history: []});
+                else if (name === "desktop.plugins.list") done({entries: [], packages: []});
+                else if (name === "desktop.layout.get") done({available: []});
+                else if (name === "desktop.plugins.diagnostics") done({entries: [], host: null});
+                else if (name === "desktop.permissions.list") done({grants: []});
+                else if (name === "desktop.plugins.development.list") done({artifacts: []});
+                else if (name === "desktop.jobs.list") done({jobs: []});
             }
         }
     }
@@ -172,30 +187,78 @@ TestCase {
         restored.destroy();
         wait(0);
     }
-    function test_packaged_history_uses_sdk_and_opt_in_flickable() {
+    function test_packaged_page_uses_sdk_and_opt_in_flickable_data() {
+        return [
+            {tag: "history", id: "history", file: "HistoryPage", calls: ["desktop.changes.list"]},
+            {tag: "composition", id: "composition", file: "CompositionCenter", calls: ["desktop.profiles.list", "desktop.profiles.get", "desktop.plugins.list", "desktop.layout.get"]},
+            {tag: "plugins", id: "plugins", file: "PluginCenter", calls: ["desktop.plugins.list", "desktop.plugins.diagnostics", "desktop.permissions.list", "desktop.plugins.development.list", "desktop.jobs.list"]}
+        ];
+    }
+    function test_packaged_page_uses_sdk_and_opt_in_flickable(data) {
         const s = setup();
-        const binding = page("history", "../shell/providers/settings_history/qml/HistoryPage.qml");
+        const binding = page(data.id, "../shell/providers/settings_" + data.id + "/qml/" + data.file + ".qml");
+        binding.package = "ditto.settings." + data.id;
+        binding.settings_page.title_key = "command." + data.id + ".open";
         binding.config = {check: true};
-        compare(prepare(s.host, "sdk-page", [binding]).items.filter(i => i.key === "history")[0].status, "ready");
+        compare(prepare(s.host, "sdk-page", [binding]).items.filter(i => i.key === data.id)[0].status, "ready");
         compare(s.client.capabilityCalls.length, 0);
         s.host.commit("sdk-page");
         compare(s.client.capabilityCalls.length, 0);
-        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, page: "history"});
+        const center = createTemporaryObject(centerFactory, testCase, {client: s.client, tokens: s.tokens, providers: s.host, page: data.id});
         tryVerify(() => !!center.currentPageItem);
         verify(!center.pageFallback);
-        compare(center.currentPageItem.pageId, "history");
-        compare(center.currentPageItem.entryId, "history");
+        compare(center.pages.map(p => p.id), ["composition", "plugins", "history", "personalization", "ai"]);
+        compare(center.pages.filter(p => p.id === data.id).length, 1);
+        compare(center.pages.find(p => p.id === data.id).label, binding.settings_page.title_key);
+        compare(center.currentPageItem.pageId, data.id);
+        compare(center.currentPageItem.entryId, data.id);
         compare(center.currentPageItem.config.check, true);
         compare(center.pageFlick, center.currentPageItem);
-        compare(s.client.capabilityCalls, ["desktop.changes.list"]);
+        const expectedCalls = data.calls.slice().sort();
+        compare(s.client.capabilityCalls.slice().sort(), expectedCalls);
+        const mount = s.host.observation().mounts.find(m => m.entry_id === data.id);
+        compare(mount.package, binding.package);
+        compare(mount.version, binding.version);
+        compare(mount.page_state, "open");
+        const tab = findChild(center, "settingsTab_" + data.id);
+        verify(tab !== null);
+        tab.forceActiveFocus(Qt.TabFocusReason);
+        verify(tab.activeFocus);
         const instance = center.currentPageItem;
-        prepare(s.host, "unrelated", [binding]); s.host.commit("unrelated");
+        const unrelated = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: "1.0.0", config: {},
+            qml_url: Qt.resolvedUrl("../shell/providers/background_default/qml/Background.qml").toString()};
+        prepare(s.host, "unrelated", [binding, unrelated]); s.host.commit("unrelated");
         wait(0);
         compare(center.currentPageItem, instance);
-        compare(s.client.capabilityCalls, ["desktop.changes.list"]);
+        compare(findChild(center, "settingsTab_" + data.id), tab);
+        verify(tab.activeFocus);
+        compare(s.client.capabilityCalls.slice().sort(), expectedCalls);
         center.visible = false;
         tryVerify(() => center.currentPageItem === null);
-        compare(s.client.capabilityCalls, ["desktop.changes.list"]);
+        compare(s.client.capabilityCalls.slice().sort(), expectedCalls);
+        center.visible = true;
+        tryVerify(() => !!center.currentPageItem && !center.pageFallback);
+        compare(center.currentPageItem.pageId, data.id);
+        // A committed page can compile successfully yet fail on creation.
+        const broken = page(data.id, "../fixtures/InstantiationFailure.qml");
+        broken.package = binding.package;
+        broken.version = "2.0.0";
+        compare(prepare(s.host, "bad-instance", [broken]).items.find(i => i.key === data.id).status, "ready");
+        s.host.commit("bad-instance");
+        tryVerify(() => center.pageFallback && !!center.currentPageItem);
+        verify(center.pageFlick !== null);
+        compare(center.currentPageItem.entryId, undefined);
+        compare(center.pages.filter(p => p.id === data.id).length, 1);
+        compare(s.host.openPageEntry, "");
+        compare(s.host.observation().mounts.find(m => m.entry_id === data.id).page_state, "registered");
+        s.host.rollback("bad-instance");
+        tryVerify(() => !!center.currentPageItem && !center.pageFallback);
+        compare(center.currentPageItem.pageId, data.id);
+        compare(center.currentPageItem.entryId, binding.entry_id);
+        compare(center.currentPageItem.config.check, true);
+        center.destroy();
+        s.host.destroy();
+        wait(0);
     }
     function test_background_fallback_commit_release_and_rollback() {
         const s = setup();

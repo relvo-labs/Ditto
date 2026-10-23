@@ -107,8 +107,9 @@ fi
 local_count="${DITTO_LATENCY_LOCAL_COUNT:-200}"
 [[ "$local_count" == 200 ]] || g1_note "DITTO_LATENCY_LOCAL_COUNT=$local_count: not the 200 the gate asks for"
 missing=()
+pill_version="$(jq -r .version "$WORKSPACE/shell/providers/dock_pill/manifest.json")"
 for tool in quickshell node wl-copy wl-paste qdbus foot kate; do command -v "$tool" >/dev/null || missing+=("$tool"); done
-[[ -f "$packages/ditto.dock.pill-1.1.0.dittopkg" ]] || missing+=("$packages/ditto.dock.pill-1.1.0.dittopkg")
+[[ -f "$packages/ditto.dock.pill-$pill_version.dittopkg" ]] || missing+=("$packages/ditto.dock.pill-$pill_version.dittopkg")
 [[ -f "$hostd" ]] || missing+=("$hostd")
 if (( ${#missing[@]} > 0 )); then
   for id in local-operations ui-plugin-switch application-survival; do check "$id" environment "missing: ${missing[*]}"; done

@@ -81,7 +81,18 @@
 
 新增欄位全部是選用欄位，依 D-39 相容規則與 `artifact_id` 同樣的方式加入：既有 manifest 與 Profile 不含它們，序列化結果與雜湊不變。
 
-## 4. 設定頁契約（P02 實作中）
+### 3.3 邊緣幾何提示（#159 §3.3，UI-P04a）
+
+surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [Shell 供應者契約](../../shell/README.md#選用邊緣幾何ui-p04a)。v1 的固定形狀為 `{ version: 1, output: <screen.name>, edge: "top"|"bottom"|"left"|"right", visible: <bool>, centreInset: <有限非負數> }`。`output` 是表面實際採用的輸出名稱，沒有輸出時為空字串；`centreInset` 是從該邊向內到視覺中心線的 QML 邏輯 px，作為本切片所需的 inset，不另加入矩形或保留區。這不是 exclusive zone。
+
+- 變更以 QML 屬性的 `edgeGeometryChanged` 通知：供應者以 binding 替換整個值，涵蓋輸出、邊緣、可見性與距離；不原地改 JS 欄位、不輪詢。v1 只表示一個輸出上的一個邊緣表面。
+- pill 1.1.1 與 bottom 1.1.2 提供同一提示；淺色 pill 中心距離為 `edgeGap + pillThickness / 2`（46 px），bottom 為 `edgeGap + (tileHeight + barPadding * 2) / 2`（34 px）。兩者視窗明確綁定宿主提供的 `screen`（目前為 `Quickshell.screens[0]`，建立實例時傳入），不是 Shell 依布局左上角選出的 primary。這可能改變已配送 Dock 在多輸出環境出現的輸出；未驗證，屬 UI-AT11。
+- **既有 store 的可見變化**：18 px FAB 底距保持不變僅適用使用 pill 1.1.1 的新 store／已升級條目及載入目前來源的開發環境。既有條目仍精確綁定 pill 1.1.0；release 工作階段的 `ProviderHost.resolveUrl` 載入套件庫中該版舊 QML，沒有 `edgeGeometry`，底距會由 18 px 改為 32 px fallback，直到使用 `upgrade_entry`（#50／#144）升級條目。開發工作階段載入來源目錄，會掩蓋這個差異。本切片不改既有綁定、不自動遷移。
+- 助理只讀 active `ui.dock` 實例的公開 `edgeGeometry`，不判斷 package，也不讀 Dock 私有尺寸。維持淺色配方／FAB 限制；底部角落、相同非空輸出、版本 1、可見、底邊且數值有效，並且縮放後 FAB 放得下，才置中於該線。
+- 無 Dock、缺屬性／無效欄位、未知版本、隱藏、其他邊緣／輸出、輸出消失或 FAB 放不下，一律回到固定 32 px 底距。capsule／舊主題仍採原布局。
+- 這是供應者持有、Shell 程序內的呈現提示；不新增 Core／協定／manifest 欄位，不持久化、不作 ChangeSet 回讀或成功判準。第三 Dock 可依此提示加入對齊，但不因此取得執行第三方 QML 的權限。此切片不建立 `ui.assistant` slot；UI-AT01 的完整替換與 UI-AT11 的實體雙螢幕證據仍另行驗證。
+
+## 4. 設定頁契約（P02 基礎宿主；P03a 官方頁套件）
 
 ### 4.1 宣告
 
@@ -107,13 +118,18 @@
 
 ### 4.2 內建頁與替換
 
-| `page_id` | 內建實作（現行） | 相容命令 |
-| --- | --- | --- |
-| `composition` | `CompositionCenter` | `composition.open` |
-| `plugins` | `PluginCenter` | `plugins.open` |
-| `history` | `HistoryCenter` | `history.open` |
-| `personalization` | `PersonalizationCenter` | `personalization.open` |
-| `ai` | `AISettings` | `ai_settings.open` |
+| `page_id` | 官方套件 | 可信內建備援 | 相容命令 |
+| --- | --- | --- | --- |
+| `composition` | `ditto.settings.composition`（order 10） | `CompositionCenter` | `composition.open` |
+| `plugins` | `ditto.settings.plugins`（order 20） | `PluginCenter` | `plugins.open` |
+| `history` | `ditto.settings.history`（order 30） | `HistoryCenter` | `history.open` |
+| `personalization` | 尚無；仍為內建頁 | `PersonalizationCenter` | `personalization.open` |
+| `ai` | 尚無；仍為內建頁 | `AISettings` | `ai_settings.open` |
+
+- P03a 沿用 History 的套件形態抽出組合與插件頁；行為、字串與布局保持相同。三個套件皆為 `source: builtin`、`trust_level: trusted` 的 `qml_provider`，共用 `ui.settings_page` 契約，不依套件名稱增加掛載分支。
+- 個人化與 AI 頁分別依賴 `providers`／`conversation`；須先拆分 facade，留待 P03b。設定外框替換、草稿／焦點交接與中心自我升版的整組驗收不在 P03a。
+- `GeneratedArtifacts` 由 Shell 擁有，SDK qmldir 以 `../../../centers/GeneratedArtifacts.qml` 引用原檔，供插件套件與內建備援共用，不複製元件。
+- P03a 不在新 store 預設文件或既有 Profile 加入綁定；套件採用留待 P06 的明確 ChangeSet。
 
 - 已註冊的套件頁若 `page_id` 等於內建 id，就取代該內建頁；同一 id 只會有一個可見頁。
 - 沒有成員提供該 id，或成員載入失敗時，內建頁是可信備援。這是相容投影，回報為 fallback，不回報為套件已載入。
@@ -246,10 +262,12 @@
 | P02 | `shell/shell.qml` | 內建背景的顯示／隱藏；`runCommand` 以 `page_id` 解析 |
 | P02 | `shell/centers/Centers.qml` | 導覽來自註冊表；`flickable` 契約 |
 | P02 | `shell/sdk/Ditto/Ui/qmldir`（新）、`shell/README.md` | UI SDK；修正單一檔案規則 |
-| P03 | `shell/centers/CompositionCenter.qml`、`PluginCenter.qml`、`HistoryCenter.qml`、`PersonalizationCenter.qml`、`AISettings.qml` | 官方頁套件化；外框可替換 |
-| P03 | `scripts/build-builtin-packages.sh`、`crates/ditto-core/src/defaults.rs` | 打包官方頁；新 store 綁定 |
+| P03a | `shell/providers/settings_composition/`、`settings_plugins/`；既有 `settings_history/` | 組合、插件、歷史頁已提供官方套件；對應 `centers/` 原頁保留為可信備援 |
+| P03a | `shell/sdk/Ditto/Ui/qmldir`、`shell/core/ProviderHost.qml`、`tests/shell-extensions/` | SDK 引用 Shell 自有 `GeneratedArtifacts`；開發目錄映射；三頁註冊、備援與外部套件庫真實載入測試 |
+| P03a | `scripts/build-builtin-packages.sh`（沿用目錄探索） | 自動打包上述套件，不改預設文件或 store；綁定採用留待 P06 |
+| P03b／後續 P03 | `shell/centers/PersonalizationCenter.qml`、`AISettings.qml`、`Centers.qml` | 個人化／AI 仍僅內建，先拆 `providers`／`conversation` facade；外框替換與自我升版／回復另行驗收 |
 | P04 | `shell/shell.qml`（背景、`assistantLoader`）、`shell/jelly/Backdrop.qml` | 背景供應者化 |
-| P04 | `shell/assistant/AssistantSurface.qml` | 移除 `ditto.dock.pill` 判斷與私有 `dockMount.object`（`:18-25`），改中立幾何 |
+| P04a | `shell/assistant/AssistantSurface.qml`、兩個 `shell/providers/dock_*/qml/` 與 manifest、`shell/README.md`、`tests/g4/visual/assistant/` 與 capture fixture | 以選用 `edgeGeometry` v1 取代套件名稱與私有尺寸；無有效提示時固定 32 px；兩個 Dock patch 升版；不改宿主或 Core |
 | P05 | `shell/chat/ConversationState.qml`、`ChatWindow.qml`、`ChatPanel.qml`、`ChatBody.qml`、`ChatInput.qml` | 單一會話 facade；草稿、串流、IME 交接 |
 | P06 | `crates/ditto-protocol/src/profile.rs`（`Appearance`）、`shell/jelly/Tokens.qml`、`crates/ditto-core/src/defaults.rs` | token 套件、組合遷移入口 |
 | P07 | `packages/host-sdk/`、`tests/g3/integration/trust-matrix.mjs` | 作者工具；信任矩陣延伸 |
@@ -259,7 +277,7 @@
 | PRD 節 | 提案增量 |
 | --- | --- |
 | §10 桌面與原生應用需求 | 背景為可替換供應者：每輸出實例、Background 圖層、輸入穿透、熱插拔 |
-| §11 柔光果凍與預設角色 | 助理入口與角色為供應者；與 Dock 對齊改用中立幾何（P04） |
+| §11 柔光果凍與預設角色 | 助理入口與角色供應者仍屬 P04 後續；P04a 以選用 `edgeGeometry` v1 提供 Dock 中心線與固定 32 px fallback，僅 Shell 內呈現提示 |
 | §12／§12.1 插件中心與信任分級 | 設定頁擴充種類；第 6 節信任矩陣；第三方設定先採宣告式表單；其前提「Core 端依 `config_schema` 驗證」已由 #161 補上（見 [manifest](manifest.md)） |
 | §13 組合配置、版本與狀態 | 新 slot／area；舊 Profile 的內建 fallback 投影；UI 暫態不進 Profile |
 | §14 變更交易、熱換與回復 | 已註冊／已掛載／允許顯示／實際可見；相同 `entry_id` 升版須讀回新版本；20 秒退休不等於任意時間撤銷 |

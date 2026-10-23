@@ -136,6 +136,12 @@ Scope {
     readonly property int edgeGap: 12
     readonly property int pillThickness: tileSize + pillPadding * 2
     readonly property int thickness: soft ? pillThickness + edgeGap + 4 : 60
+    // Public edge-surface hint (Shell README); independent of package identity.
+    readonly property var edgeGeometry: ({
+        version: 1, output: dock.screen ? dock.screen.name : "", edge: position,
+        visible: dock.visible,
+        centreInset: soft ? edgeGap + pillThickness / 2 : thickness / 2
+    })
 
     function healthy() {
         return ready && client !== null && tokens !== null;
@@ -304,6 +310,7 @@ Scope {
         readonly property Item capsule: provider.soft ? pill : legacyPill
 
         visible: provider.shown
+        screen: provider.screen
         anchors {
             bottom: provider.position === "bottom"
             left: provider.position === "left"

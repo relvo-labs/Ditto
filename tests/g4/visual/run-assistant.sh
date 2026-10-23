@@ -39,6 +39,7 @@ scenes = {
  'open': 'E1 第二次啟動：compact 與 active 雙輪廓', 'open-collapsed': '對話開啟時的圓形 FAB',
  'reduced-motion': '減少動畫下的 open 狀態', 'legacy-theme': 'legacy 主題下的 open 狀態',
  'desktop': '全桌面合成：頂部列、Dock、E1 標籤膠囊',
+ 'desktop-bottom': '全桌面合成：視窗列 Dock、FAB 底距6 px',
 }
 lines = ['# D1／56／E1（owner 2026-10-19 選定）', '',
  '新預設助理採小 Ditto、固定56 px、E1兩段啟動；既有 capsule／neutral／portrait 接點保留。', '',

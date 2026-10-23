@@ -69,7 +69,7 @@ QtObject {
     ]
     readonly property var entries: [
         { entry_id: "e-panel", package: "ditto.panel.top", version: "1.1.0", host: "qml", config: {}, disabled: false },
-        { entry_id: "e-dock", package: "ditto.dock.pill", version: "1.1.0", host: "qml", config: {}, disabled: false },
+        { entry_id: "e-dock", package: "ditto.dock.pill", version: packageVersion("ditto.dock.pill"), host: "qml", config: {}, disabled: false },
         { entry_id: "e-launch", package: "ditto.launcher.search", version: "1.1.0", host: "qml", config: {}, disabled: false },
         { entry_id: "e-tasks", package: "ditto.tasks.panel", version: "1.1.0", host: "qml", config: {}, disabled: false },
         { entry_id: "e-notif", package: "ditto.notifications.area", version: "1.1.0", host: "qml", config: {}, disabled: false },
@@ -92,6 +92,11 @@ QtObject {
         ["ditto.tasks.panel", ["ui.tasks_panel"]], ["ditto.notifications.area", ["ui.notifications"]]
     ]
 
+    // Static visual fixture metadata mirrors the current Dock manifests.
+    function packageVersion(id) {
+        return id === "ditto.dock.pill" ? "1.1.1" : id === "ditto.dock.bottom" ? "1.1.2" : "1.1.0";
+    }
+
     /// The appearance tokens `desktop.appearance.get` answers with; a test
     /// changes them to stand for a change committed elsewhere (dittoctl, the
     /// Agent, an undo). Every read is recorded in `reads`.
@@ -110,13 +115,13 @@ QtObject {
                          document: document, history: history };
             },
             "desktop.plugins.list": () => ({
-                packages: installed.map(([id]) => ({ package_id: id, version: "1.1.0", host_kind: "qml", name: names[id],
+                packages: installed.map(([id]) => ({ package_id: id, version: packageVersion(id), host_kind: "qml", name: names[id],
                     source: "builtin", author: "Ditto", license: "fixture", trust_level: "builtin" })),
                 entries: entries
             }),
             "desktop.plugins.get": () => {
                 const found = installed.find(([id]) => id === args.package_id);
-                return { manifest: { id: args.package_id, version: "1.1.0", slots: found ? found[1] : [],
+                return { manifest: { id: args.package_id, version: packageVersion(args.package_id), slots: found ? found[1] : [],
                     description: "（fixture）內建套件。", required_protocol_version: "0.2", permissions: [] } };
             },
             "desktop.plugins.diagnostics": () => ({ entries: [] }),

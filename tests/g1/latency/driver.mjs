@@ -18,10 +18,11 @@
 //     ① <local-count> simple local operations, ② <dock-count> Dock A↔B
 //     switches. Writes <work>/samples.jsonl (one line per operation) and
 //     <work>/done.json.
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { connect, sleep } from '../lib/core-client.mjs';
 
+const pillVersion = JSON.parse(readFileSync(new URL('../../../shell/providers/dock_pill/manifest.json', import.meta.url), 'utf8')).version;
 const [work, kind, countText = '100', dockText = '100'] = process.argv.slice(2);
 const count = Number(countText);
 const { call, must, events, available } = await connect();
@@ -165,7 +166,7 @@ async function session(localCount, dockCount) {
   // composition center does for an entry already in the composition.
   let profile = await must('desktop.profiles.get', {});
   const bottom = profile.document.slots['ui.dock'];
-  const pill = await dockSwitch([{ op: 'add_entry', slot: 'ui.dock', entry: { package: 'ditto.dock.pill', version: '1.1.0', host: 'qml', config: {}, disabled: false } }], 'pill', true);
+  const pill = await dockSwitch([{ op: 'add_entry', slot: 'ui.dock', entry: { package: 'ditto.dock.pill', version: pillVersion, host: 'qml', config: {}, disabled: false } }], 'pill', true);
   if (!pill) throw new Error('adding the pill Dock did not commit');
   profile = await must('desktop.profiles.get', {});
   const pillEntry = profile.document.slots['ui.dock'];

@@ -153,6 +153,11 @@ Scope {
     readonly property int barPadding: 6
     readonly property int edgeGap: 8
     readonly property int thickness: tileHeight + barPadding * 2 + edgeGap
+    // Centre of the visible bar, excluding the transparent edge gap.
+    readonly property var edgeGeometry: ({
+        version: 1, output: dock.screen ? dock.screen.name : "", edge: reservedEdge,
+        visible: dock.visible, centreInset: edgeGap + (tileHeight + barPadding * 2) / 2
+    })
     readonly property real screenWidth: screen && screen.width > 0 ? screen.width : 1280
     /// Tiles shrink (down to the minimum, then elide) so the row fits the screen.
     readonly property int tileWidth: {
@@ -190,6 +195,7 @@ Scope {
         id: dock
 
         visible: provider.shown
+        screen: provider.screen
         anchors { bottom: true }
         implicitWidth: Math.max(220, bar.width + provider.edgeGap * 2)
         implicitHeight: provider.thickness
