@@ -1,0 +1,60 @@
+{
+  "manifest_version": 1,
+  "id": "ditto.settings.composition",
+  "version": "1.0.0",
+  "name": {
+    "zh-TW": "組合中心",
+    "en": "Composition center"
+  },
+  "author": "Ditto",
+  "license": "UNLICENSED",
+  "source": "builtin",
+  "plugin_kind": "qml_provider",
+  "host_kind": "qml",
+  "trust_level": "trusted",
+  "runtime": {
+    "qt": ">=6.10"
+  },
+  "platform": [
+    "linux-x86_64"
+  ],
+  "required_protocol_version": "^0.3",
+  "slots": [
+    "ui.settings_page"
+  ],
+  "provides": [],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "qml_entry": "qml/CompositionCenter.qml",
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "commands": [],
+  "shortcuts": [],
+  "events": [],
+  "permissions": [],
+  "hot_swap": "instant",
+  "health": {
+    "timeout_ms": 2000
+  },
+  "cleanup": {
+    "timeout_ms": 5000
+  },
+  "migrations": [],
+  "activation_events": [],
+  "idle_policy": "resident",
+  "resource_budget": {
+    "memory_mib": 8
+  },
+  "rescue": {
+    "disable_safe": true
+  },
+  "settings_page": {
+    "page_id": "composition",
+    "title_key": "command.composition.open",
+    "order": 10
+  }
+}

@@ -101,7 +101,9 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 
 供應者以絕對 `file://` URL 載入。Quickshell 0.3.1 的離屏實測可解析同目錄型別、套件內相對子目錄與絕對目錄 import；跨出設定目錄的相對 import 與沒有 qmldir 的 `root:/` 目錄解析不完整。不得 import Shell 私有相對路徑；共用元件使用 `import "root:/sdk/Ditto/Ui"`（Shell 擁有的 `qmldir`，引用原始 ui/change 元件，不複製）。真實登入與同 URL 改檔後熱換尚待驗證。
 
-`ui.settings_page` 是多條目 area：manifest 的 `settings_page` 宣告 `page_id`、`title_key`、`order`、可選 `category`。prepare 只編譯，commit 登錄導覽，按 `(order, page_id)` 排序。同 id 取代內建頁，額外 id 附加；建立失敗時回到同 id 內建頁，沒有內建頁則顯示錯誤。根為 `Item`，只在設定視窗開啟時建立，接收 `client`、`tokens`、`config`、`pageId`、`entryId`；可選 `flickable` 提供捲動與焦點揭露。`mounted && visible` 表示已登錄，`page_state` 的 `registered/open` 只供觀測。`ditto.settings.history` 示範此契約，內建 HistoryCenter 保留為可信備援。
+`ui.settings_page` 是多條目 area：manifest 的 `settings_page` 宣告 `page_id`、`title_key`、`order`、可選 `category`。prepare 只編譯，commit 登錄導覽，按 `(order, page_id)` 排序。同 id 取代內建頁，額外 id 附加；建立失敗時回到同 id 內建頁，沒有內建頁則顯示錯誤。根為 `Item`，只在設定視窗開啟時建立，接收 `client`、`tokens`、`config`、`pageId`、`entryId`；可選 `flickable` 提供捲動與焦點揭露。`mounted && visible` 表示已登錄，`page_state` 的 `registered/open` 只供觀測。
+
+官方頁套件為 `ditto.settings.composition`、`ditto.settings.plugins`、`ditto.settings.history`（order 10／20／30），對應的 CompositionCenter、PluginCenter、HistoryCenter 保留為可信備援。插件頁的 GeneratedArtifacts 由 SDK qmldir 引用 Shell 原檔，沒有副本。個人化與 AI 設定仍僅內建，待 P03b 拆分 `providers`／`conversation` facade。`build-builtin-packages.sh` 自動探索這些套件；本切片不加入預設綁定，採用留待 P06。
 
 `ui.background` 是單供應者 slot，根為 `Scope`，每輸出建立 Background layer 視窗，`exclusionMode: Ignore`、空輸入區，`visible` 綁定 `shown`。`ditto.background.default` 使用現有 Backdrop。沿用 SlotHost 的交接順序：舊實例先 release，再顯示候選並設為 active；內建背景在沒有 active+shown provider 時顯示，commit 後隱藏，release/rollback 後恢復。同一同步呼叫內完成路由變更，盡量避免空白；這不是合成器逐幀呈現的保證。兩種新掛載回報實際持有的 package/version。
 
