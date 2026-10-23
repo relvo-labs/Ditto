@@ -53,6 +53,11 @@ Flickable {
         }
         onFailed: function (changeId, error) {
             page.fail(error);
+            // A first open that failed holds nothing: the row stays closed
+            // and opening it again retries.
+            if (!page.expanded[changeId]) {
+                reads.forget(changeId);
+            }
         }
     }
 
@@ -65,6 +70,26 @@ Flickable {
         diagnostic = client.diagnosticText(error);
     }
 
+    /// The list is replaced (not extended): a record whose row leaves it is
+    /// released, its read forgotten and its open card dropped. The row comes
+    /// back closed with a later page, and opening it reads it afresh.
+    function replaceList(list) {
+        changes = list;
+        const listed = new Set(list.map(change => change.change_id));
+        reads.retain(Array.from(listed));
+        const table = Object.assign({}, expanded);
+        let dropped = false;
+        for (const changeId of Object.keys(table)) {
+            if (!listed.has(changeId)) {
+                delete table[changeId];
+                dropped = true;
+            }
+        }
+        if (dropped) {
+            expanded = table;
+        }
+    }
+
     function reload() {
         if (listing) {
             listAgain = true;
@@ -75,7 +100,7 @@ Flickable {
         client.capability("desktop.changes.list", { limit: 30 }, function (result) {
             page.listing = false;
             if (generation === page.listGeneration) {
-                page.changes = result.changes;
+                page.replaceList(result.changes);
                 page.more = result.changes.length === 30;
             } else {
                 page.listAgain = true;
@@ -152,6 +177,20 @@ Flickable {
         }
         function onChangeUpdated(change) {
             page.listGeneration++;
+            // Records the page holds first, listed or not, so that no
+            // update for one is skipped.
+            if (page.expanded[change.change_id]) {
+                // The update is newer than the open record: it applies at
+                // once (the record keeps its card and items).
+                const table = Object.assign({}, page.expanded);
+                table[change.change_id] = Object.assign({}, page.expanded[change.change_id], change);
+                page.expanded = table;
+            }
+            // Open, or opening with its first read still out: read again,
+            // and an answer to a read sent before this is not applied.
+            if (reads.holds(change.change_id)) {
+                page.refresh(change.change_id);
+            }
             const index = page.changes.findIndex(item => item.change_id === change.change_id);
             if (index < 0) {
                 // Older than the loaded rows (Core publishes a deleted
@@ -164,18 +203,6 @@ Flickable {
                 const list = page.changes.slice();
                 list[index] = change;
                 page.changes = list;
-            }
-            if (page.expanded[change.change_id]) {
-                // The update is newer than the open record: it applies at
-                // once (the record keeps its card and items).
-                const table = Object.assign({}, page.expanded);
-                table[change.change_id] = Object.assign({}, page.expanded[change.change_id], change);
-                page.expanded = table;
-            }
-            // Open, or opening with its first read still out: read again,
-            // and an answer to a read sent before this is not applied.
-            if (reads.holds(change.change_id)) {
-                page.refresh(change.change_id);
             }
         }
     }

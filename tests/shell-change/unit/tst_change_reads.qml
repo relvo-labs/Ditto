@@ -124,6 +124,60 @@ TestCase {
         compare(client.held.length, 0);
     }
 
+    /// #171 R4: when the view's list is replaced, the changes it no longer
+    /// shows are released: their answers are not applied and a resync reads
+    /// only what is still held.
+    function test_retain_releases_the_changes_no_longer_shown() {
+        reads.request("chg-1");
+        reads.request("chg-2");
+        reads.request("chg-3");
+        client.answer(0, { change_id: "chg-1" });
+        compare(reads.got.length, 1);
+        compare(reads.retain(["chg-1", "chg-9"]), ["chg-2", "chg-3"]);
+        compare(reads.heldIds(), ["chg-1"]);
+        verify(!reads.holds("chg-2") && !reads.holds("chg-3"));
+        // Their answers land late: not applied, nothing read again.
+        client.answer(0, { change_id: client.held[0].changeId });
+        client.answer(0, { change_id: client.held[0].changeId });
+        compare(reads.got.length, 1);
+        compare(client.held.length, 0);
+        reads.refreshAll();
+        compare(client.held.map(call => call.changeId), ["chg-1"]);
+        compare(reads.retain(["chg-1"]), []);
+    }
+
+    /// What is kept per change stays bounded by the changes held or with a
+    /// read still out, however many come and go.
+    function test_a_forgotten_change_keeps_nothing_once_settled() {
+        for (let n = 0; n < 50; ++n) {
+            reads.request("chg-" + n);
+        }
+        reads.retain([]);
+        compare(reads.heldIds().length, 0);
+        while (client.held.length > 0) {
+            client.answer(0, { change_id: client.held[0].changeId });
+        }
+        compare(reads.got.length, 0);
+        compare(Object.keys(reads.generations).length, 0);
+        compare(Object.keys(reads.inFlight).length, 0);
+        compare(Object.keys(reads.queued).length, 0);
+        // Forgotten, then requested again while the old read is still out:
+        // the old answer is dropped and the new read applies.
+        reads.request("chg-1");
+        reads.forget("chg-1");
+        reads.request("chg-1");
+        compare(client.held.length, 1);
+        client.answer(0, { change_id: "chg-1", v: "old" });
+        compare(reads.got.length, 0, "an answer from before the forget was applied");
+        compare(client.held.length, 1);
+        client.answer(0, { change_id: "chg-1", v: "new" });
+        compare(reads.got.length, 1);
+        compare(reads.got[0].record.v, "new");
+        // Forgotten with nothing out: nothing kept.
+        reads.forget("chg-1");
+        compare(Object.keys(reads.generations).length, 0);
+    }
+
     function test_only_a_current_failure_is_reported() {
         reads.request("chg-1");
         reads.refresh("chg-1");

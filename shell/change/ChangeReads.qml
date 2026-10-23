@@ -9,8 +9,10 @@ import QtQuick
 /// answer is applied only if no generation began after its read was sent.
 /// Reads of one change are coalesced: at most one in flight and one more
 /// queued behind it, however many updates arrive meanwhile. A change is held
-/// from its first request until `forget`, answered or not, so an update or
-/// a resync that arrives before the first answer still makes it stale.
+/// from its first request until `forget` (or `retain` without it), answered
+/// or not, so an update or a resync that arrives before the first answer
+/// still makes it stale. What is kept per change is bounded by the changes
+/// held or with a read still out.
 QtObject {
     id: reads
 
@@ -71,9 +73,25 @@ QtObject {
     /// The view no longer holds `changeId` (a card closed): a read out is
     /// not applied and nothing queued is sent.
     function forget(changeId) {
-        generations[changeId] = generation(changeId) + 1;
         delete queued[changeId];
         delete held[changeId];
+        if (inFlight[changeId] === undefined) {
+            // No answer can still land: nothing to tell apart.
+            delete generations[changeId];
+        } else {
+            generations[changeId] = generation(changeId) + 1;
+        }
+    }
+
+    /// The view now shows only `changeIds` (its list was replaced): every
+    /// other change it held is forgotten. Returns the ids released.
+    function retain(changeIds) {
+        const kept = new Set(changeIds);
+        const released = heldIds().filter(changeId => !kept.has(changeId));
+        for (const changeId of released) {
+            forget(changeId);
+        }
+        return released;
     }
 
     function reset() {
@@ -96,6 +114,13 @@ QtObject {
     function settle(changeId, sent, record, error) {
         if (inFlight[changeId] === sent) {
             delete inFlight[changeId];
+        }
+        if (!holds(changeId)) {
+            // Forgotten while out: not applied, and nothing more is kept.
+            if (inFlight[changeId] === undefined) {
+                delete generations[changeId];
+            }
+            return;
         }
         const current = sent === generation(changeId);
         if (queued[changeId]) {

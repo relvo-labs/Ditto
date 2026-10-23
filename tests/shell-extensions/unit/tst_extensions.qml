@@ -479,7 +479,12 @@ TestCase {
             property var held: []
             function capability(name, args, done, fail) {
                 let value;
-                if (name === "desktop.changes.list") value = {changes: summaries};
+                if (name === "desktop.changes.list") {
+                    // As Core: newest first, `limit` rows older than `before`.
+                    let list = summaries;
+                    if (args.before !== undefined) list = list.slice(list.findIndex(summary => summary.change_id === args.before) + 1);
+                    value = {changes: list.slice(0, args.limit)};
+                }
                 else if (name === "desktop.changes.get") {
                     gets = gets.concat([args.change_id]);
                     value = records[args.change_id];
@@ -567,7 +572,7 @@ TestCase {
         compare(component.status, Component.Ready, component.errorString());
         const page = createTemporaryObject(component, testCase, {client: client, tokens: tokens, width: 900, height: 900});
         verify(page !== null);
-        tryCompare(page.changes, "length", client.summaries.length);
+        tryCompare(page.changes, "length", Math.min(client.summaries.length, 30));
         return page;
     }
     function historyPages_data() {
@@ -885,6 +890,157 @@ TestCase {
         const failure = {name: "timeout", code: -32004, message: "now"};
         client.answerFailure(client.heldLists()[0], failure);
         compare(page.notice, client.errorText(failure));
+        compare(client.held.length, 0);
+        page.destroy();
+        wait(0);
+    }
+
+    // #171 R4: a record whose row leaves the list when the list is replaced
+    // is released (its read forgotten, its open card dropped), and an update
+    // for a record the page holds is never skipped. Sixty changes, newest
+    // first; only chg-010 is on the Profile that gets deleted.
+    function sixtyChanges() {
+        const records = [];
+        for (let n = 60; n >= 1; --n) {
+            const changeId = "chg-" + String(n).padStart(3, "0");
+            records.push(historyRecord(changeId, changeId === "chg-010" ? "prf-dev" : "prf-other", null, false));
+        }
+        return records;
+    }
+    function test_history_pages_release_a_record_whose_row_leaves_the_list_data() { return historyPages_data(); }
+    function test_history_pages_release_a_record_whose_row_leaves_the_list(data) {
+        const client = historyClient(sixtyChanges());
+        const page = historyPage(data.url, client);
+        page.loadMore();
+        compare(page.changes.length, 60);
+        // An older row opens; its first read is still out.
+        client.hold = true;
+        page.open("chg-010");
+        compare(client.heldGets().length, 1);
+        // A reload (as after an undo) replaces the list with the newest 30.
+        page.reload();
+        client.answer(client.heldLists()[0]);
+        compare(page.changes.length, 30);
+        const reads = client.gets.length;
+        // The Profile is deleted; Core publishes chg-010 again.
+        client.deleteProfile("prf-dev");
+        // The first answer, taken before the delete, lands late.
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!page.expanded["chg-010"], "a record whose row left the list kept its card");
+        compare(client.held.length, 0, "a read was sent for a released record");
+        compare(client.gets.length, reads);
+        // "Load older" brings the row back closed, as Core reads it now.
+        client.hold = false;
+        page.loadMore();
+        compare(page.changes.length, 60);
+        compare(page.changes.find(change => change.change_id === "chg-010").profile_deleted, true);
+        verify(!page.expanded["chg-010"], "the row came back with the card it had before the delete");
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible), "undo offered for a row that came back");
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        // Opening it reads it afresh: deleted, no undo.
+        page.open("chg-010");
+        tryVerify(() => !!page.expanded["chg-010"]);
+        compare(page.expanded["chg-010"].profile_deleted, true);
+        wait(0);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible), "undo offered after the Profile was deleted");
+        compare(itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length, 1);
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        page.destroy();
+        wait(0);
+    }
+    function test_history_pages_never_skip_an_update_for_a_held_record_data() { return historyPages_data(); }
+    function test_history_pages_never_skip_an_update_for_a_held_record(data) {
+        // No list path leaves a held record unlisted any more (the list
+        // replacement releases it); this pins the rule on its own: the page
+        // holds chg-010 although it lists only the newest 30.
+        const client = historyClient(sixtyChanges());
+        const page = historyPage(data.url, client);
+        client.hold = true;
+        page.open("chg-010");
+        compare(client.heldGets().length, 1);
+        const reads = client.gets.length;
+        client.deleteProfile("prf-dev");
+        compare(client.heldGets().length, 1, "a read was sent beside the first one");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!page.expanded["chg-010"] || page.expanded["chg-010"].profile_deleted === true,
+               "an update for a held record was skipped");
+        compare(client.heldGets().length, 1);
+        compare(client.gets.length, reads + 1, "not exactly one more read");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(client.held.length, 0);
+        compare(page.expanded["chg-010"].profile_deleted, true);
+        // Older than the loaded rows: still not put on top.
+        compare(page.changes.length, 30);
+        compare(page.changes[0].change_id, "chg-060");
+        page.destroy();
+        wait(0);
+    }
+    // #171 R4: held records stay bounded by the rows listed and open. A
+    // failed first open releases its hold (opening the row again retries);
+    // a resync then reads only the open, listed records.
+    function test_history_pages_keep_held_records_bounded_data() { return historyPages_data(); }
+    function test_history_pages_keep_held_records_bounded(data) {
+        const client = historyClient(sixtyChanges());
+        const page = historyPage(data.url, client);
+        const failure = {name: "timeout", code: -32004, message: "now"};
+        const id = n => "chg-" + String(n).padStart(3, "0");
+        for (let round = 0; round < 3; ++round) {
+            page.loadMore();
+            compare(page.changes.length, 60);
+            client.hold = true;
+            // Round 0 also opens the newest row, which stays listed.
+            if (round === 0) page.open("chg-060");
+            for (let k = 1; k <= 4; ++k) page.open(id(4 * round + k));
+            compare(client.heldGets().length, round === 0 ? 5 : 4);
+            // Of the four older rows, the third and fourth fail to open.
+            for (const call of client.heldGets()) {
+                const failing = call.changeId === id(4 * round + 3) || call.changeId === id(4 * round + 4);
+                if (failing) client.answerFailure(call, failure);
+                else client.answer(call);
+            }
+            wait(0);
+            compare(page.notice, client.errorText(failure), "a current failure was not shown");
+            // A failed open shows no card.
+            verify(!page.expanded[id(4 * round + 3)] && !page.expanded[id(4 * round + 4)]);
+            verify(!!page.expanded[id(4 * round + 1)] && !!page.expanded[id(4 * round + 2)]);
+            // A reload replaces the list with the newest 30.
+            page.reload();
+            client.answer(client.heldLists()[0]);
+            wait(0);
+            compare(page.changes.length, 30);
+            compare(Object.keys(page.expanded), ["chg-060"]);
+            client.hold = false;
+        }
+        // A resync reads the open, listed record only.
+        client.hold = true;
+        client.capabilitiesReloaded();
+        compare(client.heldGets().map(call => call.changeId), ["chg-060"], "a resync read records the page no longer holds");
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(client.held.length, 0);
+        // A row whose first open failed opens again (the read is retried).
+        client.hold = false;
+        page.loadMore();
+        compare(page.changes.length, 60);
+        client.hold = true;
+        page.open(id(3));
+        compare(client.heldGets().map(call => call.changeId), [id(3)], "opening a failed row again sent no read");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!!page.expanded[id(3)]);
+        client.capabilitiesReloaded();
+        compare(client.heldGets().map(call => call.changeId).sort(), [id(3), "chg-060"]);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        // That resync's list read replaced the list again: chg-003 left it.
+        compare(Object.keys(page.expanded), ["chg-060"]);
+        client.capabilitiesReloaded();
+        compare(client.heldGets().map(call => call.changeId), ["chg-060"]);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
         compare(client.held.length, 0);
         page.destroy();
         wait(0);
