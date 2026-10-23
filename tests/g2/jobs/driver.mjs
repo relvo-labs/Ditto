@@ -13,13 +13,15 @@ const own=job=>{if(job?.job_id)appendFileSync(process.env.DITTO_G2_ROOT+'/job-sc
 const show=(unit,prop)=>{try{return execFileSync('systemctl',['--user','show','-p',prop,'--value',unit+'.scope'],{encoding:'utf8'}).trim()}catch{return ''}}
 try{
   const core=await connect()
-  await eventually(async()=>(await core.call('desktop.jobs.list',{})).error?.data?.reason!=='recovering')
+  // Core refuses writes while it finishes recovery; reads are never refused,
+  // so desktop.jobs.list cannot tell when recovery is over (#163). Submit
+  // itself is retried on `recovering` below: it is idempotent by key.
   const catalog=await core.must('desktop.capabilities.list')
   const submit=catalog.capabilities.find(c=>c.capability_id==='desktop.jobs.submit')
   verify('the pool is available (systemd user manager present)',submit.availability.available!==false)
   const get=id=>core.must('desktop.jobs.get',{job_id:id})
   const until=async(id,states,tries=600)=>eventually(async()=>{const j=await get(id);return states.includes(j.state)?j:false},tries)
-  const job=(kind,params,key)=>core.must('desktop.jobs.submit',{kind,params,idempotency_key:key}).then(own)
+  const job=(kind,params,key)=>eventually(async()=>{const r=await core.call('desktop.jobs.submit',{kind,params,idempotency_key:key});if(r.error?.data?.reason==='recovering')return false;if(r.error)throw new Error('desktop.jobs.submit: '+JSON.stringify(r.error));return r.result}).then(own)
 
   // ① admission: three jobs, two run, one waits
   const a=await job('test.sleep',{ms:4000},'a'),b=await job('test.sleep',{ms:4000},'b'),c=await job('test.sleep',{ms:4000},'c')
