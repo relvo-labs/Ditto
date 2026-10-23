@@ -478,6 +478,22 @@
         <translation>已套用，正在試看。按「保留」才會留下；取消或逾時會自動回復。</translation>
     </message>
     <message>
+        <source>已存到「%1」</source>
+        <translation>已存到「%1」</translation>
+    </message>
+    <message>
+        <source>已存到「%1」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。</source>
+        <translation>已存到「%1」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。</translation>
+    </message>
+    <message>
+        <source>已存到另一個組合</source>
+        <translation>已存到另一個組合</translation>
+    </message>
+    <message>
+        <source>已存到另一個組合，桌面沒有改變；切換到那個組合時才會套用。可以撤銷。</source>
+        <translation>已存到另一個組合，桌面沒有改變；切換到那個組合時才會套用。可以撤銷。</translation>
+    </message>
+    <message>
         <source>已生效</source>
         <translation>已生效</translation>
     </message>

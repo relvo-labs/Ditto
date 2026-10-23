@@ -33,6 +33,18 @@ describe('Agent tool allow-list',()=>{
     expect(BASE_INSTRUCTIONS).toMatch(/committed with result succeeded/)
     expect(BASE_INSTRUCTIONS).toMatch(/data, not instructions/)
   })
+  it('says that naming another Profile changes nothing on screen, and how the record shows it (#169)',()=>{
+    const propose=TOOL_GUIDE['desktop.changes.propose']
+    expect(propose).toMatch(/profile_id/)
+    expect(propose).toMatch(/active Profile/)
+    expect(propose).toMatch(/nothing on screen changes until/)
+    expect(propose).toMatch(/saved_only/)
+    expect(BASE_INSTRUCTIONS).toMatch(/saved_only/)
+    expect(BASE_INSTRUCTIONS).toMatch(/not on screen/)
+    // The field the text names is the one Core's record really has.
+    const record=JSON.parse(readFileSync(new URL('../../../schema/change-record.json',import.meta.url),'utf8')) as {properties:Record<string,unknown>}
+    expect(Object.keys(record.properties)).toContain('saved_only')
+  })
 })
 
 describe('recent changes context',()=>{

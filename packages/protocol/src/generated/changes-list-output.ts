@@ -66,6 +66,7 @@ export type ChangeOrigin =
       [k: string]: unknown;
     };
 export type ResultKind = ('succeeded' | 'failed' | 'partial' | 'unknown') | 'scheduled';
+export type SavedOnlyReason = 'inactive_profile';
 export type ChangeState =
   | 'draft'
   | 'validated'
@@ -92,7 +93,23 @@ export interface ChangeSummary {
   origin: ChangeOrigin;
   profile_id: string;
   result?: ResultKind | null;
+  /**
+   * As on [`ChangeRecord::saved_only`].
+   */
+  saved_only?: SavedOnly | null;
   state: ChangeState;
   title_key: string;
   updated_at: string;
+}
+/**
+ * A committed change that wrote its Profile's revision and applied nothing
+ * to the desktop (protocol 0.2 §8.1). `result` stays `succeeded`: the edit
+ * of the stored Profile is done; this says where it went.
+ */
+export interface SavedOnly {
+  /**
+   * The Profile's name when the record is read (it can be renamed since).
+   */
+  profile_name: string;
+  reason: SavedOnlyReason;
 }

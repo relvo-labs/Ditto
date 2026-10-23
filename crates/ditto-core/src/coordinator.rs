@@ -22,7 +22,7 @@ use ditto_protocol::{
     catalog,
     change::{
         ChangeMode, ChangeOp, ChangeOrigin, ChangeRecord, ChangeState, Confirmation, HotSwapLevel,
-        OutcomeItem, OutcomeStatus, PreflightCode,
+        OutcomeItem, OutcomeStatus, PreflightCode, SavedOnlyReason,
     },
     ids,
     participant::{
@@ -935,6 +935,9 @@ impl Coordinator {
             self.announce(&record);
             return Ok(record);
         }
+        if switch_to.is_none() && !self.is_active(&profile_id)? {
+            return self.save_without_applying(change_id, &validation);
+        }
         if validation.level == HotSwapLevel::SessionRestart {
             return self.defer_to_next_login(change_id, &validation, switch_to);
         }
@@ -1512,12 +1515,19 @@ impl Coordinator {
         items: Vec<OutcomeItem>,
     ) -> Result<ChangeRecord, CoreError> {
         let stored = changes::get(self.store.connection(), change_id)?;
-        let needs_confirmation = mode == ChangeMode::Preview
-            || requires_timed_revert(&stored.record.ops, &stored.record);
+        // A change to a Profile that is not on the desktop only writes its
+        // revision (#169): nothing to try out or confirm, no generated
+        // plugin data to move, and the desktop's revision stays as it is.
+        let live = switch_to.is_some() || self.is_active(&stored.record.profile_id)?;
+        let needs_confirmation = live
+            && (mode == ChangeMode::Preview
+                || requires_timed_revert(&stored.record.ops, &stored.record));
         let window = self.core.config.confirmation_window;
         fault::before_commit_revision();
         let written = self.store.write(|tx| {
-            ditto_store::generated::apply_document(tx, &validation.target, change_id)?;
+            if live {
+                ditto_store::generated::apply_document(tx, &validation.target, change_id)?;
+            }
             let revision_id = match &switch_to {
                 Some((profile, revision)) => {
                     profiles::set_active_profile(tx, profile)?;
@@ -1551,6 +1561,9 @@ impl Coordinator {
                 )?;
             }
             changes::set_items(tx, change_id, &items)?;
+            if !live {
+                changes::set_saved_only(tx, change_id, SavedOnlyReason::InactiveProfile)?;
+            }
             changes::set_committed_revision(tx, change_id, &revision_id)?;
             changes::transition(
                 tx,
@@ -1563,6 +1576,26 @@ impl Coordinator {
             Ok(revision_id)
         });
         let revision_id = match written {
+            Ok(revision_id) if !live => {
+                let record = self.record(change_id)?;
+                self.announce(&record);
+                self.core.publish(DesktopEventPayload::ProfileChanged {
+                    profile_id: record.profile_id.clone(),
+                    head_revision: revision_id.clone(),
+                    active: false,
+                });
+                self.audit(
+                    Some(change_id),
+                    &stored.subject,
+                    "change.commit",
+                    "committed",
+                    &format!("{revision_id} inactive_profile"),
+                );
+                // No observation period: the revision has not run, so it
+                // cannot become this Profile's last-known-good yet. A switch
+                // to it starts one.
+                return Ok(record);
+            }
             Ok(revision_id) => revision_id,
             Err(error) => {
                 // Nothing was written: head and last-known-good are intact.
@@ -1578,8 +1611,10 @@ impl Coordinator {
                 self.transition(change_id, ChangeState::Verifying, ChangeState::RollingBack)?;
                 let base_document =
                     profiles::revision(self.store.connection(), &stored.record.base_revision)?.1;
-                let mut steps =
-                    self.rebuild_steps(&validation.touched, &base_document, &validation.target);
+                // Participants of a change that was never applied have
+                // nothing to put back.
+                let touched: &[ParticipantRole] = if live { &validation.touched } else { &[] };
+                let mut steps = self.rebuild_steps(touched, &base_document, &validation.target);
                 for step in &mut steps {
                     step.prepared = true;
                     step.committed = true;
@@ -1647,6 +1682,26 @@ impl Coordinator {
                 })
             })
             .collect()
+    }
+
+    /// Whether `profile_id` is the Profile the desktop shows.
+    fn is_active(&self, profile_id: &str) -> StoreResult<bool> {
+        Ok(profiles::active_profile(self.store.connection())?.as_deref() == Some(profile_id))
+    }
+
+    /// A change to a Profile that is not active (#169): the desktop shows
+    /// another Profile, so no participant is prepared, committed or read
+    /// back. Preflight has run; the revision is written and the record lists
+    /// no items. A later switch to the Profile projects it.
+    fn save_without_applying(
+        &mut self,
+        change_id: &str,
+        validation: &Validation,
+    ) -> Result<ChangeRecord, CoreError> {
+        self.transition(change_id, ChangeState::Validated, ChangeState::Prepared)?;
+        self.transition(change_id, ChangeState::Prepared, ChangeState::Applying)?;
+        self.transition(change_id, ChangeState::Applying, ChangeState::Verifying)?;
+        self.commit_revision(change_id, validation, ChangeMode::Apply, None, Vec::new())
     }
 
     /// Session-restart level: nothing is applied now. The revision is saved
@@ -2272,7 +2327,16 @@ impl Coordinator {
             paths: &paths,
             grants: &grants,
         };
-        let roles = projection::touched(&base, &target, &resolver);
+        // A change to a Profile that is not active never reached a
+        // participant; there is nothing to read back, only the revision to
+        // write (#169).
+        let live = stored.target_profile.is_some()
+            || self.is_active(&stored.record.profile_id).unwrap_or(true);
+        let roles = if live {
+            projection::touched(&base, &target, &resolver)
+        } else {
+            Vec::new()
+        };
         let mut at_target = true;
         let mut at_base = true;
         let mut items = Vec::new();

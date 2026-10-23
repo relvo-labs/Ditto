@@ -7,6 +7,7 @@ mod builtin_profiles;
 mod config_schema_coordinator;
 mod config_schema_preflight;
 mod generation_transactions;
+mod inactive_profile;
 mod shell_extensions;
 
 use super::*;
@@ -2842,6 +2843,7 @@ fn roundtrip(schema: &str, value: &Value) -> Result<Value, String> {
             through::<ditto_protocol::generation::GenerationValidation>(value)
         }
         "change-record" => through::<change::ChangeRecord>(value),
+        "change-summary" => through::<change::ChangeSummary>(value),
         "participant-prepare-params" => through::<participant::PrepareParams>(value),
         "shell-report-input" => through::<participant::ShellObservation>(value),
         "handshake-input" => through::<rpc::HandshakeInput>(value),

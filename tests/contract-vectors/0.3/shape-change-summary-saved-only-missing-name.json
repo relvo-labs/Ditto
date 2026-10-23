@@ -1,0 +1,26 @@
+{
+ "kind": "shape",
+ "description": "saved_only 必須帶 profile_name：只缺 profile_name（reason 合法）也要拒絕",
+ "type": "change-summary",
+ "valid": false,
+ "value": {
+  "change_id": "chg-01M5KQSRKJZ9SGQFT6APYPYPPA",
+  "profile_id": "prf-01M5KQSRHXBJMCS80YTK7ST6JG",
+  "state": "committed",
+  "result": "succeeded",
+  "origin": {
+   "kind": "cli"
+  },
+  "hot_swap_level": "instant",
+  "title_key": "change.title.appearance",
+  "committed_revision": "rev-01M5KQSRKJZ9SGQFT6APYPYPPB",
+  "confirmation": {
+   "state": "not_required"
+  },
+  "created_at": "2026-10-23T00:00:00.000Z",
+  "updated_at": "2026-10-23T00:00:00.000Z",
+  "saved_only": {
+   "reason": "inactive_profile"
+  }
+ }
+}

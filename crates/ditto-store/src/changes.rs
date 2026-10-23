@@ -5,7 +5,7 @@
 use ditto_protocol::{
     change::{
         ChangeCard, ChangeMode, ChangeOp, ChangeOrigin, ChangeRecord, ChangeState, Confirmation,
-        HotSwapLevel, OperationSummary, OutcomeItem, PreflightReason,
+        HotSwapLevel, OperationSummary, OutcomeItem, PreflightReason, SavedOnly, SavedOnlyReason,
     },
     ids,
     profile::ProfileDocument,
@@ -59,7 +59,8 @@ fn parse<T: serde::de::DeserializeOwned>(index: usize, text: &str) -> rusqlite::
 
 const COLUMNS: &str = "change_id, profile_id, base_revision, state, hot_swap_level, mode, ops_json, card_json,
     reasons_json, items_json, target_document_json, target_profile_id, idempotency_key, origin_json, subject,
-    confirmation_json, committed_revision, failure_key, created_at, updated_at, recovered_at";
+    confirmation_json, committed_revision, failure_key, created_at, updated_at, recovered_at, saved_only,
+    (SELECT name FROM profiles WHERE profiles.profile_id = changesets.profile_id)";
 
 fn row(row: &Row<'_>) -> rusqlite::Result<StoredChange> {
     let state_text: String = row.get(3)?;
@@ -75,6 +76,19 @@ fn row(row: &Row<'_>) -> rusqlite::Result<StoredChange> {
     let mode_text: String = row.get(5)?;
     let target: Option<String> = row.get(10)?;
     let items: Vec<ditto_protocol::change::OutcomeItem> = parse(9, &row.get::<_, String>(9)?)?;
+    let saved_only = match row.get::<_, Option<String>>(21)? {
+        None => None,
+        Some(text) => Some(SavedOnly {
+            reason: SavedOnlyReason::parse(&text).ok_or_else(|| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    21,
+                    rusqlite::types::Type::Text,
+                    format!("unknown saved_only {text}").into(),
+                )
+            })?,
+            profile_name: row.get::<_, Option<String>>(22)?.unwrap_or_default(),
+        }),
+    };
     let record = ChangeRecord {
         change_id: row.get(0)?,
         profile_id: row.get(1)?,
@@ -93,6 +107,7 @@ fn row(row: &Row<'_>) -> rusqlite::Result<StoredChange> {
         operations: Vec::new(),
         recovered_at: row.get(20)?,
         failure_key: row.get(17)?,
+        saved_only,
         created_at: row.get(18)?,
         updated_at: row.get(19)?,
     };
@@ -362,6 +377,20 @@ pub fn set_failure(connection: &Connection, change_id: &str, failure_key: &str) 
     connection.execute(
         "UPDATE changesets SET failure_key = ?2 WHERE change_id = ?1",
         params![change_id, failure_key],
+    )?;
+    Ok(())
+}
+
+/// Mark a change as saved to its Profile without anything applied to the
+/// desktop; written in the commit's transaction.
+pub fn set_saved_only(
+    connection: &Connection,
+    change_id: &str,
+    reason: SavedOnlyReason,
+) -> StoreResult<()> {
+    connection.execute(
+        "UPDATE changesets SET saved_only = ?2 WHERE change_id = ?1",
+        params![change_id, reason.as_str()],
     )?;
     Ok(())
 }

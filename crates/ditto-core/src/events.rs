@@ -411,6 +411,7 @@ mod topic_tests {
                 title_key: "t".into(),
                 committed_revision: None,
                 confirmation: ditto_protocol::change::Confirmation::NotRequired,
+                saved_only: None,
                 created_at: String::new(),
                 updated_at: String::new(),
             }),
