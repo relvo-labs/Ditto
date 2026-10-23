@@ -381,8 +381,45 @@ pub struct ChangeSummary {
     pub title_key: String,
     pub committed_revision: Option<String>,
     pub confirmation: Confirmation,
+    /// As on [`ChangeRecord::saved_only`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_only: Option<SavedOnly>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// A committed change that wrote its Profile's revision and applied nothing
+/// to the desktop (protocol 0.2 §8.1). `result` stays `succeeded`: the edit
+/// of the stored Profile is done; this says where it went.
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SavedOnly {
+    pub reason: SavedOnlyReason,
+    /// The Profile's name when the record is read (it can be renamed since).
+    pub profile_name: String,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SavedOnlyReason {
+    /// The change's Profile was not the active one. It takes effect when
+    /// that Profile is switched to.
+    InactiveProfile,
+}
+
+impl SavedOnlyReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::InactiveProfile => "inactive_profile",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "inactive_profile" => Some(Self::InactiveProfile),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -414,6 +451,11 @@ pub struct ChangeRecord {
     pub recovered_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure_key: Option<String>,
+    /// Present only when the change was committed without anything being
+    /// applied to the desktop because its Profile was not active (#169).
+    /// Absent on every other record, including ones written before it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_only: Option<SavedOnly>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -430,6 +472,7 @@ impl ChangeRecord {
             title_key: self.card.title_key.clone(),
             committed_revision: self.committed_revision.clone(),
             confirmation: self.confirmation.clone(),
+            saved_only: self.saved_only.clone(),
             created_at: self.created_at.clone(),
             updated_at: self.updated_at.clone(),
         }

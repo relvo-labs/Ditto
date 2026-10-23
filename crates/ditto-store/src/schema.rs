@@ -8,7 +8,7 @@ use rusqlite::{Connection, Transaction};
 
 use crate::error::{StoreError, StoreResult};
 
-pub const CURRENT_VERSION: u32 = 5;
+pub const CURRENT_VERSION: u32 = 6;
 
 const V1: &str = r#"
 CREATE TABLE core_meta (
@@ -374,6 +374,12 @@ fn apply(transaction: &Transaction<'_>, version: u32) -> StoreResult<()> {
         5 => transaction.execute_batch(
             "ALTER TABLE generated_data_snapshots ADD COLUMN lineage_proven INTEGER NOT NULL DEFAULT 0 CHECK(lineage_proven IN (0,1));",
         )?,
+        // #169: a change committed to a Profile that was not active wrote
+        // its revision and applied nothing to the desktop. NULL on every
+        // other change, including all written before: those were applied.
+        6 => transaction.execute_batch(
+            "ALTER TABLE changesets ADD COLUMN saved_only TEXT CHECK(saved_only IS NULL OR saved_only IN ('inactive_profile'));",
+        )?,
         other => return Err(StoreError::Invalid(format!("no migration to {other}"))),
     }
     transaction.pragma_update(None, "user_version", version)?;
@@ -411,9 +417,10 @@ pub(crate) mod tests {
     }
     #[test]
     fn fresh_store_and_newer_schema_refusal() {
-        let temp = crate::testing::open("fresh-v5");
+        let temp = crate::testing::open("fresh-v6");
         let c = temp.store.connection();
-        assert_eq!(user_version(c).unwrap(), 5);
+        assert_eq!(user_version(c).unwrap(), CURRENT_VERSION);
+        assert!(c.prepare("SELECT saved_only FROM changesets").is_ok());
         assert!(c
             .prepare("SELECT lineage_proven FROM generated_data_snapshots")
             .is_ok());
@@ -462,7 +469,7 @@ pub(crate) mod tests {
         drop(db);
         let (store, report) = crate::Store::open_writer(&paths, &lock).unwrap();
         assert_eq!(report.migrated_from, Some(4));
-        assert_eq!(user_version(store.connection()).unwrap(), 5);
+        assert_eq!(user_version(store.connection()).unwrap(), CURRENT_VERSION);
         let backup = Connection::open(report.backup.unwrap()).unwrap();
         assert_eq!(user_version(&backup).unwrap(), 4);
         assert!(backup
@@ -514,6 +521,68 @@ pub(crate) mod tests {
         drop(backup);
         drop(lock);
         std::fs::remove_dir_all(root).unwrap();
+    }
+    /// #169: v6 adds `changesets.saved_only`. Changes written before it were
+    /// all applied to the desktop, so they keep no value and read back
+    /// without the field; only the one known reason can be stored.
+    #[test]
+    fn v6_saved_only_migration_leaves_earlier_changes_unmarked() {
+        let mut db = Connection::open_in_memory().unwrap();
+        configure(&db).unwrap();
+        for version in 1..=5 {
+            let tx = db.transaction().unwrap();
+            apply(&tx, version).unwrap();
+            tx.commit().unwrap();
+        }
+        let tx = db.transaction().unwrap();
+        let (profile, revision) = crate::profiles::create(
+            &tx,
+            "v5",
+            &crate::profiles::tests::document(),
+            &ditto_protocol::profile::RevisionOrigin::Create { from: "v5".into() },
+        )
+        .unwrap();
+        tx.execute(
+            "INSERT INTO changesets (change_id, profile_id, base_revision, state, hot_swap_level, mode,
+                ops_json, card_json, origin_kind, origin_json, subject, confirmation_json, created_at, updated_at)
+             VALUES ('chg-v5', ?1, ?2, 'draft', 'instant', 'apply', '[]',
+                '{\"kind\":\"mixed\",\"title_key\":\"t\",\"items\":[]}', 'cli', '{\"kind\":\"cli\"}',
+                'cli', '{\"state\":\"not_required\"}', 't', 't')",
+            rusqlite::params![profile.profile_id, revision.revision_id],
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        assert!(db.prepare("SELECT saved_only FROM changesets").is_err());
+        assert_eq!(migrate(&mut db).unwrap(), 5);
+        assert_eq!(user_version(&db).unwrap(), CURRENT_VERSION);
+        let stored = crate::changes::get(&db, "chg-v5").unwrap();
+        assert_eq!(stored.record.saved_only, None);
+        assert!(!serde_json::to_string(&stored.record)
+            .unwrap()
+            .contains("saved_only"));
+        assert!(db
+            .execute(
+                "UPDATE changesets SET saved_only = 'elsewhere' WHERE change_id = 'chg-v5'",
+                [],
+            )
+            .is_err());
+        crate::changes::set_saved_only(
+            &db,
+            "chg-v5",
+            ditto_protocol::change::SavedOnlyReason::InactiveProfile,
+        )
+        .unwrap();
+        let marked = crate::changes::get(&db, "chg-v5")
+            .unwrap()
+            .record
+            .saved_only;
+        assert_eq!(
+            marked,
+            Some(ditto_protocol::change::SavedOnly {
+                reason: ditto_protocol::change::SavedOnlyReason::InactiveProfile,
+                profile_name: "v5".into(),
+            })
+        );
     }
     #[test]
     fn v5_lineage_migration_rolls_back_on_conflict() {

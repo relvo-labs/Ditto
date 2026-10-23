@@ -113,6 +113,40 @@ impl Desktop {
         reached
     }
 
+    /// `changes.get` and `changes.list` both say the change was saved to
+    /// `profile_name` and not applied (#169 repair 1). Read as JSON, so the
+    /// wire form is what is checked.
+    fn assert_saved_only(&self, change_id: &str, profile_name: &str) {
+        let expected = json!({"reason": "inactive_profile", "profile_name": profile_name});
+        let got = self
+            .cli
+            .result(catalog::CHANGES_GET, json!({"change_id": change_id}));
+        assert_eq!(got["saved_only"], expected, "changes.get: {got}");
+        assert_eq!(got["state"], "committed", "{got}");
+        assert_eq!(self.listed(change_id)["saved_only"], expected);
+    }
+
+    /// A change that went to the desktop carries no `saved_only`.
+    fn assert_applied_live(&self, change_id: &str) {
+        let got = self
+            .cli
+            .result(catalog::CHANGES_GET, json!({"change_id": change_id}));
+        assert!(got.get("saved_only").is_none(), "changes.get: {got}");
+        assert!(self.listed(change_id).get("saved_only").is_none());
+    }
+
+    /// The change's summary as `changes.list` (the history list) gives it.
+    fn listed(&self, change_id: &str) -> Value {
+        self.cli
+            .result(catalog::CHANGES_LIST, json!({"limit": 100}))["changes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|summary| summary["change_id"] == json!(change_id))
+            .unwrap_or_else(|| panic!("{change_id} is not listed"))
+            .clone()
+    }
+
     fn assert_reached_nobody(&self, record: &ChangeRecord, what: &str) {
         let reached = self.reached(&record.change_id);
         assert!(
@@ -176,6 +210,7 @@ fn an_edit_of_an_inactive_profile_is_saved_and_reaches_no_participant() {
             {"op": "set_entry_config", "entry_id": dock.entry_id, "after": {"position": "bottom"}},
             {"op": "set_value", "path": "/appearance/tokens/accent", "after": "#123456"}]}));
     desk.assert_reached_nobody(&edit, "edit");
+    desk.assert_saved_only(&edit.change_id, "開發");
     assert_eq!(desk.shell.lock().unwrap().prepares, prepares);
     assert_eq!(desk.live_shell(), shown, "the desktop changed");
     assert_eq!(edit.state, ChangeState::Committed, "{edit:?}");
@@ -200,6 +235,7 @@ fn an_edit_of_an_inactive_profile_is_saved_and_reaches_no_participant() {
         "ops": [{"op": "switch_profile", "to_profile": other}]}));
     assert_eq!(switched.state, ChangeState::Committed, "{switched:?}");
     assert_eq!(desk.reached(&switched.change_id), vec!["shell", "hostd"]);
+    desk.assert_applied_live(&switched.change_id);
     let live = desk.live_shell();
     assert_eq!(dock_config(&live), json!({"position": "bottom"}));
     assert_eq!(live.appearance.tokens["accent"], "#123456");
@@ -225,6 +261,13 @@ fn a_service_edit_of_an_inactive_profile_does_not_reach_hostd() {
         "ops": [{"op": "set_entry_config", "entry_id": policy.entry_id,
                  "after": {"rules": {"focus": {"enabled": false, "allow": []}}}}]}));
     desk.assert_reached_nobody(&edit, "service edit");
+    desk.assert_saved_only(&edit.change_id, "簡報");
+    // The name is the Profile's name now, not a copy taken at commit.
+    desk.cli.result(
+        catalog::PROFILES_RENAME,
+        json!({"profile_id": other, "name": "簡報（新）"}),
+    );
+    desk.assert_saved_only(&edit.change_id, "簡報（新）");
     assert_eq!(edit.state, ChangeState::Committed, "{edit:?}");
     assert_eq!(desk.host.lock().unwrap().entries, running);
     assert_eq!(
@@ -260,6 +303,7 @@ fn undo_on_an_inactive_profile_edits_only_its_document() {
     // Older first: no overlapping path, so the inverse goes onto the head.
     let undo_older = desk.undo(&older.change_id);
     desk.assert_reached_nobody(&undo_older, "undo of the older change");
+    desk.assert_saved_only(&undo_older.change_id, "開發");
     assert_eq!(undo_older.state, ChangeState::Committed, "{undo_older:?}");
     let (_, after_older) = desk.head_of(&other);
     assert_eq!(
@@ -271,6 +315,7 @@ fn undo_on_an_inactive_profile_edits_only_its_document() {
     // The newest change on the Profile is now the undo above; undo it back.
     let undo_undo = desk.undo(&undo_older.change_id);
     desk.assert_reached_nobody(&undo_undo, "undo of the newest change");
+    desk.assert_saved_only(&undo_undo.change_id, "開發");
     assert_eq!(undo_undo.state, ChangeState::Committed, "{undo_undo:?}");
     assert_eq!(
         desk.head_of(&other).1.appearance.tokens["accent"],
@@ -296,6 +341,7 @@ fn a_timed_revert_after_switching_away_restores_only_the_document() {
     assert_eq!(preview.state, ChangeState::Committed, "{preview:?}");
     assert!(matches!(preview.confirmation, Confirmation::Pending { .. }));
     assert_eq!(desk.reached(&preview.change_id), vec!["shell"]);
+    desk.assert_applied_live(&preview.change_id);
 
     let (pending_head, _) = desk.head_of(&first);
     let switched = desk.propose(json!({
@@ -327,6 +373,7 @@ fn a_timed_revert_after_switching_away_restores_only_the_document() {
         }
     );
     desk.assert_reached_nobody(&revert, "timed revert");
+    desk.assert_saved_only(&revert.change_id, "預設");
     assert_eq!(revert.state, ChangeState::Committed, "{revert:?}");
     assert_eq!(desk.live_shell(), shown, "the desktop changed");
     assert_eq!(desk.active_profile(), other);
@@ -387,6 +434,7 @@ fn rescue_restore_of_an_inactive_profile_restores_only_the_document() {
         .unwrap()
         .unwrap();
     desk.assert_reached_nobody(&restored, "rescue restore");
+    desk.assert_saved_only(&restored.change_id, "開發");
     assert_eq!(restored.state, ChangeState::Committed, "{restored:?}");
     assert_eq!(restored.origin, ChangeOrigin::Rescue);
     assert_eq!(desk.head_of(&other).1, good);
@@ -436,6 +484,12 @@ fn recovery_finishes_an_interrupted_change_to_an_inactive_profile_without_partic
     assert_eq!(change.state, ChangeState::Committed, "{change:?}");
     assert!(change.items.is_empty(), "{:?}", change.items);
     assert!(change.recovered_at.is_some());
+    let raw = cli.result(catalog::CHANGES_GET, json!({"change_id": change_id}));
+    assert_eq!(
+        raw["saved_only"],
+        json!({"reason": "inactive_profile", "profile_name": "其他"}),
+        "{raw}"
+    );
     let got = cli.result(catalog::PROFILES_GET, json!({"profile_id": other}));
     assert_eq!(got["document"]["appearance"]["tokens"]["accent"], "#202020");
     assert_eq!(

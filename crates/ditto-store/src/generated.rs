@@ -1222,7 +1222,10 @@ mod tests {
             drop(db);
             let (mut store, report) = crate::Store::open_writer(&paths, &lock).unwrap();
             assert_eq!(report.migrated_from, Some(4));
-            assert_eq!(crate::schema::user_version(store.connection()).unwrap(), 5);
+            assert_eq!(
+                crate::schema::user_version(store.connection()).unwrap(),
+                crate::schema::CURRENT_VERSION
+            );
             assert_eq!(
                 store
                     .connection()

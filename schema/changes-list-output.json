@@ -196,6 +196,17 @@
             }
           ]
         },
+        "saved_only": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SavedOnly"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "As on [`ChangeRecord::saved_only`]."
+        },
         "state": {
           "$ref": "#/$defs/ChangeState"
         },
@@ -306,6 +317,33 @@
         {
           "const": "scheduled",
           "description": "Committed as a revision, but nothing took effect yet: every item is\n`scheduled` (session-restart level: at the next login; in rescue mode:\nwhen the normal mode returns). Never presented as \"applied\".",
+          "type": "string"
+        }
+      ]
+    },
+    "SavedOnly": {
+      "additionalProperties": false,
+      "description": "A committed change that wrote its Profile's revision and applied nothing\nto the desktop (protocol 0.2 §8.1). `result` stays `succeeded`: the edit\nof the stored Profile is done; this says where it went.",
+      "properties": {
+        "profile_name": {
+          "description": "The Profile's name when the record is read (it can be renamed since).",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/SavedOnlyReason"
+        }
+      },
+      "required": [
+        "reason",
+        "profile_name"
+      ],
+      "type": "object"
+    },
+    "SavedOnlyReason": {
+      "oneOf": [
+        {
+          "const": "inactive_profile",
+          "description": "The change's Profile was not the active one. It takes effect when\nthat Profile is switched to.",
           "type": "string"
         }
       ]

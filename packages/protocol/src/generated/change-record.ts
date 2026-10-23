@@ -146,6 +146,7 @@ export type PreflightCode =
   | 'precondition_failed'
   | 'budget_exceeded';
 export type ResultKind = ('succeeded' | 'failed' | 'partial' | 'unknown') | 'scheduled';
+export type SavedOnlyReason = 'inactive_profile';
 export type ChangeState =
   | 'draft'
   | 'validated'
@@ -190,6 +191,12 @@ export interface ChangeRecord {
    */
   recovered_at?: string | null;
   result?: ResultKind | null;
+  /**
+   * Present only when the change was committed without anything being
+   * applied to the desktop because its Profile was not active (#169).
+   * Absent on every other record, including ones written before it.
+   */
+  saved_only?: SavedOnly | null;
   state: ChangeState;
   updated_at: string;
 }
@@ -255,4 +262,16 @@ export interface PreflightReason {
   };
   detail_key: string;
   op_index?: number | null;
+}
+/**
+ * A committed change that wrote its Profile's revision and applied nothing
+ * to the desktop (protocol 0.2 §8.1). `result` stays `succeeded`: the edit
+ * of the stored Profile is done; this says where it went.
+ */
+export interface SavedOnly {
+  /**
+   * The Profile's name when the record is read (it can be renamed since).
+   */
+  profile_name: string;
+  reason: SavedOnlyReason;
 }

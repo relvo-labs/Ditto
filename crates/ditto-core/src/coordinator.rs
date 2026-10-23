@@ -22,7 +22,7 @@ use ditto_protocol::{
     catalog,
     change::{
         ChangeMode, ChangeOp, ChangeOrigin, ChangeRecord, ChangeState, Confirmation, HotSwapLevel,
-        OutcomeItem, OutcomeStatus, PreflightCode,
+        OutcomeItem, OutcomeStatus, PreflightCode, SavedOnlyReason,
     },
     ids,
     participant::{
@@ -1561,6 +1561,9 @@ impl Coordinator {
                 )?;
             }
             changes::set_items(tx, change_id, &items)?;
+            if !live {
+                changes::set_saved_only(tx, change_id, SavedOnlyReason::InactiveProfile)?;
+            }
             changes::set_committed_revision(tx, change_id, &revision_id)?;
             changes::transition(
                 tx,
