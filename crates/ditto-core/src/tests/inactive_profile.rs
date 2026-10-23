@@ -350,6 +350,96 @@ fn undo_on_an_inactive_profile_edits_only_its_document() {
     assert_eq!(desk.active_profile(), active);
 }
 
+/// The history list as `changes.list` gives it, every Profile.
+fn listed_ids(desk: &Desktop) -> Vec<Value> {
+    desk.cli.result(catalog::CHANGES_LIST, json!({"limit": 100}))["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|summary| summary["change_id"].clone())
+        .collect()
+}
+
+/// Undo of a change whose Profile is deleted: refused as `not_found` with a
+/// message that says why (protocol 0.2 §8.6), before any record is written
+/// or any participant is asked.
+fn assert_undo_refused_as_deleted(desk: &Desktop, change_id: &str) {
+    let listed = listed_ids(desk);
+    let shown = desk.live_shell();
+    let refused = desk
+        .cli
+        .call(catalog::CHANGES_UNDO, json!({"change_id": change_id}));
+    assert_eq!(refused["error"]["name"], "not_found", "{refused}");
+    let message = refused["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("deleted") && message.contains("cannot be undone"),
+        "{refused}"
+    );
+    assert_eq!(listed_ids(desk), listed, "undo wrote a change");
+    assert_eq!(desk.live_shell(), shown, "the desktop changed");
+}
+
+/// #171: a saved_only change, then its Profile is deleted. The record still
+/// reads (soft delete keeps the name) and now says the Profile is deleted,
+/// in `changes.get` and in the history list; switching to it is impossible,
+/// and undo is a clear refusal, not an internal error.
+#[test]
+fn a_saved_only_change_whose_profile_is_deleted_says_so_and_cannot_be_undone() {
+    let desk = desktop("inactive-deleted");
+    let active = desk.active_profile();
+    let other = desk.profile_named("開發");
+    let (head, _) = desk.head_of(&other);
+    let edit = desk.propose(json!({
+        "profile_id": other, "base_revision": head,
+        "ops": [{"op": "set_value", "path": "/appearance/tokens/accent", "after": "#123456"}]}));
+    assert_eq!(edit.state, ChangeState::Committed, "{edit:?}");
+    // While the Profile exists the field is left out.
+    desk.assert_saved_only(&edit.change_id, "開發");
+
+    desk.cli
+        .result(catalog::PROFILES_DELETE, json!({"profile_id": other}));
+    let expected = json!({"reason": "inactive_profile", "profile_name": "開發", "profile_deleted": true});
+    let got = desk
+        .cli
+        .result(catalog::CHANGES_GET, json!({"change_id": edit.change_id}));
+    assert_eq!(got["saved_only"], expected, "changes.get: {got}");
+    assert_eq!(got["state"], "committed", "{got}");
+    assert_eq!(got["result"], "succeeded", "{got}");
+    assert_eq!(desk.listed(&edit.change_id)["saved_only"], expected);
+
+    assert_undo_refused_as_deleted(&desk, &edit.change_id);
+    assert_eq!(desk.active_profile(), active);
+}
+
+/// The same refusal for a change that was applied to the desktop and whose
+/// Profile was deleted after switching away (no `saved_only` here; the
+/// record itself is unchanged, see #171's scope note).
+#[test]
+fn undo_of_an_applied_change_on_a_deleted_profile_is_refused_clearly() {
+    let desk = desktop("deleted-applied");
+    let first = desk.active_profile();
+    let (first_head, _) = desk.head_of(&first);
+    let applied = desk.propose(json!({
+        "base_revision": first_head,
+        "ops": [{"op": "set_value", "path": "/appearance/tokens/accent", "after": "#654321"}]}));
+    assert_eq!(applied.state, ChangeState::Committed, "{applied:?}");
+    desk.assert_applied_live(&applied.change_id);
+    let other = desk.profile_named("開發");
+    let (now, _) = desk.head_of(&first);
+    let switched = desk.propose(json!({
+        "base_revision": now,
+        "ops": [{"op": "switch_profile", "to_profile": other}]}));
+    assert_eq!(switched.state, ChangeState::Committed, "{switched:?}");
+    desk.cli
+        .result(catalog::PROFILES_DELETE, json!({"profile_id": first}));
+    desk.assert_applied_live(&applied.change_id);
+
+    assert_undo_refused_as_deleted(&desk, &applied.change_id);
+    // Undoing the switch would switch back to the deleted Profile.
+    assert_undo_refused_as_deleted(&desk, &switched.change_id);
+    assert_eq!(desk.active_profile(), other);
+}
+
 /// A preview on the active Profile, then a switch before anyone confirms:
 /// the timed revert lands on a Profile that is no longer on the desktop, so
 /// it restores that Profile's document and leaves the desktop alone.

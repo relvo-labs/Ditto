@@ -601,4 +601,70 @@ mod tests {
             .unwrap();
         assert_eq!(found.record.change_id, first.record.change_id);
     }
+
+    /// #171: the Profile a saved_only change went to can be deleted later.
+    /// The delete is soft, so the row and its name stay; reading the change
+    /// (one record, or the history list) says the Profile is deleted. Checked
+    /// in the wire form, where the field is left out while it is false.
+    #[test]
+    fn a_saved_only_change_reads_back_that_its_profile_was_deleted() {
+        let mut temp = testing::open("saved-only-deleted");
+        let origin = ChangeOrigin::Cli;
+        let card = card();
+        let (profile_id, change_id) = temp
+            .store
+            .write(|tx| {
+                let (profile, head) = crate::profiles::create(
+                    tx,
+                    "其他",
+                    &crate::profiles::tests::document(),
+                    &ditto_protocol::profile::RevisionOrigin::Create { from: "t".into() },
+                )?;
+                let stored = insert(
+                    tx,
+                    &NewChange {
+                        profile_id: &profile.profile_id,
+                        base_revision: &head.revision_id,
+                        ops: &[],
+                        mode: ChangeMode::Apply,
+                        origin: &origin,
+                        subject: "cli",
+                        idempotency_key: None,
+                        request_operation_id: None,
+                        card: &card,
+                        hot_swap_level: HotSwapLevel::Instant,
+                    },
+                )?;
+                set_saved_only(
+                    tx,
+                    &stored.record.change_id,
+                    SavedOnlyReason::InactiveProfile,
+                )?;
+                Ok((profile.profile_id, stored.record.change_id))
+            })
+            .unwrap();
+        let read = |temp: &testing::TempStore| {
+            let record = get(temp.store.connection(), &change_id).unwrap().record;
+            let listed = list(temp.store.connection(), None, None, 10)
+                .unwrap()
+                .into_iter()
+                .find(|stored| stored.record.change_id == change_id)
+                .unwrap()
+                .record
+                .summary();
+            (
+                serde_json::to_value(&record).unwrap()["saved_only"].clone(),
+                serde_json::to_value(&listed).unwrap()["saved_only"].clone(),
+            )
+        };
+        let kept = serde_json::json!({"reason": "inactive_profile", "profile_name": "其他"});
+        assert_eq!(read(&temp), (kept.clone(), kept));
+
+        temp.store
+            .write(|tx| crate::profiles::soft_delete(tx, &profile_id))
+            .unwrap();
+        let deleted = serde_json::json!(
+            {"reason": "inactive_profile", "profile_name": "其他", "profile_deleted": true});
+        assert_eq!(read(&temp), (deleted.clone(), deleted));
+    }
 }
