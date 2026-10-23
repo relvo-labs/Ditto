@@ -16,6 +16,7 @@ use ditto_protocol::{
 use serde_json::json;
 
 use crate::{
+    config_schema,
     docops::{self, reason},
     projection::{self, PackageSet, Resolver},
 };
@@ -106,6 +107,8 @@ pub fn run(base: &ProfileDocument, ops: &[ChangeOp], context: &Context<'_>) -> V
     let target = applied.document;
     let mut reasons = applied.reasons;
     check_all(base, &target, &mut reasons, context);
+    // `docops::apply` already reported a config that is not an object.
+    check_configs(base, &target, &applied.ops, &mut reasons, context, false);
     finish(base, target, applied.ops, reasons, context)
 }
 
@@ -118,7 +121,117 @@ pub fn run_target(
 ) -> Validation {
     let mut reasons = Vec::new();
     check_all(base, &target, &mut reasons, context);
+    if !restores_stored_revision(context.origin) {
+        check_configs(base, &target, &ops, &mut reasons, context, true);
+    }
     finish(base, target, ops, reasons, context)
+}
+
+/// Undo, timed revert, rescue and supervision hand preflight a revision Core
+/// already stored. Its configs were checked when they were written (a
+/// package's manifest never changes for the same version), or predate the
+/// check; either way, refusing them here would take away the way back.
+fn restores_stored_revision(origin: &ChangeOrigin) -> bool {
+    matches!(
+        origin,
+        ChangeOrigin::Undo { .. }
+            | ChangeOrigin::TimedRevert { .. }
+            | ChangeOrigin::Rescue
+            | ChangeOrigin::Supervisor { .. }
+    )
+}
+
+/// Violations listed in one reason; the rest are counted.
+const MAX_LISTED_VIOLATIONS: usize = 16;
+
+/// #161: every entry whose config this change writes, or which moves to
+/// another package or version, must satisfy that package version's manifest
+/// `config_schema` (the subset the SDK allows, `config_schema.rs`). Entries
+/// the change leaves alone are not checked again: a Profile stored before
+/// this check keeps loading, and can still be disabled or removed.
+fn check_configs(
+    base: &ProfileDocument,
+    target: &ProfileDocument,
+    ops: &[ChangeOp],
+    reasons: &mut Vec<PreflightReason>,
+    context: &Context<'_>,
+    report_not_object: bool,
+) {
+    // New entries are appended in the order of their `add_entry` ops; the
+    // id Core gave them is not in the op, so position names the op.
+    let mut add_ops = ops
+        .iter()
+        .enumerate()
+        .filter(|(_, op)| matches!(op, ChangeOp::AddEntry { .. }))
+        .map(|(index, _)| index);
+    for entry in &target.entries {
+        let before = base.entry(&entry.entry_id);
+        let op_index = match before {
+            None => add_ops.next(),
+            Some(_) => ops.iter().rposition(|op| match op {
+                ChangeOp::SetEntryConfig { entry_id, .. }
+                | ChangeOp::UpgradeEntry { entry_id, .. } => entry_id == &entry.entry_id,
+                _ => false,
+            }),
+        };
+        let rewritten = before.is_none_or(|old| {
+            old.package != entry.package
+                || old.version != entry.version
+                || old.config != entry.config
+        });
+        if !rewritten {
+            continue;
+        }
+        // A missing package has its own reason (`package_missing`).
+        let Some(row) = context.packages.get(&entry.package, &entry.version) else {
+            continue;
+        };
+        if !entry.config.is_object() {
+            if report_not_object {
+                reasons.push(reason(
+                    PreflightCode::SchemaInvalid,
+                    op_index,
+                    json!({"entry_id": entry.entry_id, "why": "config_not_object"}),
+                ));
+            }
+            continue;
+        }
+        match config_schema::check(&row.manifest.config_schema, &entry.config) {
+            Ok(violations) if violations.is_empty() => {}
+            Ok(violations) => {
+                let listed: Vec<_> = violations
+                    .iter()
+                    .take(MAX_LISTED_VIOLATIONS)
+                    .map(|v| json!({"pointer": v.pointer, "keyword": v.keyword, "message": v.message}))
+                    .collect();
+                reasons.push(reason(
+                    PreflightCode::SchemaInvalid,
+                    op_index,
+                    json!({
+                        "why": "config_schema_violation",
+                        "entry_id": entry.entry_id,
+                        "package": entry.package,
+                        "version": entry.version,
+                        "pointer": violations[0].pointer,
+                        "violations": listed,
+                        "violation_count": violations.len(),
+                    }),
+                ));
+            }
+            Err(unsupported) => reasons.push(reason(
+                PreflightCode::SchemaInvalid,
+                op_index,
+                json!({
+                    "why": "config_schema_unsupported",
+                    "entry_id": entry.entry_id,
+                    "package": entry.package,
+                    "version": entry.version,
+                    "schema_pointer": unsupported.schema_pointer,
+                    "message": unsupported.message,
+                }),
+            )),
+        }
+    }
 }
 
 fn finish(

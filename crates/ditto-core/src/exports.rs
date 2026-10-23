@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 
 use ditto_protocol::{
     jcs,
-    profile::{ImportProblem, ImportProblemKind, PackageLock, ProfileDocument, ProfileExport},
+    profile::{
+        EntrySpec, ImportProblem, ImportProblemKind, PackageLock, ProfileDocument, ProfileExport,
+    },
     PROTOCOL_VERSION,
 };
 use serde_json::{json, Value};
@@ -173,6 +175,31 @@ fn problem(kind: ImportProblemKind, blocking: bool, detail: Value) -> ImportProb
     }
 }
 
+/// Why an imported entry's config does not fit its package's
+/// `config_schema`, in the detail shape preflight uses.
+fn config_problem(entry: &EntrySpec, schema: &Value) -> Option<Value> {
+    let mut detail = if !entry.config.is_object() {
+        json!({"why": "config_not_object"})
+    } else {
+        match crate::config_schema::check(schema, &entry.config) {
+            Ok(violations) if violations.is_empty() => return None,
+            Ok(violations) => json!({
+                "why": "config_schema_violation",
+                "pointer": violations[0].pointer,
+                "violation_count": violations.len(),
+            }),
+            Err(unsupported) => json!({
+                "why": "config_schema_unsupported",
+                "schema_pointer": unsupported.schema_pointer,
+            }),
+        }
+    };
+    detail["entry_id"] = json!(entry.entry_id);
+    detail["package"] = json!(entry.package);
+    detail["version"] = json!(entry.version);
+    Some(detail)
+}
+
 /// Validate without executing anything. Returns the parsed export when it is
 /// structurally usable, plus every problem found.
 pub fn validate(raw: &Value, packages: &PackageSet) -> (Option<ProfileExport>, Vec<ImportProblem>) {
@@ -230,6 +257,14 @@ pub fn validate(raw: &Value, packages: &PackageSet) -> (Option<ProfileExport>, V
                         true,
                         json!({"package": entry.package, "version": entry.version}),
                     ));
+                }
+                if let Some(detail) = config_problem(entry, &row.manifest.config_schema) {
+                    // Not blocking: an export nulls redacted values, which a
+                    // schema may refuse, and the person fills them in after
+                    // the import. The imported Profile is not active; the
+                    // switch to it runs preflight, which refuses the config
+                    // until it is fixed (#161).
+                    problems.push(problem(ImportProblemKind::SchemaInvalid, false, detail));
                 }
             }
         }
