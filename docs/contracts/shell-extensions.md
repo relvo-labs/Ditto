@@ -86,7 +86,8 @@
 surface provider 可選擇在根物件提供 `edgeGeometry`；完整介面見 [Shell 供應者契約](../../shell/README.md#選用邊緣幾何ui-p04a)。v1 的固定形狀為 `{ version: 1, output: <screen.name>, edge: "top"|"bottom"|"left"|"right", visible: <bool>, centreInset: <有限非負數> }`。`output` 是表面實際採用的輸出名稱，沒有輸出時為空字串；`centreInset` 是從該邊向內到視覺中心線的 QML 邏輯 px，作為本切片所需的 inset，不另加入矩形或保留區。這不是 exclusive zone。
 
 - 變更以 QML 屬性的 `edgeGeometryChanged` 通知：供應者以 binding 替換整個值，涵蓋輸出、邊緣、可見性與距離；不原地改 JS 欄位、不輪詢。v1 只表示一個輸出上的一個邊緣表面。
-- `ditto.dock.pill` 與 `ditto.dock.bottom` 提供同一提示；淺色 pill 中心距離保持 `edgeGap + pillThickness / 2`（46 px），bottom 為 `edgeGap + (tileHeight + barPadding * 2) / 2`（34 px）。兩者視窗採用宿主給的 `screen`。
+- pill 1.1.1 與 bottom 1.1.2 提供同一提示；淺色 pill 中心距離為 `edgeGap + pillThickness / 2`（46 px），bottom 為 `edgeGap + (tileHeight + barPadding * 2) / 2`（34 px）。兩者視窗明確綁定宿主提供的 `screen`（目前為 `Quickshell.screens[0]`，建立實例時傳入），不是 Shell 依布局左上角選出的 primary。這可能改變已配送 Dock 在多輸出環境出現的輸出；未驗證，屬 UI-AT11。
+- **既有 store 的可見變化**：18 px FAB 底距保持不變僅適用使用 pill 1.1.1 的新 store／已升級條目及載入目前來源的開發環境。既有條目仍精確綁定 pill 1.1.0；release 工作階段的 `ProviderHost.resolveUrl` 載入套件庫中該版舊 QML，沒有 `edgeGeometry`，底距會由 18 px 改為 32 px fallback，直到使用 `upgrade_entry`（#50／#144）升級條目。開發工作階段載入來源目錄，會掩蓋這個差異。本切片不改既有綁定、不自動遷移。
 - 助理只讀 active `ui.dock` 實例的公開 `edgeGeometry`，不判斷 package，也不讀 Dock 私有尺寸。維持淺色配方／FAB 限制；底部角落、相同非空輸出、版本 1、可見、底邊且數值有效，並且縮放後 FAB 放得下，才置中於該線。
 - 無 Dock、缺屬性／無效欄位、未知版本、隱藏、其他邊緣／輸出、輸出消失或 FAB 放不下，一律回到固定 32 px 底距。capsule／舊主題仍採原布局。
 - 這是供應者持有、Shell 程序內的呈現提示；不新增 Core／協定／manifest 欄位，不持久化、不作 ChangeSet 回讀或成功判準。第三 Dock 可依此提示加入對齊，但不因此取得執行第三方 QML 的權限。此切片不建立 `ui.assistant` slot；UI-AT01 的完整替換與 UI-AT11 的實體雙螢幕證據仍另行驗證。

@@ -99,7 +99,7 @@ TestCase {
             edge: "bottom", visible: true, centreInset: 46 } } };
     }
     function test_selected_data() {
-        return ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"]
+        return ["collapsed", "hover", "focus", "expanded", "working-collapsed", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop", "desktop-bottom"]
             .map(scene => ({ tag: "D1-56-E1-" + scene, scene: scene }));
     }
     function test_selected(data) {
@@ -137,7 +137,7 @@ TestCase {
             chat.closeRequested.connect(() => { chat.visible = false; surface.expanded = false; });
             surface.expanded = true;
         });
-        if (["expanded", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop"].indexOf(scene) >= 0)
+        if (["expanded", "working", "open", "open-collapsed", "reduced-motion", "legacy-theme", "desktop", "desktop-bottom"].indexOf(scene) >= 0)
             mouseClick(entry, entry.width / 2, entry.height / 2);
         if (["open", "open-collapsed", "reduced-motion", "legacy-theme"].indexOf(scene) >= 0)
             entry.activate(); // E1 second activation: same compact, no new chat.
@@ -147,17 +147,23 @@ TestCase {
         else mouseMove(desktop, 640, 400);
         if (scene === "focus") entry.forceActiveFocus();
         let dock = null;
-        if (scene === "desktop") {
-            dock = provider("DockPill.qml", { position: "bottom", pinned: Data.pinned });
+        if (scene === "desktop" || scene === "desktop-bottom") {
+            dock = provider(scene === "desktop" ? "DockPill.qml" : "DockBottom.qml", { position: "bottom", pinned: Data.pinned });
             dock.screen = output;
-            surface.dockMount = { binding: { package: "ditto.dock.pill" }, object: dock };
+            surface.dockMount = { object: dock };
             provider("PanelTop.qml", {});
             tryCompare(dock, "appsLoaded", true);
-            compare(dock.entries.length, Data.pinned.length);
-            const capsule = findChild(layer, "dockCapsule");
+            const capsule = findChild(layer, scene === "desktop" ? "dockCapsule" : "dockBar");
             tryVerify(() => capsule.width > capsule.height * 2, 3000, "Dock laid out with icons");
-            tryCompare(dock, "reveal", 1);
-            tryVerify(() => dock.entries.every(item => !findChild(layer, "dockTile_" + item.appId).motionRunning));
+            if (scene === "desktop") {
+                compare(dock.entries.length, Data.pinned.length);
+                tryCompare(dock, "reveal", 1);
+                tryVerify(() => dock.entries.every(item => !findChild(layer, "dockTile_" + item.appId).motionRunning));
+            } else {
+                compare(surface.bottomMargin, 6);
+                compare(surface.contentItem.y + surface.height / 2,
+                    capsule.mapToItem(desktop, capsule.width / 2, capsule.height / 2).y);
+            }
             tryVerify(() => ["panelNetworkIcon", "panelVolumeIcon"].every(name => findChild(layer, name).status !== Image.Loading));
         }
         candidateCaption = "D1 · 56 px · E1 · " + scene
@@ -183,7 +189,8 @@ TestCase {
             chat: chat ? { x: chat.contentItem.x, y: chat.contentItem.y, width: chat.width, height: chat.height } : null,
             motion: { enabled: tokens.motionEnabled, settled: !entry.feedbackRunning, working_cue: entry.workingCueRunning },
             state_text: entry.statusText, session_id: conversation.sessionId,
-            turn_id: conversation.turn ? conversation.turn.turn_id : null, full_desktop: !!dock }));
+            turn_id: conversation.turn ? conversation.turn.turn_id : null, full_desktop: !!dock,
+            dock: dock ? { geometry: dock.edgeGeometry, bottom_margin: surface.bottomMargin } : null }));
     }
     function test_scenes_data() {
         const rows = [];

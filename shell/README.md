@@ -91,7 +91,9 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 
 供應者以 QML binding 產生整個物件；輸出、邊緣、可見性或中心距離改變時，替換值並發出自動的 `edgeGeometryChanged`。不可只原地修改 JS 物件欄位；消費者以 binding 追蹤屬性，無輪詢、無逐幀 IPC。多輸出／多表面集合不在 v1 範圍；未提供此選用提示仍是有效供應者。
 
-官方 `ditto.dock.pill` 的淺色呈現回報 `edgeGap + pillThickness / 2`（目前 46 px）；舊主題膠囊回報 `thickness / 2`。`ditto.dock.bottom` 回報 `edgeGap + (tileHeight + barPadding * 2) / 2`（34 px）。兩個 Dock 視窗的 `screen` 綁定宿主給的主輸出。
+官方 `ditto.dock.pill` 的淺色呈現回報 `edgeGap + pillThickness / 2`（目前 46 px）；舊主題膠囊回報 `thickness / 2`。`ditto.dock.bottom` 回報 `edgeGap + (tileHeight + barPadding * 2) / 2`（34 px）。兩個 Dock 視窗明確綁定宿主提供的 `screen`（目前為 `Quickshell.screens[0]`，建立實例時傳入），不是 Shell 依布局左上角選出的 primary。明確綁定可能改變已配送 Dock 在多輸出環境出現的輸出；此影響未驗證，屬 UI-AT11。
+
+18 px FAB 底距保持不變的證據只涵蓋使用 pill 1.1.1 的新 store／已升級條目，以及載入目前來源的開發環境。既有 store 仍精確綁定 pill 1.1.0；release 工作階段從套件庫載入該版舊 QML，沒有 `edgeGeometry`，因此底距會由 18 px 改為 32 px fallback，直到透過 `upgrade_entry`（#50／#144）升級條目。開發環境的來源目錄覆寫會掩蓋這個差異；本切片不自動升級既有條目。
 
 助理保留現行 `entryStyle === "fab"` 與淺色配方限制，避免改動 capsule 與舊主題布局。底部角落只接受相同輸出、`version === 1`、`visible === true`、`edge === "bottom"` 且數值有效的提示；縮放後 FAB 半高 ≤ `centreInset` 時，底距為 `centreInset - FAB 半高`。其餘情況（含無 Dock、缺提示、未知版本、隱藏、其他輸出、輸出消失、其他邊緣或 FAB 放不下）全部使用固定 32 px 底距，不做部分對齊。
 

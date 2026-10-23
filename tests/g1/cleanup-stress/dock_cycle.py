@@ -17,6 +17,10 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
+
+PILL_VERSION = json.loads((Path(__file__).resolve().parents[3]
+                           / "shell/providers/dock_pill/manifest.json").read_text())["version"]
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib"))
 from gui import relay  # noqa: E402
@@ -77,7 +81,7 @@ def main():
     try:
         bottom = dock_entry()
         change = propose([{"op": "add_entry", "slot": "ui.dock",
-                           "entry": {"package": "ditto.dock.pill", "version": "1.1.0", "host": "qml", "config": {}, "disabled": False}}])
+                           "entry": {"package": "ditto.dock.pill", "version": PILL_VERSION, "host": "qml", "config": {}, "disabled": False}}])
         if change["state"] != "committed":
             raise RuntimeError(f"adding the pill Dock ended {change['state']}")
         pill = dock_entry()
