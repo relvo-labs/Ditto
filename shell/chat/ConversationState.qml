@@ -14,6 +14,9 @@ QtObject {
 
     required property var client
 
+    /// Settings renderers receive this projection, never the conversation.
+    readonly property QtObject aiSettings: AiSettingsFacade {}
+
     // ---- what Core says -------------------------------------------------------------
     /// `settings` and `provider` hold only readback confirmed on the current
     /// connection; null is the one meaning of "not confirmed" for every

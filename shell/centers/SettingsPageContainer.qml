@@ -5,6 +5,7 @@ Item {
     id: container
     required property var client
     required property var tokens
+    property var aiSettings: null
     property string pageId: ""
     property var registration: null
     property Component fallbackComponent: null
@@ -39,6 +40,10 @@ Item {
             failed = true;
             return;
         }
+        // Optional inputs must not become unknown-property creation errors
+        // for pages which do not declare them.
+        if ("aiSettings" in object)
+            object.aiSettings = Qt.binding(() => container.aiSettings);
         embedded = object;
         object.anchors.fill = container;
     }

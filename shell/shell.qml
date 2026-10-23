@@ -376,7 +376,7 @@ ShellRoot {
             client: root.shellClient
             tokens: root.shellTokens
             providers: root.shellProviders
-            conversation: root.shellConversation
+            aiSettings: root.shellConversation.aiSettings
             page: centers.page
             onCloseRequested: centers.open = false
             onPageChanged: centers.page = page
