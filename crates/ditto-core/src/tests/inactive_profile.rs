@@ -98,7 +98,13 @@ impl Desktop {
     /// Every participant that was asked to prepare this change.
     fn reached(&self, change_id: &str) -> Vec<&'static str> {
         let mut reached = Vec::new();
-        if self.shell.lock().unwrap().candidates.contains_key(change_id) {
+        if self
+            .shell
+            .lock()
+            .unwrap()
+            .candidates
+            .contains_key(change_id)
+        {
             reached.push("shell");
         }
         if self.host.lock().unwrap().candidates.contains_key(change_id) {
@@ -222,7 +228,11 @@ fn a_service_edit_of_an_inactive_profile_does_not_reach_hostd() {
     assert_eq!(edit.state, ChangeState::Committed, "{edit:?}");
     assert_eq!(desk.host.lock().unwrap().entries, running);
     assert_eq!(
-        desk.head_of(&other).1.entry(&policy.entry_id).unwrap().config,
+        desk.head_of(&other)
+            .1
+            .entry(&policy.entry_id)
+            .unwrap()
+            .config,
         json!({"rules": {"focus": {"enabled": false, "allow": []}}})
     );
     assert_eq!(desk.active_profile(), active);
@@ -337,7 +347,10 @@ fn rescue_restore_of_an_inactive_profile_restores_only_the_document() {
     let (good_head, good) = desk.head_of(&other);
     // 開發 has run well at good_head; since then its head moved on.
     let mut broken = good.clone();
-    broken.appearance.tokens.insert("accent".into(), "#bad000".into());
+    broken
+        .appearance
+        .tokens
+        .insert("accent".into(), "#bad000".into());
     let (profile, good_revision) = (other.clone(), good_head.clone());
     desk.harness
         .core
@@ -358,7 +371,10 @@ fn rescue_restore_of_an_inactive_profile_restores_only_the_document() {
                 .unwrap()
         })
         .unwrap();
-    assert_eq!(desk.head_of(&other).1.appearance.tokens["accent"], "#bad000");
+    assert_eq!(
+        desk.head_of(&other).1.appearance.tokens["accent"],
+        "#bad000"
+    );
     let shown = desk.live_shell();
 
     let profile = other.clone();
@@ -377,4 +393,57 @@ fn rescue_restore_of_an_inactive_profile_restores_only_the_document() {
     assert_eq!(desk.live_shell(), shown, "the desktop changed");
     assert_eq!(desk.active_profile(), active);
     assert_eq!(desk.head_of(&active).0, active_head);
+}
+
+/// Boot recovery of a change to an inactive Profile that a crash left in
+/// `applying`: no participant had been asked anything, so none is waited
+/// for or read back; the revision is written as the change intended.
+#[test]
+fn recovery_finishes_an_interrupted_change_to_an_inactive_profile_without_participants() {
+    let root = root("inactive-recovery");
+    let base = plain_document("#101010");
+    let target = plain_document("#202020");
+    let seeded = Arc::new(Mutex::new(None));
+    let recorded = Arc::clone(&seeded);
+    let (stored_base, stored_target) = (base.clone(), target.clone());
+    seed_store(&root, &base, &base, move |tx, _, _, _| {
+        let (other, head) = profiles::create(
+            tx,
+            "其他",
+            &stored_base,
+            &RevisionOrigin::Create {
+                from: "default".into(),
+            },
+        )?;
+        let change = interrupted_change(
+            tx,
+            &other.profile_id,
+            &head.revision_id,
+            &stored_target,
+            ChangeState::Applying,
+            "k-inactive",
+        )?;
+        *recorded.lock().unwrap() = Some((other.profile_id, change));
+        Ok(())
+    });
+    // No Shell and no hostd: a change on the active Profile would end
+    // `unknown` here (recovery_without_the_participant_is_unknown_...).
+    let core = start_without_waiting(&root, false);
+    core.coordinate(Duration::from_secs(15), |_| ()).unwrap();
+    let cli = TestPeer::connect(&core, "dittoctl", None);
+    let (other, change_id) = seeded.lock().unwrap().clone().unwrap();
+    let change = record(&cli.result(catalog::CHANGES_GET, json!({"change_id": change_id})));
+    assert_eq!(change.state, ChangeState::Committed, "{change:?}");
+    assert!(change.items.is_empty(), "{:?}", change.items);
+    assert!(change.recovered_at.is_some());
+    let got = cli.result(catalog::PROFILES_GET, json!({"profile_id": other}));
+    assert_eq!(got["document"]["appearance"]["tokens"]["accent"], "#202020");
+    assert_eq!(
+        got["profile"]["head_revision"].as_str(),
+        change.committed_revision.as_deref()
+    );
+    // The active Profile is untouched.
+    assert_eq!(document(&cli)["appearance"]["tokens"]["accent"], "#101010");
+    drop(core);
+    let _ = std::fs::remove_dir_all(&root);
 }
