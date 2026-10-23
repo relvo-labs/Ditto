@@ -153,7 +153,7 @@
 - `before` 是**意圖比對**：Core 在 `validated` 時以基底 revision 的實際值重填；呼叫方給了 `before` 且與實際值不同 → `stale_intent`。
 - `add_entry` 的 `entry_id` 由 Core 產生（`ent-<ULID>`），跨 revision 穩定；`slot` 選填，給了就在同一個 op 裡綁定。`slot` 若是多條目區域（`ui.status_item`），條目改為加入該區域（記在條目的 `area`），不綁定 `slots`；`bind_slot` 不接受區域（`schema_invalid`，`area_is_not_a_slot`）。區域語意見 [profile-document.md](profile-document.md#多條目區域uistatus_item)。
 - `switch_profile` 必須單獨出現，並從作用中的 Profile 提出：`profile_id` 省略或等於作用中的 Profile，`base_revision` 是它的 head。切換改變的是桌面，預檢以作用中的 Profile 為基準；指名其他 Profile 時以 `precondition_failed`（`switch_not_from_active_profile`，`detail` 有 `profile_id` 與 `active_profile`）拒絕，紀錄留在被指名的 Profile 下。
-- 其他 op 的 `profile_id` 指名**非作用中**的 Profile 時，這筆 ChangeSet 只改那個 Profile 的文件，因為桌面顯示的是作用中的 Profile：預檢照常執行（含 `config_schema`），通過後寫入 revision、移動該 Profile 的 head，**不呼叫任何參與者**（§9 的 prepare、commit、readback 都沒有）。紀錄為 `state = committed`、`result = succeeded`，`items[]` 為空；`hot_swap_level` 只是記錄，不排程下次登入。不倒數確認：`mode: preview` 或需要限時回復的 op 也一樣，`confirmation` 為 `not_required`。生成插件的資料不搬動，桌面的 revision 不變，也不開始觀察期（last-known-good 不更新）；`profile_changed` 的 `active` 為 `false`。之後切換到這個 Profile，切換本身才把它投影到桌面。撤銷、限時回復與救援還原以它們作用的 Profile 判斷，規則相同（§8.5、§8.6）。
+- 其他 op 的 `profile_id` 指名**非作用中**的 Profile 時，這筆 ChangeSet 只改那個 Profile 的文件，因為桌面顯示的是作用中的 Profile：預檢照常執行（含 `config_schema`），通過後寫入 revision、移動該 Profile 的 head，**不呼叫任何參與者**（§9 的 prepare、commit、readback 都沒有）。紀錄為 `state = committed`、`result = succeeded`，`items[]` 為空，並帶 `saved_only`（見 §8.2）；`hot_swap_level` 只是記錄，不排程下次登入。不倒數確認：`mode: preview` 或需要限時回復的 op 也一樣，`confirmation` 為 `not_required`。生成插件的資料不搬動，桌面的 revision 不變，也不開始觀察期（last-known-good 不更新）；`profile_changed` 的 `active` 為 `false`。之後切換到這個 Profile，切換本身才把它投影到桌面。撤銷、限時回復與救援還原以它們作用的 Profile 判斷，規則相同（§8.5、§8.6）。
 - 主體與來源由連線決定：`shell` → `gui{surface}`、`cli` → `cli`、`agent` → `agent_standin`（G1）、救援 → `rescue`、監督 → `supervisor`、計時回復 → `timed_revert`、撤銷 → `undo`、匯入 → `import`。呼叫方不能指定來源。
 
 寫入配置的能力（`appearance.set` 等）**都是 ChangeSet 的包裝**：Core 在內部建立只有一個 op 的 ChangeSet，回傳同一種 `ChangeRecord`。
@@ -180,6 +180,8 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 | `unknown` | `unknown` |
 
 回應與歷史**永遠同時帶** `state` 與 `result`。`result = partial` 時，`items[]` 逐項列出 `applied`、`not_restored` 與原因。
+
+`saved_only = { "reason": "inactive_profile", "profile_name": "<名稱>" }`：只出現在「寫進非作用中的 Profile、沒有套用到桌面」的已提交變更（§8.1），`ChangeRecord` 與 `ChangeSummary`（`changes.list`、`change_updated`）都帶；其他紀錄省略這個欄位，包括它出現之前的所有紀錄，因為那些都已套用到桌面。`result` 仍是 `succeeded`：對那個 Profile 的編輯已完成，`saved_only` 說的是它去了哪裡。`reason` 是封閉集合，目前只有 `inactive_profile`；`profile_name` 是讀取紀錄時該 Profile 的名稱（改名後跟著變）。介面不得把它寫成「已套用」，要說已存到哪個組合、桌面沒有改變、切換到該組合時才會套用；這種變更照常可以撤銷（§8.6）。這是選用的新增欄位，不新增結果類別或原因碼（store schema 6 的 `changesets.saved_only`）。
 
 `result = scheduled`：變更已存成 revision（`state = committed`、head 已移動），但**還沒有任何東西生效**——`items[]` 全部是 `scheduled`，原因 `next_login`（§8.4 的 `session_restart`）或 `rescue_mode`（救援模式下只動到 hostd 的變更，回到一般模式時生效）。介面只能呈現為「待下次登入套用」或「回到一般模式後套用」，不得寫成已套用。判定規則在 `ditto_protocol::change::result_of`，store 的 `result_kind` 欄與回應用同一條。
 
