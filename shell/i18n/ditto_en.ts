@@ -478,6 +478,22 @@
         <translation>Applied for a try. Press “Keep” to keep it; cancelling or waiting reverts it.</translation>
     </message>
     <message>
+        <source>已存到「%1」</source>
+        <translation>Saved to “%1”</translation>
+    </message>
+    <message>
+        <source>已存到「%1」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。</source>
+        <translation>Saved to “%1”. Nothing on the desktop changed; it applies when you switch to this composition. You can undo it.</translation>
+    </message>
+    <message>
+        <source>已存到另一個組合</source>
+        <translation>Saved to another composition</translation>
+    </message>
+    <message>
+        <source>已存到另一個組合，桌面沒有改變；切換到那個組合時才會套用。可以撤銷。</source>
+        <translation>Saved to another composition. Nothing on the desktop changed; it applies when you switch to that composition. You can undo it.</translation>
+    </message>
+    <message>
         <source>已生效</source>
         <translation>In effect</translation>
     </message>

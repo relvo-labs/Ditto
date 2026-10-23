@@ -35,6 +35,17 @@ QtObject {
         return "rescue_mode";
     }
 
+    /// Core's `saved_only` on a committed change: it was written to a
+    /// Profile that is not active and nothing on the desktop changed
+    /// (protocol 0.2 §8.1). Records and list summaries both carry it.
+    function savedOnly(record) {
+        return !!record && record.state === "committed" && !!record.saved_only ? record.saved_only : null;
+    }
+
+    function savedOnlyLabel(saved) {
+        return saved.profile_name ? t(qsTr("已存到「%1」")).arg(saved.profile_name) : t(qsTr("已存到另一個組合"));
+    }
+
     /// 準備中 / 套用中 / 確認中 / 完成 / 已回復 / 部分完成 / 無法確認
     function stateLabel(record) {
         if (!record) {
@@ -50,6 +61,9 @@ QtObject {
         case "verifying":
             return t(qsTr("確認中"));
         case "committed":
+            if (savedOnly(record)) {
+                return savedOnlyLabel(savedOnly(record));
+            }
             if (record.result === "scheduled") {
                 return scheduledReason(record) === "rescue_mode" ? t(qsTr("回到一般模式後套用")) : t(qsTr("待下次登入套用"));
             }
@@ -86,7 +100,7 @@ QtObject {
         }
         switch (record.state) {
         case "committed":
-            if (record.result === "scheduled") {
+            if (record.result === "scheduled" || savedOnly(record)) {
                 return "info";
             }
             if (record.result === "partial") {
@@ -115,6 +129,13 @@ QtObject {
         }
         switch (record.state) {
         case "committed":
+            if (savedOnly(record)) {
+                // Core undoes such a change in the same Profile, so undo is
+                // offered as for any committed change.
+                return savedOnly(record).profile_name
+                    ? t(qsTr("已存到「%1」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。")).arg(savedOnly(record).profile_name)
+                    : t(qsTr("已存到另一個組合，桌面沒有改變；切換到那個組合時才會套用。可以撤銷。"));
+            }
             if (record.result === "scheduled") {
                 return scheduledReason(record) === "rescue_mode"
                     ? t(qsTr("已保存，還沒有生效：回到一般模式後才會套用。"))
