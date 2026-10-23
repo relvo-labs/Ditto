@@ -227,6 +227,7 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 - 全部一致 → 同一個 SQLite 交易內 INSERT 新 revision、移動 head、`committed`，發布 `change_updated` 與 `profile_changed`。
 - 限時回復（CHG-09）：主要快捷鍵、輸出縮放與排列、鍵盤配置、減少透明度關閉。提交後 `confirmation = { "state": "pending", "deadline": "<ISO 8601>" }`，15 秒內 `desktop.changes.confirm` 才轉為 `confirmed`；逾時由 Core 的計時器自動產生 `origin = timed_revert` 的回復變更。**Shell 死掉不會中斷倒數。** 倒數期間若已切換到別的 Profile，回復變更只改原 Profile 的文件，桌面不動（§8.1）。
 - 試看（`mode: preview`）：與限時回復同一機制，差別只在「一律倒數」與歷史中的來源描述。
+- 倒數中的變更所屬的 Profile 不能刪除（#171）：`desktop.profiles.delete` 回 `conflict`（`change_in_progress`），`message` 說明要先保留或回復，或等倒數結束自動回復，什麼都不刪、不發布事件。限時回復改的是那個 Profile 的文件，刪除後就沒有文件可回復，倒數會一直停在 `pending`。檢查與刪除在同一個 Core 協調回合內進行，和倒數不會互相競爭。刪除作用中的 Profile 仍是 `profile_in_use`。
 
 ### 8.6 撤銷
 

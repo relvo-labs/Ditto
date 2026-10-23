@@ -631,6 +631,111 @@ fn deleting_a_profile_with_more_changes_than_the_bound_asks_views_to_read_again(
     assert_eq!(gone["error"]["name"], "not_found", "{gone}");
 }
 
+/// A preview on `first` (the active Profile), then a switch to 開發 before
+/// anyone keeps it: `first` is no longer active, and its preview is still
+/// counting down. Returns (first, 開發, the preview's change id).
+fn preview_then_switch_away(desk: &Desktop) -> (String, String, String) {
+    let first = desk.active_profile();
+    let (head, _) = desk.head_of(&first);
+    let other = desk.profile_named("開發");
+    let preview = desk.propose(json!({
+        "base_revision": head, "mode": "preview",
+        "ops": [{"op": "set_value", "path": "/appearance/tokens/accent", "after": "#777777"}]}));
+    assert_eq!(preview.state, ChangeState::Committed, "{preview:?}");
+    assert!(matches!(preview.confirmation, Confirmation::Pending { .. }));
+    let (pending_head, _) = desk.head_of(&first);
+    let switched = desk.propose(json!({
+        "base_revision": pending_head,
+        "ops": [{"op": "switch_profile", "to_profile": other}]}));
+    assert_eq!(switched.state, ChangeState::Committed, "{switched:?}");
+    (first, other, preview.change_id)
+}
+
+/// Delete `profile` while its preview counts down: refused as `conflict`
+/// (`change_in_progress`) before anything is deleted or published.
+fn assert_delete_refused_while_trying_out(desk: &Desktop, profile: &str, preview: &str) {
+    let subscription = subscribe_to_changes(desk);
+    desk.cli.events.lock().unwrap().clear();
+    let refused = desk
+        .cli
+        .call(catalog::PROFILES_DELETE, json!({"profile_id": profile}));
+    assert_eq!(refused["error"]["name"], "conflict", "{refused}");
+    assert_eq!(
+        refused["error"]["data"]["reason"], "change_in_progress",
+        "{refused}"
+    );
+    let message = refused["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("kept or reverted") && message.contains(preview),
+        "{refused}"
+    );
+    // Nothing was deleted.
+    let listed = desk.cli.result(catalog::PROFILES_LIST, json!({}));
+    assert!(
+        listed["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["profile_id"] == json!(profile)),
+        "{listed}"
+    );
+    let got = desk
+        .cli
+        .result(catalog::CHANGES_GET, json!({"change_id": preview}));
+    assert!(got.get("profile_deleted").is_none(), "{got}");
+    // No refresh burst: nothing published says the Profile is deleted.
+    thread::sleep(Duration::from_millis(100));
+    for payload in change_events(desk, &subscription) {
+        assert_ne!(payload["change"]["profile_deleted"], true, "{payload}");
+    }
+}
+
+/// #171 R2: a preview still counting down on a Profile that is no longer
+/// active would be reverted in that Profile's document; a deleted Profile
+/// has none, and the countdown would be left pending for good. So the
+/// delete is refused until the preview is settled; keeping it settles it,
+/// and the delete then goes through.
+#[test]
+fn deleting_a_profile_whose_preview_counts_down_is_refused_until_it_is_kept() {
+    let desk = desktop("deleted-preview-kept");
+    let (first, other, preview) = preview_then_switch_away(&desk);
+    assert_delete_refused_while_trying_out(&desk, &first, &preview);
+    let kept = desk
+        .cli
+        .call(catalog::CHANGES_CONFIRM, json!({"change_id": preview}));
+    assert_eq!(
+        kept["result"]["confirmation"]["state"], "confirmed",
+        "the countdown ended before the preview was kept; the test needs a longer window: {kept}"
+    );
+    desk.cli
+        .result(catalog::PROFILES_DELETE, json!({"profile_id": first}));
+    assert_profile_deleted(&desk, &preview);
+    assert_eq!(desk.active_profile(), other);
+}
+
+/// The same, settled by the countdown: the timed revert runs in the still
+/// existing Profile, then the delete goes through.
+#[test]
+fn deleting_a_profile_whose_preview_counts_down_is_refused_until_it_reverts() {
+    let desk = desktop("deleted-preview-reverted");
+    let (first, other, preview) = preview_then_switch_away(&desk);
+    assert_delete_refused_while_trying_out(&desk, &first, &preview);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let reverted_by = loop {
+        if let Confirmation::Reverted { by_change } = desk.get(&preview).confirmation {
+            break by_change;
+        }
+        assert!(Instant::now() < deadline, "the preview was never reverted");
+        thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(desk.get(&reverted_by).state, ChangeState::Committed);
+    desk.cli
+        .result(catalog::PROFILES_DELETE, json!({"profile_id": first}));
+    assert_profile_deleted(&desk, &preview);
+    assert_profile_deleted(&desk, &reverted_by);
+    assert_eq!(desk.active_profile(), other);
+}
+
 /// A preview on the active Profile, then a switch before anyone confirms:
 /// the timed revert lands on a Profile that is no longer on the desktop, so
 /// it restores that Profile's document and leaves the desktop alone.

@@ -60,22 +60,25 @@ Item {
 
     /// Change records by id, read from Core once per card, and again when
     /// Core says the change was updated or after a resync (a Profile may
-    /// have been deleted, #171).
+    /// have been deleted, #171). ChangeReads keeps a late answer from
+    /// undoing a newer one.
     property var records: ({})
     function record(changeId) {
         if (records[changeId] !== undefined) {
             return records[changeId];
         }
         records[changeId] = null;
-        reread(changeId);
+        reads.request(changeId);
         return null;
     }
-    function reread(changeId) {
-        client.capability("desktop.changes.get", { change_id: changeId }, function (result) {
+    ChangeReads {
+        id: reads
+        client: window.client
+        onRead: function (changeId, record) {
             const table = Object.assign({}, window.records);
-            table[changeId] = result;
+            table[changeId] = record;
             window.records = table;
-        });
+        }
     }
     Connections {
         target: window.client
@@ -86,13 +89,11 @@ Item {
                 const table = Object.assign({}, window.records);
                 table[change.change_id] = Object.assign({}, window.records[change.change_id] || {}, change);
                 window.records = table;
-                window.reread(change.change_id);
+                reads.refresh(change.change_id);
             }
         }
         function onCapabilitiesReloaded() {
-            for (const changeId in window.records) {
-                window.reread(changeId);
-            }
+            reads.refreshAll(Object.keys(window.records));
         }
     }
 

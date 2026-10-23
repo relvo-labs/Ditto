@@ -27,6 +27,10 @@ TestCase {
             property var requests: []
             property bool online: true
             property string status: ""
+            /// desktop.profiles.delete fails with this error when set.
+            property var deleteError: null
+            function errorText(error) { return "generic: " + (error && error.name); }
+            function diagnosticText(error) { return error ? error.name : ""; }
             property var tr: QtObject {
                 function slotName(slot) { return slot; }
                 function packageName(id) { return id; }
@@ -64,6 +68,10 @@ TestCase {
                 else if (name === "desktop.permissions.list") done({grants: []});
                 else if (name === "desktop.plugins.development.list") done({artifacts: []});
                 else if (name === "desktop.jobs.list") done({jobs: []});
+                else if (name === "desktop.profiles.delete") {
+                    if (deleteError) fail(deleteError);
+                    else done({profile_id: args.profile_id, name: "Test"});
+                }
             }
         }
     }
@@ -465,26 +473,43 @@ TestCase {
             function newKey(prefix) { return prefix + "-fixture"; }
             function watchTopics(topics, event, resync, ready, fail) {}
             function capabilityAvailable(name) { return false; }
+            /// While true, reads wait in `held` until the test answers them,
+            /// in any order, with what Core had when the read was sent.
+            property bool hold: false
+            property var held: []
             function capability(name, args, done, fail) {
-                if (name === "desktop.changes.list") done({changes: summaries});
+                let value;
+                if (name === "desktop.changes.list") value = {changes: summaries};
                 else if (name === "desktop.changes.get") {
-                    // Answered later, as over the socket.
                     gets = gets.concat([args.change_id]);
-                    const record = records[args.change_id];
-                    Qt.callLater(() => done(record));
-                }
+                    value = records[args.change_id];
+                } else return;
+                if (hold) held = held.concat([{name: name, changeId: args.change_id, done: done, value: value}]);
+                else if (name === "desktop.changes.list") done(value);
+                // Answered later, as over the socket.
+                else Qt.callLater(() => done(value));
+            }
+            function heldGets() { return held.filter(call => call.name === "desktop.changes.get"); }
+            function heldLists() { return held.filter(call => call.name === "desktop.changes.list"); }
+            /// Answer the held call `call` now, with a copy of what was read
+            /// then (so a view that applied it holds a new object).
+            function answer(call) {
+                held = held.filter(other => other !== call);
+                call.done(JSON.parse(JSON.stringify(call.value)));
             }
             function undoChange(changeId, done, fail) {}
             /// What Core does when the Profile is deleted: every read now
             /// carries profile_deleted, and change_updated goes out for the
             /// committed changes of that Profile.
-            function deleteProfile(profileId) {
+            function deleteProfile(profileId, quietly) {
                 const table = {};
                 for (const id in records) {
                     table[id] = Object.assign({}, records[id], records[id].profile_id === profileId ? {profile_deleted: true} : {});
                 }
                 records = table;
                 summaries = summaries.map(summary => summary.profile_id === profileId ? Object.assign({}, summary, {profile_deleted: true}) : summary);
+                // Quietly: as when Core asks subscribers to resync instead.
+                if (quietly) return;
                 for (const id in records) {
                     if (records[id].profile_id === profileId) changeUpdated(summaryOf(records[id]));
                 }
@@ -628,6 +653,163 @@ TestCase {
         verify(!!chat.records["chg-01"].card);
         compare(chat.records["chg-01"].profile_deleted, true);
         chat.destroy();
+        wait(0);
+    }
+
+    // #171 R2: answers come back in any order. A read sent before the
+    // Profile was deleted that lands after the deletion update (and after a
+    // resync) must not bring back the undo promise or button, and overlapping
+    // updates of one change send a bounded number of reads.
+    function test_open_history_pages_ignore_a_late_answer_from_before_the_delete_data() { return historyPages_data(); }
+    function test_open_history_pages_ignore_a_late_answer_from_before_the_delete(data) {
+        const client = historyClient([historyRecord("chg-02", "prf-dev", savedToDev, false),
+                                      historyRecord("chg-01", "prf-dev", null, false)]);
+        const page = historyPage(data.url, client);
+        page.open("chg-02");
+        page.open("chg-01");
+        tryVerify(() => !!page.expanded["chg-02"] && !!page.expanded["chg-01"]);
+        client.hold = true;
+        // Something re-reads both records and the list before the delete (a
+        // confirm, a reconnect).
+        client.changeUpdated(client.summaryOf(client.records["chg-02"]));
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        client.capabilitiesReloaded();
+        compare(client.heldGets().length, 2);
+        compare(client.heldLists().length, 1);
+        client.deleteProfile("prf-dev");
+        client.capabilitiesReloaded();
+        // Each change: one read out, one queued, whatever arrived meanwhile;
+        // the list likewise.
+        compare(client.heldGets().length, 2, "overlapping reads were not coalesced");
+        compare(client.heldLists().length, 1, "overlapping list reads were not coalesced");
+        // The update itself already says the Profile is deleted.
+        let undo = buttonsWithText(page, "撤銷這次變更");
+        verify(undo.every(button => !button.visible));
+        // The old answers land late, the list read before the delete too.
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(page.expanded["chg-02"].profile_deleted, true);
+        compare(page.expanded["chg-01"].profile_deleted, true);
+        undo = buttonsWithText(page, "撤銷這次變更");
+        verify(undo.every(button => !button.visible), "a late answer brought undo back");
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1, "a late list answer undid the row");
+        // Then the reads sent after the delete.
+        compare(client.heldGets().length, 2);
+        compare(client.heldLists().length, 1);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(client.held.length, 0);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible));
+        verify(itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        page.destroy();
+        wait(0);
+    }
+    function test_open_history_pages_drop_a_late_answer_after_a_resync_data() { return historyPages_data(); }
+    function test_open_history_pages_drop_a_late_answer_after_a_resync(data) {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const page = historyPage(data.url, client);
+        page.open("chg-01");
+        tryVerify(() => !!page.expanded["chg-01"]);
+        client.hold = true;
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        const before = page.expanded["chg-01"];
+        // Core could not publish the changes, so it asked for a resync.
+        client.deleteProfile("prf-dev", true);
+        client.capabilitiesReloaded();
+        compare(client.heldGets().length, 1);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(page.expanded["chg-01"], before, "a stale answer was applied after the resync");
+        compare(client.heldGets().length, 1, "no read after the resync");
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(page.expanded["chg-01"].profile_deleted, true);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible));
+        page.destroy();
+        wait(0);
+    }
+    function test_an_open_chat_card_ignores_a_late_answer_from_before_the_delete() {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const conversation = createTemporaryObject(conversationFactory, testCase, {client: client});
+        const chat = createTemporaryObject(chatFactory, testCase, {client: client, tokens: tokens, conversation: conversation,
+            width: 800, height: 700});
+        conversation.events = [{type: "tool/result", data: {change_id: "chg-01"}}];
+        tryVerify(() => buttonsWithText(chat, "撤銷這項變更").length === 1 && buttonsWithText(chat, "撤銷這項變更")[0].visible);
+        const undo = buttonsWithText(chat, "撤銷這項變更")[0];
+        client.hold = true;
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        compare(client.heldGets().length, 1);
+        client.deleteProfile("prf-dev");
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        client.capabilitiesReloaded();
+        compare(client.heldGets().length, 1, "overlapping reads were not coalesced");
+        verify(!undo.visible);
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(chat.records["chg-01"].profile_deleted, true);
+        verify(!undo.visible, "a late answer brought undo back");
+        compare(itemsWithText(chat, "已套用並確認生效。可以撤銷。").length, 0);
+        compare(client.heldGets().length, 1);
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(client.held.length, 0);
+        verify(!undo.visible);
+        verify(!!chat.records["chg-01"].card);
+        // A resync alone, with an old answer out: dropped, then read again.
+        const second = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const chat2 = createTemporaryObject(chatFactory, testCase, {client: second, tokens: tokens,
+            conversation: createTemporaryObject(conversationFactory, testCase, {client: second}), width: 800, height: 700});
+        chat2.conversation.events = [{type: "tool/result", data: {change_id: "chg-01"}}];
+        tryVerify(() => buttonsWithText(chat2, "撤銷這項變更").length === 1 && buttonsWithText(chat2, "撤銷這項變更")[0].visible);
+        second.hold = true;
+        second.changeUpdated(second.summaryOf(second.records["chg-01"]));
+        const kept = chat2.records["chg-01"];
+        second.deleteProfile("prf-dev", true);
+        second.capabilitiesReloaded();
+        compare(second.heldGets().length, 1);
+        second.answer(second.heldGets()[0]);
+        wait(0);
+        compare(chat2.records["chg-01"], kept, "a stale answer was applied after the resync");
+        compare(second.heldGets().length, 1, "no read after the resync");
+        second.answer(second.heldGets()[0]);
+        wait(0);
+        compare(chat2.records["chg-01"].profile_deleted, true);
+        verify(!buttonsWithText(chat2, "撤銷這項變更")[0].visible);
+        verify(kept !== chat2.records["chg-01"]);
+        chat2.destroy();
+        chat.destroy();
+        wait(0);
+    }
+
+    // #171 R2: Core refuses to delete a Profile whose preview still counts
+    // down (conflict, change_in_progress). Both Composition Centres say why,
+    // and what to do, in product words.
+    function test_composition_centres_explain_a_delete_refused_for_a_preview_data() {
+        return [
+            {tag: "built-in", url: "../shell/centers/CompositionCenter.qml"},
+            {tag: "packaged", url: "../shell/providers/settings_composition/qml/CompositionCenter.qml"}
+        ];
+    }
+    function test_composition_centres_explain_a_delete_refused_for_a_preview(data) {
+        const s = setup();
+        const component = Qt.createComponent(Qt.resolvedUrl(data.url));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: s.client, tokens: s.tokens, width: 900, height: 900});
+        verify(page !== null);
+        const refusal = "「開發」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。";
+        s.client.deleteError = {name: "conflict", code: -32006, message: "diagnostic",
+            data: {reason: "change_in_progress"}};
+        page.deleteProfile({profile_id: "prf-dev", name: "開發"});
+        compare(page.notice, refusal);
+        tryVerify(() => itemsWithText(page, refusal).some(item => item.visible));
+        compare(page.diagnostic, "conflict");
+        // Other refusals keep the client's wording.
+        s.client.deleteError = {name: "conflict", code: -32006, message: "diagnostic", data: {reason: "profile_in_use"}};
+        page.deleteProfile({profile_id: "prf-dev", name: "開發"});
+        compare(page.notice, "generic: conflict");
+        page.destroy();
         wait(0);
     }
 }

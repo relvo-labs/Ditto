@@ -221,7 +221,14 @@ Flickable {
                 page.selected = page.active;
             }
             page.reload();
-        }, fail);
+        }, function (error) {
+            page.fail(error);
+            // Core refuses while a preview of this composition still counts
+            // down: say which one and what to do (#171).
+            if (error && error.name === "conflict" && error.data && error.data.reason === "change_in_progress") {
+                page.notice = t(qsTr("「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。")).arg(profile.name);
+            }
+        });
     }
 
     function diff(fromRevision, toRevision) {

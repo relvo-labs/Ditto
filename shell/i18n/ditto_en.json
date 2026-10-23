@@ -49,6 +49,7 @@
   "「%1」": "“%1”",
   "「%1」%2": "“%1” %2",
   "「%1」的版本": "Versions of “%1”",
+  "「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。": "“%1” still has a change being tried out, so it cannot be deleted yet. Keep or revert it first, or wait for it to revert by itself, then delete it.",
   "一般桌面已啟動。": "The normal desktop is running.",
   "一般桌面沒有啟動，仍可在這裡修復。": "The normal desktop did not start; you can keep repairing here.",
   "上次中斷，已於 %1 處理": "Interrupted last time; settled at %1",

@@ -1926,10 +1926,16 @@ impl Coordinator {
     /// again for each committed change of the Profile, read the way
     /// `changes.get` reads it (#171). Changes that did not commit promise
     /// neither undo nor a later apply, so they are not sent.
+    ///
+    /// Refused (`conflict`, `change_in_progress`) while a change of the
+    /// Profile still waits to be kept or reverted: its timed revert edits
+    /// that Profile's document, which a deleted Profile no longer has, so
+    /// the countdown could never settle. The check and the delete run in
+    /// this one coordinator turn, as the countdown does, so they cannot race.
     pub fn delete_profile(
         &mut self,
         profile_id: &str,
-    ) -> StoreResult<ditto_protocol::profile::ProfileSummary> {
+    ) -> Result<ditto_protocol::profile::ProfileSummary, CoreError> {
         self.delete_profile_refreshing(profile_id, DELETION_REFRESH_LIMIT)
     }
 
@@ -1941,10 +1947,27 @@ impl Coordinator {
         &mut self,
         profile_id: &str,
         limit: u32,
-    ) -> StoreResult<ditto_protocol::profile::ProfileSummary> {
-        let deleted = self
-            .store
-            .write(|tx| profiles::soft_delete(tx, profile_id))?;
+    ) -> Result<ditto_protocol::profile::ProfileSummary, CoreError> {
+        let profile = profiles::get(self.store.connection(), profile_id)?;
+        if !profile.active {
+            if let Some(change_id) =
+                changes::pending_confirmation_of(self.store.connection(), profile_id)?
+            {
+                return Err(CoreError::conflict(
+                    ConflictReason::ChangeInProgress,
+                    format!(
+                        "the composition has a change being tried out ({change_id}); it must be kept or reverted first, and reverts by itself when its countdown ends"
+                    ),
+                ));
+            }
+        }
+        let deleted = match self.store.write(|tx| profiles::soft_delete(tx, profile_id)) {
+            Ok(deleted) => deleted,
+            Err(StoreError::Conflict(message)) => {
+                return Err(CoreError::conflict(ConflictReason::ProfileInUse, message))
+            }
+            Err(error) => return Err(error.into()),
+        };
         match changes::committed_of(self.store.connection(), profile_id, limit.saturating_add(1)) {
             Ok(committed) if committed.len() <= limit as usize => {
                 // Oldest first, the order they were made in.

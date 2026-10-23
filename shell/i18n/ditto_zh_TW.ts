@@ -987,6 +987,10 @@
 <context>
     <name>CompositionCenter</name>
     <message>
+        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
+        <translation>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</translation>
+    </message>
+    <message>
         <source>「%1」的版本</source>
         <translation>「%1」的版本</translation>
     </message>

@@ -987,6 +987,10 @@
 <context>
     <name>CompositionCenter</name>
     <message>
+        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
+        <translation>“%1” still has a change being tried out, so it cannot be deleted yet. Keep or revert it first, or wait for it to revert by itself, then delete it.</translation>
+    </message>
+    <message>
         <source>「%1」的版本</source>
         <translation>Versions of “%1”</translation>
     </message>

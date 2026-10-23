@@ -226,6 +226,23 @@ pub fn committed_of(
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
+/// The newest committed change of one Profile whose confirmation is still
+/// pending (a preview or a timed-revert change counting down), if any.
+pub fn pending_confirmation_of(
+    connection: &Connection,
+    profile_id: &str,
+) -> StoreResult<Option<String>> {
+    Ok(connection
+        .query_row(
+            "SELECT change_id FROM changesets WHERE profile_id = ?1 AND state = 'committed'
+               AND json_extract(confirmation_json, '$.state') = 'pending'
+             ORDER BY change_id DESC LIMIT 1",
+            [profile_id],
+            |row| row.get(0),
+        )
+        .optional()?)
+}
+
 /// Changes a crash may have left between states.
 pub fn in_flight(connection: &Connection) -> StoreResult<Vec<StoredChange>> {
     let mut statement = connection.prepare(&format!(
