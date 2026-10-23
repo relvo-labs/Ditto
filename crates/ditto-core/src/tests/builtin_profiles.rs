@@ -5,7 +5,7 @@ use super::*;
 use ditto_protocol::profile::{ProfileDocument, RevisionOrigin};
 use ditto_store::profiles;
 
-fn shipped_harness(label: &str) -> Harness {
+pub(super) fn shipped_harness(label: &str) -> Harness {
     let root = root(label);
     let builtin = root.join("builtin");
     std::fs::create_dir_all(&builtin).unwrap();

@@ -4,6 +4,7 @@
 //! back, so a lying fake is how readback mismatches are tested.
 
 mod builtin_profiles;
+mod config_schema_coordinator;
 mod config_schema_preflight;
 mod generation_transactions;
 mod shell_extensions;
