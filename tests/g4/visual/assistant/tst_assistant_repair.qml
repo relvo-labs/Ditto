@@ -36,6 +36,11 @@ TestCase {
         signal changeUpdated(var change)
     }
     Chat.ConversationState { id: conversation; client: client }
+    // A third provider opts in with only the public geometry property.
+    Component {
+        id: thirdDock
+        QtObject { property var edgeGeometry: ({ version: 1, output: "fixture", edge: "bottom", visible: true, centreInset: 50 }) }
+    }
     property var mounted: []
     function mount(path, props) {
         const c = Qt.createComponent(Qt.resolvedUrl("../.staged/assistant/" + path));
@@ -75,7 +80,7 @@ TestCase {
             entryStyle: data.style, labelExpanded: data.style === "fab" && data.labelled });
         const entry = control(s);
         s.dockMount = { binding: { package: "ditto.dock.pill" }, object: {
-            shown: true, reservedEdge: "bottom", screen: s.screen, edgeGap: 18, pillThickness: 56 } };
+            edgeGeometry: { version: 1, output: s.screen.name, edge: "bottom", visible: true, centreInset: 46 } } };
         for (const scale of [1, 1.01, 1.25, 1.5, 1.64, 1]) {
             s.entryScale = scale;
             for (const state of [null, "running", "awaiting_approval", "succeeded", "failed", "unknown", "cancelled"]) {
@@ -161,29 +166,48 @@ TestCase {
         console.log("REPAIR_MEASURE " + JSON.stringify({ defect: "a", theme: data.theme, working: data.working, edge: String(edge), fill: String(fill), contrast: ratio }));
         verify(ratio >= 3, "symbol edge against capsule fill >= 3:1");
     }
-    function test_dock_alignment_data() { return [{ tag: "collapsed", expanded: false }, { tag: "label", expanded: true }]; }
+    function test_dock_alignment_data() {
+        const rows = [];
+        for (const file of ["DockPill.qml", "DockBottom.qml"])
+            for (const expanded of [false, true]) rows.push({ tag: file + (expanded ? "-label" : "-circle"), file: file, expanded: expanded });
+        return rows;
+    }
     function test_dock_alignment(data) {
         const s = surface(); s.labelExpanded = data.expanded;
-        const c = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/DockPill.qml"));
+        const c = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/" + data.file));
         compare(c.status, Component.Ready, c.errorString());
         const incubator = c.incubateObject(testCase, { tokens: tokens, client: client,
             config: { position: "bottom", pinned: Data.pinned }, shown: false });
         incubator.forceCompletion(); const dock = incubator.object; mounted.push(dock); dock.shown = true;
         dock.screen = s.screen;
-        s.dockMount = { binding: { package: "ditto.dock.pill" }, object: dock };
-        const capsule = findChild(layer, "dockCapsule");
+        s.dockMount = { object: dock };
+        const capsule = findChild(layer, data.file === "DockPill.qml" ? "dockCapsule" : "dockBar");
         tryVerify(() => capsule.width > capsule.height * 2);
         const dockCentre = capsule.mapToItem(desktop, capsule.width / 2, capsule.height / 2).y;
         const fabCentre = s.contentItem.y + s.height / 2;
         console.log("REPAIR_MEASURE " + JSON.stringify({ defect: "b", expanded: data.expanded, fab_centre: fabCentre,
             dock_centre: dockCentre, difference: fabCentre - dockCentre, right_margin: 1280 - s.contentItem.x - s.width }));
-        verify(Math.abs(fabCentre - dockCentre) <= 1, "FAB aligned to actual default Dock capsule centre");
+        verify(Math.abs(fabCentre - dockCentre) <= 1, "FAB aligned to actual Dock visual centre");
+        compare(dock.edgeGeometry.centreInset, data.file === "DockPill.qml" ? dock.edgeGap + dock.pillThickness / 2 : 34);
+        compare(800 - dockCentre, dock.edgeGeometry.centreInset);
+        compare(dock.edgeGeometry.output, s.screen.name);
+        const dockWindow = dock.children.find(item => item.contentItem !== undefined);
+        compare(dockWindow.screen.name, dock.edgeGeometry.output);
+        dock.screen = { name: "second-output", width: 1280, height: 800 };
+        compare(dockWindow.screen.name, "second-output");
+        compare(dock.edgeGeometry.output, "second-output");
+        compare(s.bottomMargin, 32);
+        dock.screen = s.screen;
+        compare(s.bottomMargin, data.file === "DockPill.qml" ? 18 : 6);
+        dock.release();
+        compare(dock.edgeGeometry.visible, false);
+        compare(s.bottomMargin, 32);
         compare(1280 - s.contentItem.x - s.width, 32);
     }
     function test_dock_alignment_scope_data() {
         const cases = [
             { tag: "default", file: "DockPill.qml", package: "ditto.dock.pill", margin: 18 },
-            { tag: "replacement", file: "DockBottom.qml", package: "ditto.dock.bottom", margin: 32 },
+            { tag: "replacement", file: "DockBottom.qml", package: "ditto.dock.bottom", margin: 6 },
             { tag: "hidden", file: "DockPill.qml", package: "ditto.dock.pill", hidden: true, margin: 32 },
             { tag: "left", file: "DockPill.qml", package: "ditto.dock.pill", position: "left", margin: 32 },
             { tag: "other-output", file: "DockPill.qml", package: "ditto.dock.pill", otherOutput: true, margin: 32 },
@@ -235,6 +259,79 @@ TestCase {
         }
         console.log("DOCK_SCOPE " + JSON.stringify({ scenario: data.tag, scale: s.entryScale,
             width: s.width, height: s.height, bottom_margin: s.margins.bottom }));
+    }
+    function test_neutral_geometry_data() {
+        return [
+            { tag: "third-provider", margin: 22 },
+            { tag: "third-provider-label", label: true, margin: 22 },
+            { tag: "bottom-left", corner: "bottom_left", margin: 22 },
+            { tag: "no-property", object: {}, margin: 32 },
+            { tag: "no-object", noObject: true, margin: 32 },
+            { tag: "null", geometry: null, margin: 32 },
+            { tag: "unknown-version", patch: { version: 2 }, margin: 32 },
+            { tag: "string-version", patch: { version: "1" }, margin: 32 },
+            { tag: "other-output", patch: { output: "other" }, margin: 32 },
+            { tag: "missing-output", patch: { output: undefined }, margin: 32 },
+            { tag: "empty-output", patch: { output: "" }, margin: 32 },
+            { tag: "hidden", patch: { visible: false }, margin: 32 },
+            { tag: "truthy-visible", patch: { visible: "true" }, margin: 32 },
+            { tag: "top-dock", patch: { edge: "top" }, margin: 32 },
+            { tag: "right-dock", patch: { edge: "right" }, margin: 32 },
+            { tag: "missing-inset", patch: { centreInset: undefined }, margin: 32 },
+            { tag: "string-inset", patch: { centreInset: "50" }, margin: 32 },
+            { tag: "negative-inset", patch: { centreInset: -1 }, margin: 32 },
+            { tag: "nan-inset", patch: { centreInset: NaN }, margin: 32 },
+            { tag: "infinite-inset", patch: { centreInset: Infinity }, margin: 32 },
+            { tag: "scaled-fits", scale: 1.5, margin: 8 },
+            { tag: "scaled-too-large", scale: 2, margin: 32 },
+            { tag: "exact-fit", patch: { centreInset: 28 }, margin: 0 },
+            { tag: "legacy-theme", theme: "soft-jelly", margin: 32 },
+            { tag: "capsule", style: "capsule", margin: 32 }
+        ];
+    }
+    function test_neutral_geometry(data) {
+        const s = surface();
+        s.labelExpanded = data.label === true;
+        s.corner = data.corner || "bottom_right";
+        s.entryScale = data.scale || 1;
+        s.entryStyle = data.style || "fab";
+        if (data.theme) tokens.appearance = { theme: data.theme, tokens: {}, reduced_motion: true };
+        const dock = createTemporaryObject(thirdDock, testCase);
+        verify(dock !== null);
+        if (data.geometry === null) dock.edgeGeometry = null;
+        else dock.edgeGeometry = Object.assign({}, dock.edgeGeometry, data.patch || {});
+        // Deliberately no binding/package or private Dock fields.
+        s.dockMount = { object: data.noObject ? null : data.object || dock };
+        compare(s.bottomMargin, data.margin);
+        compare(s.margins.bottom, data.margin);
+        if (data.corner) compare(s.contentItem.x, 32);
+    }
+    function test_neutral_geometry_live_changes() {
+        const s = surface();
+        const dock = createTemporaryObject(thirdDock, testCase);
+        s.dockMount = { object: dock };
+        compare(s.bottomMargin, 22);
+        for (const patch of [{ visible: false }, { edge: "left" }, { output: "other" }, { version: 99 }]) {
+            const previous = dock.edgeGeometry;
+            dock.edgeGeometry = Object.assign({}, previous, patch);
+            compare(s.bottomMargin, 32);
+            dock.edgeGeometry = previous;
+            compare(s.bottomMargin, 22);
+        }
+        dock.edgeGeometry = Object.assign({}, dock.edgeGeometry, { centreInset: 60 });
+        compare(s.bottomMargin, 32);
+        dock.edgeGeometry = Object.assign({}, dock.edgeGeometry, { centreInset: 64 });
+        compare(s.bottomMargin, 36);
+        s.screen = { name: "other", width: 1280, height: 800 };
+        compare(s.bottomMargin, 32);
+        s.screen = null;
+        compare(s.bottomMargin, 32);
+        s.screen = { name: "fixture", width: 1280, height: 800 };
+        compare(s.bottomMargin, 36);
+        s.dockMount = { object: {} };
+        compare(s.bottomMargin, 32);
+        s.dockMount = { object: dock };
+        compare(s.bottomMargin, 36);
     }
     function test_open_state_data() {
         return [{ tag: "light", theme: "soft-jelly-light", reduced: false },

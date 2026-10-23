@@ -75,9 +75,10 @@ if digest != after_digest:
 print("; ".join(problems) or "ok")
 PYEOF
 }
+pill_version="$(jq -r .version "$WORKSPACE/shell/providers/dock_pill/manifest.json")"
 for spec in \
   'package-missing|package_missing|[{"op":"add_entry","entry":{"package":"ditto.nowhere","version":"1.0.0","host":"qml"}}]' \
-  'single-provider|single_provider_violation|[{"op":"add_entry","entry":{"package":"ditto.dock.pill","version":"1.1.0","host":"qml"},"slot":"svc.tasks"}]'; do
+  "single-provider|single_provider_violation|[{\"op\":\"add_entry\",\"entry\":{\"package\":\"ditto.dock.pill\",\"version\":\"$pill_version\",\"host\":\"qml\"},\"slot\":\"svc.tasks\"}]"; do
   IFS='|' read -r id code ops <<<"$spec"
   verdict="$(live "$id" "$code" "$ops")"
   if [[ "$verdict" == ok ]]; then

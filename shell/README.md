@@ -73,6 +73,32 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 
 所有表面的 `visible` 與 `exclusiveZone` 都要綁 `shown`。資料訂閱在 `shown` 變成 `true` 才開始，所以候選載入不發請求、不佔輸入區、不影響幀時。
 
+#### 選用邊緣幾何（UI-P04a）
+
+邊緣表面的根物件可宣告 `readonly property var edgeGeometry`，讓消費者只讀公開提示，不依賴套件名稱或私有尺寸。v1 是單一輸出、單一邊緣的固定形狀：
+
+```js
+({ version: 1, output: "DP-1", edge: "bottom", visible: true, centreInset: 46 })
+```
+
+| 欄位 | v1 語意 |
+| --- | --- |
+| `version` | 數字 `1`；不是套件版本 |
+| `output` | 表面實際採用的 `screen.name`，非空字串；沒有輸出時為空字串，消費者使用 fallback |
+| `edge` | `top`／`bottom`／`left`／`right` |
+| `visible` | bool；表面的 `visible`，`shown: false`／release 時必須為 `false` |
+| `centreInset` | 有限、非負數，從該輸出邊緣向內到表面視覺中心線的距離；單位為 QML 邏輯 px，與 FAB 尺寸同座標，不乘 device pixel ratio。不是 exclusive zone，也不含陰影 |
+
+供應者以 QML binding 產生整個物件；輸出、邊緣、可見性或中心距離改變時，替換值並發出自動的 `edgeGeometryChanged`。不可只原地修改 JS 物件欄位；消費者以 binding 追蹤屬性，無輪詢、無逐幀 IPC。多輸出／多表面集合不在 v1 範圍；未提供此選用提示仍是有效供應者。
+
+官方 `ditto.dock.pill` 的淺色呈現回報 `edgeGap + pillThickness / 2`（目前 46 px）；舊主題膠囊回報 `thickness / 2`。`ditto.dock.bottom` 回報 `edgeGap + (tileHeight + barPadding * 2) / 2`（34 px）。兩個 Dock 視窗明確綁定宿主提供的 `screen`（目前為 `Quickshell.screens[0]`，建立實例時傳入），不是 Shell 依布局左上角選出的 primary。明確綁定可能改變已配送 Dock 在多輸出環境出現的輸出；此影響未驗證，屬 UI-AT11。
+
+18 px FAB 底距保持不變的證據只涵蓋使用 pill 1.1.1 的新 store／已升級條目，以及載入目前來源的開發環境。既有 store 仍精確綁定 pill 1.1.0；release 工作階段從套件庫載入該版舊 QML，沒有 `edgeGeometry`，因此底距會由 18 px 改為 32 px fallback，直到透過 `upgrade_entry`（#50／#144）升級條目。開發環境的來源目錄覆寫會掩蓋這個差異；本切片不自動升級既有條目。
+
+助理保留現行 `entryStyle === "fab"` 與淺色配方限制，避免改動 capsule 與舊主題布局。底部角落只接受相同輸出、`version === 1`、`visible === true`、`edge === "bottom"` 且數值有效的提示；縮放後 FAB 半高 ≤ `centreInset` 時，底距為 `centreInset - FAB 半高`。其餘情況（含無 Dock、缺提示、未知版本、隱藏、其他輸出、輸出消失、其他邊緣或 FAB 放不下）全部使用固定 32 px 底距，不做部分對齊。
+
+這是供應者持有的 Shell 程序內呈現提示，不是配置、Core 權威或合成器實際映射的證明；不進 Profile／revision、RPC、manifest 或 `shell.report`，不新增 ChangeSet 回讀條件。
+
 供應者以絕對 `file://` URL 載入。Quickshell 0.3.1 的離屏實測可解析同目錄型別、套件內相對子目錄與絕對目錄 import；跨出設定目錄的相對 import 與沒有 qmldir 的 `root:/` 目錄解析不完整。不得 import Shell 私有相對路徑；共用元件使用 `import "root:/sdk/Ditto/Ui"`（Shell 擁有的 `qmldir`，引用原始 ui/change 元件，不複製）。真實登入與同 URL 改檔後熱換尚待驗證。
 
 `ui.settings_page` 是多條目 area：manifest 的 `settings_page` 宣告 `page_id`、`title_key`、`order`、可選 `category`。prepare 只編譯，commit 登錄導覽，按 `(order, page_id)` 排序。同 id 取代內建頁，額外 id 附加；建立失敗時回到同 id 內建頁，沒有內建頁則顯示錯誤。根為 `Item`，只在設定視窗開啟時建立，接收 `client`、`tokens`、`config`、`pageId`、`entryId`；可選 `flickable` 提供捲動與焦點揭露。`mounted && visible` 表示已登錄，`page_state` 的 `registered/open` 只供觀測。
