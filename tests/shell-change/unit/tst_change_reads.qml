@@ -74,7 +74,7 @@ TestCase {
         reads.request("chg-1");
         reads.request("chg-2");
         compare(client.held.length, 2);
-        reads.refreshAll(["chg-1", "chg-2"]);
+        reads.refreshAll();
         compare(client.held.length, 2, "a resync sent reads beside those already out");
         client.answer(1, { change_id: "chg-2", v: "old" });
         client.answer(0, { change_id: "chg-1", v: "old" });
@@ -84,6 +84,26 @@ TestCase {
         client.answer(0, { change_id: client.held[0].changeId, v: "new" });
         compare(reads.got.length, 2);
         verify(reads.got.every(item => item.record.v === "new"));
+    }
+
+    /// A change is held from its first request, before any answer: an
+    /// update or a resync then makes that first answer stale too.
+    function test_a_first_read_still_out_is_held_and_made_stale() {
+        verify(!reads.holds("chg-1"));
+        reads.request("chg-1");
+        verify(reads.holds("chg-1"));
+        compare(reads.heldIds(), ["chg-1"]);
+        reads.refreshAll();
+        compare(client.held.length, 1);
+        client.answer(0, { change_id: "chg-1", v: "old" });
+        compare(reads.got.length, 0, "the first answer was applied after a resync");
+        compare(client.held.length, 1, "exactly one more read");
+        client.answer(0, { change_id: "chg-1", v: "new" });
+        compare(reads.got.length, 1);
+        compare(reads.got[0].record.v, "new");
+        reads.forget("chg-1");
+        verify(!reads.holds("chg-1"));
+        compare(reads.heldIds().length, 0);
     }
 
     function test_joining_a_current_read_sends_nothing_more() {

@@ -8,7 +8,9 @@ import QtQuick
 /// `change_updated` and every resync starts a new one (`refresh`), and an
 /// answer is applied only if no generation began after its read was sent.
 /// Reads of one change are coalesced: at most one in flight and one more
-/// queued behind it, however many updates arrive meanwhile.
+/// queued behind it, however many updates arrive meanwhile. A change is held
+/// from its first request until `forget`, answered or not, so an update or
+/// a resync that arrives before the first answer still makes it stale.
 QtObject {
     id: reads
 
@@ -23,13 +25,25 @@ QtObject {
     property var generations: ({})   // change id → current generation
     property var inFlight: ({})      // change id → generation the read was sent in
     property var queued: ({})        // change id → true: read again once the read out lands
+    property var held: ({})          // change id → true: requested and not forgotten
 
     function generation(changeId) {
         return generations[changeId] || 0;
     }
 
+    /// Whether the view holds `changeId`: requested (answered or not) and
+    /// not forgotten. Updates and resyncs concern exactly these.
+    function holds(changeId) {
+        return held[changeId] === true;
+    }
+
+    function heldIds() {
+        return Object.keys(held);
+    }
+
     /// Read `changeId` unless a read of the current generation is already out.
     function request(changeId) {
+        held[changeId] = true;
         if (inFlight[changeId] !== undefined) {
             if (inFlight[changeId] !== generation(changeId)) {
                 queued[changeId] = true;
@@ -42,13 +56,14 @@ QtObject {
     /// Core said `changeId` changed (`change_updated`): answers to reads
     /// sent before now are stale. Read it again.
     function refresh(changeId) {
+        held[changeId] = true;
         generations[changeId] = generation(changeId) + 1;
         request(changeId);
     }
 
     /// After a resync: everything the view holds is read again.
-    function refreshAll(changeIds) {
-        for (const changeId of changeIds) {
+    function refreshAll() {
+        for (const changeId of heldIds()) {
             refresh(changeId);
         }
     }
@@ -58,12 +73,14 @@ QtObject {
     function forget(changeId) {
         generations[changeId] = generation(changeId) + 1;
         delete queued[changeId];
+        delete held[changeId];
     }
 
     function reset() {
         generations = {};
         inFlight = {};
         queued = {};
+        held = {};
     }
 
     function send(changeId) {

@@ -86,8 +86,15 @@ Flickable {
             }
         }, function (error) {
             page.listing = false;
-            page.listAgain = false;
-            page.fail(error);
+            // Only a failure of a current read is news; a read queued behind
+            // this one still goes out.
+            if (generation === page.listGeneration) {
+                page.fail(error);
+            }
+            if (page.listAgain || generation !== page.listGeneration) {
+                page.listAgain = false;
+                page.reload();
+            }
         });
     }
 
@@ -140,7 +147,8 @@ Flickable {
         function onCapabilitiesReloaded() {
             page.listGeneration++;
             page.reload();
-            reads.refreshAll(Object.keys(page.expanded));
+            // Open records, and those whose first read is still out.
+            reads.refreshAll();
         }
         function onChangeUpdated(change) {
             page.listGeneration++;
@@ -159,11 +167,14 @@ Flickable {
             }
             if (page.expanded[change.change_id]) {
                 // The update is newer than the open record: it applies at
-                // once (the record keeps its card and items), then the full
-                // record is read again.
+                // once (the record keeps its card and items).
                 const table = Object.assign({}, page.expanded);
                 table[change.change_id] = Object.assign({}, page.expanded[change.change_id], change);
                 page.expanded = table;
+            }
+            // Open, or opening with its first read still out: read again,
+            // and an answer to a read sent before this is not applied.
+            if (reads.holds(change.change_id)) {
                 page.refresh(change.change_id);
             }
         }

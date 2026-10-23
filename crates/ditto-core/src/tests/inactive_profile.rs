@@ -3,7 +3,7 @@
 //! hears of the change; switching to the Profile later is what projects it.
 //! The same holds for undo, timed revert and rescue restore when the Profile
 //! they act on is not the active one.
-use super::builtin_profiles::shipped_harness;
+use super::builtin_profiles::shipped_harness_with;
 use super::*;
 use ditto_protocol::{
     change::{ChangeOrigin, Confirmation},
@@ -23,7 +23,12 @@ struct Desktop {
 /// and a hostd that accept every change and remember every change id they
 /// were asked to prepare.
 fn desktop(label: &str) -> Desktop {
-    let harness = shipped_harness(label);
+    desktop_with(label, |_| {})
+}
+
+/// `desktop`, with the test's own changes to the Core config.
+fn desktop_with(label: &str, tweak: impl FnOnce(&mut CoreConfig)) -> Desktop {
+    let harness = shipped_harness_with(label, tweak);
     let shell = Arc::new(Mutex::new(ShellState::default()));
     let host = Arc::new(Mutex::new(HostState::default()));
     let shell_peer = fake_shell(&harness.core, Arc::clone(&shell));
@@ -697,7 +702,11 @@ fn assert_delete_refused_while_trying_out(desk: &Desktop, profile: &str, preview
 /// and the delete then goes through.
 #[test]
 fn deleting_a_profile_whose_preview_counts_down_is_refused_until_it_is_kept() {
-    let desk = desktop("deleted-preview-kept");
+    // A window no slow runner outlasts: the preview is still counting down
+    // when the delete and the keep arrive, whatever the scheduling.
+    let desk = desktop_with("deleted-preview-kept", |config| {
+        config.confirmation_window = Duration::from_secs(600);
+    });
     let (first, other, preview) = preview_then_switch_away(&desk);
     assert_delete_refused_while_trying_out(&desk, &first, &preview);
     let kept = desk
@@ -705,7 +714,7 @@ fn deleting_a_profile_whose_preview_counts_down_is_refused_until_it_is_kept() {
         .call(catalog::CHANGES_CONFIRM, json!({"change_id": preview}));
     assert_eq!(
         kept["result"]["confirmation"]["state"], "confirmed",
-        "the countdown ended before the preview was kept; the test needs a longer window: {kept}"
+        "{kept}"
     );
     desk.cli
         .result(catalog::PROFILES_DELETE, json!({"profile_id": first}));
@@ -717,10 +726,14 @@ fn deleting_a_profile_whose_preview_counts_down_is_refused_until_it_is_kept() {
 /// existing Profile, then the delete goes through.
 #[test]
 fn deleting_a_profile_whose_preview_counts_down_is_refused_until_it_reverts() {
-    let desk = desktop("deleted-preview-reverted");
+    // Long enough for the refusal to land inside the window on a slow
+    // runner; the wait for the revert below allows for it.
+    let desk = desktop_with("deleted-preview-reverted", |config| {
+        config.confirmation_window = Duration::from_secs(3);
+    });
     let (first, other, preview) = preview_then_switch_away(&desk);
     assert_delete_refused_while_trying_out(&desk, &first, &preview);
-    let deadline = Instant::now() + Duration::from_secs(5);
+    let deadline = Instant::now() + Duration::from_secs(30);
     let reverted_by = loop {
         if let Confirmation::Reverted { by_change } = desk.get(&preview).confirmation {
             break by_change;

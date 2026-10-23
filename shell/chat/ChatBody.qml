@@ -85,7 +85,7 @@ Item {
         // change_updated carries a summary, which has no card or items: it
         // updates the record at once, and the full record is read again.
         function onChangeUpdated(change) {
-            if (window.records[change.change_id] !== undefined) {
+            if (reads.holds(change.change_id)) {
                 const table = Object.assign({}, window.records);
                 table[change.change_id] = Object.assign({}, window.records[change.change_id] || {}, change);
                 window.records = table;
@@ -93,7 +93,7 @@ Item {
             }
         }
         function onCapabilitiesReloaded() {
-            reads.refreshAll(Object.keys(window.records));
+            reads.refreshAll();
         }
     }
 

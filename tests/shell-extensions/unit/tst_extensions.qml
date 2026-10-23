@@ -484,10 +484,15 @@ TestCase {
                     gets = gets.concat([args.change_id]);
                     value = records[args.change_id];
                 } else return;
-                if (hold) held = held.concat([{name: name, changeId: args.change_id, done: done, value: value}]);
+                if (hold) held = held.concat([{name: name, changeId: args.change_id, done: done, fail: fail, value: value}]);
                 else if (name === "desktop.changes.list") done(value);
                 // Answered later, as over the socket.
                 else Qt.callLater(() => done(value));
+            }
+            /// Fail the held call `call` now.
+            function answerFailure(call, error) {
+                held = held.filter(other => other !== call);
+                call.fail(error);
             }
             function heldGets() { return held.filter(call => call.name === "desktop.changes.get"); }
             function heldLists() { return held.filter(call => call.name === "desktop.changes.list"); }
@@ -809,6 +814,78 @@ TestCase {
         s.client.deleteError = {name: "conflict", code: -32006, message: "diagnostic", data: {reason: "profile_in_use"}};
         page.deleteProfile({profile_id: "prf-dev", name: "開發"});
         compare(page.notice, "generic: conflict");
+        page.destroy();
+        wait(0);
+    }
+
+    // #171 R3: a record the page is still opening (its first read not yet
+    // answered) is held too: an update or a resync before that answer makes
+    // it stale, and exactly one more read follows.
+    function test_history_pages_drop_a_late_first_answer_data() {
+        return [
+            {tag: "built-in update", url: "../shell/centers/HistoryCenter.qml", resync: false},
+            {tag: "built-in resync", url: "../shell/centers/HistoryCenter.qml", resync: true},
+            {tag: "packaged update", url: "../shell/providers/settings_history/qml/HistoryPage.qml", resync: false},
+            {tag: "packaged resync", url: "../shell/providers/settings_history/qml/HistoryPage.qml", resync: true}
+        ];
+    }
+    function test_history_pages_drop_a_late_first_answer(data) {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const page = historyPage(data.url, client);
+        client.hold = true;
+        page.open("chg-01");
+        compare(client.heldGets().length, 1);
+        const reads = client.gets.length;
+        if (data.resync) {
+            client.deleteProfile("prf-dev", true);
+            client.capabilitiesReloaded();
+            client.answer(client.heldLists()[0]);
+        } else {
+            client.deleteProfile("prf-dev");
+        }
+        compare(client.heldGets().length, 1, "a read was sent beside the first one");
+        // The first answer, taken before the delete, lands late.
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!page.expanded["chg-01"] || page.expanded["chg-01"].profile_deleted === true,
+               "the late first answer was applied");
+        compare(client.heldGets().length, 1);
+        compare(client.gets.length, reads + 1, "not exactly one more read");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(client.held.length, 0);
+        compare(page.expanded["chg-01"].profile_deleted, true);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible));
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        page.destroy();
+        wait(0);
+    }
+    // #171 R3: a list read that fails does not drop the list read queued
+    // behind it, and only a failure of a current read is reported.
+    function test_history_pages_keep_a_queued_list_read_after_a_failure_data() { return historyPages_data(); }
+    function test_history_pages_keep_a_queued_list_read_after_a_failure(data) {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", savedToDev, false)]);
+        const page = historyPage(data.url, client);
+        client.hold = true;
+        client.capabilitiesReloaded();
+        compare(client.heldLists().length, 1);
+        client.deleteProfile("prf-dev", true);
+        client.capabilitiesReloaded();
+        compare(client.heldLists().length, 1, "list reads were not coalesced");
+        // The older list read fails after the resync queued a fresh one.
+        client.answerFailure(client.heldLists()[0], {name: "timeout", code: -32004, message: "late"});
+        compare(page.notice, "", "a stale failure was reported");
+        compare(client.heldLists().length, 1, "the queued list read was dropped");
+        client.answer(client.heldLists()[0]);
+        wait(0);
+        compare(page.changes[0].profile_deleted, true);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
+        // A failure of the current read is reported.
+        client.capabilitiesReloaded();
+        const failure = {name: "timeout", code: -32004, message: "now"};
+        client.answerFailure(client.heldLists()[0], failure);
+        compare(page.notice, client.errorText(failure));
+        compare(client.held.length, 0);
         page.destroy();
         wait(0);
     }
