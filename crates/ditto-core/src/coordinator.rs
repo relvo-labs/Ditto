@@ -1936,6 +1936,18 @@ impl Coordinator {
                 "only a committed change can be undone",
             ));
         }
+        // The delete is soft: the change stays in history, but its Profile
+        // has no document left to undo it in, and a switch cannot go back
+        // to it (protocol 0.2 §8.6, #171). Refused before anything is written.
+        match profiles::get(self.store.connection(), &stored.record.profile_id) {
+            Err(StoreError::NotFound(_)) => {
+                return Err(CoreError::not_found(
+                    "the composition this change was made in has been deleted; the change cannot be undone",
+                ))
+            }
+            Err(error) => return Err(error.into()),
+            Ok(_) => {}
+        }
         let origin = ChangeOrigin::Undo {
             undoes: change_id.into(),
         };

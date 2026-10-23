@@ -325,6 +325,10 @@
       "additionalProperties": false,
       "description": "A committed change that wrote its Profile's revision and applied nothing\nto the desktop (protocol 0.2 §8.1). `result` stays `succeeded`: the edit\nof the stored Profile is done; this says where it went.",
       "properties": {
+        "profile_deleted": {
+          "description": "The Profile has been deleted since (#171), read with the name. It\ncan no longer be switched to, so the change will never apply, and\nundo is refused (protocol 0.2 §8.6). Left out while false.",
+          "type": "boolean"
+        },
         "profile_name": {
           "description": "The Profile's name when the record is read (it can be renamed since).",
           "type": "string"

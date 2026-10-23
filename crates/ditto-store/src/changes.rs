@@ -60,7 +60,8 @@ fn parse<T: serde::de::DeserializeOwned>(index: usize, text: &str) -> rusqlite::
 const COLUMNS: &str = "change_id, profile_id, base_revision, state, hot_swap_level, mode, ops_json, card_json,
     reasons_json, items_json, target_document_json, target_profile_id, idempotency_key, origin_json, subject,
     confirmation_json, committed_revision, failure_key, created_at, updated_at, recovered_at, saved_only,
-    (SELECT name FROM profiles WHERE profiles.profile_id = changesets.profile_id)";
+    (SELECT name FROM profiles WHERE profiles.profile_id = changesets.profile_id),
+    (SELECT deleted_at IS NOT NULL FROM profiles WHERE profiles.profile_id = changesets.profile_id)";
 
 fn row(row: &Row<'_>) -> rusqlite::Result<StoredChange> {
     let state_text: String = row.get(3)?;
@@ -86,7 +87,10 @@ fn row(row: &Row<'_>) -> rusqlite::Result<StoredChange> {
                     format!("unknown saved_only {text}").into(),
                 )
             })?,
+            // Both read the Profile row whether or not it is deleted (the
+            // delete is soft), when the record is read.
             profile_name: row.get::<_, Option<String>>(22)?.unwrap_or_default(),
+            profile_deleted: row.get::<_, Option<bool>>(23)?.unwrap_or(false),
         }),
     };
     let record = ChangeRecord {

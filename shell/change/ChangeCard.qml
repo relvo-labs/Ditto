@@ -23,6 +23,9 @@ Column {
     property string title: cardData ? client.key(cardData.title_key, cardData.title_args || {}) : ""
     property string kind: cardData ? cardData.kind : "diff"
     property bool showDiagnostics: true
+    /// Whether an undo button belongs beside this card's record
+    /// (ChangeText.undoable), for hosts of the card that offer undo.
+    readonly property bool undoable: words.undoable(record)
 
     spacing: tokens.space
 

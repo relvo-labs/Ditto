@@ -626,11 +626,12 @@ Item {
                     tokens: window.tokens
                     record: row.modelData.type === "tool/result" ? window.record(row.modelData.data.change_id) : null
                 }
-                // Undo is a new change through Core, offered on what committed.
+                // Undo is a new change through Core, offered on what committed
+                // and Core can still undo (ChangeText.undoable).
                 Button {
                     id: undo
                     anchors.top: card.bottom
-                    visible: !!card.record && card.record.state === "committed" && !window.compact
+                    visible: card.undoable && !window.compact
                     height: visible ? implicitHeight : 0
                     tokens: window.tokens
                     kind: "subtle"

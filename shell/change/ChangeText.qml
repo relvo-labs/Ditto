@@ -42,8 +42,28 @@ QtObject {
         return !!record && record.state === "committed" && !!record.saved_only ? record.saved_only : null;
     }
 
+    /// Core says the Profile was deleted since (#171): it cannot be switched
+    /// to, so the change will never apply, and Core refuses to undo it.
+    function savedOnlyDeleted(record) {
+        const saved = savedOnly(record);
+        return !!saved && saved.profile_deleted === true;
+    }
+
     function savedOnlyLabel(saved) {
+        if (saved.profile_deleted === true) {
+            return saved.profile_name ? t(qsTr("曾存到「%1」（已刪除）")).arg(saved.profile_name) : t(qsTr("曾存到另一個組合（已刪除）"));
+        }
         return saved.profile_name ? t(qsTr("已存到「%1」")).arg(saved.profile_name) : t(qsTr("已存到另一個組合"));
+    }
+
+    /// Whether an undo button is offered for this record or summary: only a
+    /// committed change that was not reverted, and not one Core says it
+    /// cannot undo because its Profile was deleted. Every undo button that
+    /// shows a change record uses this.
+    function undoable(record) {
+        return !!record && record.state === "committed"
+            && !(record.confirmation && record.confirmation.state === "reverted")
+            && !savedOnlyDeleted(record);
     }
 
     /// 準備中 / 套用中 / 確認中 / 完成 / 已回復 / 部分完成 / 無法確認
@@ -100,6 +120,9 @@ QtObject {
         }
         switch (record.state) {
         case "committed":
+            if (savedOnlyDeleted(record)) {
+                return "neutral";
+            }
             if (record.result === "scheduled" || savedOnly(record)) {
                 return "info";
             }
@@ -129,6 +152,11 @@ QtObject {
         }
         switch (record.state) {
         case "committed":
+            if (savedOnlyDeleted(record)) {
+                return savedOnly(record).profile_name
+                    ? t(qsTr("曾存到「%1」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。")).arg(savedOnly(record).profile_name)
+                    : t(qsTr("曾存到另一個組合，桌面沒有改變；那個組合已刪除，所以不會再套用，也不能撤銷。"));
+            }
             if (savedOnly(record)) {
                 // Core undoes such a change in the same Profile, so undo is
                 // offered as for any committed change.

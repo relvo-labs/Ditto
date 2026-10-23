@@ -68,7 +68,7 @@
 | --- | --- | --- |
 | `unsupported` | -32000 | 平台或合成器沒有路徑 |
 | `invalid_params` | -32001 | |
-| `not_found` | -32002 | |
+| `not_found` | -32002 | 包括撤銷所屬 Profile 已刪除的變更（§8.6） |
 | `permission_denied` | -32003 | **G1 開始實際回傳**；`data.reason` ∈ `not_granted`、`policy_denied`、`approval_unavailable` |
 | `timeout` | -32004 | 可帶 `outcome: "unknown"` |
 | `cancelled` | -32005 | |
@@ -181,7 +181,9 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 
 回應與歷史**永遠同時帶** `state` 與 `result`。`result = partial` 時，`items[]` 逐項列出 `applied`、`not_restored` 與原因。
 
-`saved_only = { "reason": "inactive_profile", "profile_name": "<名稱>" }`：只出現在「寫進非作用中的 Profile、沒有套用到桌面」的已提交變更（§8.1），`ChangeRecord` 與 `ChangeSummary`（`changes.list`、`change_updated`）都帶；其他紀錄省略這個欄位。store schema 6 之前寫入的紀錄都不會有它；沒有 `saved_only` 並不代表變更已套用到桌面，仍要照舊看 `state` 與 `result`。`result` 仍是 `succeeded`：對那個 Profile 的編輯已完成，`saved_only` 說的是它去了哪裡。`reason` 是封閉集合，目前只有 `inactive_profile`；`profile_name` 是讀取紀錄時該 Profile 的名稱（改名後跟著變）。介面不得把它寫成「已套用」，要說已存到哪個組合、桌面沒有改變、切換到該組合時才會套用；這種變更照常可以撤銷（§8.6）。這是選用的新增欄位，不新增結果類別或原因碼（store schema 6 的 `changesets.saved_only`）。
+`saved_only = { "reason": "inactive_profile", "profile_name": "<名稱>" }`：只出現在「寫進非作用中的 Profile、沒有套用到桌面」的已提交變更（§8.1），`ChangeRecord` 與 `ChangeSummary`（`changes.list`、`change_updated`）都帶；其他紀錄省略這個欄位。store schema 6 之前寫入的紀錄都不會有它；沒有 `saved_only` 並不代表變更已套用到桌面，仍要照舊看 `state` 與 `result`。`result` 仍是 `succeeded`：對那個 Profile 的編輯已完成，`saved_only` 說的是它去了哪裡。`reason` 是封閉集合，目前只有 `inactive_profile`；`profile_name` 是讀取紀錄時該 Profile 的名稱（改名後跟著變）。介面不得把它寫成「已套用」，要說已存到哪個組合、桌面沒有改變、切換到該組合時才會套用；那個 Profile 還在時，這種變更照常可以撤銷（§8.6）。這是選用的新增欄位，不新增結果類別或原因碼（store schema 6 的 `changesets.saved_only`）。
+
+`saved_only.profile_deleted = true`（#171）：那個 Profile 之後被刪除了。刪除是軟刪除，紀錄與 `profile_name` 都還讀得到；`profile_deleted` 與 `profile_name` 在同一次讀取中由該 Profile 的 `deleted_at` 算出，未刪除時省略（不會出現 `false`），不寫入 store、不需遷移。已刪除的 Profile 不能再切換過去，所以這筆變更不會再套用，撤銷也會被拒絕（§8.6）；介面要說它曾存到哪個組合、那個組合已刪除，不得再說切換時會套用或可以撤銷，也不提供撤銷入口。這同樣是選用的新增欄位，不新增結果類別或原因碼。
 
 `result = scheduled`：變更已存成 revision（`state = committed`、head 已移動），但**還沒有任何東西生效**——`items[]` 全部是 `scheduled`，原因 `next_login`（§8.4 的 `session_restart`）或 `rescue_mode`（救援模式下只動到 hostd 的變更，回到一般模式時生效）。介面只能呈現為「待下次登入套用」或「回到一般模式後套用」，不得寫成已套用。判定規則在 `ditto_protocol::change::result_of`，store 的 `result_kind` 欄與回應用同一條。
 
@@ -233,6 +235,7 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 - 被撤銷的是該 Profile 最新一筆已提交的變更 → 目標 = 它的父 revision。
 - 不是最新，且後續變更碰過同樣的路徑 → `conflict`（`undo_blocked_by_newer_change`），產品語言為「請先撤銷較新的變更」。
 - 不是最新，但沒有路徑重疊 → 以反向 op 套用到目前的 head。
+- 該變更所屬的 Profile 已刪除（#171）→ `not_found`，`message` 說明那個組合已刪除、這筆變更不能撤銷。在寫入任何紀錄之前拒絕，不呼叫參與者。撤銷從已刪除的 Profile 切走的切換也一樣：沒有組合可以切回去。
 
 被撤銷的變更所屬 Profile 目前不是作用中的 Profile 時，撤銷只改那個 Profile 的文件，不呼叫參與者（§8.1）。撤銷切換 Profile 則是一次從作用中 Profile 出發的切換，照常套用到桌面。`desktop.rescue.restore_last_good` 指名非作用中的 Profile 時也一樣，只改它的 head。
 

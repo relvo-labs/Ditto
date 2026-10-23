@@ -433,4 +433,81 @@ TestCase {
         verify(fallback.shown);
         verify(!s.host.backgroundShown);
     }
+
+    // #171: both history pages (built-in and packaged, as staged) show a
+    // saved_only change whose Profile Core says is deleted without an undo
+    // button, and keep it for the same change while the Profile exists.
+    Component {
+        id: historyClientFactory
+        QtObject {
+            property var summaries: []
+            property var records: ({})
+            property var tr: QtObject {
+                function slotName(slot) { return slot; }
+                function packageName(id) { return id; }
+                function has(key) { return false; }
+            }
+            signal capabilitiesReloaded()
+            signal changeUpdated(var change)
+            function t(source) { return source; }
+            function key(source, args) { return source; }
+            function join(values) { return values.join(", "); }
+            function errorText(error) { return String(error); }
+            function diagnosticText(error) { return ""; }
+            function capability(name, args, done, fail) {
+                if (name === "desktop.changes.list") done({changes: summaries});
+                else if (name === "desktop.changes.get") done(records[args.change_id]);
+            }
+            function undoChange(changeId, done, fail) {}
+        }
+    }
+    function historySummary(changeId, savedOnly) {
+        return {change_id: changeId, profile_id: "prf-dev", state: "committed", result: "succeeded", origin: {kind: "cli"},
+            hot_swap_level: "instant", title_key: "change.title.appearance", committed_revision: "rev-1",
+            confirmation: {state: "not_required"}, saved_only: savedOnly,
+            created_at: "2026-10-23T00:00:00.000Z", updated_at: "2026-10-23T00:00:00.000Z"};
+    }
+    function historyRecord(changeId, savedOnly) {
+        return Object.assign(historySummary(changeId, savedOnly), {base_revision: "rev-0", idempotency_key: null, ops: [],
+            card: {kind: "appearance", title_key: "change.title.appearance", title_args: {}, items: []},
+            reasons: [], items: [], operations: []});
+    }
+    function itemsWithText(item, text) {
+        let found = item.text === text ? [item] : [];
+        for (let i = 0; i < item.children.length; ++i) found = found.concat(itemsWithText(item.children[i], text));
+        return found;
+    }
+    function test_history_pages_hide_undo_for_a_deleted_target_data() {
+        return [
+            {tag: "built-in", url: "../shell/centers/HistoryCenter.qml"},
+            {tag: "packaged", url: "../shell/providers/settings_history/qml/HistoryPage.qml"}
+        ];
+    }
+    function test_history_pages_hide_undo_for_a_deleted_target(data) {
+        const kept = {reason: "inactive_profile", profile_name: "開發"};
+        const gone = {reason: "inactive_profile", profile_name: "開發", profile_deleted: true};
+        const client = createTemporaryObject(historyClientFactory, testCase, {
+            summaries: [historySummary("chg-gone", gone), historySummary("chg-kept", kept)],
+            records: {"chg-gone": historyRecord("chg-gone", gone), "chg-kept": historyRecord("chg-kept", kept)}});
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const component = Qt.createComponent(Qt.resolvedUrl(data.url));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: client, tokens: tokens, width: 900, height: 700});
+        verify(page !== null);
+        tryCompare(page.changes, "length", 2);
+        page.open("chg-gone");
+        page.open("chg-kept");
+        tryVerify(() => !!page.expanded["chg-gone"] && !!page.expanded["chg-kept"]);
+        wait(0);
+        // The list row of the deleted target says so.
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
+        // Rows follow the list order: the deleted target first. Only the
+        // buttons themselves (a Button has an accessibleName), not their labels.
+        const undo = itemsWithText(page, "撤銷這次變更").filter(item => item.accessibleName !== undefined);
+        compare(undo.length, 2);
+        verify(!undo[0].visible, "undo offered for a change on a deleted Profile");
+        verify(undo[1].visible, "undo missing for a change on an existing Profile");
+        page.destroy();
+        wait(0);
+    }
 }

@@ -534,6 +534,22 @@
         <translation>Created</translation>
     </message>
     <message>
+        <source>曾存到「%1」（已刪除）</source>
+        <translation>Was saved to “%1” (deleted)</translation>
+    </message>
+    <message>
+        <source>曾存到「%1」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>Was saved to “%1”. Nothing on the desktop changed; this composition has been deleted, so it will not apply and cannot be undone.</translation>
+    </message>
+    <message>
+        <source>曾存到另一個組合（已刪除）</source>
+        <translation>Was saved to another composition (deleted)</translation>
+    </message>
+    <message>
+        <source>曾存到另一個組合，桌面沒有改變；那個組合已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>Was saved to another composition. Nothing on the desktop changed; that composition has been deleted, so it will not apply and cannot be undone.</translation>
+    </message>
+    <message>
         <source>未保留，自動回復</source>
         <translation>Not kept, reverted automatically</translation>
     </message>

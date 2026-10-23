@@ -248,12 +248,12 @@ Flickable {
                         visible: !!changeRow.record
                         spacing: page.tokens.space
 
-                        // Undo exists only for a change that took effect. An
+                        // Undo exists only for a change that took effect and
+                        // that Core can still undo (ChangeText.undoable). An
                         // unknown result has no retry here: what is true is
                         // read back first, then decided.
                         Button {
-                            visible: !!changeRow.record && changeRow.record.state === "committed"
-                                && !(changeRow.record.confirmation && changeRow.record.confirmation.state === "reverted")
+                            visible: words.undoable(changeRow.record)
                             tokens: page.tokens
                             text: page.t(qsTr("撤銷這次變更"))
                             onClicked: page.undo(changeRow.record)

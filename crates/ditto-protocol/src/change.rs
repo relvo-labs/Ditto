@@ -397,6 +397,11 @@ pub struct SavedOnly {
     pub reason: SavedOnlyReason,
     /// The Profile's name when the record is read (it can be renamed since).
     pub profile_name: String,
+    /// The Profile has been deleted since (#171), read with the name. It
+    /// can no longer be switched to, so the change will never apply, and
+    /// undo is refused (protocol 0.2 §8.6). Left out while false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub profile_deleted: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

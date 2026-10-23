@@ -272,6 +272,12 @@ export interface PreflightReason {
  */
 export interface SavedOnly {
   /**
+   * The Profile has been deleted since (#171), read with the name. It
+   * can no longer be switched to, so the change will never apply, and
+   * undo is refused (protocol 0.2 §8.6). Left out while false.
+   */
+  profile_deleted?: boolean;
+  /**
    * The Profile's name when the record is read (it can be renamed since).
    */
   profile_name: string;
