@@ -90,13 +90,22 @@ Flickable {
 
     Connections {
         target: page.client
-        // After a resync or a reconnect: changes made meanwhile are listed.
+        // After a resync or a reconnect: changes made meanwhile are listed,
+        // and open records are read again (a Profile may have been deleted).
         function onCapabilitiesReloaded() {
             page.reload();
+            for (const changeId in page.expanded) {
+                page.refresh(changeId);
+            }
         }
         function onChangeUpdated(change) {
             const index = page.changes.findIndex(item => item.change_id === change.change_id);
             if (index < 0) {
+                // Older than the loaded rows (Core publishes a deleted
+                // Profile's changes again): read with its page, not put on top.
+                if (page.changes.length > 0 && change.change_id < page.changes[page.changes.length - 1].change_id) {
+                    return;
+                }
                 page.changes = [change].concat(page.changes);
             } else {
                 const list = page.changes.slice();

@@ -434,14 +434,20 @@ TestCase {
         verify(!s.host.backgroundShown);
     }
 
-    // #171: both history pages (built-in and packaged, as staged) show a
-    // saved_only change whose Profile Core says is deleted without an undo
-    // button, and keep it for the same change while the Profile exists.
+    // #171: the history pages (built-in and packaged, as staged) and the
+    // chat's change card follow Core's record-level `profile_deleted`: no
+    // undo button and no undo promise for a change whose Profile is deleted,
+    // whether it was saved_only or applied, both when the record is read
+    // fresh and when the view already holds it as the Profile is deleted
+    // (Core then publishes change_updated for those changes).
     Component {
         id: historyClientFactory
         QtObject {
             property var summaries: []
             property var records: ({})
+            property bool online: true
+            property var packages: []
+            property var gets: []
             property var tr: QtObject {
                 function slotName(slot) { return slot; }
                 function packageName(id) { return id; }
@@ -449,65 +455,179 @@ TestCase {
             }
             signal capabilitiesReloaded()
             signal changeUpdated(var change)
+            signal profileChanged(var profile)
+            signal disconnected()
             function t(source) { return source; }
             function key(source, args) { return source; }
             function join(values) { return values.join(", "); }
             function errorText(error) { return String(error); }
             function diagnosticText(error) { return ""; }
+            function newKey(prefix) { return prefix + "-fixture"; }
+            function watchTopics(topics, event, resync, ready, fail) {}
+            function capabilityAvailable(name) { return false; }
             function capability(name, args, done, fail) {
                 if (name === "desktop.changes.list") done({changes: summaries});
-                else if (name === "desktop.changes.get") done(records[args.change_id]);
+                else if (name === "desktop.changes.get") {
+                    // Answered later, as over the socket.
+                    gets = gets.concat([args.change_id]);
+                    const record = records[args.change_id];
+                    Qt.callLater(() => done(record));
+                }
             }
             function undoChange(changeId, done, fail) {}
+            /// What Core does when the Profile is deleted: every read now
+            /// carries profile_deleted, and change_updated goes out for the
+            /// committed changes of that Profile.
+            function deleteProfile(profileId) {
+                const table = {};
+                for (const id in records) {
+                    table[id] = Object.assign({}, records[id], records[id].profile_id === profileId ? {profile_deleted: true} : {});
+                }
+                records = table;
+                summaries = summaries.map(summary => summary.profile_id === profileId ? Object.assign({}, summary, {profile_deleted: true}) : summary);
+                for (const id in records) {
+                    if (records[id].profile_id === profileId) changeUpdated(summaryOf(records[id]));
+                }
+            }
+            function summaryOf(record) {
+                const summary = {};
+                for (const field of ["change_id", "profile_id", "state", "result", "origin", "hot_swap_level", "committed_revision",
+                                     "confirmation", "saved_only", "profile_deleted", "created_at", "updated_at"]) {
+                    if (record[field] !== undefined) summary[field] = record[field];
+                }
+                summary.title_key = record.card.title_key;
+                return summary;
+            }
         }
     }
-    function historySummary(changeId, savedOnly) {
-        return {change_id: changeId, profile_id: "prf-dev", state: "committed", result: "succeeded", origin: {kind: "cli"},
-            hot_swap_level: "instant", title_key: "change.title.appearance", committed_revision: "rev-1",
-            confirmation: {state: "not_required"}, saved_only: savedOnly,
-            created_at: "2026-10-23T00:00:00.000Z", updated_at: "2026-10-23T00:00:00.000Z"};
-    }
-    function historyRecord(changeId, savedOnly) {
-        return Object.assign(historySummary(changeId, savedOnly), {base_revision: "rev-0", idempotency_key: null, ops: [],
+    Component { id: chatFactory; Chat.ChatBody {} }
+    readonly property var savedToDev: ({reason: "inactive_profile", profile_name: "開發"})
+    function historyRecord(changeId, profileId, savedOnly, deleted) {
+        const record = {change_id: changeId, profile_id: profileId, state: "committed", result: "succeeded", origin: {kind: "cli"},
+            hot_swap_level: "instant", committed_revision: "rev-1", confirmation: {state: "not_required"},
+            created_at: "2026-10-23T00:00:00.000Z", updated_at: "2026-10-23T00:00:00.000Z",
+            base_revision: "rev-0", idempotency_key: null, ops: [],
             card: {kind: "appearance", title_key: "change.title.appearance", title_args: {}, items: []},
-            reasons: [], items: [], operations: []});
+            reasons: [], items: [], operations: []};
+        if (savedOnly) record.saved_only = savedOnly;
+        if (deleted) record.profile_deleted = true;
+        return record;
+    }
+    /// A client holding these records, newest first in the history list.
+    function historyClient(records) {
+        const client = createTemporaryObject(historyClientFactory, testCase);
+        const table = {};
+        for (const record of records) table[record.change_id] = record;
+        client.records = table;
+        client.summaries = records.map(record => client.summaryOf(record));
+        return client;
     }
     function itemsWithText(item, text) {
         let found = item.text === text ? [item] : [];
         for (let i = 0; i < item.children.length; ++i) found = found.concat(itemsWithText(item.children[i], text));
         return found;
     }
-    function test_history_pages_hide_undo_for_a_deleted_target_data() {
+    /// Buttons only (a Button has an accessibleName), not their labels.
+    function buttonsWithText(item, text) {
+        return itemsWithText(item, text).filter(found => found.accessibleName !== undefined);
+    }
+    function historyPage(url, client) {
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const component = Qt.createComponent(Qt.resolvedUrl(url));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: client, tokens: tokens, width: 900, height: 900});
+        verify(page !== null);
+        tryCompare(page.changes, "length", client.summaries.length);
+        return page;
+    }
+    function historyPages_data() {
         return [
             {tag: "built-in", url: "../shell/centers/HistoryCenter.qml"},
             {tag: "packaged", url: "../shell/providers/settings_history/qml/HistoryPage.qml"}
         ];
     }
-    function test_history_pages_hide_undo_for_a_deleted_target(data) {
-        const kept = {reason: "inactive_profile", profile_name: "開發"};
-        const gone = {reason: "inactive_profile", profile_name: "開發", profile_deleted: true};
-        const client = createTemporaryObject(historyClientFactory, testCase, {
-            summaries: [historySummary("chg-gone", gone), historySummary("chg-kept", kept)],
-            records: {"chg-gone": historyRecord("chg-gone", gone), "chg-kept": historyRecord("chg-kept", kept)}});
-        const tokens = createTemporaryObject(tokenFactory, testCase);
-        const component = Qt.createComponent(Qt.resolvedUrl(data.url));
-        compare(component.status, Component.Ready, component.errorString());
-        const page = createTemporaryObject(component, testCase, {client: client, tokens: tokens, width: 900, height: 700});
-        verify(page !== null);
-        tryCompare(page.changes, "length", 2);
-        page.open("chg-gone");
-        page.open("chg-kept");
-        tryVerify(() => !!page.expanded["chg-gone"] && !!page.expanded["chg-kept"]);
+    function test_history_pages_hide_undo_for_a_deleted_profile_data() { return historyPages_data(); }
+    function test_history_pages_hide_undo_for_a_deleted_profile(data) {
+        const client = historyClient([
+            historyRecord("chg-03", "prf-dev", savedToDev, true),
+            historyRecord("chg-02", "prf-old", null, true),
+            historyRecord("chg-01", "prf-dev2", savedToDev, false)]);
+        const page = historyPage(data.url, client);
+        for (const id of ["chg-03", "chg-02", "chg-01"]) page.open(id);
+        tryVerify(() => ["chg-03", "chg-02", "chg-01"].every(id => !!page.expanded[id]));
         wait(0);
-        // The list row of the deleted target says so.
         verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
-        // Rows follow the list order: the deleted target first. Only the
-        // buttons themselves (a Button has an accessibleName), not their labels.
-        const undo = itemsWithText(page, "撤銷這次變更").filter(item => item.accessibleName !== undefined);
-        compare(undo.length, 2);
-        verify(!undo[0].visible, "undo offered for a change on a deleted Profile");
-        verify(undo[1].visible, "undo missing for a change on an existing Profile");
+        verify(itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        // Rows follow the list order.
+        const undo = buttonsWithText(page, "撤銷這次變更");
+        compare(undo.length, 3);
+        verify(!undo[0].visible, "undo offered for a saved change of a deleted Profile");
+        verify(!undo[1].visible, "undo offered for an applied change of a deleted Profile");
+        verify(undo[2].visible, "undo missing for a change of an existing Profile");
         page.destroy();
+        wait(0);
+    }
+    function test_open_history_pages_follow_a_profile_deletion_data() { return historyPages_data(); }
+    function test_open_history_pages_follow_a_profile_deletion(data) {
+        const client = historyClient([
+            historyRecord("chg-03", "prf-other", null, false),
+            historyRecord("chg-02", "prf-dev", savedToDev, false),
+            historyRecord("chg-01", "prf-dev", null, false)]);
+        // Older than the loaded rows: not in this view.
+        client.records = Object.assign({"chg-00": historyRecord("chg-00", "prf-dev", null, false)}, client.records);
+        const page = historyPage(data.url, client);
+        page.open("chg-02");
+        page.open("chg-01");
+        tryVerify(() => !!page.expanded["chg-02"] && !!page.expanded["chg-01"]);
+        wait(0);
+        // One per row (rows follow the list order); the unopened row has none shown.
+        let undo = buttonsWithText(page, "撤銷這次變更");
+        compare(undo.length, 3);
+        verify(!undo[0].visible && undo[1].visible && undo[2].visible);
+        verify(itemsWithText(page, "已存到「開發」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。").length === 1);
+        verify(itemsWithText(page, "已套用並確認生效。可以撤銷。").length === 1);
+
+        client.deleteProfile("prf-dev");
+        // The page is not recreated; its rows and open cards read again.
+        tryVerify(() => itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        tryVerify(() => itemsWithText(page, "曾存到「開發」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。").length === 1);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
+        compare(itemsWithText(page, "已存到「開發」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。").length, 0);
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        undo = buttonsWithText(page, "撤銷這次變更");
+        compare(undo.length, 3);
+        verify(undo.every(button => !button.visible), "undo still offered after the Profile was deleted");
+        // An older change the page never loaded is not put at the top.
+        compare(page.changes.map(change => change.change_id), ["chg-03", "chg-02", "chg-01"]);
+        verify(page.changes[1].profile_deleted === true && page.changes[2].profile_deleted === true);
+        verify(page.changes[0].profile_deleted === undefined);
+        page.destroy();
+        wait(0);
+    }
+    function test_an_open_chat_card_follows_a_profile_deletion() {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const conversation = createTemporaryObject(conversationFactory, testCase, {client: client});
+        const chat = createTemporaryObject(chatFactory, testCase, {client: client, tokens: tokens, conversation: conversation,
+            width: 800, height: 700});
+        verify(chat !== null);
+        conversation.events = [{type: "tool/result", data: {change_id: "chg-01"}}];
+        tryVerify(() => buttonsWithText(chat, "撤銷這項變更").length === 1 && buttonsWithText(chat, "撤銷這項變更")[0].visible);
+        const undo = buttonsWithText(chat, "撤銷這項變更")[0];
+        verify(itemsWithText(chat, "已套用並確認生效。可以撤銷。").length === 1);
+        const reads = client.gets.length;
+
+        client.deleteProfile("prf-dev");
+        // The same card and button: the record is read again from Core.
+        tryVerify(() => !undo.visible, 3000, "undo still offered after the Profile was deleted");
+        compare(buttonsWithText(chat, "撤銷這項變更")[0], undo);
+        verify(client.gets.length > reads);
+        verify(itemsWithText(chat, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        compare(itemsWithText(chat, "已套用並確認生效。可以撤銷。").length, 0);
+        // The full record (with its card) is kept, not the summary.
+        verify(!!chat.records["chg-01"].card);
+        compare(chat.records["chg-01"].profile_deleted, true);
+        chat.destroy();
         wait(0);
     }
 }

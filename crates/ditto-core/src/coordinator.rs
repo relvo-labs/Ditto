@@ -54,6 +54,11 @@ use crate::{
     sdnotify,
 };
 
+/// How many committed changes of a deleted Profile Core publishes again as
+/// `change_updated` (#171); the largest window one `changes.list` call
+/// serves. Past it, `changes` subscribers are asked to read again instead.
+pub(crate) const DELETION_REFRESH_LIMIT: u32 = 200;
+
 /// A change request as the router hands it over. Subject and origin come from
 /// the connection, never from the caller's parameters.
 #[derive(Clone, Debug)]
@@ -1912,6 +1917,60 @@ impl Coordinator {
             },
             None,
         )
+    }
+
+    /// Soft-delete a Profile that is not the active one
+    /// (`desktop.profiles.delete`). Its changes stay in history and now read
+    /// `profile_deleted`; views that already hold one (a history row, an
+    /// open card, a chat card) learn of it from `change_updated`, published
+    /// again for each committed change of the Profile, read the way
+    /// `changes.get` reads it (#171). Changes that did not commit promise
+    /// neither undo nor a later apply, so they are not sent.
+    pub fn delete_profile(
+        &mut self,
+        profile_id: &str,
+    ) -> StoreResult<ditto_protocol::profile::ProfileSummary> {
+        self.delete_profile_refreshing(profile_id, DELETION_REFRESH_LIMIT)
+    }
+
+    /// `delete_profile` with the bound on how many changes are published
+    /// again. Past it, or when they cannot be read, every `changes`
+    /// subscriber is asked to read again (`resync_required`) instead of
+    /// being sent a flood or a partial set.
+    pub(crate) fn delete_profile_refreshing(
+        &mut self,
+        profile_id: &str,
+        limit: u32,
+    ) -> StoreResult<ditto_protocol::profile::ProfileSummary> {
+        let deleted = self
+            .store
+            .write(|tx| profiles::soft_delete(tx, profile_id))?;
+        match changes::committed_of(self.store.connection(), profile_id, limit.saturating_add(1)) {
+            Ok(committed) if committed.len() <= limit as usize => {
+                // Oldest first, the order they were made in.
+                for stored in committed.iter().rev() {
+                    self.core.publish(DesktopEventPayload::ChangeUpdated {
+                        change: Box::new(stored.record.summary()),
+                    });
+                }
+            }
+            Ok(_) => self
+                .core
+                .resync_topic(ditto_protocol::EventTopic::Changes, "profile_deleted"),
+            Err(error) => {
+                crate::log::event(
+                    "profile.delete_refresh_failed",
+                    &[
+                        ("profile_id", profile_id),
+                        ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
+                    ],
+                );
+                self.core
+                    .resync_topic(ditto_protocol::EventTopic::Changes, "profile_deleted");
+            }
+        }
+        Ok(deleted)
     }
 
     /// Undo (CHG-04): the newest committed change reverts to its base; an

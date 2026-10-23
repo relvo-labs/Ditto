@@ -42,15 +42,16 @@ QtObject {
         return !!record && record.state === "committed" && !!record.saved_only ? record.saved_only : null;
     }
 
-    /// Core says the Profile was deleted since (#171): it cannot be switched
-    /// to, so the change will never apply, and Core refuses to undo it.
-    function savedOnlyDeleted(record) {
-        const saved = savedOnly(record);
-        return !!saved && saved.profile_deleted === true;
+    /// Core says the change's Profile was deleted since (#171), on records
+    /// and list summaries alike: it cannot be switched to, so nothing of it
+    /// applies again, and Core refuses to undo any change of it.
+    function profileDeleted(record) {
+        return !!record && record.profile_deleted === true;
     }
 
-    function savedOnlyLabel(saved) {
-        if (saved.profile_deleted === true) {
+    function savedOnlyLabel(record) {
+        const saved = savedOnly(record);
+        if (profileDeleted(record)) {
             return saved.profile_name ? t(qsTr("曾存到「%1」（已刪除）")).arg(saved.profile_name) : t(qsTr("曾存到另一個組合（已刪除）"));
         }
         return saved.profile_name ? t(qsTr("已存到「%1」")).arg(saved.profile_name) : t(qsTr("已存到另一個組合"));
@@ -63,7 +64,7 @@ QtObject {
     function undoable(record) {
         return !!record && record.state === "committed"
             && !(record.confirmation && record.confirmation.state === "reverted")
-            && !savedOnlyDeleted(record);
+            && !profileDeleted(record);
     }
 
     /// 準備中 / 套用中 / 確認中 / 完成 / 已回復 / 部分完成 / 無法確認
@@ -82,7 +83,11 @@ QtObject {
             return t(qsTr("確認中"));
         case "committed":
             if (savedOnly(record)) {
-                return savedOnlyLabel(savedOnly(record));
+                return savedOnlyLabel(record);
+            }
+            if (record.result === "scheduled" && profileDeleted(record)) {
+                // It would apply when its Profile is active; it never is again.
+                return t(qsTr("已保存（組合已刪除）"));
             }
             if (record.result === "scheduled") {
                 return scheduledReason(record) === "rescue_mode" ? t(qsTr("回到一般模式後套用")) : t(qsTr("待下次登入套用"));
@@ -120,7 +125,7 @@ QtObject {
         }
         switch (record.state) {
         case "committed":
-            if (savedOnlyDeleted(record)) {
+            if (savedOnly(record) && profileDeleted(record)) {
                 return "neutral";
             }
             if (record.result === "scheduled" || savedOnly(record)) {
@@ -152,7 +157,7 @@ QtObject {
         }
         switch (record.state) {
         case "committed":
-            if (savedOnlyDeleted(record)) {
+            if (savedOnly(record) && profileDeleted(record)) {
                 return savedOnly(record).profile_name
                     ? t(qsTr("曾存到「%1」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。")).arg(savedOnly(record).profile_name)
                     : t(qsTr("曾存到另一個組合，桌面沒有改變；那個組合已刪除，所以不會再套用，也不能撤銷。"));
@@ -163,6 +168,9 @@ QtObject {
                 return savedOnly(record).profile_name
                     ? t(qsTr("已存到「%1」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。")).arg(savedOnly(record).profile_name)
                     : t(qsTr("已存到另一個組合，桌面沒有改變；切換到那個組合時才會套用。可以撤銷。"));
+            }
+            if (record.result === "scheduled" && profileDeleted(record)) {
+                return t(qsTr("已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。"));
             }
             if (record.result === "scheduled") {
                 return scheduledReason(record) === "rescue_mode"
@@ -177,6 +185,9 @@ QtObject {
             }
             if (record.confirmation && record.confirmation.state === "reverted") {
                 return t(qsTr("這項變更已被回復，目前是變更前的設定。"));
+            }
+            if (profileDeleted(record)) {
+                return t(qsTr("已套用並確認生效。這個組合之後已刪除，所以不能撤銷。"));
             }
             return t(qsTr("已套用並確認生效。可以撤銷。"));
         case "rejected":

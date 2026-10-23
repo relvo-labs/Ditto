@@ -183,7 +183,7 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 
 `saved_only = { "reason": "inactive_profile", "profile_name": "<名稱>" }`：只出現在「寫進非作用中的 Profile、沒有套用到桌面」的已提交變更（§8.1），`ChangeRecord` 與 `ChangeSummary`（`changes.list`、`change_updated`）都帶；其他紀錄省略這個欄位。store schema 6 之前寫入的紀錄都不會有它；沒有 `saved_only` 並不代表變更已套用到桌面，仍要照舊看 `state` 與 `result`。`result` 仍是 `succeeded`：對那個 Profile 的編輯已完成，`saved_only` 說的是它去了哪裡。`reason` 是封閉集合，目前只有 `inactive_profile`；`profile_name` 是讀取紀錄時該 Profile 的名稱（改名後跟著變）。介面不得把它寫成「已套用」，要說已存到哪個組合、桌面沒有改變、切換到該組合時才會套用；那個 Profile 還在時，這種變更照常可以撤銷（§8.6）。這是選用的新增欄位，不新增結果類別或原因碼（store schema 6 的 `changesets.saved_only`）。
 
-`saved_only.profile_deleted = true`（#171）：那個 Profile 之後被刪除了。刪除是軟刪除，紀錄與 `profile_name` 都還讀得到；`profile_deleted` 與 `profile_name` 在同一次讀取中由該 Profile 的 `deleted_at` 算出，未刪除時省略（不會出現 `false`），不寫入 store、不需遷移。已刪除的 Profile 不能再切換過去，所以這筆變更不會再套用，撤銷也會被拒絕（§8.6）；介面要說它曾存到哪個組合、那個組合已刪除，不得再說切換時會套用或可以撤銷，也不提供撤銷入口。這同樣是選用的新增欄位，不新增結果類別或原因碼。
+`profile_deleted = true`（#171）：這筆變更所屬的 Profile 之後被刪除了。`ChangeRecord` 與 `ChangeSummary` 都在紀錄層級帶它，不論有沒有 `saved_only`；未刪除時省略（不會出現 `false`）。刪除是軟刪除，紀錄與 `saved_only.profile_name` 都還讀得到；`profile_deleted` 在同一次讀取中由該 Profile 的 `deleted_at` 算出，不寫入 store、不需遷移。已刪除的 Profile 不能再切換過去，所以它的變更不會再套用（包括 `scheduled` 的變更），撤銷也一律被拒絕（§8.6）。介面不得再說切換或登入時會套用、可以撤銷，也不提供撤銷入口；已發生的事照實說（已套用的仍是已套用，`saved_only` 的說曾存到哪個組合、那個組合已刪除）。刪除 Profile 時，Core 為該 Profile 最新的至多 200 筆已提交變更（`changes.list` 單次的上限）再發布一次 `change_updated`，內容與 `changes.get` 讀到的相同，所以已經開著的變更紀錄、變更卡與對話中的卡片不必重開就會更新；超過 200 筆或讀取失敗時，改為要求所有 `changes` 訂閱重新讀取（`resync_required`，`reason = profile_deleted`，§10）。未提交的變更沒有可撤銷或之後套用的承諾，不再發布。這同樣是選用的新增欄位，不新增結果類別或原因碼。
 
 `result = scheduled`：變更已存成 revision（`state = committed`、head 已移動），但**還沒有任何東西生效**——`items[]` 全部是 `scheduled`，原因 `next_login`（§8.4 的 `session_restart`）或 `rescue_mode`（救援模式下只動到 hostd 的變更，回到一般模式時生效）。介面只能呈現為「待下次登入套用」或「回到一般模式後套用」，不得寫成已套用。判定規則在 `ditto_protocol::change::result_of`，store 的 `result_kind` 欄與回應用同一條。
 
@@ -304,7 +304,7 @@ Shell 在每次掛載變化後主動呼叫 `shell.report`（與 `observed` 同�
 | `tasks` | `host_event`（`name` 以 `tasks/` 開頭） | `tasks.read` |
 | `session` | `session_changed` | `desktop.read` |
 
-所有主題共用一條 `seq`，所以一個訂閱看到的 `seq` 本來就會跳號（中間是它沒訂的主題）。缺口偵測因此看 `prev_seq`：每則通知帶 Core 送給**這個訂閱**的上一則通知的 `seq`（第一則連到訂閱回應中的 `seq`，即快照或重播所到的位置）；`prev_seq` 不等於客戶端手上最後一則的 `seq` 就是漏收，客戶端丟掉增量狀態、重新取快照並重訂。`resync_required` 的語意與 G0 相同（溢位、斷線、`permission_revoked`）。通知事件中的 `DesktopEventNotification.revision` 在 0.2 改名為 `profile_revision`（作用中 head，字串或 `null`）。
+所有主題共用一條 `seq`，所以一個訂閱看到的 `seq` 本來就會跳號（中間是它沒訂的主題）。缺口偵測因此看 `prev_seq`：每則通知帶 Core 送給**這個訂閱**的上一則通知的 `seq`（第一則連到訂閱回應中的 `seq`，即快照或重播所到的位置）；`prev_seq` 不等於客戶端手上最後一則的 `seq` 就是漏收，客戶端丟掉增量狀態、重新取快照並重訂。`resync_required` 的語意與 G0 相同（溢位、斷線、`permission_revoked`）；刪除 Profile 時要重新發布的變更超過上限，`changes` 訂閱以 `reason = profile_deleted` 結束（§8.2）。通知事件中的 `DesktopEventNotification.revision` 在 0.2 改名為 `profile_revision`（作用中 head，字串或 `null`）。
 
 ## 11. 能力群組
 

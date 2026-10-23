@@ -1,8 +1,8 @@
 {
  "kind": "shape",
- "description": "#171：變更紀錄清單的摘要同樣帶 profile_deleted: true",
+ "description": "profile_deleted 只能是布林值：字串 \"true\" 也要拒絕",
  "type": "change-summary",
- "valid": true,
+ "valid": false,
  "value": {
   "change_id": "chg-01M5KQSRKJZ9SGQFT6APYPYPPA",
   "profile_id": "prf-01M5KQSRHXBJMCS80YTK7ST6JG",
@@ -17,12 +17,8 @@
   "confirmation": {
    "state": "not_required"
   },
-  "saved_only": {
-   "reason": "inactive_profile",
-   "profile_name": "開發",
-   "profile_deleted": true
-  },
   "created_at": "2026-10-23T00:00:00.000Z",
-  "updated_at": "2026-10-23T00:00:00.000Z"
+  "updated_at": "2026-10-23T00:00:00.000Z",
+  "profile_deleted": "true"
  }
 }

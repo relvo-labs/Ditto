@@ -361,12 +361,25 @@ fn listed_ids(desk: &Desktop) -> Vec<Value> {
         .collect()
 }
 
+/// What the fake participants have been asked so far.
+fn participant_calls(desk: &Desktop) -> (u32, usize, usize, Vec<Value>) {
+    let shell = desk.shell.lock().unwrap();
+    let host = desk.host.lock().unwrap();
+    (
+        shell.prepares,
+        shell.candidates.len(),
+        host.candidates.len(),
+        host.entries.clone(),
+    )
+}
+
 /// Undo of a change whose Profile is deleted: refused as `not_found` with a
 /// message that says why (protocol 0.2 §8.6), before any record is written
 /// or any participant is asked.
 fn assert_undo_refused_as_deleted(desk: &Desktop, change_id: &str) {
     let listed = listed_ids(desk);
     let shown = desk.live_shell();
+    let asked = participant_calls(desk);
     let refused = desk
         .cli
         .call(catalog::CHANGES_UNDO, json!({"change_id": change_id}));
@@ -378,12 +391,26 @@ fn assert_undo_refused_as_deleted(desk: &Desktop, change_id: &str) {
     );
     assert_eq!(listed_ids(desk), listed, "undo wrote a change");
     assert_eq!(desk.live_shell(), shown, "the desktop changed");
+    assert_eq!(participant_calls(desk), asked, "a participant was asked");
+}
+
+/// `changes.get` and `changes.list` both say the change's Profile is
+/// deleted, at the record level (#171).
+fn assert_profile_deleted(desk: &Desktop, change_id: &str) {
+    let got = desk
+        .cli
+        .result(catalog::CHANGES_GET, json!({"change_id": change_id}));
+    assert_eq!(got["profile_deleted"], true, "changes.get: {got}");
+    let listed = desk.listed(change_id);
+    assert_eq!(listed["profile_deleted"], true, "changes.list: {listed}");
 }
 
 /// #171: a saved_only change, then its Profile is deleted. The record still
 /// reads (soft delete keeps the name) and now says the Profile is deleted,
 /// in `changes.get` and in the history list; switching to it is impossible,
-/// and undo is a clear refusal, not an internal error.
+/// and undo is a clear refusal, not an internal error. An undo sent before
+/// the delete and replayed with its idempotency key still returns the
+/// record it made.
 #[test]
 fn a_saved_only_change_whose_profile_is_deleted_says_so_and_cannot_be_undone() {
     let desk = desktop("inactive-deleted");
@@ -394,30 +421,56 @@ fn a_saved_only_change_whose_profile_is_deleted_says_so_and_cannot_be_undone() {
         "profile_id": other, "base_revision": head,
         "ops": [{"op": "set_value", "path": "/appearance/tokens/accent", "after": "#123456"}]}));
     assert_eq!(edit.state, ChangeState::Committed, "{edit:?}");
+    let (head, _) = desk.head_of(&other);
+    let later = desk.propose(json!({
+        "profile_id": other, "base_revision": head,
+        "ops": [{"op": "set_value", "path": "/avatar/hidden", "after": true}]}));
+    assert_eq!(later.state, ChangeState::Committed, "{later:?}");
+    let undone = desk.cli.result(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": later.change_id, "idempotency_key": "undo-171"}),
+    );
+    assert_eq!(undone["state"], "committed", "{undone}");
     // While the Profile exists the field is left out.
     desk.assert_saved_only(&edit.change_id, "開發");
+    for change_id in [&edit.change_id, &later.change_id] {
+        let got = desk
+            .cli
+            .result(catalog::CHANGES_GET, json!({"change_id": change_id}));
+        assert!(got.get("profile_deleted").is_none(), "{got}");
+        assert!(desk.listed(change_id).get("profile_deleted").is_none());
+    }
 
     desk.cli
         .result(catalog::PROFILES_DELETE, json!({"profile_id": other}));
-    let expected =
-        json!({"reason": "inactive_profile", "profile_name": "開發", "profile_deleted": true});
+    // saved_only reads as before; the deletion is said beside it.
+    desk.assert_saved_only(&edit.change_id, "開發");
+    assert_profile_deleted(&desk, &edit.change_id);
     let got = desk
         .cli
         .result(catalog::CHANGES_GET, json!({"change_id": edit.change_id}));
-    assert_eq!(got["saved_only"], expected, "changes.get: {got}");
     assert_eq!(got["state"], "committed", "{got}");
     assert_eq!(got["result"], "succeeded", "{got}");
-    assert_eq!(desk.listed(&edit.change_id)["saved_only"], expected);
 
     assert_undo_refused_as_deleted(&desk, &edit.change_id);
+    // The replayed undo returns the record it made before the delete.
+    let asked = participant_calls(&desk);
+    let replayed = desk.cli.result(
+        catalog::CHANGES_UNDO,
+        json!({"change_id": later.change_id, "idempotency_key": "undo-171"}),
+    );
+    assert_eq!(replayed["change_id"], undone["change_id"], "{replayed}");
+    assert_eq!(replayed["state"], "committed", "{replayed}");
+    assert_eq!(replayed["profile_deleted"], true, "{replayed}");
+    assert_eq!(participant_calls(&desk), asked, "a participant was asked");
     assert_eq!(desk.active_profile(), active);
 }
 
-/// The same refusal for a change that was applied to the desktop and whose
-/// Profile was deleted after switching away (no `saved_only` here; the
-/// record itself is unchanged, see #171's scope note).
+/// The same for a change that was applied to the desktop and whose Profile
+/// was deleted after switching away: no `saved_only` here, and the record
+/// still says the Profile is deleted, so no surface offers its undo.
 #[test]
-fn undo_of_an_applied_change_on_a_deleted_profile_is_refused_clearly() {
+fn an_applied_change_on_a_deleted_profile_says_so_and_cannot_be_undone() {
     let desk = desktop("deleted-applied");
     let first = desk.active_profile();
     let (first_head, _) = desk.head_of(&first);
@@ -435,11 +488,147 @@ fn undo_of_an_applied_change_on_a_deleted_profile_is_refused_clearly() {
     desk.cli
         .result(catalog::PROFILES_DELETE, json!({"profile_id": first}));
     desk.assert_applied_live(&applied.change_id);
+    assert_profile_deleted(&desk, &applied.change_id);
+    // The switch is recorded under the Profile it left.
+    assert_profile_deleted(&desk, &switched.change_id);
 
     assert_undo_refused_as_deleted(&desk, &applied.change_id);
     // Undoing the switch would switch back to the deleted Profile.
     assert_undo_refused_as_deleted(&desk, &switched.change_id);
     assert_eq!(desk.active_profile(), other);
+}
+
+/// `change_updated` and `resync_required` notifications the CLI has seen
+/// on the `changes` subscription `subscription`, as payloads.
+fn change_events(desk: &Desktop, subscription: &Value) -> Vec<Value> {
+    desk.cli
+        .events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|event| event["params"]["subscription_id"] == *subscription)
+        .map(|event| event["params"]["payload"].clone())
+        .filter(|payload| {
+            payload["type"] == "change_updated" || payload["type"] == "resync_required"
+        })
+        .collect()
+}
+
+/// A subscription to the `changes` topic only; its id.
+fn subscribe_to_changes(desk: &Desktop) -> Value {
+    let subscribed = desk
+        .cli
+        .result(catalog::EVENTS_SUBSCRIBE, json!({"topics": ["changes"]}));
+    assert!(subscribed["subscription_id"].is_string(), "{subscribed}");
+    subscribed["subscription_id"].clone()
+}
+
+/// #171: views that already hold a change of the deleted Profile (a history
+/// row, an expanded card, a chat card) learn of it from Core: deleting the
+/// Profile publishes `change_updated` again for each committed change of
+/// that Profile, read the same way `changes.get` reads it, so with
+/// `profile_deleted`. Nothing is published for other Profiles, nor for a
+/// change of the Profile that did not commit (it promises nothing).
+#[test]
+fn deleting_a_profile_publishes_its_committed_changes_again() {
+    let desk = desktop("deleted-events");
+    let other = desk.profile_named("開發");
+    let third = desk.profile_named("簡報");
+    let edit = |profile: &str, accent: &str| {
+        let (head, _) = desk.head_of(profile);
+        let record = desk.propose(json!({
+            "profile_id": profile, "base_revision": head,
+            "ops": [{"op": "set_value", "path": "/appearance/tokens/accent", "after": accent}]}));
+        assert_eq!(record.state, ChangeState::Committed, "{record:?}");
+        record.change_id
+    };
+    let first = edit(&other, "#111111");
+    let second = edit(&other, "#222222");
+    let elsewhere = edit(&third, "#333333");
+    let (head, document) = desk.head_of(&other);
+    let dock = document.slot_entry("ui.dock").unwrap().entry_id.clone();
+    let refused = desk.propose(json!({
+        "profile_id": other, "base_revision": head,
+        "ops": [{"op": "set_entry_config", "entry_id": dock, "after": {"position": 3}}]}));
+    assert_eq!(refused.state, ChangeState::Rejected, "{refused:?}");
+
+    let subscription = subscribe_to_changes(&desk);
+    desk.cli.events.lock().unwrap().clear();
+    desk.cli
+        .result(catalog::PROFILES_DELETE, json!({"profile_id": other}));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while change_events(&desk, &subscription).len() < 2 && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    // Anything published late would land now.
+    thread::sleep(Duration::from_millis(200));
+    let events = change_events(&desk, &subscription);
+    let mut published: Vec<String> = events
+        .iter()
+        .map(|payload| {
+            assert_eq!(payload["type"], "change_updated", "{payload}");
+            assert_eq!(payload["change"]["profile_deleted"], true, "{payload}");
+            assert_eq!(payload["change"]["profile_id"], json!(other), "{payload}");
+            payload["change"]["change_id"].as_str().unwrap().to_string()
+        })
+        .collect();
+    published.sort();
+    let mut expected = vec![first.clone(), second.clone()];
+    expected.sort();
+    assert_eq!(published, expected, "{events:?}");
+    assert!(!published.contains(&elsewhere));
+    assert!(!published.contains(&refused.change_id));
+    // Each published summary is what the history list now reads.
+    for payload in &events {
+        let id = payload["change"]["change_id"].as_str().unwrap();
+        let mut listed = desk.listed(id);
+        let mut sent = payload["change"].clone();
+        listed.as_object_mut().unwrap().remove("_meta");
+        sent.as_object_mut().unwrap().remove("_meta");
+        assert_eq!(sent, listed);
+    }
+}
+
+/// Past the bound on how many changes a delete publishes again, Core asks
+/// every `changes` subscriber to read again (`resync_required`, reason
+/// `profile_deleted`) instead, so no view keeps a stale record. The bound is
+/// lowered here to 1 so two changes cross it.
+#[test]
+fn deleting_a_profile_with_more_changes_than_the_bound_asks_views_to_read_again() {
+    let desk = desktop("deleted-resync");
+    let other = desk.profile_named("開發");
+    for accent in ["#111111", "#222222"] {
+        let (head, _) = desk.head_of(&other);
+        let record = desk.propose(json!({
+            "profile_id": other, "base_revision": head,
+            "ops": [{"op": "set_value", "path": "/appearance/tokens/accent", "after": accent}]}));
+        assert_eq!(record.state, ChangeState::Committed, "{record:?}");
+    }
+    let subscription = subscribe_to_changes(&desk);
+    desk.cli.events.lock().unwrap().clear();
+    let profile = other.clone();
+    desk.harness
+        .core
+        .coordinate(Duration::from_secs(10), move |co| {
+            co.delete_profile_refreshing(&profile, 1)
+        })
+        .unwrap()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while change_events(&desk, &subscription).is_empty() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    thread::sleep(Duration::from_millis(200));
+    let events = change_events(&desk, &subscription);
+    assert_eq!(
+        events,
+        vec![json!({"type": "resync_required", "reason": "profile_deleted"})],
+        "{events:?}"
+    );
+    let gone = desk
+        .cli
+        .call(catalog::PROFILES_GET, json!({"profile_id": other}));
+    assert_eq!(gone["error"]["name"], "not_found", "{gone}");
 }
 
 /// A preview on the active Profile, then a switch before anyone confirms:

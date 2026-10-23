@@ -1,6 +1,6 @@
 {
  "kind": "shape",
- "description": "profile_deleted 只能是布林值：字串 \"true\" 也要拒絕",
+ "description": "profile_deleted 在紀錄層級，不在 saved_only 裡：放進 saved_only 要拒絕",
  "type": "change-summary",
  "valid": false,
  "value": {
@@ -20,7 +20,7 @@
   "saved_only": {
    "reason": "inactive_profile",
    "profile_name": "開發",
-   "profile_deleted": "true"
+   "profile_deleted": true
   },
   "created_at": "2026-10-23T00:00:00.000Z",
   "updated_at": "2026-10-23T00:00:00.000Z"

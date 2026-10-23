@@ -583,7 +583,6 @@ pub(crate) mod tests {
             Some(ditto_protocol::change::SavedOnly {
                 reason: ditto_protocol::change::SavedOnlyReason::InactiveProfile,
                 profile_name: "v5".into(),
-                profile_deleted: false,
             })
         );
     }

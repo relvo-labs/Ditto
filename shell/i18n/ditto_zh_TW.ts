@@ -534,6 +534,18 @@
         <translation>新建立</translation>
     </message>
     <message>
+        <source>已保存（組合已刪除）</source>
+        <translation>已保存（組合已刪除）</translation>
+    </message>
+    <message>
+        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</translation>
+    </message>
+    <message>
+        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
+        <translation>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</translation>
+    </message>
+    <message>
         <source>曾存到「%1」（已刪除）</source>
         <translation>曾存到「%1」（已刪除）</translation>
     </message>

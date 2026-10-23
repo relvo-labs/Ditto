@@ -58,27 +58,40 @@ Item {
         return true;
     }
 
-    /// Change records by id, read once per card from Core.
+    /// Change records by id, read from Core once per card, and again when
+    /// Core says the change was updated or after a resync (a Profile may
+    /// have been deleted, #171).
     property var records: ({})
     function record(changeId) {
         if (records[changeId] !== undefined) {
             return records[changeId];
         }
         records[changeId] = null;
+        reread(changeId);
+        return null;
+    }
+    function reread(changeId) {
         client.capability("desktop.changes.get", { change_id: changeId }, function (result) {
             const table = Object.assign({}, window.records);
             table[changeId] = result;
             window.records = table;
         });
-        return null;
     }
     Connections {
         target: window.client
+        // change_updated carries a summary, which has no card or items: it
+        // updates the record at once, and the full record is read again.
         function onChangeUpdated(change) {
             if (window.records[change.change_id] !== undefined) {
                 const table = Object.assign({}, window.records);
-                table[change.change_id] = change;
+                table[change.change_id] = Object.assign({}, window.records[change.change_id] || {}, change);
                 window.records = table;
+                window.reread(change.change_id);
+            }
+        }
+        function onCapabilitiesReloaded() {
+            for (const changeId in window.records) {
+                window.reread(changeId);
             }
         }
     }

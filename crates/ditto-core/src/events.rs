@@ -412,6 +412,7 @@ mod topic_tests {
                 committed_revision: None,
                 confirmation: ditto_protocol::change::Confirmation::NotRequired,
                 saved_only: None,
+                profile_deleted: false,
                 created_at: String::new(),
                 updated_at: String::new(),
             }),

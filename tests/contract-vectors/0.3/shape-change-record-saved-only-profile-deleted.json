@@ -1,6 +1,6 @@
 {
  "kind": "shape",
- "description": "#171：saved_only 的目標 Profile 之後被刪除（軟刪除保留名稱）。讀取紀錄時帶 profile_deleted: true，不能再切換過去，也不能撤銷",
+ "description": "#171：saved_only 的目標 Profile 之後被刪除（軟刪除保留名稱）。紀錄層級帶 profile_deleted: true，saved_only 不變；不能再切換過去，也不能撤銷",
  "type": "change-record",
  "valid": true,
  "value": {
@@ -37,10 +37,10 @@
   "operations": [],
   "saved_only": {
    "reason": "inactive_profile",
-   "profile_name": "開發",
-   "profile_deleted": true
+   "profile_name": "開發"
   },
   "created_at": "2026-10-23T00:00:00.000Z",
-  "updated_at": "2026-10-23T00:00:00.000Z"
+  "updated_at": "2026-10-23T00:00:00.000Z",
+  "profile_deleted": true
  }
 }
