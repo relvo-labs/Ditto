@@ -282,6 +282,14 @@ impl Manifest {
                 problems.push(format!("event {} needs a schema", event.name));
             }
         }
+        // #161: refuse a config_schema Core cannot judge before the package
+        // is stored, not at the first add_entry. Same rule as the SDK.
+        if let Err(unsupported) = crate::config_schema::supported(&self.config_schema) {
+            problems.push(format!(
+                "config_schema{}: {}",
+                unsupported.schema_pointer, unsupported.message
+            ));
+        }
         problems
     }
 }

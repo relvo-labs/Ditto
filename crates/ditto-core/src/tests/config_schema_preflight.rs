@@ -101,7 +101,11 @@ fn base() -> ProfileDocument {
     document
 }
 
-fn with_context<T>(origin: ChangeOrigin, run: impl FnOnce(&preflight::Context<'_>) -> T) -> T {
+fn with_context<T>(
+    origin: ChangeOrigin,
+    restored_from: Option<&ProfileDocument>,
+    run: impl FnOnce(&preflight::Context<'_>) -> T,
+) -> T {
     let packages = packages();
     let paths = Paths::under(std::path::Path::new("/unused"));
     let resolver = Resolver {
@@ -115,6 +119,7 @@ fn with_context<T>(origin: ChangeOrigin, run: impl FnOnce(&preflight::Context<'_
         packages: &packages,
         resolver: &resolver,
         origin: &origin,
+        restored_from,
         session_locked: false,
         free_bytes: None,
         node_version: None,
@@ -124,13 +129,13 @@ fn with_context<T>(origin: ChangeOrigin, run: impl FnOnce(&preflight::Context<'_
 }
 
 fn run(ops: Vec<ChangeOp>) -> Vec<PreflightReason> {
-    with_context(ChangeOrigin::Cli, |context| {
+    with_context(ChangeOrigin::Cli, None, |context| {
         preflight::run(&base(), &ops, context).reasons
     })
 }
 
 fn run_target(origin: ChangeOrigin, target: ProfileDocument) -> Vec<PreflightReason> {
-    with_context(origin, |context| {
+    with_context(origin, None, |context| {
         preflight::run_target(&base(), target, vec![], context).reasons
     })
 }
@@ -336,10 +341,16 @@ fn a_switch_checks_the_entries_it_brings_in() {
 
 #[test]
 fn restoring_a_stored_revision_is_not_blocked_by_the_schema() {
-    // Undo, timed revert and rescue go back to content Core already stored;
-    // refusing them would take away the way back.
-    let mut target = base();
-    target.entries[0].config = json!({"position": "up"});
+    // Undo, timed revert and rescue restore put back a revision Core already
+    // stored; refusing them would take away the way back. Core names that
+    // revision (`restored_from`); the origin alone exempts nothing.
+    let mut stored = base();
+    stored.entries[0].config = json!({"position": "up"});
+    let restore = |origin: ChangeOrigin, from: Option<&ProfileDocument>| {
+        with_context(origin, from, |context| {
+            preflight::run_target(&base(), stored.clone(), vec![], context).reasons
+        })
+    };
     for origin in [
         ChangeOrigin::Undo {
             undoes: "chg-x".into(),
@@ -348,16 +359,44 @@ fn restoring_a_stored_revision_is_not_blocked_by_the_schema() {
             reverts: "chg-x".into(),
         },
         ChangeOrigin::Rescue,
-        ChangeOrigin::Supervisor {
-            reason: "crash_loop".into(),
-        },
     ] {
-        let reasons = run_target(origin.clone(), target.clone());
+        let reasons = restore(origin.clone(), Some(&stored));
         assert!(
             schema_reasons(&reasons).is_empty(),
             "{origin:?}: {reasons:?}"
         );
+        let unnamed = restore(origin.clone(), None);
+        assert_eq!(schema_reasons(&unnamed).len(), 1, "{origin:?}: {unnamed:?}");
     }
+
+    // Op-based undo (an older change): the config put back is exempt only
+    // while package, version and config are as stored.
+    let ops_from = |from: &ProfileDocument, ops: Vec<ChangeOp>| {
+        with_context(
+            ChangeOrigin::Undo {
+                undoes: "chg-x".into(),
+            },
+            Some(from),
+            |context| preflight::run(&base(), &ops, context).reasons,
+        )
+    };
+    let back = ops_from(
+        &stored,
+        vec![set_config("ent-pill", json!({"position": "up"}))],
+    );
+    assert!(schema_reasons(&back).is_empty(), "{back:?}");
+    let other = ops_from(
+        &stored,
+        vec![set_config("ent-pill", json!({"position": "down"}))],
+    );
+    assert_eq!(schema_reasons(&other).len(), 1, "{other:?}");
+    let mut older_version = stored.clone();
+    older_version.entries[0].version = "0.9.0".into();
+    let moved = ops_from(
+        &older_version,
+        vec![set_config("ent-pill", json!({"position": "up"}))],
+    );
+    assert_eq!(schema_reasons(&moved).len(), 1, "{moved:?}");
 }
 
 #[test]
@@ -523,6 +562,7 @@ fn every_shipped_and_fixture_manifest_accepts_its_default_config() {
         packages: &packages,
         resolver: &resolver,
         origin: &ChangeOrigin::Cli,
+        restored_from: None,
         session_locked: false,
         free_bytes: None,
         node_version: None,

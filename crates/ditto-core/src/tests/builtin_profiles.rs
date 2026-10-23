@@ -426,6 +426,7 @@ fn builtin_compositions_pass_preflight_with_shipped_config_schemas() {
                 packages: &packages,
                 resolver: &resolver,
                 origin: &origin,
+                restored_from: None,
                 session_locked: false,
                 free_bytes: None,
                 node_version: Some("22.23.2"),
@@ -503,6 +504,7 @@ fn switch_undo_restores_profile_identity_and_refuses_newer_edits_without_ipc() {
             let propose_switch = |co: &mut crate::coordinator::Coordinator| {
                 co.propose(
                     Proposal {
+                        restored_from: None,
                         profile_id: Some(source.clone()),
                         base_revision: source_revision.revision_id.clone(),
                         ops: vec![ChangeOp::SwitchProfile {
@@ -713,6 +715,7 @@ fn builtin_compositions_pass_the_config_schema_check_from_an_empty_profile() {
                 packages: &packages,
                 resolver: &resolver,
                 origin: &origin,
+                restored_from: None,
                 session_locked: false,
                 free_bytes: None,
                 node_version: Some("22.23.2"),
@@ -761,6 +764,7 @@ fn a_config_the_shipped_schema_refuses_is_rejected_and_nothing_is_written() {
             let dock = doc.slot_entry("ui.dock").unwrap().clone();
             assert_eq!(dock.package, "ditto.dock.pill");
             let proposal = |ops: Vec<ChangeOp>, base: &str| Proposal {
+                restored_from: None,
                 profile_id: None,
                 base_revision: base.into(),
                 ops,

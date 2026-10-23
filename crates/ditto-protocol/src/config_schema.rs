@@ -2,25 +2,28 @@
 //!
 //! The SDK decides what a `config_schema` may contain
 //! (`packages/host-sdk/src/manifest/json-schema.ts`: `configSchemaKeywords`,
-//! `unsupportedKeywords`) and how a value is judged (`validateJsonSchema`).
+//! `configSchemaIssues`) and how a value is judged (`validateJsonSchema`).
 //! This module mirrors both for that subset, so a config the SDK accepts at
 //! author time is the config Core accepts at preflight, and the other way
-//! round:
+//! round. `tests/config-schema/parity.json` holds cases both sides run.
 //!
 //! - Allowed keywords: `type`, `properties`, `required`, `enum`, `items`,
 //!   `minimum`, `maximum`, `additionalProperties`, plus the annotations
 //!   `default`, `title`, `description` and `$schema`, which judge nothing.
 //! - The top level is an object schema with `"type": "object"`.
-//! - Any other keyword, at any depth the SDK looks at, makes the schema
-//!   unsupported. The SDK refuses such a manifest, so Core refuses to judge a
-//!   config by it instead of ignoring the keyword.
-//!
-//! Where the SDK quietly ignores a malformed keyword value (`minimum` that is
-//! not a number, `enum` that is not an array, `properties` or `required` that
-//! is `null`) this module ignores it too. Where the SDK would throw or read
-//! the value in an unintended way (`properties` that is not an object,
-//! `required` that is not a list of strings, a subschema that is neither an
-//! object nor a boolean) the schema is unsupported.
+//! - Any other keyword makes the schema unsupported, and so does a keyword
+//!   value that cannot be judged: `properties` that is not an object,
+//!   `required` that is not a list of strings, or a subschema (a property,
+//!   `items`, `additionalProperties`) that is neither an object nor a
+//!   boolean. `supported` is the one check for this: `Manifest::check` runs
+//!   it when a package is installed or seeded, the SDK runs the same rule
+//!   when it validates a manifest, and preflight refuses to judge a config
+//!   by a schema that fails it (a package stored before the install check).
+//! - A malformed value the SDK quietly ignores is ignored here too:
+//!   `minimum`/`maximum` that is not a number, `enum` that is not an array,
+//!   `properties` or `required` that is `null`.
+//! - Property names are own keys on both sides: `toString`, `constructor`
+//!   and `__proto__` are ordinary names.
 //!
 //! Pointers are RFC 6901 (`/a~1b` for the key `a/b`, `""` for the whole
 //! config); the SDK writes the same paths without escaping and uses `/` for
@@ -543,6 +546,42 @@ mod tests {
                 "no value is allowed here",
             ]
         );
+    }
+
+    /// The Rust half of tests/config-schema/parity.json; the SDK half is
+    /// packages/host-sdk/tests/config-schema-parity.test.ts.
+    #[test]
+    fn shared_parity_cases_match_the_sdk() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/config-schema/parity.json");
+        let parity: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let cases = parity["cases"].as_array().unwrap();
+        assert!(cases.len() > 15);
+        for case in cases {
+            let name = case["name"].as_str().unwrap();
+            match check(&case["schema"], &case["value"]) {
+                Ok(found) => {
+                    let pointers: Vec<&str> = found.iter().map(|v| v.pointer.as_str()).collect();
+                    let wanted: Vec<&str> = case["violations"]
+                        .as_array()
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "{name}: supported, but the case expects {}",
+                                case["unsupported"]
+                            )
+                        })
+                        .iter()
+                        .map(|p| p.as_str().unwrap())
+                        .collect();
+                    assert_eq!(pointers, wanted, "{name}");
+                }
+                Err(refused) => assert_eq!(
+                    Some(refused.schema_pointer.as_str()),
+                    case["unsupported"].as_str(),
+                    "{name}"
+                ),
+            }
+        }
     }
 
     #[test]

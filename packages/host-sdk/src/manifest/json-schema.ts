@@ -35,6 +35,10 @@ function equal(a: unknown, b: unknown): boolean {
   return ka.length === kb.length && ka.every(key => equal((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
 }
 
+function hasOwn(object: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key)
+}
+
 function resolveRef(root: JsonSchema, ref: string): JsonSchema {
   if (!ref.startsWith('#')) throw new Error(`only local $ref is supported: ${ref}`)
   let node: unknown = root
@@ -91,11 +95,13 @@ export function validateJsonSchema(schema: JsonSchema, value: unknown, root: Jso
   if (typeOf(value) === 'object') {
     const object = value as Record<string, unknown>
     const properties = (s['properties'] ?? {}) as Record<string, JsonSchema>
+    // Own keys only: `toString`, `constructor` and `__proto__` are ordinary
+    // names, as they are for Core (crates/ditto-protocol/src/config_schema.rs).
     for (const key of (s['required'] as string[] | undefined) ?? []) {
-      if (!(key in object)) issues.push({ path: `${path}/${key}`, message: 'is required' })
+      if (!hasOwn(object, key)) issues.push({ path: `${path}/${key}`, message: 'is required' })
     }
     for (const [key, item] of Object.entries(object)) {
-      if (key in properties) issues.push(...validateJsonSchema(properties[key]!, item, root, `${path}/${key}`))
+      if (hasOwn(properties, key)) issues.push(...validateJsonSchema(properties[key]!, item, root, `${path}/${key}`))
       else if (s['additionalProperties'] !== undefined) issues.push(...validateJsonSchema(s['additionalProperties'] as JsonSchema, item, root, `${path}/${key}`))
     }
   }
@@ -113,8 +119,8 @@ export function validateJsonSchema(schema: JsonSchema, value: unknown, root: Jso
 
 /**
  * Keywords manifest.md allows inside a plugin's `config_schema`. Core checks entry configs with the
- * same subset and the same judgement as `validateJsonSchema` (crates/ditto-core/src/config_schema.rs);
- * change both together.
+ * same subset and the same judgement as `validateJsonSchema` (crates/ditto-protocol/src/config_schema.rs);
+ * change both together. tests/config-schema/parity.json holds cases both sides run.
  */
 export const configSchemaKeywords = new Set([
   'type', 'properties', 'required', 'enum', 'items', 'default', 'minimum', 'maximum', 'additionalProperties',
@@ -122,6 +128,46 @@ export const configSchemaKeywords = new Set([
   'title', 'description', '$schema',
 ])
 
+const isSchemaObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/**
+ * Is this a `config_schema` Core can judge? The same rule as Core's `config_schema::supported`, which
+ * Core runs when a package is installed: an object schema with `"type": "object"` at the top, only
+ * `configSchemaKeywords`, `properties` an object (or null), `required` a list of strings (or null), and
+ * every subschema (a property, `items`, `additionalProperties`) an object or a boolean. Runs on the
+ * schema alone, whatever defaults it declares.
+ */
+export function configSchemaIssues(schema: unknown, path = '/config_schema'): SchemaIssue[] {
+  if (!isSchemaObject(schema)) return [{ path, message: 'config_schema must be a JSON Schema object' }]
+  if (schema['type'] !== 'object') return [{ path: `${path}/type`, message: 'the top level must be an object schema' }]
+  return subschemaIssues(schema, path)
+}
+
+function subschemaIssues(node: unknown, path: string): SchemaIssue[] {
+  if (typeof node === 'boolean') return []
+  if (!isSchemaObject(node)) return [{ path, message: 'a subschema must be an object or a boolean' }]
+  const issues: SchemaIssue[] = []
+  for (const [key, value] of Object.entries(node)) {
+    const here = `${path}/${key}`
+    if (!configSchemaKeywords.has(key)) {
+      issues.push({ path: here, message: `keyword "${key}" is outside the config_schema subset` })
+    } else if (key === 'properties') {
+      if (value === null) continue
+      if (!isSchemaObject(value)) issues.push({ path: here, message: 'properties must be an object' })
+      else for (const [name, sub] of Object.entries(value)) issues.push(...subschemaIssues(sub, `${here}/${name}`))
+    } else if (key === 'required') {
+      if (value !== null && !(Array.isArray(value) && value.every(name => typeof name === 'string'))) {
+        issues.push({ path: here, message: 'required must be a list of property names' })
+      }
+    } else if (key === 'items' || key === 'additionalProperties') {
+      issues.push(...subschemaIssues(value, here))
+    }
+  }
+  return issues
+}
+
+/** @deprecated Keywords only; use `configSchemaIssues`, which also checks the shape Core needs. */
 export function unsupportedKeywords(schema: unknown, path = '/config_schema'): SchemaIssue[] {
   if (typeof schema !== 'object' || schema === null) return []
   const issues: SchemaIssue[] = []
@@ -134,5 +180,3 @@ export function unsupportedKeywords(schema: unknown, path = '/config_schema'): S
   }
   return issues
 }
-
-export type { Json }

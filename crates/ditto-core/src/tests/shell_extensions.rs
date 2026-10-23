@@ -92,6 +92,7 @@ fn reasons(
         packages,
         resolver: &resolver,
         origin: &ChangeOrigin::Cli,
+        restored_from: None,
         session_locked: false,
         free_bytes: None,
         node_version: None,

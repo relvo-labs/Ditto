@@ -28,7 +28,7 @@ manifest 是**請求**，不是事實：信任等級、權限、資源預算都�
 | `conflicts` | 強制 | 套件 id 陣列；同時啟用 → `declared_conflict` |
 | `entry` | 強制（cordis） | 相對於套件根的單一 ESM bundle，例 `dist/index.mjs` |
 | `qml_entry` | 強制（qml） | 相對於套件根，例 `qml/DockPill.qml` |
-| `config_schema` | 強制 | JSON Schema（draft 2020-12 的子集：`type`、`properties`、`required`、`enum`、`items`、`default`、`minimum`、`maximum`、`additionalProperties`，另可有不影響判定的 `title`、`description`、`$schema`）；最上層須為 `"type": "object"`。Core 在預檢依它檢查條目的 `config`，規則見下方「config 的檢查」 |
+| `config_schema` | 強制 | JSON Schema（draft 2020-12 的子集：`type`、`properties`、`required`、`enum`、`items`、`default`、`minimum`、`maximum`、`additionalProperties`，另可有不影響判定的 `title`、`description`、`$schema`）；最上層須為 `"type": "object"`。Core 安裝套件時拒絕無法判定的 schema，並在預檢依它檢查條目的 `config`，規則見下方「config 的檢查」 |
 | `data_schema` | 記錄 | G3 的資料遷移使用 |
 | `commands` | 強制 | `[{ "id": "launcher.toggle", "title_key": "…" }]`；同一 `id` 兩個擁有者 → `command_conflict` |
 | `shortcuts` | 強制 | `[{ "chord": "Super+Space", "command": "launcher.toggle" }]`；重複 → `shortcut_conflict`；Core 保留的組合（救援、鎖定）不得宣告 |
@@ -47,13 +47,13 @@ manifest 是**請求**，不是事實：信任等級、權限、資源預算都�
 
 ## config 的檢查
 
-SDK 在作者端檢查 `config_schema` 與其中的 `default`（`packages/host-sdk/src/manifest/rules.ts`）；Core 在預檢檢查實際寫入的 `config`（`crates/ditto-core/src/config_schema.rs`，#161）。兩邊用同一組關鍵字與同一套判定，所以 SDK 接受的 `config`，Core 也接受。
+SDK 在作者端檢查 `config_schema` 與其中的 `default`（`packages/host-sdk/src/manifest/rules.ts`）；Core 在安裝時檢查 `config_schema`，在預檢檢查實際寫入的 `config`（`crates/ditto-protocol/src/config_schema.rs`，#161）。兩邊用同一組關鍵字與同一套判定，屬性名稱都只看物件自己的鍵（`toString`、`constructor`、`__proto__` 是普通名稱）；共用案例在 `tests/config-schema/parity.json`，兩邊的測試都讀它。所以 SDK 接受的 `config`，Core 也接受。
 
-- **何時檢查**：一筆變更寫入條目的 `config`（`add_entry`、`set_entry_config`），或把條目換到另一個套件版本（`upgrade_entry`）時，以**該版本** manifest 的 `config_schema` 檢查變更後的 `config`。升版後沿用的舊 `config` 若不符新版 schema，整筆變更被拒，不會默默通過。切換 Profile 時，對目標 Profile 中與目前 Profile 不同的條目做同樣檢查。
-- **何時不再檢查**：變更沒碰到的條目不重新檢查，所以 #161 之前存下、不符 schema 的條目仍可載入、停用與移除；Core 啟動與參與者同步也不檢查。撤銷、限時回復、救援與監督停用是回到 Core 已保存的 revision，不重新檢查，以免擋住回復的路。同一套件版本的 manifest 不會改變（重新安裝同版本但內容不同會被拒），所以保存時通過檢查的 revision，之後不會因為 schema 改變而變得不符。
-- **匯入**：`profiles.import_validate` 與 `profiles.import` 把不符 schema 的 `config` 列為**非阻擋**的 `schema_invalid` 問題（`why` 同下）。匯出會把疑似秘密或私人路徑的值換成 `null`，這可能讓 `config` 不符 schema，需要匯入後再補；補好之前，切換到該 Profile 會在預檢被拒。
-- **結果**：不符時原因碼為 `schema_invalid`，見 [protocol-0.2.md §8.3](protocol-0.2.md#83-預檢) 的 `why` 清單；整筆 ChangeSet 被拒，Profile 不寫入。套件未安裝時仍只回 `package_missing`，不另做 schema 檢查。
-- **超出子集的 schema**：含子集以外關鍵字（例如 `pattern`、`const`、`$ref`）、最上層不是物件 schema，或關鍵字的值無法判定（`properties` 不是物件、`required` 不是字串陣列、子 schema 不是物件或布林）時，Core 不判定這份 `config`，而是以 `config_schema_unsupported` 拒絕。SDK 對這種 manifest 同樣報錯。SDK 會略過的格式錯誤（`minimum` 不是數字、`enum` 不是陣列、`properties` 或 `required` 為 `null`），Core 也略過。
+- **可判定的 schema**：最上層是 `"type": "object"`；只用上表的關鍵字；`properties` 是物件（或 `null`）、`required` 是字串陣列（或 `null`）；每個子 schema（屬性、`items`、`additionalProperties`）是物件或布林。不符合時，SDK 驗證 manifest 就報 `schema_invalid`（與是否宣告 `default` 無關），Core 安裝或載入內建套件時也拒絕（`Manifest::check`），套件不寫入。SDK 會略過的格式錯誤（`minimum`／`maximum` 不是數字、`enum` 不是陣列），兩邊都略過。
+- **何時檢查**：一筆變更寫入條目的 `config`（`add_entry`、`set_entry_config`），或把條目換到另一個套件版本（`upgrade_entry`）時，以**該版本** manifest 的 `config_schema` 檢查變更後的 `config`。升版後沿用的舊 `config` 若不符新版 schema，整筆變更被拒，不會默默通過。切換 Profile 時，以**作用中的** Profile 為基準，對目標 Profile 中與它不同的條目做同樣檢查；切換必須從作用中的 Profile 提出（見 [protocol-0.2.md §8.1](protocol-0.2.md#81-changeset-與-op)）。
+- **何時不再檢查**：變更沒碰到的條目不重新檢查，所以 #161 之前存下、不符 schema 的條目仍可載入、停用與移除；Core 啟動與參與者同步也不檢查。撤銷（包括撤銷較舊的變更）、限時回復與救援還原是放回 Core 已保存的 revision：Core 在內部指名那個 revision，條目的套件、版本與 `config` 與它完全相同時不重新檢查，以免擋住回復的路。這個指名只由 Core 的還原路徑設定，`desktop.changes.propose` 沒有對應欄位；呼叫方送出同樣的 `config` 仍會檢查。放回的 `config` 若落在條目之後換成的版本上，仍會檢查。監督與救援停用只改停用狀態，不涉及檢查。同一套件版本的 manifest 不會改變（重新安裝同版本但內容不同會被拒），所以保存時通過檢查的 revision，之後不會因為 schema 改變而變得不符。
+- **匯入**：`profiles.import_validate` 與 `profiles.import` 把不符 schema 的 `config` 列為**非阻擋**的 `schema_invalid` 問題（`why` 同下）。匯出會把疑似秘密或私人路徑的值換成 `null`，這可能讓 `config` 不符 schema。匯入的 Profile 在 `config` 補好（例如以修正後的匯出重新匯入）之前，切換到它會在預檢被拒。
+- **結果**：不符時原因碼為 `schema_invalid`，見 [protocol-0.2.md §8.3](protocol-0.2.md#83-預檢) 的 `why` 清單；整筆 ChangeSet 被拒，Profile 不寫入。套件未安裝時仍只回 `package_missing`，不另做 schema 檢查。安裝檢查加入前就已安裝、`config_schema` 無法判定的套件，預檢以 `config_schema_unsupported` 拒絕新增它或寫入它的 `config`。
 
 ## 套件格式 `.dittopkg`（D-10 提案）
 

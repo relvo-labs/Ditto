@@ -41,6 +41,9 @@ pub struct Context<'a> {
     pub packages: &'a PackageSet,
     pub resolver: &'a Resolver<'a>,
     pub origin: &'a ChangeOrigin,
+    /// The stored revision a restore puts back (undo, timed revert, rescue
+    /// restore); set by Core only. See `check_configs`.
+    pub restored_from: Option<&'a ProfileDocument>,
     pub session_locked: bool,
     pub free_bytes: Option<u64>,
     /// Node version hostd reported, when known.
@@ -121,24 +124,8 @@ pub fn run_target(
 ) -> Validation {
     let mut reasons = Vec::new();
     check_all(base, &target, &mut reasons, context);
-    if !restores_stored_revision(context.origin) {
-        check_configs(base, &target, &ops, &mut reasons, context, true);
-    }
+    check_configs(base, &target, &ops, &mut reasons, context, true);
     finish(base, target, ops, reasons, context)
-}
-
-/// Undo, timed revert, rescue and supervision hand preflight a revision Core
-/// already stored. Its configs were checked when they were written (a
-/// package's manifest never changes for the same version), or predate the
-/// check; either way, refusing them here would take away the way back.
-fn restores_stored_revision(origin: &ChangeOrigin) -> bool {
-    matches!(
-        origin,
-        ChangeOrigin::Undo { .. }
-            | ChangeOrigin::TimedRevert { .. }
-            | ChangeOrigin::Rescue
-            | ChangeOrigin::Supervisor { .. }
-    )
 }
 
 /// Violations listed in one reason; the rest are counted.
@@ -149,6 +136,13 @@ const MAX_LISTED_VIOLATIONS: usize = 16;
 /// `config_schema` (the subset the SDK allows, `config_schema.rs`). Entries
 /// the change leaves alone are not checked again: a Profile stored before
 /// this check keeps loading, and can still be disabled or removed.
+///
+/// A restore (undo, timed revert, rescue restore) puts back a revision Core
+/// already stored; refusing it would take away the way back. An entry whose
+/// package, version and config are exactly as in `context.restored_from` is
+/// therefore not checked again. Only Core's restore paths set that revision,
+/// and only the exact stored triple is exempt: a config put back onto a
+/// version the entry has since moved to is checked like any other.
 fn check_configs(
     base: &ProfileDocument,
     target: &ProfileDocument,
@@ -180,6 +174,17 @@ fn check_configs(
                 || old.config != entry.config
         });
         if !rewritten {
+            continue;
+        }
+        let restored = context
+            .restored_from
+            .and_then(|stored| stored.entry(&entry.entry_id))
+            .is_some_and(|old| {
+                old.package == entry.package
+                    && old.version == entry.version
+                    && old.config == entry.config
+            });
+        if restored {
             continue;
         }
         // A missing package has its own reason (`package_missing`).

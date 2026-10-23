@@ -69,6 +69,12 @@ pub struct Proposal {
     /// A whole target document (profile switch, restore, revert) instead of
     /// ops applied to the head.
     pub target: Option<Target>,
+    /// A stored revision whose entry configs this change puts back (undo,
+    /// timed revert, rescue restore). Preflight does not check an entry's
+    /// config against its schema again when package, version and config are
+    /// exactly as in this revision (#161). Core sets it on its own restore
+    /// paths only; `desktop.changes.propose` has no field for it.
+    pub restored_from: Option<ProfileDocument>,
 }
 
 #[derive(Clone, Debug)]
@@ -622,6 +628,7 @@ impl Coordinator {
         resolver: &'a Resolver<'a>,
         origin: &'a ChangeOrigin,
         node_version: Option<&'a str>,
+        restored_from: Option<&'a ProfileDocument>,
     ) -> preflight::Context<'a> {
         preflight::Context {
             head_revision,
@@ -629,6 +636,7 @@ impl Coordinator {
             packages,
             resolver,
             origin,
+            restored_from,
             session_locked: self.core.session_locked(),
             free_bytes: self.store.free_bytes().ok(),
             node_version,
@@ -698,6 +706,7 @@ impl Coordinator {
             &resolver,
             &proposal.origin,
             node.as_deref(),
+            proposal.restored_from.as_ref(),
         );
         let mut validation = match &proposal.target {
             Some(target) => preflight::run_target(
@@ -708,6 +717,26 @@ impl Coordinator {
             ),
             None => preflight::run(&head_document, &proposal.ops, &context),
         };
+        // A switch changes the desktop, which shows the active Profile: it is
+        // judged against that Profile and recorded as its change (undo of a
+        // switch reads it so). Naming another Profile as the base would
+        // compare the target with itself and skip every check that looks at
+        // what changes, the config_schema check among them (#161).
+        if proposal
+            .ops
+            .iter()
+            .any(|op| matches!(op, ChangeOp::SwitchProfile { .. }))
+        {
+            let active = profiles::active_profile(self.store.connection())?;
+            if active.as_deref() != Some(profile.profile_id.as_str()) {
+                validation.reasons.push(docops::reason(
+                    PreflightCode::PreconditionFailed,
+                    None,
+                    json!({"why": "switch_not_from_active_profile",
+                           "profile_id": profile.profile_id, "active_profile": active}),
+                ));
+            }
+        }
         if let Err(error) =
             ditto_store::generated::check_document(self.store.connection(), &validation.target)
         {
@@ -1812,6 +1841,7 @@ impl Coordinator {
         let ops = docops::ops_between(&head_document, &base_document);
         self.propose(
             Proposal {
+                restored_from: Some(base_document.clone()),
                 profile_id: Some(stored.record.profile_id.clone()),
                 base_revision: head.revision_id,
                 ops: ops.clone(),
@@ -1868,8 +1898,12 @@ impl Coordinator {
                     "the active composition or either revision changed; undo the newer change first",
                 ));
             }
+            // Switching back activates the revision that was active before.
+            let (_, previous) =
+                profiles::revision(self.store.connection(), &stored.record.base_revision)?;
             return self.propose(
                 Proposal {
+                    restored_from: Some(previous),
                     profile_id: Some(active.profile_id),
                     base_revision: current.revision_id,
                     ops: vec![ChangeOp::SwitchProfile {
@@ -1895,6 +1929,7 @@ impl Coordinator {
                 profiles::revision(self.store.connection(), &stored.record.base_revision)?;
             return self.propose(
                 Proposal {
+                    restored_from: Some(base_document.clone()),
                     profile_id: Some(stored.record.profile_id.clone()),
                     base_revision: head.revision_id,
                     ops: docops::ops_between(&head_document, &base_document),
@@ -1947,6 +1982,9 @@ impl Coordinator {
         let inverse = docops::ops_between(&after, &before);
         self.propose(
             Proposal {
+                // The configs put back are the ones the undone change found;
+                // an entry since moved to another version is checked again.
+                restored_from: Some(before),
                 profile_id: Some(stored.record.profile_id.clone()),
                 base_revision: head.revision_id,
                 ops: inverse,
@@ -2012,6 +2050,7 @@ impl Coordinator {
         }
         let outcome = self.propose(
             Proposal {
+                restored_from: None,
                 profile_id: None,
                 base_revision: head.revision_id,
                 ops: vec![ChangeOp::SetEntryDisabled {
@@ -2067,6 +2106,7 @@ impl Coordinator {
         }
         self.propose(
             Proposal {
+                restored_from: None,
                 profile_id: None,
                 base_revision: head.revision_id,
                 ops,
@@ -2097,6 +2137,7 @@ impl Coordinator {
             ditto_store::rescue::last_good_document(self.store.connection(), &profile_id)?;
         self.propose(
             Proposal {
+                restored_from: Some(good.clone()),
                 profile_id: Some(profile_id),
                 base_revision: head.revision_id,
                 ops: docops::ops_between(&head_document, &good),
