@@ -7,6 +7,7 @@ mod builtin_profiles;
 mod config_schema_coordinator;
 mod config_schema_preflight;
 mod generation_transactions;
+mod inactive_profile;
 mod shell_extensions;
 
 use super::*;
