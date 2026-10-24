@@ -2,6 +2,21 @@
 
 此清單跟隨第一批 G0 程式碼建立。版本取自 `Cargo.lock`、`pnpm-lock.yaml` 與凍結參考平台；CI 的 [`licenses.yml`](../../.github/workflows/licenses.yml) 會輸出完整 Cargo metadata 與 pnpm 依賴授權清單供逐項審查。**這不是發行前授權審查完成的聲明**；NOTICE 彙整、Qt 模組逐項義務、名稱與角色素材權利仍屬 D-11。
 
+## Ubuntu 發行版增量（2026-10-24）
+
+owner 已選 Ubuntu 26.04＋mkosi＋sysupdate，A／B 共用封裝責任見[雙形式 ADR](distro-architecture.md)。下列為 PoC／UAT 的來源盤點，尚非完整 SBOM 或發布接受；Fedora 證據保留、實作暫停。
+
+| 元件 | 精確基線／來源 | 修改、義務與責任 |
+| --- | --- | --- |
+| Ubuntu base／kernel／systemd／dracut 與 runtime packages | resolute snapshot `20261020T000000Z`；UAT kernel `7.0.0-38-generic`，PoC systemd `259.9-0ubuntu0.1`；逐包版本由 mkosi manifest／`packages.tsv` 輸出 | 各包授權以 `/usr/share/doc/*/copyright` 為準，不能套用單一 Ubuntu 授權；D04／D11 補齊 source／NOTICE／傳遞依賴與自有修改，D12 負責安全重建 |
+| mkosi | PoC／UAT `26-3`，Ubuntu builder package | LGPL-2.1-or-later（仍須以出貨來源核對）；僅建置工具，不納入 target runtime；builder 工具鏈未完整快照化 |
+| Qt／Quickshell | Qt 6.10.2 獨立版本鎖；Ubuntu UAT 用 snapshot `/usr` Qt；Quickshell `1a4716cde794a59928d9d9fc15f2afc7a95de360` cache binary | UAT 無 source patch，cache 留 PoC label；D04 需乾淨重建及逐模組散布材料。跨 suite 私有 runtime 不可覆蓋 B 宿主 Qt |
+| Wayfire／subprojects | source-built `d39902379c5737eebe1dc3a830659fa3f0fa22e0`；鎖見 `packaging/reference-image/source-builds.lock` | UAT build glue 非產品 patch；MIT 與各 subproject LICENSE 隨 payload，D04／D11 記錄實際 dependency closure |
+| Node | 22.23.2，UAT 的本機相同版本 cache | MIT 及 Node 內第三方 notices；正式包須保存來源、hash、LICENSE，不能把 cache 來源當正式供應鏈 |
+| xdg-desktop-portal-wlr／D-Bus proxy | repo `tools/xdpw`／`tools/dbus-proxy` 的 pin、patch 與建置腳本 | 沿既有來源紀錄彙整授權與修改；D11 補完整 NOTICE。recipe 保留 payload hash，未重新取得上游 |
+
+字型、Fcitx、foot、portal 等進入 A 後是實際出貨元件，不能沿用下表 G0「由宿主提供」的排除理由。配方攜帶 Ubuntu copyright 與外部 payload notices；這不是逐檔權利審查完成。Rust／pnpm／編譯器與 mkosi 是建置期工具，除 Node runtime 外不因建置使用而出貨。D-11 法律裁定由 owner 處理，工程 SBOM／source／NOTICE 仍由 #51 交付。
+
 ## Rust 直接依賴
 
 | 名稱 | 鎖定版本 | 來源 | 授權標示 | 修改 | 使用與散布義務 |
