@@ -458,6 +458,14 @@
         <translation>左下</translation>
     </message>
     <message>
+        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</translation>
+    </message>
+    <message>
+        <source>已保存（組合已刪除）</source>
+        <translation>已保存（組合已刪除）</translation>
+    </message>
+    <message>
         <source>已保存，還沒有生效：下次登入時才會套用。</source>
         <translation>已保存，還沒有生效：下次登入時才會套用。</translation>
     </message>
@@ -472,6 +480,10 @@
     <message>
         <source>已套用並確認生效。可以撤銷。</source>
         <translation>已套用並確認生效。可以撤銷。</translation>
+    </message>
+    <message>
+        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
+        <translation>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</translation>
     </message>
     <message>
         <source>已套用，正在試看。按「保留」才會留下；取消或逾時會自動回復。</source>
@@ -532,18 +544,6 @@
     <message>
         <source>新建立</source>
         <translation>新建立</translation>
-    </message>
-    <message>
-        <source>已保存（組合已刪除）</source>
-        <translation>已保存（組合已刪除）</translation>
-    </message>
-    <message>
-        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
-        <translation>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</translation>
-    </message>
-    <message>
-        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
-        <translation>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</translation>
     </message>
     <message>
         <source>曾存到「%1」（已刪除）</source>
@@ -987,12 +987,12 @@
 <context>
     <name>CompositionCenter</name>
     <message>
-        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
-        <translation>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</translation>
-    </message>
-    <message>
         <source>「%1」的版本</source>
         <translation>「%1」的版本</translation>
+    </message>
+    <message>
+        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
+        <translation>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</translation>
     </message>
     <message>
         <source>下方顯示這個組合的版本</source>
@@ -1346,10 +1346,6 @@
         <translation>模型尚未連接；桌面仍可照常操作</translation>
     </message>
     <message>
-        <source>模型後端無法使用</source>
-        <translation>模型後端無法使用</translation>
-    </message>
-    <message>
         <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
         <translation>模型沒有回應；桌面沒有被改動，可以再試一次</translation>
     </message>
@@ -1394,16 +1390,16 @@
         <translation>無法讀取 AI 設定；重新開啟會再讀取</translation>
     </message>
     <message>
+        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
         <source>登入未完成，請重新嘗試。</source>
         <translation>登入未完成，請重新嘗試。</translation>
     </message>
     <message>
         <source>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</source>
         <translation>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</translation>
-    </message>
-    <message>
-        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
-        <translation>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
     <message>
         <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
@@ -1418,10 +1414,6 @@
         <translation>訂閱額度已用完；等額度重設後再試</translation>
     </message>
     <message>
-        <source>這次登入已逾期，請重新開始。</source>
-        <translation>這次登入已逾期，請重新開始。</translation>
-    </message>
-    <message>
         <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
     </message>
@@ -1432,6 +1424,10 @@
     <message>
         <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</translation>
+    </message>
+    <message>
+        <source>這次登入已逾期，請重新開始。</source>
+        <translation>這次登入已逾期，請重新開始。</translation>
     </message>
     <message>
         <source>需要你的確認</source>
@@ -2104,6 +2100,10 @@
         <translation>待辦服務</translation>
     </message>
     <message>
+        <source>slot.ui.background</source>
+        <translation>桌面背景</translation>
+    </message>
+    <message>
         <source>slot.ui.dock</source>
         <translation>Dock</translation>
     </message>
@@ -2122,6 +2122,10 @@
     <message>
         <source>slot.ui.panel_top</source>
         <translation>頂部面板</translation>
+    </message>
+    <message>
+        <source>slot.ui.settings_page</source>
+        <translation>設定頁面</translation>
     </message>
     <message>
         <source>slot.ui.status_item</source>
@@ -2199,20 +2203,28 @@
         <source>unavailable.system_unavailable</source>
         <translation>系統服務沒有回應</translation>
     </message>
-    <message>
-        <source>slot.ui.background</source>
-        <translation>桌面背景</translation>
-    </message>
-    <message>
-        <source>slot.ui.settings_page</source>
-        <translation>設定頁面</translation>
-    </message>
 </context>
 <context>
     <name>DockBottom</name>
     <message>
+        <source>%1：%2</source>
+        <translation>%1：%2</translation>
+    </message>
+    <message>
+        <source>工作區 %1</source>
+        <translation>工作區 %1</translation>
+    </message>
+    <message>
+        <source>未命名應用程式</source>
+        <translation>未命名應用程式</translation>
+    </message>
+    <message>
         <source>目前沒有執行中的視窗</source>
         <translation>目前沒有執行中的視窗</translation>
+    </message>
+    <message>
+        <source>網頁應用程式</source>
+        <translation>網頁應用程式</translation>
     </message>
     <message>
         <source>關閉</source>
@@ -2223,28 +2235,12 @@
         <translation>（作用中）</translation>
     </message>
     <message>
-        <source>%1：%2</source>
-        <translation>%1：%2</translation>
-    </message>
-    <message>
-        <source>未命名應用程式</source>
-        <translation>未命名應用程式</translation>
-    </message>
-    <message>
-        <source>網頁應用程式</source>
-        <translation>網頁應用程式</translation>
-    </message>
-    <message>
-        <source>（已最小化）</source>
-        <translation>（已最小化）</translation>
-    </message>
-    <message>
         <source>（工作區 %1）</source>
         <translation>（工作區 %1）</translation>
     </message>
     <message>
-        <source>工作區 %1</source>
-        <translation>工作區 %1</translation>
+        <source>（已最小化）</source>
+        <translation>（已最小化）</translation>
     </message>
 </context>
 <context>
@@ -2469,6 +2465,45 @@
     </message>
 </context>
 <context>
+    <name>HistoryPage</name>
+    <message>
+        <source>保留</source>
+        <translation>保留</translation>
+    </message>
+    <message>
+        <source>取消並回復</source>
+        <translation>取消並回復</translation>
+    </message>
+    <message>
+        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
+        <translation>已撤銷。撤銷本身也記錄成一筆變更。</translation>
+    </message>
+    <message>
+        <source>撤銷這次變更</source>
+        <translation>撤銷這次變更</translation>
+    </message>
+    <message>
+        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
+        <translation>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>變更紀錄</translation>
+    </message>
+    <message>
+        <source>載入較早的紀錄</source>
+        <translation>載入較早的紀錄</translation>
+    </message>
+    <message>
+        <source>還沒有任何變更。</source>
+        <translation>還沒有任何變更。</translation>
+    </message>
+</context>
+<context>
     <name>LauncherGrid</name>
     <message>
         <source>全部</source>
@@ -2479,12 +2514,28 @@
         <translation>應用程式</translation>
     </message>
     <message>
-        <source>應用程式清單暫不可用</source>
-        <translation>應用程式清單暫不可用</translation>
+        <source>應用程式清單暫不可用；請關閉後重新開啟。</source>
+        <translation>應用程式清單暫不可用；請關閉後重新開啟。</translation>
+    </message>
+    <message>
+        <source>搜尋應用程式</source>
+        <translation>搜尋應用程式</translation>
+    </message>
+    <message>
+        <source>搜尋暫不可用；請修改搜尋文字後重試。</source>
+        <translation>搜尋暫不可用；請修改搜尋文字後重試。</translation>
+    </message>
+    <message>
+        <source>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</source>
+        <translation>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</translation>
     </message>
     <message>
         <source>方向鍵選擇，Enter 開啟，PageUp／PageDown 換類別，Esc 關閉</source>
         <translation>方向鍵選擇，Enter 開啟，PageUp／PageDown 換類別，Esc 關閉</translation>
+    </message>
+    <message>
+        <source>正在搜尋應用程式</source>
+        <translation>正在搜尋應用程式</translation>
     </message>
     <message>
         <source>正在讀取應用程式清單</source>
@@ -2495,36 +2546,16 @@
         <translation>沒有找到應用程式</translation>
     </message>
     <message>
-        <source>無法啟動「%1」</source>
-        <translation>無法啟動「%1」</translation>
-    </message>
-    <message>
-        <source>搜尋應用程式</source>
-        <translation>搜尋應用程式</translation>
-    </message>
-    <message>
-        <source>輸入應用程式名稱</source>
-        <translation>輸入應用程式名稱</translation>
-    </message>
-    <message>
-        <source>正在搜尋應用程式</source>
-        <translation>正在搜尋應用程式</translation>
-    </message>
-    <message>
         <source>沒有符合的應用程式</source>
         <translation>沒有符合的應用程式</translation>
     </message>
     <message>
-        <source>搜尋暫不可用；請修改搜尋文字後重試。</source>
-        <translation>搜尋暫不可用；請修改搜尋文字後重試。</translation>
+        <source>無法啟動「%1」</source>
+        <translation>無法啟動「%1」</translation>
     </message>
     <message>
-        <source>應用程式清單暫不可用；請關閉後重新開啟。</source>
-        <translation>應用程式清單暫不可用；請關閉後重新開啟。</translation>
-    </message>
-    <message>
-        <source>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</source>
-        <translation>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</translation>
+        <source>輸入應用程式名稱</source>
+        <translation>輸入應用程式名稱</translation>
     </message>
 </context>
 <context>
@@ -2707,16 +2738,8 @@
         <translation>低效能樣式（關閉模糊與陰影）</translation>
     </message>
     <message>
-        <source>例如 Super+Space</source>
-        <translation>例如 Super+Space</translation>
-    </message>
-    <message>
         <source>個人化設定</source>
         <translation>個人化設定</translation>
-    </message>
-    <message>
-        <source>加入</source>
-        <translation>加入</translation>
     </message>
     <message>
         <source>動畫</source>
@@ -2771,24 +2794,12 @@
         <translation>左下</translation>
     </message>
     <message>
-        <source>已生效</source>
-        <translation>已生效</translation>
-    </message>
-    <message>
         <source>強調色</source>
         <translation>強調色</translation>
     </message>
     <message>
         <source>強調色 %1</source>
         <translation>強調色 %1</translation>
-    </message>
-    <message>
-        <source>快捷鍵</source>
-        <translation>快捷鍵</translation>
-    </message>
-    <message>
-        <source>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</source>
-        <translation>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</translation>
     </message>
     <message>
         <source>指定的螢幕 %1 沒有連接，所以先放在主螢幕。</source>
@@ -2801,10 +2812,6 @@
     <message>
         <source>最大</source>
         <translation>最大</translation>
-    </message>
-    <message>
-        <source>未生效</source>
-        <translation>未生效</translation>
     </message>
     <message>
         <source>標準</source>
@@ -2831,14 +2838,6 @@
         <translation>目前沒有顯示角色。</translation>
     </message>
     <message>
-        <source>移除</source>
-        <translation>移除</translation>
-    </message>
-    <message>
-        <source>系統保留</source>
-        <translation>系統保留</translation>
-    </message>
-    <message>
         <source>系統已設定減少動畫，這裡關閉也不會恢復動畫。系統設定在桌面啟動時讀取。</source>
         <translation>系統已設定減少動畫，這裡關閉也不會恢復動畫。系統設定在桌面啟動時讀取。</translation>
     </message>
@@ -2853,10 +2852,6 @@
     <message>
         <source>螢幕</source>
         <translation>螢幕</translation>
-    </message>
-    <message>
-        <source>衝突</source>
-        <translation>衝突</translation>
     </message>
     <message>
         <source>角色</source>
@@ -3262,6 +3257,203 @@
     </message>
 </context>
 <context>
+    <name>SettingsPageContainer</name>
+    <message>
+        <source>這個頁面無法載入。請在插件中心停用它，或稍後再試。</source>
+        <translation>這個頁面無法載入。請在插件中心停用它，或稍後再試。</translation>
+    </message>
+</context>
+<context>
+    <name>ShortcutRecorder</name>
+    <message>
+        <source>一次只能設定一個主鍵。請放開所有按鍵後再試。</source>
+        <translation>一次只能設定一個主鍵。請放開所有按鍵後再試。</translation>
+    </message>
+    <message>
+        <source>取消錄製</source>
+        <translation>取消錄製</translation>
+    </message>
+    <message>
+        <source>可使用 Ctrl、Alt、Shift、Super，加上英數、F1–F12 或導覽鍵。</source>
+        <translation>可使用 Ctrl、Alt、Shift、Super，加上英數、F1–F12 或導覽鍵。</translation>
+    </message>
+    <message>
+        <source>已讀取按鍵，尚未套用。</source>
+        <translation>已讀取按鍵，尚未套用。</translation>
+    </message>
+    <message>
+        <source>正在等待系統允許錄製…</source>
+        <translation>正在等待系統允許錄製…</translation>
+    </message>
+    <message>
+        <source>目前無法安全錄製。尚未確認系統的緊急退出設定，或系統未允許暫停快捷鍵。請關閉後再試。</source>
+        <translation>目前無法安全錄製。尚未確認系統的緊急退出設定，或系統未允許暫停快捷鍵。請關閉後再試。</translation>
+    </message>
+    <message>
+        <source>空白鍵</source>
+        <translation>空白鍵</translation>
+    </message>
+    <message>
+        <source>設定快捷鍵</source>
+        <translation>設定快捷鍵</translation>
+    </message>
+    <message>
+        <source>請先放開啟動錄製的按鍵。</source>
+        <translation>請先放開啟動錄製的按鍵。</translation>
+    </message>
+    <message>
+        <source>請先放開所有按鍵，再重新按組合。</source>
+        <translation>請先放開所有按鍵，再重新按組合。</translation>
+    </message>
+    <message>
+        <source>請按下組合鍵。Esc 取消，原按鍵不會更改。</source>
+        <translation>請按下組合鍵。Esc 取消，原按鍵不會更改。</translation>
+    </message>
+    <message>
+        <source>請放開所有按鍵。</source>
+        <translation>請放開所有按鍵。</translation>
+    </message>
+    <message>
+        <source>這個按鍵目前不支援。請放開後換一組；不支援 AltGr、多媒體鍵或多段組合。</source>
+        <translation>這個按鍵目前不支援。請放開後換一組；不支援 AltGr、多媒體鍵或多段組合。</translation>
+    </message>
+    <message>
+        <source>錄製已取消，原按鍵未更改。</source>
+        <translation>錄製已取消，原按鍵未更改。</translation>
+    </message>
+</context>
+<context>
+    <name>ShortcutSettings</name>
+    <message>
+        <source>儲存結果未知。輸入已保留，請重新讀取狀態並查看變更紀錄，勿重複套用。</source>
+        <translation>儲存結果未知。輸入已保留，請重新讀取狀態並查看變更紀錄，勿重複套用。</translation>
+    </message>
+    <message>
+        <source>先選用途，再設定按鍵。系統保留的快捷鍵無法更改。</source>
+        <translation>先選用途，再設定按鍵。系統保留的快捷鍵無法更改。</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <source>套用並試用</source>
+        <translation>套用並試用</translation>
+    </message>
+    <message>
+        <source>尚未儲存。已保留輸入，請查看原因後再試。</source>
+        <translation>尚未儲存。已保留輸入，請查看原因後再試。</translation>
+    </message>
+    <message>
+        <source>尚無法確認儲存結果。輸入已保留，請重新讀取狀態。</source>
+        <translation>尚無法確認儲存結果。輸入已保留，請重新讀取狀態。</translation>
+    </message>
+    <message>
+        <source>已生效</source>
+        <translation>已生效</translation>
+    </message>
+    <message>
+        <source>快捷鍵</source>
+        <translation>快捷鍵</translation>
+    </message>
+    <message>
+        <source>快捷鍵已儲存。可在變更紀錄中撤銷。</source>
+        <translation>快捷鍵已儲存。可在變更紀錄中撤銷。</translation>
+    </message>
+    <message>
+        <source>按鍵組合</source>
+        <translation>按鍵組合</translation>
+    </message>
+    <message>
+        <source>新增快捷鍵</source>
+        <translation>新增快捷鍵</translation>
+    </message>
+    <message>
+        <source>未生效</source>
+        <translation>未生效</translation>
+    </message>
+    <message>
+        <source>正在套用快捷鍵…輸入會保留到確認完成。</source>
+        <translation>正在套用快捷鍵…輸入會保留到確認完成。</translation>
+    </message>
+    <message>
+        <source>清除待套用按鍵</source>
+        <translation>清除待套用按鍵</translation>
+    </message>
+    <message>
+        <source>無法開啟按鍵錄製。請關閉後再試。</source>
+        <translation>無法開啟按鍵錄製。請關閉後再試。</translation>
+    </message>
+    <message>
+        <source>用途</source>
+        <translation>用途</translation>
+    </message>
+    <message>
+        <source>目前僅在桌面介面有鍵盤焦點時可用，尚未綁定全域快捷鍵。</source>
+        <translation>目前僅在桌面介面有鍵盤焦點時可用，尚未綁定全域快捷鍵。</translation>
+    </message>
+    <message>
+        <source>移除</source>
+        <translation>移除</translation>
+    </message>
+    <message>
+        <source>空白鍵</source>
+        <translation>空白鍵</translation>
+    </message>
+    <message>
+        <source>系統保留</source>
+        <translation>系統保留</translation>
+    </message>
+    <message>
+        <source>編輯 %1</source>
+        <translation>編輯 %1</translation>
+    </message>
+    <message>
+        <source>衝突</source>
+        <translation>衝突</translation>
+    </message>
+    <message>
+        <source>設定快捷鍵</source>
+        <translation>設定快捷鍵</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>診斷</translation>
+    </message>
+    <message>
+        <source>請試用快捷鍵，再按「保留」。倒數結束會還原，輸入仍會保留。</source>
+        <translation>請試用快捷鍵，再按「保留」。倒數結束會還原，輸入仍會保留。</translation>
+    </message>
+    <message>
+        <source>這次變更未保留。輸入仍在，可修改後再試。</source>
+        <translation>這次變更未保留。輸入仍在，可修改後再試。</translation>
+    </message>
+    <message>
+        <source>這組按鍵已用於「%1」。請換一組。</source>
+        <translation>這組按鍵已用於「%1」。請換一組。</translation>
+    </message>
+    <message>
+        <source>這組按鍵由系統保留。已停止錄製，原按鍵未更改。</source>
+        <translation>這組按鍵由系統保留。已停止錄製，原按鍵未更改。</translation>
+    </message>
+    <message>
+        <source>這組按鍵由系統保留：%1。請換一組。</source>
+        <translation>這組按鍵由系統保留：%1。請換一組。</translation>
+    </message>
+    <message>
+        <source>選擇用途後，點按鍵開始錄製。按下實際組合，再放開所有按鍵；套用前會檢查衝突。</source>
+        <translation>選擇用途後，點按鍵開始錄製。按下實際組合，再放開所有按鍵；套用前會檢查衝突。</translation>
+    </message>
+    <message>
+        <source>重新讀取狀態</source>
+        <translation>重新讀取狀態</translation>
+    </message>
+    <message>
+        <source>錄製已結束，尚未更改快捷鍵。</source>
+        <translation>錄製已結束，尚未更改快捷鍵。</translation>
+    </message>
+</context>
+<context>
     <name>StatusArea</name>
     <message>
         <source>狀態列項目</source>
@@ -3493,52 +3685,6 @@
     <message>
         <source>顯示診斷</source>
         <translation>顯示診斷</translation>
-    </message>
-</context>
-<context>
-    <name>HistoryPage</name>
-    <message>
-        <source>保留</source>
-        <translation>保留</translation>
-    </message>
-    <message>
-        <source>取消並回復</source>
-        <translation>取消並回復</translation>
-    </message>
-    <message>
-        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
-        <translation>已撤銷。撤銷本身也記錄成一筆變更。</translation>
-    </message>
-    <message>
-        <source>撤銷這次變更</source>
-        <translation>撤銷這次變更</translation>
-    </message>
-    <message>
-        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
-        <translation>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</translation>
-    </message>
-    <message>
-        <source>診斷</source>
-        <translation>診斷</translation>
-    </message>
-    <message>
-        <source>變更紀錄</source>
-        <translation>變更紀錄</translation>
-    </message>
-    <message>
-        <source>載入較早的紀錄</source>
-        <translation>載入較早的紀錄</translation>
-    </message>
-    <message>
-        <source>還沒有任何變更。</source>
-        <translation>還沒有任何變更。</translation>
-    </message>
-</context>
-<context>
-    <name>SettingsPageContainer</name>
-    <message>
-        <source>這個頁面無法載入。請在插件中心停用它，或稍後再試。</source>
-        <translation>這個頁面無法載入。請在插件中心停用它，或稍後再試。</translation>
     </message>
 </context>
 </TS>

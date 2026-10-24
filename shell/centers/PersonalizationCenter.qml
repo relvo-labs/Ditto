@@ -27,9 +27,6 @@ Flickable {
     property var avatar: null
     property var outputs: []          // desktop.outputs.list
     property var placement: null      // where the Shell reports the character
-    property var shortcuts: []        // the Profile's own bindings
-    property var shortcutInfo: []     // desktop.shortcuts.list
-    property var commands: []
     property string notice: ""
     property string diagnostic: ""
     property var lastRecord: null
@@ -70,15 +67,6 @@ Flickable {
             page.appearance = result.appearance;
             page.avatar = result.avatar;
         }, fail);
-        client.capability("desktop.profiles.get", { history_limit: 1 }, function (result) {
-            page.shortcuts = result.document.shortcuts || [];
-        }, fail);
-        client.capability("desktop.shortcuts.list", {}, function (result) {
-            page.shortcutInfo = result.shortcuts;
-        });
-        client.capability("desktop.commands.list", {}, function (result) {
-            page.commands = result.commands;
-        });
         client.capability("desktop.outputs.list", {}, function (result) {
             page.outputs = result.outputs.filter(output => output.enabled !== false);
         });
@@ -167,16 +155,6 @@ Flickable {
         after[field] = value;
         busy = true;
         client.propose([{ op: "set_value", path: "/avatar", before: avatar, after: after }], { surface: "personalization" }, done, fail);
-    }
-
-    function setShortcuts(after) {
-        busy = true;
-        client.propose([{ op: "set_value", path: "/shortcuts", before: shortcuts, after: after }], { surface: "personalization" }, done, fail);
-    }
-
-    function commandTitle(commandId) {
-        const command = commands.find(item => item.command_id === commandId);
-        return command ? client.key(command.title_key, {}) : commandId;
     }
 
     Component.onCompleted: reload()
@@ -443,81 +421,11 @@ Flickable {
             }
         }
 
-        Section {
+        ShortcutSettings {
+            width: parent.width
+            client: page.client
             tokens: page.tokens
-            title: page.t(qsTr("快捷鍵"))
-            note: page.t(qsTr("快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。"))
-
-            Repeater {
-                model: page.shortcutInfo
-
-                Row {
-                    required property var modelData
-                    spacing: page.tokens.space
-                    Text {
-                        width: 140
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: modelData.chord
-                        color: page.tokens.appInk
-                        font.pixelSize: page.tokens.appFontBody
-                        font.family: "monospace"
-                    }
-                    Text {
-                        width: 200
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: page.commandTitle(modelData.command)
-                        color: page.tokens.appInk
-                        font.pixelSize: page.tokens.appFontBody
-                    }
-                    Badge {
-                        anchors.verticalCenter: parent.verticalCenter
-                        tokens: page.tokens
-                        text: modelData.reserved ? page.t(qsTr("系統保留"))
-                            : modelData.conflict ? page.t(qsTr("衝突"))
-                            : modelData.bound ? page.t(qsTr("已生效"))
-                            : page.t(qsTr("未生效"))
-                        tone: modelData.conflict ? "bad" : modelData.bound ? "good" : "warn"
-                    }
-                    Button {
-                        visible: !modelData.reserved && page.shortcuts.some(binding => binding.chord === modelData.chord)
-                        tokens: page.tokens
-                        kind: "subtle"
-                        text: page.t(qsTr("移除"))
-                        enabled: !page.busy
-                        onClicked: page.setShortcuts(page.shortcuts.filter(binding => binding.chord !== modelData.chord))
-                    }
-                }
-            }
-
-            Row {
-                spacing: page.tokens.space
-                TextField {
-                    id: chordField
-                    width: 160
-                    tokens: page.tokens
-                    placeholder: page.t(qsTr("例如 Super+Space"))
-                }
-                Choice {
-                    id: commandChoice
-                    tokens: page.tokens
-                    maxWidth: column.width - 260
-                    property string chosenCommand: ""
-                    value: chosenCommand
-                    options: page.commands.filter(command => command.command_id !== "session.lock" && command.command_id !== "rescue.open")
-                        .map(command => ({ value: command.command_id, label: page.client.key(command.title_key, {}) }))
-                    onChosen: value => chosenCommand = value
-                }
-                Button {
-                    tokens: page.tokens
-                    kind: "primary"
-                    text: page.t(qsTr("加入"))
-                    enabled: !page.busy && chordField.text.trim().length > 0 && commandChoice.chosenCommand.length > 0
-                    onClicked: {
-                        page.setShortcuts(page.shortcuts.concat([{ chord: chordField.text.trim(), command: commandChoice.chosenCommand }]));
-                        chordField.text = "";
-                    }
-                }
-            }
+            externalBusy: page.busy
         }
 
         Section {

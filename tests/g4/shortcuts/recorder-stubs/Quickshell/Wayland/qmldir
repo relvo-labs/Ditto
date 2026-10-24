@@ -1,0 +1,2 @@
+module Quickshell.Wayland
+ShortcutInhibitor 1.0 ShortcutInhibitor.qml

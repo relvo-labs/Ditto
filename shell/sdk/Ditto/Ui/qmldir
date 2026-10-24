@@ -23,3 +23,4 @@ Toggle 1.0 ../../../ui/Toggle.qml
 WindowControls 1.0 ../../../ui/WindowControls.qml
 WindowFrameless 1.0 ../../../ui/WindowFrameless.qml
 WindowHeader 1.0 ../../../ui/WindowHeader.qml
+ShortcutSettings 1.0 ../../../ui/ShortcutSettings.qml
