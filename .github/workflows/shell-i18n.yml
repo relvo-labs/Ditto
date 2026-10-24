@@ -7,9 +7,9 @@ name: shell-i18n
 on:
   push:
     branches: [main]
-    paths: ['shell/**', 'scripts/lint-shell-i18n.mjs', 'crates/ditto-protocol/src/change.rs', '.github/workflows/shell-i18n.yml']
+    paths: ['shell/**', 'scripts/lint-shell-*.mjs', 'crates/ditto-protocol/src/change.rs', '.github/workflows/shell-i18n.yml']
   pull_request:
-    paths: ['shell/**', 'scripts/lint-shell-i18n.mjs', 'crates/ditto-protocol/src/change.rs', '.github/workflows/shell-i18n.yml']
+    paths: ['shell/**', 'scripts/lint-shell-*.mjs', 'crates/ditto-protocol/src/change.rs', '.github/workflows/shell-i18n.yml']
 jobs:
   lint:
     runs-on: [self-hosted, ditto-ci]
@@ -27,7 +27,4 @@ jobs:
             echo "::notice::qmllint not found under $qt; QML syntax not checked on this runner"
             exit 0
           fi
-          # The broken-syntax fixture is broken on purpose (plan/03/04 §11 #2).
-          find shell -name '*.qml' -not -path '*/tests/fixtures/dock_broken_syntax/*' -not -path 'shell/lock/core/*' \
-            -not -path 'shell/rescue/*/*' -print0 |
-            xargs -0 "$qt/bin/qmllint" -I "$qt/qml" --max-warnings -1
+          node scripts/lint-shell-qml.mjs "$qt"
