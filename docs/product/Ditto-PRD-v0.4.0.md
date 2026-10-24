@@ -648,7 +648,7 @@ G1 與 G2 可交錯進行；G3 不可繞過 G1 的變更及救援基礎。時程
 
 以實際固定版本盤點 Qt、Quickshell、Cordis、Harness、合成器、傳遞依賴、字型、圖示與角色素材。保存適用 LICENSE、NOTICE、來源、修改與必要散布資料；不把主專案授權套用到所有插件。生成或移植程式須保留可追溯來源，不能宣稱自動生成即可免除上游義務。
 
-Ditto 自有程式碼依 owner 2026-10-25 的 [D-52 決定](../../docs/product/2026-10-25-d52-mit-license.md) 採根目錄 [MIT LICENSE](../../LICENSE)（`2026 Ditto contributors`）。此決定不重新授權 Linux、Ubuntu、Qt、Wayfire 等相依元件、第三方插件與素材，也不替 owner／使用者生成物指定 MIT。
+Ditto 自有程式碼依 owner 2026-10-25 的 [D-52 決定](../../.agents/notes/decisions/2026-10-25-d52-mit-license.md) 採根目錄 [MIT LICENSE](../../LICENSE)（`2026 Ditto contributors`）。此決定不重新授權 Linux、Ubuntu、Qt、Wayfire 等相依元件、第三方插件與素材，也不替 owner／使用者生成物指定 MIT。
 
 Ditto 名稱與預設角色設計已作為產品方向，但公開散布前仍需由 owner 確定名稱、商標、角色、圖示及美術素材的使用權。商業模式與完整發行包的第三方義務仍由 owner 處理；本文件不代表已完成法律審查。
 

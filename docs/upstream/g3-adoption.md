@@ -13,7 +13,7 @@
 | modifications | 9 個 Harness 值檔原樣；Ditto backend／schema adapter 自行實作；G3 新增 uint8／uint16 嚴格格式支援 | G3 加 9 個 development 工具；仍依動態 catalog、intent、授權及回讀，未新增 PTC／run_code | G3 artifact 只保存最小來源；刪除對話遮蔽來源，worker 不複製摘要；原會話 writer fence 不變 |
 | host_contract | 一個 Core 啟動的 Agent controller，受限 Codex 經私有 stdio；無第二個自主迴圈 | 同一 Agent 程序，所有副作用經 Core；生成測試共用兩槽工作池 | 同一 Agent 的 Cordis agentSessions service；持久資料由 Core 寫入 |
 | trust_level | 第一方適配器可信，模型回應不可信；assembler 不是沙箱 | 第一方代理可信，工具參數不可信，不能自宣告 caller／授權 | 第一方代理可信，對話內容不賦權；無第二份正式會話 |
-| license | Harness MIT，保留 LICENSE；Codex Apache-2.0／standalone 再散布仍待 D-11／G4；proxy LGPL-2.1-or-later | Ditto 自有實作依 [D-52](../../docs/product/2026-10-25-d52-mit-license.md) 採根目錄 MIT；實際 bundled Harness 檔仍附上游 MIT | 同左；未把主專案授權套用到未複製的上游程式 |
+| license | Harness MIT，保留 LICENSE；Codex Apache-2.0／standalone 再散布仍待 D-11／G4；proxy LGPL-2.1-or-later | Ditto 自有實作依 [D-52](../../.agents/notes/decisions/2026-10-25-d52-mit-license.md) 採根目錄 MIT；實際 bundled Harness 檔仍附上游 MIT | 同左；未把主專案授權套用到未複製的上游程式 |
 | test_matrix | agent-runtime codex/direct/harness 測試；G3 腳本模型走釘選 app-server 與 assembler；真訂閱另列未執行 | tools／完整工具 strict schema 測試、共享向量、G3 無授權拒絕與生成／修改 | session／Core conversation writer fence 測試；G3 多輪來源歸屬及刪除來源；Agent 退出後面板保留 |
 
 「上游概念」不等於上游原始碼移植。工具、Session 的 bridge 是 Ditto 自有實作，不能寫成複製了 Harness 自帶持久儲存或安全沙箱。上游升版時先重驗 9 檔摘要、Codex／proxy pins、schema 整形與固定測試矩陣；G3 改動都在 vendor 之外，沒有需重套的 vendor patch。
