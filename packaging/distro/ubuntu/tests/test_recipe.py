@@ -560,6 +560,265 @@ class RecipeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "refusing host root"):
                 policy.check_target_ownership(Path("/usr/.."), ["usr/bin/wayfire"])
 
+    def target_database(self, case, owned="/usr/share/doc/fixture/copyright"):
+        target = self.root / case
+        self.put("var/lib/dpkg/status", "Package: fixture\nStatus: install ok installed\nArchitecture: amd64\nVersion: 1\nMaintainer: Fixture <fixture@example.invalid>\nDescription: task-owned fixture\n\n", target)
+        self.put("var/lib/dpkg/info/fixture.list", owned + "\n", target)
+        return target
+
+    def runtime_args(self, target, copy=True):
+        lock = self.root / f"runtime-{next(self.counter)}.json"
+        lock.write_text(json.dumps(self.lock()))
+        return [RECIPE / "apply-runtime.py", "--root", target, "--runtime-lock", lock,
+                *(["--runtime-tree", self.tree] if copy else [])]
+
+    def test_target_query_timeouts_exit_two_before_copy(self):
+        # Execute the real CLI in a child interpreter. Only the selected dpkg
+        # call raises TimeoutExpired; all other queries use the real target DB.
+        script = """
+import runpy, subprocess, sys
+from pathlib import Path
+original_run = subprocess.run
+fail_at = int(sys.argv[1])
+queries = 0
+def query(command, **kwargs):
+    global queries
+    if command[0] == 'dpkg-query':
+        queries += 1
+        if queries == fail_at:
+            raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+    return original_run(command, **kwargs)
+subprocess.run = query
+sys.argv = sys.argv[2:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        for index, stage in enumerate(("probe", "catalog", "exact-path"), 1):
+            with self.subTest(stage=stage):
+                target = self.target_database("timeout-" + stage)
+                args = self.runtime_args(target)
+                result = call(sys.executable, "-c", script, index, *args)
+                self.assertFalse((target / "usr").exists(), result.stderr)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertIn("timed out", result.stderr)
+                control = call(sys.executable, *args)
+                self.assertEqual(control.returncode, 0, control.stderr)
+                self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
+                                 (self.tree / "usr/bin/wayfire").read_bytes())
+                # Finish's read-only audit must use the same rejection path.
+                audit = call(sys.executable, "-c", script, index,
+                             *self.runtime_args(target, copy=False))
+                self.assertEqual(audit.returncode, 2, audit.stderr)
+                self.assertNotIn("Traceback", audit.stderr)
+
+    def test_target_metadata_symlinks_rejected_before_copy(self):
+        for name in ("updates", "info/format"):
+            for dangling in (False, True):
+                with self.subTest(metadata=name, dangling=dangling):
+                    target = self.target_database(f"metadata-{next(self.counter)}")
+                    path = target / "var/lib/dpkg" / name
+                    saved = target / "saved-metadata"
+                    if not dangling:
+                        if name == "updates":
+                            saved.mkdir()
+                        else:
+                            saved.write_text("1\n")
+                    path.symlink_to(saved)
+                    result = call(sys.executable, *self.runtime_args(target))
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("ownership database missing or unsafe", result.stderr)
+                    self.assertFalse((target / "usr").exists())
+
+    def test_target_regular_metadata_control(self):
+        target = self.target_database("metadata-control")
+        (target / "var/lib/dpkg/updates").mkdir()
+        self.put("var/lib/dpkg/info/format", "1\n", target)
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
+                         (self.tree / "usr/bin/wayfire").read_bytes())
+
+    def assert_updates_rejected(self, target, untouched):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("policy", RECIPE / "runtime_policy.py")
+        policy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy)
+        before = {path: path.read_bytes() for path in untouched}
+        # Ordering guard also prevents a FIFO regression from hanging dpkg.
+        with mock.patch.object(policy.subprocess, "run", side_effect=AssertionError("dpkg reached")):
+            with self.assertRaisesRegex(ValueError, "ownership database missing or unsafe: updates journal"):
+                policy.check_target_ownership(target, ["usr/bin/wayfire"])
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("ownership database missing or unsafe: updates journal", result.stderr)
+        self.assertFalse((target / "usr/bin").exists(), "no earlier runtime copy")
+        self.assertEqual({path: path.read_bytes() for path in untouched}, before)
+        # Prepare a valid installed payload to reach finish's read-only audit.
+        shutil.copytree(self.tree, target, dirs_exist_ok=True)
+        audit = call(sys.executable, *self.runtime_args(target, copy=False))
+        self.assertEqual(audit.returncode, 2, audit.stderr)
+        self.assertIn("ownership database missing or unsafe: updates journal", audit.stderr)
+        self.assertEqual({path: path.read_bytes() for path in untouched}, before)
+        for name in self.lock()["files"]:
+            self.assertEqual((target / name).read_bytes(), (self.tree / name).read_bytes())
+
+    def test_updates_unsafe_objects_and_entries_rejected_before_query_and_copy(self):
+        kinds = ("object-file", "object-fifo", "object-link", "object-dangling", "object-loop",
+                 "external-link", "other-name-link", "nonnumeric-link", "dangling-link",
+                 "directory-link", "self-loop", "two-link-loop", "directory", "fifo")
+        for kind in kinds:
+            with self.subTest(kind=kind):
+                target = self.target_database("journal-" + kind, "/usr/share/doc/fixture/protected")
+                protected = self.put("usr/share/doc/fixture/protected", "protected package bytes\n", target)
+                record = "Package: fixture\nStatus: install ok installed\nArchitecture: amd64\nVersion: 2\nMaintainer: Fixture <fixture@example.invalid>\nDescription: external task-owned journal\n\n"
+                outside = self.put("outside-" + kind, record, self.root)
+                sentinel = self.put("outside-dir-" + kind + "/sentinel", "outside directory bytes\n", self.root)
+                updates = target / "var/lib/dpkg/updates"
+                if kind == "object-file":
+                    updates.write_text(record)
+                elif kind == "object-fifo":
+                    os.mkfifo(updates)
+                elif kind == "object-link":
+                    updates.symlink_to(sentinel.parent)
+                elif kind == "object-dangling":
+                    updates.symlink_to(self.root / "missing-updates")
+                elif kind == "object-loop":
+                    updates.symlink_to(updates.name)
+                else:
+                    updates.mkdir()
+                    name = {"other-name-link": "0042", "nonnumeric-link": "tmp.i"}.get(kind, "0001")
+                    entry = updates / name
+                    if kind in ("external-link", "other-name-link", "nonnumeric-link"):
+                        entry.symlink_to(outside)
+                    elif kind == "dangling-link":
+                        entry.symlink_to(self.root / "missing-journal")
+                    elif kind == "directory-link":
+                        entry.symlink_to(sentinel.parent)
+                    elif kind == "self-loop":
+                        entry.symlink_to(entry.name)
+                    elif kind == "two-link-loop":
+                        entry.symlink_to("0002")
+                        (updates / "0002").symlink_to(entry.name)
+                    elif kind == "directory":
+                        entry.mkdir()
+                    elif kind == "fifo":
+                        os.mkfifo(entry)
+                self.assert_updates_rejected(target, [outside, sentinel, protected,
+                    target / "var/lib/dpkg/status", target / "var/lib/dpkg/info/fixture.list"])
+
+    def test_updates_absent_empty_and_regular_journal_controls(self):
+        for kind in ("absent", "empty", "regular"):
+            with self.subTest(kind=kind):
+                target = self.target_database("journal-control-" + kind)
+                updates = target / "var/lib/dpkg/updates"
+                version = "1"
+                if kind != "absent":
+                    updates.mkdir()
+                if kind == "regular":
+                    version = "2"
+                    # Same installed package and coherent .list: this journal
+                    # must affect the real query and still allow apply/audit.
+                    self.put("var/lib/dpkg/updates/0001", (target / "var/lib/dpkg/status").read_text().replace(
+                        "Version: 1\n", "Version: 2\n"), target)
+                    # dpkg's temporary journal file is regular and is ignored.
+                    self.put("var/lib/dpkg/updates/tmp.i", "temporary journal bytes\n", target)
+                query = call("dpkg-query", "--admindir=" + str(target / "var/lib/dpkg"), "-W")
+                self.assertEqual(query.returncode, 0, query.stderr)
+                self.assertEqual(query.stdout, "fixture\t" + version + "\n")
+                self.assertEqual(query.stderr, "")
+                catalog = call("dpkg-query", "--admindir=" + str(target / "var/lib/dpkg"), "-S", "*")
+                self.assertEqual(catalog.returncode, 0, catalog.stderr)
+                self.assertIn("fixture: /usr/share/doc/fixture/copyright", catalog.stdout)
+                untouched = [target / "var/lib/dpkg/status", target / "var/lib/dpkg/info/fixture.list"]
+                if kind == "regular":
+                    untouched.extend(updates.iterdir())
+                before = {path: path.read_bytes() for path in untouched}
+                result = call(sys.executable, *self.runtime_args(target))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                audit = call(sys.executable, *self.runtime_args(target, copy=False))
+                self.assertEqual(audit.returncode, 0, audit.stderr)
+                self.assertEqual({path: path.read_bytes() for path in untouched}, before)
+                for name in self.lock()["files"]:
+                    self.assertEqual((target / name).read_bytes(), (self.tree / name).read_bytes())
+
+    def test_target_root_inode_alias_stat_simulation(self):
+        # Stat simulation only, NOT privileged bind-mount acceptance. The real
+        # CLI sees /'s (st_dev, st_ino) at a task-owned target; it never reads the
+        # host dpkg DB. Each single-field difference is a valid-root control.
+        script = """
+import os, runpy, sys
+from pathlib import Path
+mode, target = sys.argv[1], Path(sys.argv[2])
+original_stat = Path.stat
+fields = list(original_stat(Path('/')))
+if mode == 'other-inode':
+    fields[1] += 1
+elif mode == 'other-device':
+    fields[2] += 1
+identity = os.stat_result(fields)
+def target_stat(path, *args, **kwargs):
+    return identity if path == target else original_stat(path, *args, **kwargs)
+Path.stat = target_stat
+sys.argv = sys.argv[3:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        for mode in ("alias", "other-inode", "other-device"):
+            with self.subTest(mode=mode):
+                target = self.target_database("root-stat-" + mode)
+                result = call(sys.executable, "-c", script, mode, target,
+                              *self.runtime_args(target))
+                self.assertEqual(result.returncode, 2 if mode == "alias" else 0, result.stderr)
+                if mode == "alias":
+                    self.assertIn("refusing host root", result.stderr)
+                    self.assertFalse((target / "usr").exists())
+                else:
+                    self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
+                                     (self.tree / "usr/bin/wayfire").read_bytes())
+
+    def test_target_catalog_terminal_dotdot_rejected(self):
+        for row in ("/usr/bin/wayfire/child/..", "/usr/bin/wayfire/child/../",
+                    "/unrelated/child/.."):
+            with self.subTest(row=row):
+                target = self.target_database(f"catalog-{next(self.counter)}", row)
+                catalog = call("dpkg-query", "--admindir=" + str(target / "var/lib/dpkg"), "-S", "*")
+                self.assertEqual(catalog.returncode, 0, catalog.stderr)
+                self.assertIn(row.rstrip("/"), catalog.stdout)
+                result = call(sys.executable, *self.runtime_args(target))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("catalog failed closed", result.stderr)
+                self.assertFalse((target / "usr").exists())
+
+    def test_target_catalog_interior_dotdot_controls(self):
+        self.apply_fixture("dotdot-collision", "/opt/../usr/bin/wayfire")
+        self.apply_fixture("dotdot-unowned", "/opt/../usr/bin/unrelated", expected=0)
+
+    def test_existing_hardlink_rejected_before_any_copy(self):
+        target = self.target_database("hardlink", "/usr/share/doc/fixture/protected")
+        protected = self.put("usr/share/doc/fixture/protected", "protected package bytes\n", target)
+        # A late destination shares the package inode, but its path is unowned.
+        name = "usr/share/doc/ditto-runtime/NOTICE"
+        dest = target / name
+        dest.parent.mkdir(parents=True)
+        dest.hardlink_to(protected)
+        identity = (protected.stat().st_dev, protected.stat().st_ino)
+        self.assertEqual(dest.stat().st_nlink, 2)
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(protected.read_bytes(), b"protected package bytes\n", result.stderr)
+        self.assertEqual((dest.stat().st_dev, dest.stat().st_ino), identity)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("existing target hardlink", result.stderr)
+        self.assertFalse((target / "usr/bin").exists())
+
+    def test_existing_single_link_destination_control(self):
+        target = self.target_database("single-link")
+        dest = self.put("usr/share/doc/ditto-runtime/NOTICE", "replaceable bytes\n", target)
+        self.assertEqual(dest.stat().st_nlink, 1)
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(dest.read_bytes(), (self.tree / "usr/share/doc/ditto-runtime/NOTICE").read_bytes())
+
     def test_drm_present_delayed_absent_and_unit_wiring(self):
         cards = self.root / "drm"
         cards.mkdir()

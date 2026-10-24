@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 import shutil
+import subprocess
 from runtime_policy import check_target_ownership, confined_path, validate
 
 
@@ -23,6 +24,8 @@ def main():
                 dest = confined_path(args.root, name)
                 if dest.is_symlink():
                     raise ValueError(f"existing target symlink: {name}")
+                if dest.exists() and dest.stat().st_nlink > 1:
+                    raise ValueError(f"existing target hardlink: {name}")
             for name in lock.get("symlinks", {}):
                 dest = confined_path(args.root, name)
                 if dest.exists() or dest.is_symlink():
@@ -34,7 +37,7 @@ def main():
                     shutil.copy2(args.runtime_tree / name, dest)
                 else:
                     dest.symlink_to(lock["symlinks"][name])
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
         parser.error(str(error))
 
 
