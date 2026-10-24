@@ -2,7 +2,9 @@
 
 Owner Neil 於2026-10-19選定 **D1／56／E1**。Shell的AssistantSurface instance僅在既有assistant presentation路徑選用 `entryStyle: "fab"`、`symbolVariant: "ditto"`；元件固定56 px與E1兩段啟動，沒有未選尺寸／展開方式的開關。`capsule`、`neutral`、`portrait`接點與其測試保留。Core／Profile、已儲存文件、開發／簡報、legacy avatar與會話安全契約不變。決策歷史見 [D-48](../../../.agents/notes/decisions/2026-10-17-d48-default-assistant-entry.md)。2026-10-19追加已收錄於D-48（commit `f6062a6`）；原結論不改寫。2026-10-23（#159 UI-P04a）：FAB 在淺色主題、底部入口與同一輸出上，依 active Dock 的公開 `edgeGeometry` v1 對齊，不再判斷套件名稱或讀私有尺寸。pill 1.1.1 回報中心離底46 px，56 px FAB 底距18 px；bottom 1.1.2 回報34 px，FAB 底距6 px；只提供相同契約的第三 Dock 也可對齊。無 Dock、缺提示、未知版本、無效欄位、隱藏／非底邊、輸出不同或入口不在底部時，底距固定32 px。縮放後若半高超過中心離底也完整退回32 px：2×高度112 px，中心離底88 px，不夾成半對齊值。收合／標籤展開均有實際 provider 與 Region 縮放測試。此次沒有新增 Profile 欄位，但兩個 provider 已 patch 升版。
 
-**Release 相容差異**：18 px 不變只涵蓋使用 pill 1.1.1 的新 store／已升級條目。既有 store 精確綁定 pill 1.1.0，release 工作階段載入套件庫中沒有 `edgeGeometry` 的舊 QML，助理會由18 px 移到32 px fallback，直到以 `upgrade_entry`（#50／#144）升級；開發工作階段載入來源目錄會掩蓋此差異。兩個 Dock 明確綁定宿主建立時提供的 `screen`（目前為 `Quickshell.screens[0]`），可能改變多輸出環境的出現位置；未驗證，屬 UI-AT11。v1 刻意只提供中心 inset，§3.3 的矩形／保留區項目仍未完成。
+**Release 相容差異**：18 px 不變涵蓋使用 pill 1.1.1 及後續相同 `edgeGeometry` v1 契約版本的新 store／已升級條目。既有 store 精確綁定 pill 1.1.0，release 工作階段載入套件庫中沒有 `edgeGeometry` 的舊 QML，助理會由18 px 移到32 px fallback，直到以 `upgrade_entry`（#50／#144）升級；開發工作階段載入來源目錄會掩蓋此差異。兩個 Dock 明確綁定宿主建立時提供的 `screen`（目前為 `Quickshell.screens[0]`），可能改變多輸出環境的出現位置；未驗證，屬 UI-AT11。v1 刻意只提供中心 inset，§3.3 的矩形／保留區項目仍未完成。
+
+2026-10-25 #200 授權 metadata 補記：現行來源版本為 pill 1.1.2、bottom 1.1.3；本次只變更 MIT metadata 與套件 patch 版本，沒有改變幾何程式。既有 Profile 的精確版本綁定不變，下列歷史畫面與量測不作新 archive 的驗證證據。
 
 D1授權仍**未釐清**，來源與修改見 [SOURCES](../../../shell/assistant/SOURCES.md)。
 
@@ -11,7 +13,7 @@ E1第一次click／Enter／Space展開「助理＋真實狀態」標籤膠囊（
 ## 視覺修正與 oracle
 
 - D1仍引用既有body.png，35 px顯示，按device pixel ratio作3×解碼（DPR 1為105 px），smooth／mipmap。圓底加深、外環固定，不隨working pulse淡去。像素量測符號外環核心對實際膠囊填色，非只比token；淺色由約1.43:1到6.89:1，legacy約7.85:1，目標≥3:1。抗鋸齒邊緣不冒充核心對比。
-- 使用目前 pill 1.1.1 的淺色 Dock 中心離底46 px（edgeGap 12＋pillThickness 68／2），AssistantSurface 透過公開提示讀取；測試直接比較實際 provider 幾何。1280×800 收合／標籤中心 y=754，右距32 px，限新 store／已升級條目。另有 bottom Dock 的6 px 底距 capture；不決定 #46 移動。
+- 使用 pill 1.1.1 的淺色 Dock 時所記錄的中心離底46 px（edgeGap 12＋pillThickness 68／2），AssistantSurface 透過公開提示讀取；測試直接比較實際 provider 幾何。1280×800 收合／標籤中心 y=754，右距32 px，限新 store／已升級條目。另有 bottom Dock 的6 px 底距 capture；不決定 #46 移動。
 - chat.open驅動第二圈可見輪廓和Accessible「對話已開啟」文字；包含圓形FAB、標籤膠囊、reduced-motion與legacy theme。這是當前開啟狀態，不改任務投影或操作。
 - E1第二次啟動重現compact範例按鈕超出右界16 px。只在有entryRect的assistant compact啟用boundedSuggestions：按鈕保留既有16 px外邊距，完整文字在其內換行、保留原Accessible name與操作。legacy compact（entryRect=null）與full維持原單行版。ChatPanel只新增該padding opt-in，ChatBody只改範例排版。
 

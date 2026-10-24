@@ -93,6 +93,12 @@ TestCase {
             version: "1.0.0", config: {}, qml_url: Qt.resolvedUrl(url || "../fixtures/Page.qml").toString(),
             settings_page: {page_id: id, title_key: "title." + id, order: order || 0}};
     }
+    // Only bindings that load maintained provider source use these versions.
+    // Synthetic ditto.test.* lifecycle fixtures keep their own 1.0.0/2.0.0.
+    function packagedVersion(id) {
+        return {history: "1.0.1", composition: "1.0.1", plugins: "1.1.1",
+            personalization: "1.0.1", ai: "1.0.1", background: "1.0.1"}[id];
+    }
     function prepare(host, id, bindings) {
         let reply = null;
         host.prepare({change_id: id, origin: "test", target: {role: "shell", slots: bindings,
@@ -185,7 +191,7 @@ TestCase {
         tab.forceActiveFocus(Qt.TabFocusReason);
         verify(tab.activeFocus);
         const registrations = s.host.registeredPages;
-        const unrelated = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: "1.0.0", config: {},
+        const unrelated = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: packagedVersion("background"), config: {},
             qml_url: Qt.resolvedUrl("../shell/providers/background_default/qml/Background.qml").toString()};
         prepare(s.host, "unrelated-slot", [binding, unrelated]); s.host.commit("unrelated-slot");
         wait(0);
@@ -224,6 +230,7 @@ TestCase {
         const s = setup();
         const binding = page(data.id, "../shell/providers/settings_" + data.id + "/qml/" + data.file + ".qml");
         binding.package = "ditto.settings." + data.id;
+        binding.version = packagedVersion(data.id);
         binding.settings_page.title_key = "command." + (data.id === "ai" ? "ai_settings" : data.id) + ".open";
         binding.config = {check: true};
         compare(prepare(s.host, "sdk-page", [binding]).items.filter(i => i.key === data.id)[0].status, "ready");
@@ -264,7 +271,7 @@ TestCase {
         tab.forceActiveFocus(Qt.TabFocusReason);
         verify(tab.activeFocus);
         const instance = center.currentPageItem;
-        const unrelated = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: "1.0.0", config: {},
+        const unrelated = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: packagedVersion("background"), config: {},
             qml_url: Qt.resolvedUrl("../shell/providers/background_default/qml/Background.qml").toString()};
         prepare(s.host, "unrelated", [binding, unrelated]); s.host.commit("unrelated");
         wait(0);
@@ -420,7 +427,7 @@ TestCase {
         verify(fallback.shown);
         const fallbackSurface = findChild(fallback, "stubPanelWindow");
         verify(fallbackSurface !== null && fallbackSurface.visible);
-        const binding = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: "1.0.0", config: {},
+        const binding = {slot: "ui.background", entry_id: "background", package: "ditto.background.default", version: packagedVersion("background"), config: {},
             qml_url: Qt.resolvedUrl("../shell/providers/background_default/qml/Background.qml").toString()};
         const result = prepare(s.host, "background", [binding]);
         compare(result.items.filter(i => i.key === "ui.background")[0].status, "ready");
@@ -432,7 +439,7 @@ TestCase {
         const providerSurface = findChild(s.host.item("ui.background"), "stubPanelWindow");
         verify(providerSurface !== null && providerSurface.visible);
         compare(s.host.observation().mounts[0].package, binding.package);
-        compare(s.host.observation().mounts[0].version, "1.0.0");
+        compare(s.host.observation().mounts[0].version, binding.version);
         s.host.item("ui.background").release();
         verify(!providerSurface.visible);
         verify(fallback.shown);

@@ -30,6 +30,8 @@ PRD §23 另列發布成效指標；本計畫逐項指定承接：對話改造�
 
 ## 3. 現況盤點（`39da297`）
 
+授權狀態補記（2026-10-25）：下表 `UNLICENSED` 是當時的歷史快照；Ditto 自有程式碼已由 owner 依 [D-52](../../.agents/notes/decisions/2026-10-25-d52-mit-license.md) 改採 MIT。第三方、名稱與素材等 #51 缺口未因此完成。
+
 | 領域 | 實際位置與已有行為 | G4 缺口 | issue |
 | --- | --- | --- | --- |
 | 預設組合 | `crates/ditto-core/src/defaults.rs` 建一份「預設」Profile，主題 `soft-jelly` | 沒有內建「開發」「簡報」用途組合；現有的只是 `tests/g1/manual-switch/run.sh` 裡臨時建立的測試組合 | #45 |

@@ -1,13 +1,13 @@
 {
   "manifest_version": 1,
   "id": "ditto.settings.history",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": {
     "zh-TW": "變更紀錄",
     "en": "Change history"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "plugin_kind": "qml_provider",
   "host_kind": "qml",

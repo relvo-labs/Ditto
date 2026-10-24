@@ -1,13 +1,13 @@
 {
   "manifest_version": 1,
   "id": "ditto.tasks.panel",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": {
     "zh-TW": "待辦面板",
     "en": "Tasks panel"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "顯示與編輯待辦服務的項目。",

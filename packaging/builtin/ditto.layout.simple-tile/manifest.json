@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
   "id": "ditto.layout.simple-tile",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": { "zh-TW": "基本平鋪", "en": "Basic tiling" },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": { "zh-TW": "布局策略：基本平鋪。由 Core 經合成器轉接套用。", "en": "Layout strategy: Basic tiling, applied by Core through the compositor adapter." },
   "plugin_kind": "declarative_bundle",
