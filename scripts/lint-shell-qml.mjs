@@ -12,6 +12,7 @@ if (!qt) throw new Error('QT_PREFIX or a Qt prefix argument is required');
 
 async function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
+    // Fail-safe against hung tools, with headroom for slower CI runners.
     const child = spawn(command, args, { cwd, timeout: 120_000 });
     let stdout = '';
     let stderr = '';
@@ -45,6 +46,7 @@ try {
   // copying assets or generating another set of SDK type declarations.
   cpSync(join(root, 'shell'), join(stage, 'shell'), {
     recursive: true,
+    verbatimSymlinks: true,
     filter: source => statSync(source).isDirectory()
       || /(?:\.(qml|js|mjs|qmltypes)|\/qmldir)$/.test(source),
   });
@@ -63,7 +65,9 @@ try {
   const lint = await run(join(qt, 'bin/qmllint'), [
     '-I', join(qt, 'qml'), '--max-warnings', '-1', '--json', report, ...files,
   ], stage);
-  const display = text => (text || '').replaceAll(`${stage}/`, '').replaceAll(stage, '.');
+  const display = text => (text || '')
+    .replaceAll(pathToFileURL(`${stage}/`).href, '')
+    .replaceAll(`${stage}/`, '').replaceAll(stage, '.');
   process.stdout.write(display(lint.stdout));
   process.stderr.write(display(lint.stderr));
   process.exitCode = lint.status ?? 1;
