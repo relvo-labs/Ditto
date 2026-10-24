@@ -2,8 +2,10 @@ name: shell-i18n
 # EX1-13 ④: no Ditto-owned CJK string outside qsTr(), every qsTr() source and
 # every Core translation key translated in both catalogues, and the runtime
 # catalogues (JSON, .qm) regenerated from the .ts files. qmllint then checks
-# that every Shell QML file parses (warnings are reported, not fatal: Quickshell
-# ships no qmllint type information for its grouped properties).
+# that every Shell QML file parses and enforces zero-warning budgets for the
+# three files listed in scripts/lint-shell-qml.mjs. Other warnings are reported
+# without failing: Quickshell ships no qmllint type information for its grouped
+# properties.
 on:
   push:
     branches: [main]
@@ -20,7 +22,7 @@ jobs:
           node-version-file: .nvmrc
       - name: i18n lint
         run: node scripts/lint-shell-i18n.mjs
-      - name: qmllint (syntax)
+      - name: qmllint (syntax and warning budgets)
         run: |
           qt="${QT_PREFIX:-$HOME/Qt/6.10.2/gcc_64}"
           if [ ! -x "$qt/bin/qmllint" ]; then
