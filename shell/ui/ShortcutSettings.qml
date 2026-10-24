@@ -122,6 +122,7 @@ Column {
         if (pending) {
             writing = false;
             message = t(qsTr("請試用快捷鍵，再按「保留」。倒數結束會還原，輸入仍會保留。"));
+            reload(); // The trial is already committed; show its current bindings too.
             return;
         }
         if (change.state !== "committed" || !change.committed_revision

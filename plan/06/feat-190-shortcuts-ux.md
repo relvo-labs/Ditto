@@ -22,3 +22,11 @@
 3. A/B 清單／編輯／衝突／失敗／pending，zh-TW 相同 viewport 加窄版及 en，實際 Qt render。截圖不作 save 證明；回讀另有可控 protocol double 及可行的真 Core reproducer。
 4. focused tests、i18n、QML lint（與 baseline 警告比較）、provider package/version witness、相關 shell extension tests、diff --check。首個 meaningful checkpoint commit 後立即寫 evidence/checkpoint.json／Draft packet。保留所有失敗，不 skip。
 5. evidence/result.json／result.md 記錄 exact HEAD、commits、檔案與捕捉路徑、未驗限制，狀態 `waiting_for_owner_visual_selection`。Parent 才能 push／發布 Draft。此 UX 開發證據對應 DES-05／CFG-05～06／CHG-04～09 與 AT-10／11 的局部路徑，不宣稱完整 AT 或人類可用性通過。
+
+## Checkpoint 與延續驗證
+
+- 第一個 commit `68884d3` 已建立 Draft request packet 與 evidence/checkpoint.json；此處仍未選定、未發布、未部署。
+- 延續檢查加入真正 Qt key events 的新增／Tab／方向鍵／Enter 路徑；試用期間另回讀已 committed 的新按鍵，但草稿必須繼續鎖住且可見。重複舊事件不得清空下一份草稿。
+- 原版三項 RED 保留；原版／A／B 各 24 張實際 offscreen 圖（zh-TW/en、兩種 viewport、六狀態）。同一 protocol double 檢查 UI 輸入、confirmation 及回讀判斷，Core 既有契約測試另驗保留鍵、限時保留、回讀回復及過期基底。沒有端到端實體 compositor save／鍵盤擷取證據。
+- `shell/` lint 基底 248 warnings、候選 228；新 helper 無 lint warnings。legacy Section／StylePicker 的動態主題及 teardown warnings 以原版控制記錄比較；不擴大此 task 修復。shell extensions 46 tests 通過，五個 packaged pages 真 Quickshell 載入；此 runner 的長 UNIX socket 路徑令 IPC listener 啟動失敗，沒有當作 IPC 驗證通過。
+- 最終數字、來源 hash、截圖、版本 witness、已知限制與失敗原始日誌統一在 task evidence/result.json／result.md。完整 G4、獨立審查與 owner 視覺選擇仍待後續。

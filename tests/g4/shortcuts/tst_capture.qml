@@ -81,6 +81,12 @@ TestCase {
                 page.contentY = section.mapToItem(page.contentItem, 0, 0).y - 12;
             }
             waitForRendering(scene, 150);
+            if (settings && state !== "list") {
+                // A projection refresh may rebuild a row. Inspect the current editor.
+                field = all(settings, i => i.objectName === "shortcutChord")[0];
+                compare(field.text, settings.draftChord);
+                verify(field.visible && field.height > 0);
+            }
             const name = Config.label + "-" + locale + "-" + viewport + "-" + state + ".png";
             const path = Qt.resolvedUrl("captures/" + name).toString().replace("file://", "");
             grabImage(scene).save(path);

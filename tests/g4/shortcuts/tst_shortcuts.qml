@@ -47,6 +47,10 @@ TestCase {
         compare(call.options.profileId, "p-fixture"); compare(call.ops[0].before[0].chord, "Super+Space");
         compare(call.ops[0].after[0].chord, "Super+K");
         client.reply("pending"); verify(settings.locked); compare(settings.draftChord, "Super+K");
+        compare(settings.info[0].chord, "Super+K", "the active trial is read back while its draft stays locked");
+        wait(0);
+        compare(named("shortcutChord").text, "Super+K");
+        verify(named("shortcutChord").visible && named("shortcutChord").height > 0, "the pending draft remains visible");
         client.reply("confirmed");
         compare(settings.editing, -2); compare(settings.draftChord, ""); compare(settings.bindings[0].chord, "Super+K");
         verify(client.calls.filter(c => c.method === "desktop.profiles.get").length >= 2, "save read back from authority");
@@ -64,6 +68,29 @@ TestCase {
         client.bindings = settings.draftBefore; client.headRevision = "rev-1";
         client.reply("reverted", "rolled_back");
         compare(settings.draftChord, "Super+K"); verify(!settings.locked); compare(settings.bindings[0].chord, "Super+Space");
+    }
+    function test_keyboard_create_with_real_key_events() {
+        page.contentY = settings.y;
+        named("shortcutAdd").forceActiveFocus();
+        keyClick(Qt.Key_Return);
+        tryVerify(() => all(named("shortcutChord"), i => i.activeFocus).length > 0);
+        keyClick("S");
+        for (const key of [Qt.Key_U, Qt.Key_P, Qt.Key_E, Qt.Key_R]) keyClick(key);
+        keyClick(Qt.Key_Plus);
+        keyClick("K");
+        compare(settings.draftChord, "Super+K");
+        keyClick(Qt.Key_Tab, Qt.ShiftModifier);
+        keyClick(Qt.Key_Right);
+        keyClick(Qt.Key_Space);
+        compare(settings.draftCommand, "chat.toggle");
+        keyClick(Qt.Key_Tab); // chord
+        keyClick(Qt.Key_Tab); // Apply and try
+        verify(named("shortcutSave").activeFocus);
+        keyClick(Qt.Key_Return);
+        compare(client.proposed[2].chord, "Super+K");
+        compare(client.proposed[2].command, "chat.toggle");
+        client.failure({name: "preflight_rejected", message: "fixture failure"});
+        compare(settings.draftChord, "Super+K");
     }
     function test_late_event_does_not_clear_a_new_draft() {
         edit(); settings.save(); client.reply("pending"); client.reply("confirmed");
