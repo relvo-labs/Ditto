@@ -878,6 +878,31 @@ class RecipeTests(unittest.TestCase):
             "missing-classification": self.fixture_manifest(
                 {k: v for k, v in entry.items() if k != "classification"}),
             "empty-classification": with_entry(classification=""),
+            # Repair 1 (R1/R2): JSON types must be exact. bool/float equal to 1
+            # in Python, and unhashable or non-string values, are defects too.
+            "schema-true": {**good, "schema": True}, "schema-false": {**good, "schema": False},
+            "schema-float": {**good, "schema": 1.0}, "schema-string": {**good, "schema": "1"},
+            "schema-exponent": text.replace('"schema": 1', '"schema": 1e0'),
+            "kind-list": with_source(kind=[]), "kind-object": with_source(kind={}),
+            "kind-int": with_source(kind=1), "kind-null": with_source(kind=None),
+            "kind-true": with_source(kind=True),
+            "level-list": with_entry(verification={"level": [], "detail": "x"}),
+            "level-object": with_entry(verification={"level": {}, "detail": "x"}),
+            "level-int": with_entry(verification={"level": 1, "detail": "x"}),
+            "level-null": with_entry(verification={"level": None, "detail": "x"}),
+            "level-true": with_entry(verification={"level": True, "detail": "x"}),
+            "bytes-true": with_entry(bytes=True),
+            "bytes-float": with_entry(bytes=float(len(UPSTREAM_BYTES))),
+            "authority-list": {**good, "authority": []}, "authority-true": {**good, "authority": True},
+            "entries-object": {**good, "entries": {}}, "entry-list": self.fixture_manifest([]),
+            "path-list": with_entry(path=[]), "path-int": with_entry(path=1),
+            "sha256-int": with_entry(sha256=1), "sha256-list": with_entry(sha256=[]),
+            "source-list": with_entry(source=[]), "version-int": with_source(version=1),
+            "version-true": with_source(version=True), "deb-digest-list": with_source(deb_sha256=[]),
+            "verification-list": with_entry(verification=[]),
+            "detail-list": with_entry(verification={"level": "signed-snapshot-index", "detail": []}),
+            "classification-list": with_entry(classification=[]),
+            "classification-true": with_entry(classification=True),
         }
         for index, path in enumerate(("/" + UPSTREAM_REL, UPSTREAM_REL.replace("/", "//", 1),
                                       "usr/./" + UPSTREAM_REL[4:], "usr/../" + UPSTREAM_REL,
@@ -893,13 +918,58 @@ class RecipeTests(unittest.TestCase):
         for name, manifest in rows.items():
             with self.subTest(row=name):
                 result = call(sys.executable, self.fixture_recipe(manifest) / "scan-pristine-rootfs.py", image)
-                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(result.returncode, 1, result.stdout[-400:] + result.stderr[-400:])
                 self.assertNotIn("Traceback", result.stderr)
                 report = json.loads(result.stdout)
                 self.assertIn(PUBLIC_PRODUCER_MANIFEST, [row["file"] for row in report["errors"]])
                 self.assertEqual(report["literal_matches"], [UPSTREAM_REL])
                 self.assertEqual(report["public_producer_fixtures"], [])
                 self.assert_no_content(report)
+
+    def test_public_producer_manifest_loader_raises_only_value_error(self):
+        # D2 type sweep: every JSON field position gets every wrongly typed
+        # value; the loader must reject each with ValueError, never accept it
+        # (bool/float == int in Python) and never raise TypeError & co.
+        scanner = load_module("pristine", RECIPE / "scan-pristine-rootfs.py")
+        entry = self.fixture_entry()
+        good = self.fixture_manifest(entry)
+        manifest_path = self.root / "loader-manifest.json"
+        manifest_path.write_text(json.dumps(good))
+        self.assertEqual(set(scanner.load_public_producer_fixtures(manifest_path)), {UPSTREAM_REL})
+        wrong = (True, False, 0, 1, -1, 1.0, "", "1", [], {}, None)
+        setters = {"schema": lambda m, v: m.__setitem__("schema", v),
+                   "authority": lambda m, v: m.__setitem__("authority", v),
+                   "entries": lambda m, v: m.__setitem__("entries", v),
+                   "entry": lambda m, v: m["entries"].__setitem__(0, v),
+                   "verification": lambda m, v: m["entries"][0].__setitem__("verification", v),
+                   "source": lambda m, v: m["entries"][0].__setitem__("source", v)}
+        for field in ("path", "sha256", "bytes", "classification"):
+            setters[field] = lambda m, v, f=field: m["entries"][0].__setitem__(f, v)
+        for field in entry["source"]:
+            setters["source." + field] = lambda m, v, f=field: m["entries"][0]["source"].__setitem__(f, v)
+        for field in entry["verification"]:
+            setters["verification." + field] = (
+                lambda m, v, f=field: m["entries"][0]["verification"].__setitem__(f, v))
+        # Free-text fields legitimately accept any non-empty string; closed
+        # values (kind, level) and digests do not.
+        free_text = {"authority", "path", "classification", "verification.detail"} | {
+            "source." + key for key in entry["source"] if key != "kind" and not key.endswith("_sha256")}
+        for field, setter in setters.items():
+            for value in wrong:
+                # Well-typed values in `wrong`: integer 1 for schema/bytes, "1" for free text.
+                if ((field in ("schema", "bytes") and type(value) is int and value == 1) or
+                        (field in free_text and value == "1")):
+                    continue
+                with self.subTest(field=field, value=value):
+                    manifest = json.loads(json.dumps(good))
+                    setter(manifest, value)
+                    manifest_path.write_text(json.dumps(manifest))
+                    try:
+                        scanner.load_public_producer_fixtures(manifest_path)
+                    except Exception as error:  # noqa: BLE001 - the exception type is the assertion
+                        self.assertIsInstance(error, ValueError)
+                    else:
+                        self.fail("malformed manifest accepted")
 
     def test_public_producer_fixture_does_not_dominate_other_checks(self):
         # D3: an exact manifest match only reclassifies the producer-path hit.

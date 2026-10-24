@@ -241,7 +241,8 @@ def load_public_producer_fixtures(path):
     except (OSError, UnicodeError, RecursionError) as error:
         raise ValueError("manifest unreadable") from error
     if (not isinstance(manifest, dict) or set(manifest) != {"schema", "authority", "entries"} or
-            manifest["schema"] != 1 or not text(manifest["authority"]) or
+            type(manifest["schema"]) is not int or manifest["schema"] != 1 or
+            not text(manifest["authority"]) or
             not isinstance(manifest["entries"], list) or not manifest["entries"]):
         raise ValueError("manifest structure")
     fixtures = {}
@@ -258,12 +259,13 @@ def load_public_producer_fixtures(path):
                 not text(entry["classification"])):
             raise ValueError("entry digest, size or classification")
         kind = source.get("kind") if isinstance(source, dict) else None
-        if kind not in SOURCE_KINDS or set(source) != SOURCE_KINDS[kind][0]:
+        if not isinstance(kind, str) or kind not in SOURCE_KINDS or set(source) != SOURCE_KINDS[kind][0]:
             raise ValueError("entry source")
         if not all(text(value) for value in source.values()) or not all(
                 SHA256_HEX.fullmatch(source[key]) for key in source if key.endswith("_sha256")):
             raise ValueError("entry source values")
         if (not isinstance(verification, dict) or set(verification) != {"level", "detail"} or
+                not isinstance(verification["level"], str) or
                 verification["level"] != SOURCE_KINDS[kind][1] or not text(verification["detail"])):
             raise ValueError("entry verification")
         fixtures[path_value] = entry
