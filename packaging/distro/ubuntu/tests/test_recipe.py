@@ -560,6 +560,162 @@ class RecipeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "refusing host root"):
                 policy.check_target_ownership(Path("/usr/.."), ["usr/bin/wayfire"])
 
+    def target_database(self, case, owned="/usr/share/doc/fixture/copyright"):
+        target = self.root / case
+        self.put("var/lib/dpkg/status", "Package: fixture\nStatus: install ok installed\nArchitecture: amd64\nVersion: 1\nMaintainer: Fixture <fixture@example.invalid>\nDescription: task-owned fixture\n\n", target)
+        self.put("var/lib/dpkg/info/fixture.list", owned + "\n", target)
+        return target
+
+    def runtime_args(self, target, copy=True):
+        lock = self.root / f"runtime-{next(self.counter)}.json"
+        lock.write_text(json.dumps(self.lock()))
+        return [RECIPE / "apply-runtime.py", "--root", target, "--runtime-lock", lock,
+                *(["--runtime-tree", self.tree] if copy else [])]
+
+    def test_target_query_timeouts_exit_two_before_copy(self):
+        # Execute the real CLI in a child interpreter. Only the selected dpkg
+        # call raises TimeoutExpired; all other queries use the real target DB.
+        script = """
+import runpy, subprocess, sys
+from pathlib import Path
+original_run = subprocess.run
+fail_at = int(sys.argv[1])
+queries = 0
+def query(command, **kwargs):
+    global queries
+    if command[0] == 'dpkg-query':
+        queries += 1
+        if queries == fail_at:
+            raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+    return original_run(command, **kwargs)
+subprocess.run = query
+sys.argv = sys.argv[2:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        for index, stage in enumerate(("probe", "catalog", "exact-path"), 1):
+            with self.subTest(stage=stage):
+                target = self.target_database("timeout-" + stage)
+                args = self.runtime_args(target)
+                result = call(sys.executable, "-c", script, index, *args)
+                self.assertFalse((target / "usr").exists(), result.stderr)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertIn("timed out", result.stderr)
+                control = call(sys.executable, *args)
+                self.assertEqual(control.returncode, 0, control.stderr)
+                self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
+                                 (self.tree / "usr/bin/wayfire").read_bytes())
+                # Finish's read-only audit must use the same rejection path.
+                audit = call(sys.executable, "-c", script, index,
+                             *self.runtime_args(target, copy=False))
+                self.assertEqual(audit.returncode, 2, audit.stderr)
+                self.assertNotIn("Traceback", audit.stderr)
+
+    def test_target_metadata_symlinks_rejected_before_copy(self):
+        for name in ("updates", "info/format"):
+            for dangling in (False, True):
+                with self.subTest(metadata=name, dangling=dangling):
+                    target = self.target_database(f"metadata-{next(self.counter)}")
+                    path = target / "var/lib/dpkg" / name
+                    saved = target / "saved-metadata"
+                    if not dangling:
+                        if name == "updates":
+                            saved.mkdir()
+                        else:
+                            saved.write_text("1\n")
+                    path.symlink_to(saved)
+                    result = call(sys.executable, *self.runtime_args(target))
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn("ownership database missing or unsafe", result.stderr)
+                    self.assertFalse((target / "usr").exists())
+
+    def test_target_regular_metadata_control(self):
+        target = self.target_database("metadata-control")
+        (target / "var/lib/dpkg/updates").mkdir()
+        self.put("var/lib/dpkg/info/format", "1\n", target)
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
+                         (self.tree / "usr/bin/wayfire").read_bytes())
+
+    def test_target_root_inode_alias_stat_simulation(self):
+        # Stat simulation only, NOT privileged bind-mount acceptance. The real
+        # CLI sees /'s (st_dev, st_ino) at a task-owned target; it never reads the
+        # host dpkg DB. Each single-field difference is a valid-root control.
+        script = """
+import os, runpy, sys
+from pathlib import Path
+mode, target = sys.argv[1], Path(sys.argv[2])
+original_stat = Path.stat
+fields = list(original_stat(Path('/')))
+if mode == 'other-inode':
+    fields[1] += 1
+elif mode == 'other-device':
+    fields[2] += 1
+identity = os.stat_result(fields)
+def target_stat(path, *args, **kwargs):
+    return identity if path == target else original_stat(path, *args, **kwargs)
+Path.stat = target_stat
+sys.argv = sys.argv[3:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        for mode in ("alias", "other-inode", "other-device"):
+            with self.subTest(mode=mode):
+                target = self.target_database("root-stat-" + mode)
+                result = call(sys.executable, "-c", script, mode, target,
+                              *self.runtime_args(target))
+                self.assertEqual(result.returncode, 2 if mode == "alias" else 0, result.stderr)
+                if mode == "alias":
+                    self.assertIn("refusing host root", result.stderr)
+                    self.assertFalse((target / "usr").exists())
+                else:
+                    self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
+                                     (self.tree / "usr/bin/wayfire").read_bytes())
+
+    def test_target_catalog_terminal_dotdot_rejected(self):
+        for row in ("/usr/bin/wayfire/child/..", "/usr/bin/wayfire/child/../",
+                    "/unrelated/child/.."):
+            with self.subTest(row=row):
+                target = self.target_database(f"catalog-{next(self.counter)}", row)
+                catalog = call("dpkg-query", "--admindir=" + str(target / "var/lib/dpkg"), "-S", "*")
+                self.assertEqual(catalog.returncode, 0, catalog.stderr)
+                self.assertIn(row.rstrip("/"), catalog.stdout)
+                result = call(sys.executable, *self.runtime_args(target))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("catalog failed closed", result.stderr)
+                self.assertFalse((target / "usr").exists())
+
+    def test_target_catalog_interior_dotdot_controls(self):
+        self.apply_fixture("dotdot-collision", "/opt/../usr/bin/wayfire")
+        self.apply_fixture("dotdot-unowned", "/opt/../usr/bin/unrelated", expected=0)
+
+    def test_existing_hardlink_rejected_before_any_copy(self):
+        target = self.target_database("hardlink", "/usr/share/doc/fixture/protected")
+        protected = self.put("usr/share/doc/fixture/protected", "protected package bytes\n", target)
+        # A late destination shares the package inode, but its path is unowned.
+        name = "usr/share/doc/ditto-runtime/NOTICE"
+        dest = target / name
+        dest.parent.mkdir(parents=True)
+        dest.hardlink_to(protected)
+        identity = (protected.stat().st_dev, protected.stat().st_ino)
+        self.assertEqual(dest.stat().st_nlink, 2)
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(protected.read_bytes(), b"protected package bytes\n", result.stderr)
+        self.assertEqual((dest.stat().st_dev, dest.stat().st_ino), identity)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("existing target hardlink", result.stderr)
+        self.assertFalse((target / "usr/bin").exists())
+
+    def test_existing_single_link_destination_control(self):
+        target = self.target_database("single-link")
+        dest = self.put("usr/share/doc/ditto-runtime/NOTICE", "replaceable bytes\n", target)
+        self.assertEqual(dest.stat().st_nlink, 1)
+        result = call(sys.executable, *self.runtime_args(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(dest.read_bytes(), (self.tree / "usr/share/doc/ditto-runtime/NOTICE").read_bytes())
+
     def test_drm_present_delayed_absent_and_unit_wiring(self):
         cards = self.root / "drm"
         cards.mkdir()

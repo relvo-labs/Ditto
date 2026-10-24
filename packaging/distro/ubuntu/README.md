@@ -53,7 +53,7 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 | `usr/lib/ditto-node/bin/node` | Node 22.23.2；官方來源／hash 與 Node 的第三方授權材料另核對 |
 | `usr/share/doc/ditto-runtime/` | 必備 source provenance、各元件 LICENSE／NOTICE、修改清單；至少有檔案不代表法律盤點完成，D11 須逐項審查 |
 
-`runtime_policy.py` 同時供 lock generation、generator、apply 與 finish audit 使用。runtime 不透過 ExtraTrees 覆寫套件：先 stage 在 generated project 的 `runtime/`，finalizer 以 `dpkg-query --admindir=$BUILDROOT/var/lib/dpkg` 檢查全部路徑（包含 link），任一已被 target package 擁有或 query 異常即停止，全部通過才 copy。finish 再對 mounted target DB 與實際 payload hashes 做唯讀 audit。這些查詢不讀 builder 的預設 dpkg DB；preflight 拒絕不得被忽略。
+`runtime_policy.py` 同時供 lock generation、generator、apply 與 finish audit 使用。runtime 不透過 ExtraTrees 覆寫套件：先 stage 在 generated project 的 `runtime/`，finalizer 以 `dpkg-query --admindir=$BUILDROOT/var/lib/dpkg` 檢查全部路徑（包含 link）。target 的 merged-/usr 等別名依映像內實際 parent symlink 解析，再比對 target package 歸屬；獨立的實體 `/bin` 不會直接視為 `/usr/bin`。任一已被套件擁有或 query 異常（含逾時）即以 exit 2 拒絕，全部通過才 copy；既有 regular-file 目的地的 `st_nlink > 1` 也在任何 copy 前拒絕，避免改寫共用的套件 inode。finish 再對 mounted target DB 與實際 payload hashes 做唯讀 audit。這些查詢不讀 builder 的預設 dpkg DB；preflight 拒絕不得被忽略。真實映像的 catalog 查詢耗時尚待 #148／#151 重建時量測，#199 保留該項驗收。
 
 此 generator 從 source tar 安裝 Shell、固定 session／units 與 Fcitx profile，替換 checkout 路徑為 `/usr/lib/ditto`。runtime pins 固定 Qt 6.10.2、Rust 1.98.1、Node 22.23.2；這些欄位是輸入聲明，仍需 binary／ELF／QML 實測。此抽取版本沿 Ubuntu UAT 使用 snapshot `/usr` Qt，不引入另一份私有 Qt；正式跨 suite runtime 決策交 D04。
 
@@ -63,7 +63,7 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 
 沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清除 machine-id／random seed；D06 尚須提供首次帳號建立，直接開機只有登入提示，尚無可用帳號。這不是安裝器。
 
-scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作者／checkout 路徑，全檔比對；預設檢查具名 home 與 build producer 路徑，允許 AppArmor 等 distro 使用的泛用 `/home/` tunable，不按檔名全面排除。報告只輸出路徑／hash，不輸出檔案內容。host keys、authorized keys、known-hosts、非空 machine-id／random seed、shadow 的空值／active credential／格式錯誤、greetd／getty／GDM 等 active autologin、sudoers（包含 include）免密規則、未核准完整 PEM key blocks 或讀取錯誤均失敗。未結構化或其他格式秘密仍需 D11／D12 供應鏈掃描，不將此掃描當完整保證。
+scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作者／checkout 路徑，全檔比對；預設檢查具名 home 與 build producer 路徑，允許 AppArmor 等 distro 使用的泛用 `/home/` tunable，不按檔名全面排除。報告只輸出路徑／hash，不輸出檔案內容。帳號檢查採 passwd／shadow 聯合驗證：`etc/passwd` 與 `etc/shadow` 均須包含 root、帳號集合必須一致，任一缺檔、不可讀、非 regular file、檔案或 parent symlink、重複帳號、密碼欄位空值／active credential／格式錯誤均失敗；passwd 可用 `x` 指向 shadow，shadow 則只接受真正鎖定的密碼欄位。host keys、authorized keys、known-hosts、非空 machine-id／random seed、greetd／getty／GDM 等 active autologin、sudoers（包含 include）免密規則、未核准完整 PEM key blocks 或讀取錯誤也均失敗。未結構化或其他格式秘密仍需 D11／D12 供應鏈掃描，不將此掃描當完整保證。
 
 `public-selftest-key-sha256.json` 僅核准 GnuTLS `usr/lib/x86_64-linux-gnu/libgnutls.so.30.41.1` 七份公開 upstream self-test 的完整 block hash，不按 library 路徑全面豁免。原 PoC 的 source commit `4e84948a5e89689edbab2c5920db7fc32f31a985`、blob `914b94a5903e45af1560b603cf7ca20e5b2f8e24` 及來源分類見 [D-51 §依據](../../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md#依據)。升版出現新 block 必須重新分類。
 

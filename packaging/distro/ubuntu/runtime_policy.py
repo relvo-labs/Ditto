@@ -142,7 +142,8 @@ def target_entry(root, name):
 def check_target_ownership(root, names):
     """Query only the installed TARGET database, never the builder's default DB."""
     root = root.absolute()
-    if root.resolve() == Path("/") or root.is_symlink() or not root.is_dir():
+    if (root.resolve() == Path("/") or root.is_symlink() or not root.is_dir() or
+            root.samefile("/")):
         raise ValueError("refusing host root as a runtime target")
     admindir = confined_path(root, "var/lib/dpkg/status").parent
     if not (admindir / "status").is_file() or (admindir / "status").is_symlink():
@@ -150,7 +151,8 @@ def check_target_ownership(root, names):
     info = admindir / "info"
     if (info.is_symlink() or (info.exists() and not info.is_dir()) or
             any(path.is_symlink() or not path.is_file() for path in info.glob("*.list")) or
-            (admindir / "diversions").is_symlink()):
+            (admindir / "diversions").is_symlink() or
+            (admindir / "updates").is_symlink() or (info / "format").is_symlink()):
         raise ValueError("target dpkg ownership database missing or unsafe")
     command = ["dpkg-query", f"--admindir={admindir}"]
     env = os.environ | {"LC_ALL": "C"}
@@ -173,7 +175,8 @@ def check_target_ownership(root, names):
         for line in catalog.stdout.splitlines():
             # Also handles dpkg's diversion descriptions and multi-owner lines.
             owner, separator, suffix = line.partition(": /")
-            if not owner or not separator or not suffix:
+            # Reject terminal '..' before the basename filter can skip it.
+            if not owner or not separator or not suffix or PurePosixPath(suffix).name == "..":
                 raise ValueError("target dpkg ownership catalog failed closed")
             owned_paths.append("/" + suffix)
     else:
