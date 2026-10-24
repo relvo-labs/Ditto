@@ -17,3 +17,4 @@ WindowControls 1.0 WindowControls.qml
 WindowFrameless 1.0 WindowFrameless.qml
 WindowHeader 1.0 WindowHeader.qml
 ShortcutSettings 1.0 ShortcutSettings.qml
+ShortcutCaptureState 1.0 ShortcutCaptureState.qml

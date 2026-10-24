@@ -1,32 +1,30 @@
-# #190 快捷鍵設定 UX 候選計畫 v0.1
+# #190／PR #191 快捷鍵錄製計畫 v0.2
 
-本計畫是未選定預覽；owner 視覺選擇、獨立審查及最終 gates 仍待執行。T2／唯一 writer；base `48593c3383353e25f07b6f247ae834cb92064911`，分支 `hermes/feat-190-shortcuts-ux`。不部署、不接 VM、不發布 PR。
+owner 已修正核心需求：**直接按組合鍵並自動辨識**。舊 A／B 文字表單不符合需求，撤回選型 gate；沒有任何視覺選擇已核准。舊紀錄／圖片／失敗留在原 evidence，歷史計畫見 `bca39e6`。本次沿用同一 writer、分支及交易基礎，T3；起點 `bca39e637d7d2fda34b06ed08c08151c2b6daaff`，原 base 不變。
 
-## Design Read
+## Design Read 與範圍
 
-- 現有 `PersonalizationCenter.qml`（legacy／provider）以固定 140／200 寬度顯示原始 chord、命令、狀態、移除；沒有編輯／取消。加入後立即清空欄位，非同步錯誤無法恢復原輸入。先用乾淨 archive 跑行為 RED 與原版渲染，保留證據。
-- 延續 Soft Jelly J1／既有 tokens、系統字型及 CJK fallback、Button／Choice／TextField、語意 warning/error；標題與動作在前，鍵名分開顯示（Space → 空白鍵／Space），不改實際 chord。使用原本間距、圓角、焦點環，不加裝飾動畫／依賴。設計差異 3／動作 1／密度 5（描述用，非量測分數）。窄版以垂直堆疊與 Flow 換行，保留控制清單，沒有矩陣。
-- A：按列編輯，草稿緊貼目標；B：清單下方的集中編輯區。兩者同資料、視窗、語言及狀態渲染。A 可在隔離分支作未選定提案；B 僅存 evidence/prototypes，不交付兩套 runtime 架構。
+研究權威為 task `issue-body-recorder-v0.2.md`、`research/report-v0.2.md`、`pr-body-recorder-v0.2.md`。GNOME／KDE／macOS／PowerToys 的一手研究支持明確錄製態、實際按鍵、可取消、獨立清除與衝突說明；不移植其外觀／任意鍵盤政策。維持 Soft Jelly tokens、動作優先清單、繁中／英文及窄版，收斂成一條流程。
 
-## 契約與界線
+已驗本機 Quickshell 0.3.1 revision `1a4716cde794a59928d9d9fc15f2afc7a95de360` 及 installed ShortcutInhibitor；Qt 6.10.2 QQuickKeyEvent 有 nativeScanCode。固定來源／metadata 不當成 compositor grant 證據。採既有 window-scoped inhibition，不新增輸入服務、dependency 或 Core protocol。
 
-- Core 是 `/shortcuts`、revision 與 ChangeSet 唯一權威。Shell 僅保有短暫草稿及提交時 snapshot；沿用 `client.propose` 和 `before`／`baseRevision`，不改 Rust、schema、Wayfire 或 reserved keys。
-- `desktop.shortcuts.list` 提供 reserved／conflict／bound／binding_path，沒有可捕捉全域鍵的介面；僅提供文字輸入及語法範例。前端只提示精確字串重複／reserved，不新增鍵盤正規化政策。Core preflight 仍為裁決，plugin conflicts 未完整列在此查詢。
-- coordinator 對 `/shortcuts` 啟用 timed revert。保留草稿、鎖住寫入直到確認結束；以 `changes.get`／changeUpdated 查同 change；只有 committed＋confirmed/not_required＋profiles.get 回讀目標與 committed_revision 一致才清空。失敗、回復、未知及 readback 失敗保留輸入，不自動重送。
-- personalization provider 由 1.0.0 升到 1.1.0：內容已變動，不覆寫 immutable id+version。不改既有 Profile 鎖定。
+## 順序與 checkpoint
 
-## 步驟與證據
+1. 先做 task-owned 真 Wayfire＋同版 Quickshell 探針：已綁 chord 在錄製外執行、active 時被 recorder 收到但 counter 不變；取消／失焦／銷毀後恢復。記錄 build、protocol、focus、事件與計數。檢查 cancelled／refusal，以及保留救援／鎖定與 compositor break_grab。合成鍵盤／stipc 標為 compositor 證據，非實體鍵盤／RustDesk／完整 Ditto save。
+2. 探針只用 `ditto-shortcut-probe-190-` 資源；容器 ≤2 CPU／4 GiB／512 pids，runtime network none、drop capabilities、no-new-privileges，software headless。只掛 task 工作／證據及固定工具鏈唯讀；無 host display、Docker socket、credentials、privileged 或 UAT 存取。啟動前保留 >10 GiB host available。
+3. 依實測 Qt Wayland nativeScanCode／Linux KEY_* 對應實作 recorder state：requesting／active／provisional modifiers／release／captured／cancelled／unavailable。只有 active 才說正在錄製；不靠 event.text／IME，不把 Qt.Key 字串當實體鍵碼。僅既有 adapter 支援範圍；autorepeat、activation Enter/Space、pure modifier、多主鍵、AltGr／unsupported 有負例。
+4. 選動作 → 點按鍵／設定 → focused recorder → 完整 release 後成為草稿 → 顯示新舊值／衝突 → 明確套用。Esc 保留原值；清除另列。失焦、切頁、關窗、銷毀、cancelled、拒絕／斷線釋放且不自動重抓。Core ChangeSet、限時試用、權威回讀及 failed-write draft retention 保持。
+5. 若 compositor 安全逃生／reserved 可達性需新 policy，停在明確決策；不能把 QML Timer 稱作 fail-safe。可保留 fail-closed、可在獨立 probe 執行的 coherent preview，真實列出尚缺接受條件。
+6. focused regression／native probe result、i18n／相關 lint／package witness，選新 personalization version（1.1.0 舊 private stores 不覆寫）。首個 coherent recorder commit 後寫 `recorder/evidence/checkpoint.json` 及本輪單一報告，立即停止；parent 推送／更新 Draft 後，同一 writer 才繼續 native Core save／完整 gates／獨立 review repair。不回到 A/B gate，不標 Ready、不部署。
 
-1. 原版行為 RED（輸入保留、pending interlock、缺 edit）及完整 QML 原版擷取；所有 fixture 明示 offscreen，非 VM／Core 證據。
-2. 共用 shortcut UI 與單一 transaction path，provider／legacy 相同；測 create/edit/cancel、reserved/duplicate、pending/confirmation/revert、失敗保留、confirmed authoritative readback、鍵盤與窄版。
-3. A/B 清單／編輯／衝突／失敗／pending，zh-TW 相同 viewport 加窄版及 en，實際 Qt render。截圖不作 save 證明；回讀另有可控 protocol double 及可行的真 Core reproducer。
-4. focused tests、i18n、QML lint（與 baseline 警告比較）、provider package/version witness、相關 shell extension tests、diff --check。首個 meaningful checkpoint commit 後立即寫 evidence/checkpoint.json／Draft packet。保留所有失敗，不 skip。
-5. evidence/result.json／result.md 記錄 exact HEAD、commits、檔案與捕捉路徑、未驗限制，狀態 `waiting_for_owner_visual_selection`。Parent 才能 push／發布 Draft。此 UX 開發證據對應 DES-05／CFG-05～06／CHG-04～09 與 AT-10／11 的局部路徑，不宣稱完整 AT 或人類可用性通過。
+本輪所有新證據只存 `recorder/evidence` 或 `work/recorder`。原 evidence/result.json 與原 RED 不覆寫。沒有新持久配置權威；Shell 只持草稿與錄製暫態，所有寫入仍由 Core。
 
-## Checkpoint 與延續驗證
+## 本輪 checkpoint 實測（待 parent 備份／review）
 
-- 第一個 commit `68884d3` 已建立 Draft request packet 與 evidence/checkpoint.json；此處仍未選定、未發布、未部署。
-- 延續檢查加入真正 Qt key events 的新增／Tab／方向鍵／Enter 路徑；試用期間另回讀已 committed 的新按鍵，但草稿必須繼續鎖住且可見。重複舊事件不得清空下一份草稿。
-- 原版三項 RED 保留；原版／A／B 各 24 張實際 offscreen 圖（zh-TW/en、兩種 viewport、六狀態）。同一 protocol double 檢查 UI 輸入、confirmation 及回讀判斷，Core 既有契約測試另驗保留鍵、限時保留、回讀回復及過期基底。沒有端到端實體 compositor save／鍵盤擷取證據。
-- `shell/` lint 基底 248 warnings、候選 228；新 helper 無 lint warnings。legacy Section／StylePicker 的動態主題及 teardown warnings 以原版控制記錄比較；不擴大此 task 修復。shell extensions 46 tests 通過，五個 packaged pages 真 Quickshell 載入；此 runner 的長 UNIX socket 路徑令 IPC listener 啟動失敗，沒有當作 IPC 驗證通過。
-- 最終數字、來源 hash、截圖、版本 witness、已知限制與失敗原始日誌統一在 task evidence/result.json／result.md。完整 G4、獨立審查與 owner 視覺選擇仍待後續。
+- 原生 Quickshell revision 與上列相同；獨立 Ubuntu 26.04 映像的 Wayfire 為 **Wayfire package 0.10.0-1／installed wlroots library 0.19.2**（binary 自報 `0.10.0-unknown ... wlroots-0.19.1`），不是以 research snapshot 冒充安裝 build。headless pixman、network none，cgroup 回讀 CPU `200000 100000`、memory `4294967296`、pids `512`。既有桌面／UAT 未接觸。
+- raw inhibitor 與實際 `ShortcutRecorder.qml` 各有可重跑腳本（`tests/g4/shortcuts/native`）。真 stipc 的 Super+Space 在外部產生一次 binding event，active 時 recorder 捕獲且 event 為零，release／cancel／失焦／銷毀後恢復；Ctrl+Alt+K、完整放開、modifier provisional、Esc、斷線、拒絕 grant／不重抓有原生結果。German layout 的實體 KEY_Y 是 scan 29，但 Qt logical key 是 Z；因此 canonical mapping 用已驗 Wayland XKB evdev+8，不用文字。
+- 預設 break_grab=`none`，inhibition 也會擋 lock。探針暫設 **Super+Shift+Escape** 後，即使 SIGSTOP 凍結 Quickshell，compositor 仍可解除 inhibition，之後 lock counter 可觸發。這只證明 generic counter／compositor route；**尚未證明完整 Ditto rescue／lock／launcher 與 Core save**。
+- 材料決策仍待 owner／parent：是否採既有 reserved **Super+Shift+Escape** 作 compositor `shortcuts-inhibit/break_grab`，並驗證目標 session 與 host 安全狀態接線？正式設定頁 `recordingSafetyConfirmed` 維持 false，顯示 unavailable；不猜測正式 compositor 安全狀態，不以 QML timer 當 fail-safe。此次沒有改正式 policy。
+- 發現並重現 pinned inhibitor 在 focus-loss callback 內同步刪除 protocol object 的 reentrant failure。capture 同步停止後，延後釋放 native inhibitor；銷毀前的延遲 callback 也有 null guard。失敗 log 留存，最後原生失焦／銷毀重跑無該 warning／崩潰；不宣稱已對 upstream 做根因堆疊鑑定。
+- focused QML：recorder state 21、交易 17、既有 regressions 5、render 3 項皆通過（含 init／cleanup）；24 張離屏交易 workflow 圖。真 compositor 另有繁中／英文及 360px recorder 圖，fixture 標記明確。shell extensions 46 項及五個真 archive 頁載入通過；i18n 712 strings／183 keys／雙語；qmllint 維持 228 warnings，無新增。這些不等同完整 G4／實體座位／Core-save 驗收。
+- 舊 1.1.0 private archive／store 保持；新候選 personalization 使用 **1.2.0**，套件及共用 host source 分開記錄。第一個新 commit 是可執行但正式啟用仍 fail-closed 的 recorder checkpoint，parent 備份後才繼續上述決策及 native Core-save／完整 affected gates／獨立 review。

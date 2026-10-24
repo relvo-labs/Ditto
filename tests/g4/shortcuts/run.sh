@@ -2,9 +2,9 @@
 # #190 development evidence. QML fixtures, no VM or compositor key capture.
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-evidence="${1:?usage: run.sh evidence-dir [source-root] [a|b|baseline]}"
+evidence="${1:?usage: run.sh evidence-dir [source-root] [recorder|baseline]}"
 source_root="${2:-$root}"
-label="${3:-a}"
+label="${3:-recorder}"
 mkdir -p "$evidence"
 evidence="$(cd "$evidence" && pwd)"
 export QT_QPA_PLATFORM=offscreen QML_DISABLE_DISK_CACHE=1
@@ -16,6 +16,7 @@ timeout -k 2 40 "$runner" -import "$evidence/staged/stubs" -input "$evidence/sta
 regressions=$?
 set -e
 if [[ "$label" != baseline ]]; then
+    timeout -k 2 40 "$runner" -import "$evidence/staged/stubs" -input "$evidence/staged/tst_recorder.qml" > "$evidence/recorder-unit.log" 2>&1
     timeout -k 2 40 "$runner" -import "$evidence/staged/stubs" -input "$evidence/staged/tst_shortcuts.qml" > "$evidence/workflows.log" 2>&1
 fi
 timeout -k 2 55 "$runner" -import "$evidence/staged/stubs" -input "$evidence/staged/tst_capture.qml" > "$evidence/capture.log" 2>&1

@@ -10,7 +10,7 @@ report = []
 for path in (out / "shell").rglob("*.qml"):
     if path.is_symlink(): continue
     original = path.read_text()
-    changed = re.sub(r'^\s*(import Quickshell\.Wayland\s*$|WlrLayershell\.\w+\s*:.*$)', '', original, flags=re.M)
+    changed = original if path.name == 'ShortcutRecorder.qml' else re.sub(r'^\s*(import Quickshell\.Wayland\s*$|WlrLayershell\.\w+\s*:.*$)', '', original, flags=re.M)
     changed = changed.replace('import "root:/sdk/Ditto/Ui"', 'import "' + (out / 'shell/sdk/Ditto/Ui').as_uri() + '"')
     if changed != original: path.write_text(changed)
     report.append({"path": str(path.relative_to(out)), "sha256": hashlib.sha256(original.encode()).hexdigest(), "transformed": changed != original})
@@ -22,4 +22,6 @@ for var, name in [("zh", "ditto_zh_TW"), ("en", "ditto_en")]:
 (out / 'staging.json').write_text(json.dumps(report, indent=2))
 
 (out / 'captures').mkdir(exist_ok=True)
-(out / 'capture-config.js').write_text('.pragma library\nvar label = ' + json.dumps(sys.argv[3] if len(sys.argv) > 3 else 'a') + ';\n')
+(out / 'capture-config.js').write_text('.pragma library\nvar label = ' + json.dumps(sys.argv[3] if len(sys.argv) > 3 else 'recorder') + ';\n')
+
+shutil.copytree(root / 'tests/g4/shortcuts/recorder-stubs', out / 'stubs', dirs_exist_ok=True)

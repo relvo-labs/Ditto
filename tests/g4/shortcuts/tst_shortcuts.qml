@@ -29,12 +29,12 @@ TestCase {
     function edit() {
         const button = all(settings, i => i.clicked !== undefined && i.Accessible.name === client.t("編輯 %1").arg(settings.title("launcher.toggle")))[0];
         page.contentY = settings.y;
-        button.clicked();
-        named("shortcutChord").text = "Super+K";
+        settings.begin(0, button);
+        settings.acceptCaptured("Super+K");
     }
     function test_edit_cancel_focus_and_snapshot() {
         edit(); compare(settings.draftChord, "Super+K");
-        tryVerify(() => all(named("shortcutChord"), i => i.activeFocus).length > 0);
+        tryVerify(() => named("shortcutChord").activeFocus);
         keyClick(Qt.Key_Escape);
         compare(settings.editing, -2); compare(client.bindings[0].chord, "Super+Space");
         compare(client.calls.filter(c => c.method === "desktop.changes.propose").length, 0);
@@ -49,7 +49,7 @@ TestCase {
         client.reply("pending"); verify(settings.locked); compare(settings.draftChord, "Super+K");
         compare(settings.info[0].chord, "Super+K", "the active trial is read back while its draft stays locked");
         wait(0);
-        compare(named("shortcutChord").text, "Super+K");
+        compare(named("shortcutChord").text, settings.keyLabel("Super+K"));
         verify(named("shortcutChord").visible && named("shortcutChord").height > 0, "the pending draft remains visible");
         client.reply("confirmed");
         compare(settings.editing, -2); compare(settings.draftChord, ""); compare(settings.bindings[0].chord, "Super+K");
@@ -69,45 +69,40 @@ TestCase {
         client.reply("reverted", "rolled_back");
         compare(settings.draftChord, "Super+K"); verify(!settings.locked); compare(settings.bindings[0].chord, "Super+Space");
     }
+    // Actual key events open the UI, not a typed chord. The no-grant fixture
+    // must remain unavailable. acceptCaptured only injects the result at the
+    // transaction seam; native recorder recognition has separate evidence.
     function test_keyboard_create_with_real_key_events() {
         page.contentY = settings.y;
-        named("shortcutAdd").forceActiveFocus();
-        keyClick(Qt.Key_Return);
-        tryVerify(() => all(named("shortcutChord"), i => i.activeFocus).length > 0);
-        keyClick("S");
-        for (const key of [Qt.Key_U, Qt.Key_P, Qt.Key_E, Qt.Key_R]) keyClick(key);
-        keyClick(Qt.Key_Plus);
-        keyClick("K");
-        compare(settings.draftChord, "Super+K");
-        keyClick(Qt.Key_Tab, Qt.ShiftModifier);
-        keyClick(Qt.Key_Right);
-        keyClick(Qt.Key_Space);
-        compare(settings.draftCommand, "chat.toggle");
-        keyClick(Qt.Key_Tab); // chord
-        keyClick(Qt.Key_Tab); // Apply and try
-        verify(named("shortcutSave").activeFocus);
-        keyClick(Qt.Key_Return);
-        compare(client.proposed[2].chord, "Super+K");
-        compare(client.proposed[2].command, "chat.toggle");
-        client.failure({name: "preflight_rejected", message: "fixture failure"});
-        compare(settings.draftChord, "Super+K");
+        named("shortcutAdd").forceActiveFocus(); keyClick(Qt.Key_Return);
+        const option=all(named("shortcutCommand"), i => i.activeFocusOnTab && i.Accessible.name === settings.title("launcher.toggle"))[0];
+        option.forceActiveFocus(); keyClick(Qt.Key_Right); keyClick(Qt.Key_Space);
+        compare(settings.draftCommand,"chat.toggle");
+        named("shortcutChord").forceActiveFocus(); keyClick(Qt.Key_Return);
+        verify(settings.captureOpen);compare(settings.draftChord,"");
+        settings.cancelRecording();tryCompare(settings,"captureOpen",false);
+        settings.acceptCaptured("Ctrl+Alt+K");
+        named("shortcutSave").forceActiveFocus();keyClick(Qt.Key_Return);
+        compare(client.proposed[2].chord,"Ctrl+Alt+K");
+        client.failure({name:"preflight_rejected",message:"fixture failure"});
+        compare(settings.draftChord,"Ctrl+Alt+K");
     }
     function test_late_event_does_not_clear_a_new_draft() {
         edit(); settings.save(); client.reply("pending"); client.reply("confirmed");
         settings.begin(-1, named("shortcutAdd"));
-        named("shortcutChord").text = "Super+M";
+        settings.acceptCaptured("Super+M");
         client.changeUpdated(client.last);
         compare(settings.draftChord, "Super+M"); compare(settings.editing, -1);
     }
     function test_conflicts_reserved_and_duplicate() {
-        edit(); named("shortcutChord").text = "Super+L";
+        edit(); settings.acceptCaptured("Super+L");
         verify(settings.conflict.indexOf("系統保留") >= 0); verify(!named("shortcutSave").enabled);
-        named("shortcutChord").text = "Super+A";
+        settings.acceptCaptured("Super+A");
         verify(settings.conflict.indexOf("已用於") >= 0); verify(!named("shortcutSave").enabled);
         compare(client.calls.filter(c => c.method === "desktop.changes.propose").length, 0);
     }
     function test_create_pending_failed_and_retry() {
-        named("shortcutAdd").clicked(); named("shortcutCommand").chosen("chat.toggle"); named("shortcutChord").text = "Super+K";
+        named("shortcutAdd").clicked(); named("shortcutCommand").chosen("chat.toggle"); settings.acceptCaptured("Super+K");
         settings.save(); settings.save();
         compare(client.calls.filter(c => c.method === "desktop.changes.propose").length, 1);
         verify(!named("shortcutChord").enabled); verify(!named("shortcutCancel").enabled);

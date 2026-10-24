@@ -49,9 +49,11 @@ TestCase {
             if (settings) {
                 if (state !== "list") {
                     const edit = all(settings, i => i.clicked !== undefined && i.Accessible.name === client.t("編輯 %1").arg(settings.title("launcher.toggle")))[0];
-                    edit.clicked();
+                    settings.begin(0, edit);
                     field = all(settings, i => i.objectName === "shortcutChord")[0];
-                    field.text = state === "conflict" ? "Super+A" : state === "reserved" ? "Super+L" : "Super+K";
+                    // Transaction-render fixture only; native recording is
+                    // exercised by the separate real Wayfire probe.
+                    settings.acceptCaptured(state === "conflict" ? "Super+A" : state === "reserved" ? "Super+L" : "Super+K");
                     if (state === "failure" || state === "pending") settings.save();
                     if (state === "failure") client.failure({name: "preflight_rejected", message: "fixture write rejected"});
                     if (state === "pending") client.reply("pending");
@@ -84,13 +86,13 @@ TestCase {
             if (settings && state !== "list") {
                 // A projection refresh may rebuild a row. Inspect the current editor.
                 field = all(settings, i => i.objectName === "shortcutChord")[0];
-                compare(field.text, settings.draftChord);
+                compare(field.text, settings.keyLabel(settings.draftChord));
                 verify(field.visible && field.height > 0);
             }
             const name = Config.label + "-" + locale + "-" + viewport + "-" + state + ".png";
             const path = Qt.resolvedUrl("captures/" + name).toString().replace("file://", "");
             grabImage(scene).save(path);
-            console.log("SHORTCUT_CAPTURE " + JSON.stringify({file: path, candidate: Config.label, locale: locale, state: state, viewport: [viewport,900], fixture: true, renderer: "Qt Quick offscreen", pageWidth: page.width, contentY: page.contentY, draft: field ? field.text : null}));
+            console.log("SHORTCUT_CAPTURE " + JSON.stringify({file: path, candidate: Config.label, locale: locale, state: state, viewport: [viewport,900], fixture: true, renderer: "Qt Quick offscreen", pageWidth: page.width, contentY: page.contentY, draft: settings ? settings.draftChord : field ? field.text : null}));
             bar.destroy(); window.destroy(); wait(0);
         }
     }

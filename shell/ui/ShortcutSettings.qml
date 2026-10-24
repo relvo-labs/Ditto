@@ -2,12 +2,18 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "../change"
 
-/// #190 UNSELECTED preview. Only UI drafts live here; Core owns bindings.
+/// #190 recorder preview. Only UI drafts live here; Core owns bindings.
 Column {
     id: root
     required property var client
     required property var tokens
     property bool externalBusy: false
+    // Fail closed until the compositor escape/reserved-key policy is approved
+    // and verified by its host. Native #190 probes provide this explicitly.
+    property bool recordingSafetyConfirmed: false
+    property bool captureOpen: false
+    property var draftKeyButton: null
+    property var captureWindow: recorderLoader.item
     property var bindings: []
     property var info: []
     property var commands: []
@@ -30,7 +36,7 @@ Column {
     property string diagnostic: ""
     property var returnFocus: null
     readonly property bool pending: !!record && !!record.confirmation && record.confirmation.state === "pending"
-    readonly property bool locked: externalBusy || writing || pending || uncertain
+    readonly property bool locked: externalBusy || writing || pending || uncertain || captureOpen
     readonly property bool canWrite: loaded && !loading && !locked
     readonly property string conflict: draftConflict()
     spacing: tokens.space
@@ -95,6 +101,45 @@ Column {
         draftCommand = "";
         message = "";
         if (returnFocus) returnFocus.forceActiveFocus();
+    }
+    function acceptCaptured(chord) {
+        if (editing !== -2 && !writing && !pending && !uncertain) draftChord = chord;
+    }
+    function startRecording(activationKey) {
+        if (!canWrite || editing === -2 || !draftCommand) return;
+        captureOpen = true;
+        recorderLoader.setSource(Qt.resolvedUrl("ShortcutRecorder.qml"), {
+            client: client, tokens: tokens, actionTitle: title(draftCommand),
+            reservedBindings: info.filter(item => item.reserved),
+            activationKey: activationKey || 0, safetyReady: recordingSafetyConfirmed
+        });
+    }
+    function closeRecording(reason) {
+        captureOpen = false;
+        recorderLoader.source = "";
+        if (draftKeyButton && draftKeyButton.enabled) draftKeyButton.forceActiveFocus();
+        if (reason === "reserved") message = t(qsTr("這組按鍵由系統保留。已停止錄製，原按鍵未更改。"));
+        else if (reason !== "captured") message = t(qsTr("錄製已結束，尚未更改快捷鍵。"));
+    }
+    function cancelRecording() {
+        if (captureWindow) captureWindow.cancel();
+        else if (captureOpen) closeRecording("cancelled");
+    }
+    onVisibleChanged: if (!visible) cancelRecording()
+    Loader {
+        id: recorderLoader
+        onLoaded: {
+            item.captured.connect(root.acceptCaptured);
+            item.finished.connect(reason => Qt.callLater(root.closeRecording, reason));
+            item.reservedPressed.connect(chord => {
+                const binding = root.info.find(item => item.reserved && item.chord === chord);
+                if (binding) root.client.capability("desktop.commands.invoke", { command_id: binding.command }, null, root.failed);
+            });
+        }
+        onStatusChanged: if (status === Loader.Error) {
+            root.captureOpen = false;
+            root.message = root.t(qsTr("無法開啟按鍵錄製。請關閉後再試。"));
+        }
     }
     function save() {
         if (!canWrite || editing === -2 || conflict || !draftChord.trim() || !draftCommand) return;
@@ -174,7 +219,7 @@ Column {
         Text {
             width: parent.width
             wrapMode: Text.WordWrap
-            text: root.t(qsTr("請輸入按鍵名稱，例如 Super+Space。這裡不會擷取全域按鍵；衝突仍由系統在套用前檢查。"))
+            text: root.t(qsTr("選擇用途後，點按鍵開始錄製。按下實際組合，再放開所有按鍵；套用前會檢查衝突。"))
             color: root.tokens.appInkMuted
             font.pixelSize: root.tokens.appFontCaption
         }
@@ -215,13 +260,19 @@ Column {
                         Flow {
                             width: parent.width
                             spacing: root.tokens.space
-                            Text {
+                            Button {
+                                id: editButton
+                                tokens: root.tokens
                                 width: Math.min(implicitWidth, rowContent.width)
-                                wrapMode: Text.WrapAnywhere
                                 text: root.keyLabel(row.modelData.chord)
-                                color: root.tokens.appInk
-                                font.pixelSize: root.tokens.appFontBody
-                                topPadding: 5
+                                accessibleName: root.t(qsTr("編輯 %1")).arg(root.title(row.modelData.command))
+                                kind: "subtle"
+                                enabled: !row.modelData.reserved && row.bindingIndex >= 0 && root.canWrite && root.editing === -2
+                                function record(key) { root.begin(row.bindingIndex, editButton); root.startRecording(key); }
+                                onClicked: record(0)
+                                Keys.onReturnPressed: record(Qt.Key_Return)
+                                Keys.onEnterPressed: record(Qt.Key_Enter)
+                                Keys.onSpacePressed: record(Qt.Key_Space)
                             }
                             Badge {
                                 tokens: root.tokens
@@ -230,20 +281,10 @@ Column {
                                     : row.modelData.bound ? root.t(qsTr("已生效")) : root.t(qsTr("未生效"))
                                 tone: row.modelData.conflict ? "bad" : row.modelData.bound ? "good" : "warn"
                             }
-                            Button {
-                                id: editButton
-                                visible: !row.modelData.reserved && row.bindingIndex >= 0
-                                tokens: root.tokens
-                                text: root.t(qsTr("編輯"))
-                                accessibleName: root.t(qsTr("編輯 %1")).arg(root.title(row.modelData.command))
-                                kind: "subtle"
-                                enabled: root.canWrite && root.editing === -2
-                                onClicked: root.begin(row.bindingIndex, editButton)
-                            }
                         }
                     }
                 }
-                // A: one active editor directly under its selected binding.
+                // The one workflow keeps its draft next to the selected action.
                 Loader {
                     objectName: "shortcutInlineSlot"
                     width: parent.width
@@ -292,7 +333,11 @@ Column {
         Column {
             width: parent.width
             spacing: root.tokens.space
-            Component.onCompleted: chordField.focusInput()
+
+            Component.onCompleted: Qt.callLater(function() {
+                if (recordButton.enabled) recordButton.forceActiveFocus();
+                else if (commandChoice.enabled) commandChoice.forceActiveFocus();
+            })
             Keys.onEscapePressed: event => { root.cancel(); event.accepted = true; }
             Text {
                 width: parent.width
@@ -304,6 +349,7 @@ Column {
             }
             Text { text: root.t(qsTr("用途")); color: root.tokens.appInkMuted; font.pixelSize: root.tokens.appFontCaption }
             Choice {
+                id: commandChoice
                 objectName: "shortcutCommand"
                 tokens: root.tokens
                 maxWidth: parent.width
@@ -315,17 +361,30 @@ Column {
                 onChosen: value => root.draftCommand = value
             }
             Text { text: root.t(qsTr("按鍵組合")); color: root.tokens.appInkMuted; font.pixelSize: root.tokens.appFontCaption }
-            TextField {
-                id: chordField
-                objectName: "shortcutChord"
+            Flow {
                 width: parent.width
-                tokens: root.tokens
-                placeholder: root.t(qsTr("例如 Super+Space"))
-                accessibleName: root.t(qsTr("按鍵組合"))
-                enabled: !root.locked
-                text: root.draftChord
-                onTextChanged: root.draftChord = text
-                onAccepted: root.save()
+                spacing: root.tokens.space
+                Button {
+                    id: recordButton
+                    objectName: "shortcutChord"
+                    Component.onCompleted: root.draftKeyButton = recordButton
+                    tokens: root.tokens
+                    width: Math.min(implicitWidth, parent.width)
+                    text: root.draftChord ? root.keyLabel(root.draftChord) : root.t(qsTr("設定快捷鍵"))
+                    accessibleName: root.t(qsTr("設定快捷鍵"))
+                    enabled: !root.locked && root.draftCommand.length > 0
+                    onClicked: root.startRecording(0)
+                    Keys.onReturnPressed: root.startRecording(Qt.Key_Return)
+                    Keys.onEnterPressed: root.startRecording(Qt.Key_Enter)
+                    Keys.onSpacePressed: root.startRecording(Qt.Key_Space)
+                }
+                Button {
+                    objectName: "shortcutClear"
+                    tokens: root.tokens
+                    text: root.t(qsTr("清除待套用按鍵"))
+                    enabled: !root.locked && root.draftChord.length > 0
+                    onClicked: root.draftChord = ""
+                }
             }
             Text {
                 objectName: "shortcutConflict"

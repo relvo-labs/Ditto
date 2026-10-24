@@ -3264,11 +3264,66 @@
     </message>
 </context>
 <context>
-    <name>ShortcutSettings</name>
+    <name>ShortcutRecorder</name>
     <message>
-        <source>例如 Super+Space</source>
-        <translation>例如 Super+Space</translation>
+        <source>一次只能設定一個主鍵。請放開所有按鍵後再試。</source>
+        <translation>一次只能設定一個主鍵。請放開所有按鍵後再試。</translation>
     </message>
+    <message>
+        <source>取消錄製</source>
+        <translation>取消錄製</translation>
+    </message>
+    <message>
+        <source>可使用 Ctrl、Alt、Shift、Super，加上英數、F1–F12 或導覽鍵。</source>
+        <translation>可使用 Ctrl、Alt、Shift、Super，加上英數、F1–F12 或導覽鍵。</translation>
+    </message>
+    <message>
+        <source>已讀取按鍵，尚未套用。</source>
+        <translation>已讀取按鍵，尚未套用。</translation>
+    </message>
+    <message>
+        <source>正在等待系統允許錄製…</source>
+        <translation>正在等待系統允許錄製…</translation>
+    </message>
+    <message>
+        <source>目前無法安全錄製。尚未確認系統的緊急退出設定，或系統未允許暫停快捷鍵。請關閉後再試。</source>
+        <translation>目前無法安全錄製。尚未確認系統的緊急退出設定，或系統未允許暫停快捷鍵。請關閉後再試。</translation>
+    </message>
+    <message>
+        <source>空白鍵</source>
+        <translation>空白鍵</translation>
+    </message>
+    <message>
+        <source>設定快捷鍵</source>
+        <translation>設定快捷鍵</translation>
+    </message>
+    <message>
+        <source>請先放開啟動錄製的按鍵。</source>
+        <translation>請先放開啟動錄製的按鍵。</translation>
+    </message>
+    <message>
+        <source>請先放開所有按鍵，再重新按組合。</source>
+        <translation>請先放開所有按鍵，再重新按組合。</translation>
+    </message>
+    <message>
+        <source>請按下組合鍵。Esc 取消，原按鍵不會更改。</source>
+        <translation>請按下組合鍵。Esc 取消，原按鍵不會更改。</translation>
+    </message>
+    <message>
+        <source>請放開所有按鍵。</source>
+        <translation>請放開所有按鍵。</translation>
+    </message>
+    <message>
+        <source>這個按鍵目前不支援。請放開後換一組；不支援 AltGr、多媒體鍵或多段組合。</source>
+        <translation>這個按鍵目前不支援。請放開後換一組；不支援 AltGr、多媒體鍵或多段組合。</translation>
+    </message>
+    <message>
+        <source>錄製已取消，原按鍵未更改。</source>
+        <translation>錄製已取消，原按鍵未更改。</translation>
+    </message>
+</context>
+<context>
+    <name>ShortcutSettings</name>
     <message>
         <source>儲存結果未知。輸入已保留，請重新讀取狀態並查看變更紀錄，勿重複套用。</source>
         <translation>儲存結果未知。輸入已保留，請重新讀取狀態並查看變更紀錄，勿重複套用。</translation>
@@ -3322,6 +3377,14 @@
         <translation>正在套用快捷鍵…輸入會保留到確認完成。</translation>
     </message>
     <message>
+        <source>清除待套用按鍵</source>
+        <translation>清除待套用按鍵</translation>
+    </message>
+    <message>
+        <source>無法開啟按鍵錄製。請關閉後再試。</source>
+        <translation>無法開啟按鍵錄製。請關閉後再試。</translation>
+    </message>
+    <message>
         <source>用途</source>
         <translation>用途</translation>
     </message>
@@ -3342,16 +3405,16 @@
         <translation>系統保留</translation>
     </message>
     <message>
-        <source>編輯</source>
-        <translation>編輯</translation>
-    </message>
-    <message>
         <source>編輯 %1</source>
         <translation>編輯 %1</translation>
     </message>
     <message>
         <source>衝突</source>
         <translation>衝突</translation>
+    </message>
+    <message>
+        <source>設定快捷鍵</source>
+        <translation>設定快捷鍵</translation>
     </message>
     <message>
         <source>診斷</source>
@@ -3362,10 +3425,6 @@
         <translation>請試用快捷鍵，再按「保留」。倒數結束會還原，輸入仍會保留。</translation>
     </message>
     <message>
-        <source>請輸入按鍵名稱，例如 Super+Space。這裡不會擷取全域按鍵；衝突仍由系統在套用前檢查。</source>
-        <translation>請輸入按鍵名稱，例如 Super+Space。這裡不會擷取全域按鍵；衝突仍由系統在套用前檢查。</translation>
-    </message>
-    <message>
         <source>這次變更未保留。輸入仍在，可修改後再試。</source>
         <translation>這次變更未保留。輸入仍在，可修改後再試。</translation>
     </message>
@@ -3374,12 +3433,24 @@
         <translation>這組按鍵已用於「%1」。請換一組。</translation>
     </message>
     <message>
+        <source>這組按鍵由系統保留。已停止錄製，原按鍵未更改。</source>
+        <translation>這組按鍵由系統保留。已停止錄製，原按鍵未更改。</translation>
+    </message>
+    <message>
         <source>這組按鍵由系統保留：%1。請換一組。</source>
         <translation>這組按鍵由系統保留：%1。請換一組。</translation>
     </message>
     <message>
+        <source>選擇用途後，點按鍵開始錄製。按下實際組合，再放開所有按鍵；套用前會檢查衝突。</source>
+        <translation>選擇用途後，點按鍵開始錄製。按下實際組合，再放開所有按鍵；套用前會檢查衝突。</translation>
+    </message>
+    <message>
         <source>重新讀取狀態</source>
         <translation>重新讀取狀態</translation>
+    </message>
+    <message>
+        <source>錄製已結束，尚未更改快捷鍵。</source>
+        <translation>錄製已結束，尚未更改快捷鍵。</translation>
     </message>
 </context>
 <context>
