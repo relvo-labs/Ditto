@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.launcher.search",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": {
     "zh-TW": "搜尋式啟動器",
     "en": "Search launcher"

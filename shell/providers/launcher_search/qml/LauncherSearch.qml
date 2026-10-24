@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -94,6 +95,17 @@ Scope {
         }, function (error) {
             provider.status = provider.t(qsTr("無法啟動「%1」")).arg(app.name);
         });
+    }
+
+    function iconSource(icon) {
+        if (!icon) return "";
+        const name = String(icon);
+        if (name.charAt(0) === "/") return "file://" + name;
+        return Quickshell.iconPath(name, true);
+    }
+
+    function iconFallback(source, imageStatus) {
+        return String(source).length === 0 || imageStatus !== Image.Ready;
     }
 
     Component.onCompleted: ready = true
@@ -193,6 +205,7 @@ Scope {
                     model: provider.results
 
                     Rectangle {
+                        id: row
                         required property var modelData
                         required property int index
                         width: column.width
@@ -203,18 +216,50 @@ Scope {
                         Accessible.name: modelData.name
                         Accessible.selected: index === provider.selected
 
-                        Text {
+                        Rectangle {
+                            id: iconTile
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
                             anchors.leftMargin: provider.tokens.space
-                            text: modelData.name + (modelData.generic_name ? "  ·  " + modelData.generic_name : "")
-                            color: index === provider.selected ? provider.tokens.accentForeground : provider.tokens.foreground
+                            width: 24
+                            height: 24
+                            radius: provider.tokens.radiusSmall
+                            color: fallback.visible ? provider.tokens.accent : "transparent"
+                            Image {
+                                id: appIcon
+                                objectName: "launcherSearchIcon"
+                                anchors.fill: parent
+                                source: provider.iconSource(row.modelData.icon)
+                                sourceSize: Qt.size(24, 24)
+                                fillMode: Image.PreserveAspectFit
+                                visible: !provider.iconFallback(source, status)
+                            }
+                            Text {
+                                id: fallback
+                                objectName: "launcherSearchIconFallback"
+                                anchors.centerIn: parent
+                                visible: provider.iconFallback(appIcon.source, appIcon.status)
+                                text: row.modelData.name.substring(0, 1)
+                                color: provider.tokens.accentForeground
+                                font.pixelSize: provider.tokens.fontBody
+                            }
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: iconTile.right
+                            anchors.leftMargin: provider.tokens.space
+                            anchors.right: parent.right
+                            anchors.rightMargin: provider.tokens.space
+                            elide: Text.ElideRight
+                            text: row.modelData.name + (row.modelData.generic_name ? "  ·  " + row.modelData.generic_name : "")
+                            color: row.index === provider.selected ? provider.tokens.accentForeground : provider.tokens.foreground
                             font.pixelSize: provider.tokens.fontBody
                         }
 
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: provider.launch(modelData)
+                            onClicked: provider.launch(row.modelData)
                         }
                     }
                 }
