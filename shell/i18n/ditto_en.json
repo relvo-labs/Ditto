@@ -11,6 +11,7 @@
   "%1（%2）：%3": "%1 (%2): %3",
   "%1（未連接）": "%1 (not connected)",
   "%1：%2": "%1: %2",
+  "%3，第 %1 項，共 %2 項": "%3, %1 of %2",
   ".dittopkg 檔案的完整路徑": "Full path of the .dittopkg file",
   "AI 對話": "AI chat",
   "AI 對話已關閉；桌面仍可照常操作": "AI chat is off; the desktop works as usual",

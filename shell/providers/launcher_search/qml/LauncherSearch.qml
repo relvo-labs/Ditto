@@ -194,6 +194,7 @@ Scope {
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             visible: query.text.length === 0
+                            textFormat: Text.PlainText
                             text: provider.t(qsTr("輸入應用程式名稱"))
                             color: provider.tokens.foregroundMuted
                             font.pixelSize: provider.tokens.fontTitle
@@ -230,7 +231,10 @@ Scope {
                                 objectName: "launcherSearchIcon"
                                 anchors.fill: parent
                                 source: provider.iconSource(row.modelData.icon)
-                                sourceSize: Qt.size(24, 24)
+                                // Decode at device pixels: a raster PNG decoded at
+                                // 24 px is stretched and blurred on a 2x output (#188).
+                                sourceSize: Qt.size(Math.ceil(24 * Screen.devicePixelRatio),
+                                                    Math.ceil(24 * Screen.devicePixelRatio))
                                 fillMode: Image.PreserveAspectFit
                                 visible: !provider.iconFallback(source, status)
                             }
@@ -239,6 +243,7 @@ Scope {
                                 objectName: "launcherSearchIconFallback"
                                 anchors.centerIn: parent
                                 visible: provider.iconFallback(appIcon.source, appIcon.status)
+                                textFormat: Text.PlainText
                                 text: row.modelData.name.substring(0, 1)
                                 color: provider.tokens.accentForeground
                                 font.pixelSize: provider.tokens.fontBody
@@ -252,6 +257,8 @@ Scope {
                             anchors.right: parent.right
                             anchors.rightMargin: provider.tokens.space
                             elide: Text.ElideRight
+                            // App names come from desktop entries: never rich text (#189).
+                            textFormat: Text.PlainText
                             text: row.modelData.name + (row.modelData.generic_name ? "  ·  " + row.modelData.generic_name : "")
                             color: row.index === provider.selected ? provider.tokens.accentForeground : provider.tokens.foreground
                             font.pixelSize: provider.tokens.fontBody
@@ -266,6 +273,8 @@ Scope {
 
                 Text {
                     visible: text.length > 0
+                    // The status can carry an app name (a launch error): never rich text.
+                    textFormat: Text.PlainText
                     text: provider.status
                     color: provider.tokens.foregroundMuted
                     font.pixelSize: provider.tokens.fontSmall

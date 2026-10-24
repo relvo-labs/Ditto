@@ -42,3 +42,16 @@ R1 修正另驗證兩個控制器的 inline facade 各自綁定擁有者；AI �
 
 部署限制：新 archive 是 `ditto.settings.plugins-1.1.0.dittopkg`。安裝新版不會自動改變既有 Profile 的精確版本綁定；
 仍固定 1.0.0 的條目須經明確的既有升版 ChangeSet 才啟用新版。本修復不更動 live Profile，也不處理 #144。
+
+#188：`run.sh` 最後以真正 Quickshell（offscreen）在裝置縮放 1 與 2 下載入兩個啟動器，逐列檢查五種圖示來源。
+主題名稱經 `Quickshell.iconPath(name, true)` 解析為 `image://icon/…` 並載入成功；
+絕對 PNG 路徑直接載入；未知名稱與無圖示改用首字；檔案存在但無法解碼時為 `Image.Error`，同樣改用首字。
+每個圖示的 `sourceSize` 須為 `ceil(顯示尺寸 × 裝置縮放)`。
+主題 `DittoLauncherTest` 是證據目錄中的 fixture（`launcher-icon-theme/index.theme` 加上 G4 的 `raster-icon-256.png`）。
+
+Qt 的 offscreen 平台沒有圖示搜尋路徑（`QIcon::themeSearchPaths()` 只有 `:/icons`），主題查找一律失敗。
+因此以測試專用的 LD_PRELOAD `icon-search-paths.cpp` 設定 `$XDG_DATA_DIRS/icons`，與 Wayland／X11 平台主題相同；其餘查找仍由 Quickshell 自己完成。
+沒有 Wayland 合成器時 Quickshell 沒有 PanelWindow 後端，`stage-launcher.py` 因此把 layer-shell 視窗改成 FloatingWindow。
+它另外移除 layer-shell 屬性與 `focusable`，並加一行 `stagedSurface` 讓測試找到圖示；每條規則須命中預期行數，改動逐行記在 `launcher-icons/staged/staging.json`。
+offscreen 的 FloatingWindow 不回傳 `grabToImage`，像素清晰度因此由 G4 視覺測試的 `check_launcher_icons.py` 比較。
+這裡不驗證實際桌面圖示主題、layer-shell、合成器縮放或實體 HiDPI 螢幕。
