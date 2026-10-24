@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.layout.simple-tile",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": { "zh-TW": "基本平鋪", "en": "Basic tiling" },
   "author": "Ditto",
   "license": "MIT",

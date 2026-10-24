@@ -40,6 +40,18 @@ export function activeDocAgrees(text) {
   ].some(pattern => pattern.test(text));
 }
 
+// The fixture records old immutable identities, not the version of the latest
+// release. Later versions remain free to advance without editing this guard.
+export function immutableManifestError(previous, text) {
+  const current = JSON.parse(text);
+  if (current.id !== previous.id) return 'builtin ID must remain stable';
+  if (typeof current.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(current.version))
+    return 'expected a package version';
+  if (current.version === previous.version && sha256(text) !== previous.sha256)
+    return 'changed archived manifest bytes require a new version';
+  return null;
+}
+
 export function checkLicense({
   files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
     { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean),
@@ -72,6 +84,24 @@ export function checkLicense({
   group('first-party JSON metadata', [...node, ...manifests], (_path, text) => {
     require(JSON.parse(text).license === 'MIT', 'expected license: MIT');
   });
+  const fixture = 'tests/licensing/pre-mit-builtin-manifests.json';
+  try {
+    const { packages } = JSON.parse(read(fixture).toString());
+    require(Array.isArray(packages) && packages.length > 0, 'expected immutable manifest baselines');
+    const previous = new Map();
+    for (const item of packages) {
+      require(/^(?:shell\/providers|packaging\/builtin)\/[^/]+\/manifest.json$/.test(item.path)
+        && typeof item.id === 'string' && typeof item.version === 'string'
+        && /^[a-f0-9]{64}$/.test(item.sha256) && !previous.has(item.path), 'invalid or duplicate baseline');
+      previous.set(item.path, item);
+    }
+    group('immutable builtin manifests', [...previous.keys()], (path, text) => {
+      const error = immutableManifestError(previous.get(path), text);
+      require(!error, error);
+    });
+  } catch (error) {
+    results.push({ name: 'immutable builtin manifests', cases: 1, errors: [`${fixture}: ${error.message}`] });
+  }
   group('generated user default', ['crates/ditto-protocol/src/generation.rs'], (_path, text) => {
     const bundle = text.slice(text.indexOf('pub fn bundle('));
     require(/"author"\s*:\s*"Ditto user"\s*,\s*"license"\s*:\s*"UNLICENSED"/.test(bundle),

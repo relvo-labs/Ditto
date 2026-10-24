@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.settings.ai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": {
     "zh-TW": "AI 設定",
     "en": "AI settings"

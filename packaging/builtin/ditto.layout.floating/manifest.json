@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.layout.floating",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": { "zh-TW": "浮動視窗", "en": "Floating windows" },
   "author": "Ditto",
   "license": "MIT",

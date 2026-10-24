@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
-import { activeDocAgrees, checkLicense } from './check-license.mjs';
+import { activeDocAgrees, checkLicense, immutableManifestError } from './check-license.mjs';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFileSync(new URL(path, root));
@@ -12,7 +14,7 @@ function changed(group, path, transform) {
 }
 
 for (const group of ['canonical MIT', 'Cargo license fields', 'first-party JSON metadata',
-  'generated user default', 'vendor LICENSE/NOTICE hashes']) {
+  'generated user default', 'vendor LICENSE/NOTICE hashes', 'active licensing docs', 'immutable builtin manifests']) {
   test(`${group}: actual source passes`, () => {
     const result = baseline.find(result => result.name === group);
     assert.ok(result.cases > 0);
@@ -24,6 +26,74 @@ test('MIT text rejects a changed copyright or removed permission', () => {
     text => text.replace('free of charge, ', '')]) {
     assert.equal(changed('canonical MIT', 'LICENSE', transform).length, 1);
   }
+});
+test('every relicensed builtin rejects restoration of its former version', () => {
+  const { packages } = JSON.parse(read('tests/licensing/pre-mit-builtin-manifests.json'));
+  for (const previous of packages) {
+    const errors = changed('immutable builtin manifests', previous.path, text => {
+      const current = JSON.parse(text);
+      current.version = previous.version;
+      return JSON.stringify(current);
+    });
+    assert.equal(errors.length, 1, previous.path);
+    assert.match(errors[0], /changed archived manifest bytes require a new version/);
+  }
+});
+test('metadata-only archived edits need a new identity; unchanged bytes and later versions pass', () => {
+  const old = JSON.stringify({ id: 'ditto.test.provider', version: '1.0.0', license: 'UNLICENSED', author: 'Ditto' });
+  const previous = { id: 'ditto.test.provider', version: '1.0.0', sha256: createHash('sha256').update(old).digest('hex') };
+  assert.equal(immutableManifestError(previous, old), null);
+  for (const patch of [{ license: 'MIT' }, { author: 'Ditto contributors' }]) {
+    const current = { ...JSON.parse(old), ...patch };
+    assert.match(immutableManifestError(previous, JSON.stringify(current)), /new version/);
+    for (const version of ['1.0.1', '1.2.0', '2.0.0']) {
+      assert.equal(immutableManifestError(previous, JSON.stringify({ ...current, version })), null);
+    }
+  }
+  assert.match(immutableManifestError(previous, old.replace('ditto.test.provider', 'ditto.test.other')), /ID/);
+});
+test('missing or malformed immutable baseline fails closed', () => {
+  const path = 'tests/licensing/pre-mit-builtin-manifests.json';
+  for (const text of ['{', '{}', '{"packages":[]}', '{"packages":[{}]}']) {
+    assert.equal(changed('immutable builtin manifests', path, () => text).length, 1);
+  }
+  const result = checkLicense({ read: candidate => {
+    if (candidate === path) throw Error('missing fixture');
+    return read(candidate);
+  } });
+  assert.equal(result.find(group => group.name === 'immutable builtin manifests').errors.length, 1);
+});
+
+// Parse and execute the actual fixture JavaScript without provisioning Qt or
+// claiming a QML runtime test. These pins describe real source providers.
+function qmlFunction(text, name) {
+  const source = text.match(new RegExp(`^    function ${name}\\([^)]*\\) \\{[\\s\\S]*?^    \\}`, 'm'))?.[0];
+  assert.ok(source, `missing ${name}`);
+  return source;
+}
+test('visual client fixture entries and package metadata match authoritative manifests', () => {
+  const text = read('tests/g4/visual/fixtures/AppFixtureClient.qml').toString();
+  const source = qmlFunction(text, 'packageVersion');
+  const manifests = baseline.find(group => group.name === 'immutable builtin manifests');
+  assert.deepEqual(manifests.errors, []);
+  const rows = JSON.parse(read('tests/licensing/pre-mit-builtin-manifests.json')).packages;
+  const lookup = new Map(rows.map(row => [row.id, JSON.parse(read(row.path)).version]));
+  const entries = text.match(/readonly property var entries: (\[[\s\S]*?\n    \])/)[1];
+  const installed = text.match(/readonly property var installed: (\[[\s\S]*?\n    \])/)[1];
+  const value = runInNewContext(`${source}; ({ entries: ${entries}, installed: ${installed} })`);
+  for (const entry of value.entries) assert.equal(entry.version, lookup.get(entry.package), entry.package);
+  for (const [id] of value.installed) assert.equal(runInNewContext(`${source}; packageVersion(id)`, { id }), lookup.get(id), id);
+});
+test('shell extension source fixtures use the real provider versions', () => {
+  const text = read('tests/shell-extensions/unit/tst_extensions.qml').toString();
+  const source = qmlFunction(text, 'packagedVersion');
+  for (const id of ['history', 'composition', 'plugins', 'personalization', 'ai', 'background']) {
+    const directory = id === 'background' ? 'background_default' : `settings_${id}`;
+    const manifest = JSON.parse(read(`shell/providers/${directory}/manifest.json`));
+    assert.equal(runInNewContext(`${source}; packagedVersion(id)`, { id }), manifest.version, id);
+  }
+  assert.match(text, /binding\.version = packagedVersion\(data\.id\)/);
+  assert.equal((text.match(/version: packagedVersion\("background"\)/g) || []).length, 3);
 });
 test('Cargo rejects a workspace license change and missing inheritance', () => {
   assert.equal(changed('Cargo license fields', 'Cargo.toml', text => text.replace('license = "MIT"', 'license = "UNLICENSED"')).length, 1);

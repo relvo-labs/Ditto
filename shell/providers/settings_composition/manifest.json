@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.settings.composition",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": {
     "zh-TW": "組合中心",
     "en": "Composition center"
