@@ -30,6 +30,7 @@ Ditto 要發行的東西不只是程式碼：它綁著 Qt、Quickshell、Cordis�
 權威來源（本 skill 不複製其內容，有疑義以來源為準）：
 
 - [PRD v0.4.0 §24.1 發行要求](../../../docs/product/Ditto-PRD-v0.4.0.md)
+- [D-52 自有程式碼採 MIT](../../notes/decisions/2026-10-25-d52-mit-license.md) 與[根目錄 LICENSE](../../../LICENSE)
 - [PRD v0.4.0 §23 成效指標與發布交付物](../../../docs/product/Ditto-PRD-v0.4.0.md)
 - [milestones/01/03 G4-PLAT-04 授權盤點](../../../milestones/01/03-phases.md)
 
@@ -73,12 +74,13 @@ Ditto 要發行的東西不只是程式碼：它綁著 Qt、Quickshell、Cordis�
 三條容易出錯的規則：
 
 - **不得把主專案授權套用到所有插件。** 每個插件有自己的授權。
+- Ditto 自有程式碼已依 D-52 採 MIT；Linux、Ubuntu、Qt、Wayfire 等相依元件、第三方素材與 owner／使用者生成物不因本決定改授權。生成物的預設 `UNLICENSED` 保留，不能由主專案 metadata 推定為 MIT。
 - 修改過的上游程式碼要保留修改說明與必要的散布資料。
 - 生成或移植的程式碼保留可追溯來源；自動生成不免除上游義務。
 
 ### 4. 處理角色與名稱
 
-PRD 明說名稱、角色、圖示與素材的使用權**尚未確定**，且產品授權與商業模式未定案。
+PRD 已記錄 Ditto 自有程式碼採 MIT；名稱、商標、角色、圖示與美術素材的使用權**尚未確定**，商業模式與剩餘法律裁定仍由 owner 負責。MIT 不代表完整映像或第三方授權審查完成，亦不改變 D-49 的法律責任歸屬。
 
 - 發行前必須完成這項審查，不得以「先發再說」推進。
 - 盤點素材的產生方式與權利狀態：是自製、委製、生成，或取用他人作品。
@@ -119,6 +121,7 @@ PRD 明說名稱、角色、圖示與素材的使用權**尚未確定**，且產
 - 隨機抽三個打包出去的檔案，確認都能在盤點表中找到來源與授權。
 - 對含金鑰引用的組合執行匯出，確認不含秘密與私人內容（AT-15）。
 - 確認每個第三方授權的 NOTICE 都在發行包中。
+- 依 `.nvmrc` 啟用 Node，執行 `node scripts/check-license.mjs` 與 `node --test scripts/check-license.test.mjs`，核對自有 metadata、MIT 文字、生成物預設及既有 vendor LICENSE／NOTICE 雜湊；這不代替實際發行包盤點。
 - 確認已知限制清單涵蓋所有未達標的量測項目。
 - 確認名稱與角色素材的權利狀態有書面結論。
 

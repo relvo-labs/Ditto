@@ -1,13 +1,13 @@
 {
   "manifest_version": 1,
   "id": "ditto.launcher.search",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "name": {
     "zh-TW": "搜尋式啟動器",
     "en": "Search launcher"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "中央搜尋框，輸入即搜。",

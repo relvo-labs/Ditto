@@ -1,1 +1,1 @@
-{ "name": "ditto-example-counter", "private": true, "type": "module", "ditto": { "source": "src/index.ts" } }
+{ "name": "ditto-example-counter", "license": "MIT", "private": true, "type": "module", "ditto": { "source": "src/index.ts" } }

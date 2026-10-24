@@ -40,8 +40,10 @@ R1 修正另驗證兩個控制器的 inline facade 各自綁定擁有者；AI �
 並在查詢不變時切換 zh-TW／en，確認真正 `root:/sdk/Ditto/Ui` 的 PluginFilter 執行、重新篩選且不呼叫 Core。
 兩份實際頁面的 markup、符號、引號與 CJK 查詢另以表格檢查 `Text.PlainText` 及字面匹配。
 
-部署限制：新 archive 是 `ditto.settings.plugins-1.1.0.dittopkg`。安裝新版不會自動改變既有 Profile 的精確版本綁定；
+部署限制：現行 archive 是 `ditto.settings.plugins-1.1.1.dittopkg`（#200 MIT metadata 變更的 patch 升版；測試路徑從 manifest 讀取）。安裝新版不會自動改變既有 Profile 的精確版本綁定；
 仍固定 1.0.0 的條目須經明確的既有升版 ChangeSet 才啟用新版。本修復不更動 live Profile，也不處理 #144。
+
+#200 的 fixture 版本檢查：依 `.nvmrc` 啟用 Node 後執行 `node --test scripts/check-license.test.mjs`，比對維護中的來源 provider 版本與視覺／頁面 fixture。合成的生命週期與協定 fixture 保留原本版本語意；此檢查不代表 QML runtime 或新 archive 已建置通過。
 
 #188：`run.sh` 最後以真正 Quickshell（offscreen）在裝置縮放 1 與 2 下載入兩個啟動器，逐列檢查五種圖示來源。
 主題名稱經 `Quickshell.iconPath(name, true)` 解析為 `image://icon/…` 並載入成功；
