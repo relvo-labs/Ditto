@@ -10,6 +10,10 @@ Ditto 是以使用者意圖與 AI 互動為入口的 Linux 作業系統專案。
 
 想先了解產品，從下方的工作情境開始；想動手開發，直接看[從原始碼開始](#從原始碼開始)。
 
+![Ditto Soft Jelly 原生桌面，個人化設定顯示 J1／J2／J3 風格、強調色與圓角選項](docs/assets/readme/native-settings.png)
+
+原生 Soft Jelly 桌面與個人化設定，擷取自 main `1d055ce` 的隔離 Ubuntu 26.04 無頭、軟體繪製容器工作階段。網路管理與音效服務在此擷取環境未啟動。
+
 ## 讓工作環境跟著意圖改變
 
 Ditto 希望讓「我要怎麼工作」成為作業系統的起點：把工作列移到側邊、換成搜尋式啟動器、調整工作區與通知，再把結果存成下一次可用的桌面組合。對話是控制入口，改變會落到真正的 Linux 桌面與原生應用。
@@ -26,6 +30,10 @@ Ditto 希望讓「我要怎麼工作」成為作業系統的起點：把工作�
 | 處理桌面故障 | 救援介面與 CLI 可停用故障插件、恢復最近可用組合；救援底座不依賴 Agent 或 Cordis |
 
 這些是目前實作範圍，不是每一種自然語言要求都能完成的保證。原生介面與開發操作見 [Shell 文件](shell/README.md)，生成限制見[固定模板邊界](docs/platform/generated-template-boundary.md)。
+
+![Ditto 網格啟動器，顯示搜尋列、應用分類及 Calculator、Foot、Mousepad 圖示](docs/assets/readme/native-launcher.png)
+
+網格啟動器顯示容器內實際安裝的應用程式；擷取自 main `1d055ce` 的隔離 Ubuntu 26.04 無頭、軟體繪製容器工作階段。
 
 ## 適合誰
 
@@ -63,7 +71,7 @@ AI-native OS 描述的是整個工作環境的互動與控制方式。Linux 核�
 | --- | --- |
 | 桌面 MVP | owner 已接受；未取得的 G4／NFR 出口證據仍是缺口，見 [D-49](.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) |
 | Linux 發行版 | owner 選定 Ubuntu-first，目標有完整映像與既有 Ubuntu Desktop 上安裝套件兩種形態；Fedora 工作暫停。這是[發行方向](https://github.com/relvo-labs/Ditto/issues/148#issuecomment-6384379418)，不是可下載產品的宣告 |
-| 安裝與升級 | 目前倉庫保留原生開發與參考工作階段工具；完整 release 映像、正式安裝器與生產升級信任鏈尚未完成。待合併的 [#192](https://github.com/relvo-labs/Ditto/pull/192) 配方不能當作現有發行物 |
+| 安裝與升級 | 目前倉庫保留原生開發與參考工作階段工具；完整 release 映像、正式安裝器與生產升級信任鏈尚未完成。已合併的 [#192](https://github.com/relvo-labs/Ditto/pull/192) 提供 Ubuntu 26.04 建置配方，仍待從 repo 完整重建驗證，不能當作可發行映像 |
 | 模型連線 | 已有 Codex 訂閱／app-server 與 API 金鑰路徑；需相應帳號、秘密儲存及隔離支援。Codex 訂閱路徑要求 Landlock ABI ≥6，版本與條件見[支援矩陣](docs/platform/support-matrix.md#codex-訂閱連線的開發環境相容性) |
 | 生成與安裝 | 現有生成限兩種固定模板；任意程式生成、任意第三方插件自助安裝仍未完成，見[生成邊界](docs/platform/generated-template-boundary.md) |
 | 硬體與無障礙 | Secure Boot、廣泛 NVIDIA／硬體支援、實體雙螢幕與完整輔助科技驗收仍未完成；參考機結果不能泛化為全硬體保證 |
@@ -79,7 +87,7 @@ AI-native OS 描述的是整個工作環境的互動與控制方式。Linux 核�
 2. **選擇原生開發入口**：讀 [Shell 的開發執行方式](shell/README.md#在開發環境執行)，了解內建套件、Core、Shell 與 hostd 如何接線。這需要先建置 Rust 二進位與 hostd；該段不是全新主機的一鍵安裝流程。需要參考工作階段重建時，再查[參考環境工具](packaging/reference-image/README.md)。
 3. **以小型、可回讀的變更作為第一次成功**：原生工作階段就緒後，先從個人化設定改一項外觀，查看變更紀錄並撤銷；再設定模型連線，測試同一個有支援能力的需求。用實際畫面與配置回讀確認結果，不只看助理文字。
 
-這個入口提供開發導覽；本 README 更新尚未重新驗證完整原生建置與登入。若啟動受阻，先核對工具版本、合成器與 Core／Shell 診斷，不以停用隔離或借用日常 Profile 繞過問題。
+這個入口提供開發導覽。本次已在隔離容器建置 Core 與 hostd、啟動原生 Shell 並回讀狀態；主機安裝、登入管理器與上述完整首次操作流程尚未重新驗證。若啟動受阻，先核對工具版本、合成器與 Core／Shell 診斷，不以停用隔離或借用日常 Profile 繞過問題。
 
 ## 依你的工作找文件
 

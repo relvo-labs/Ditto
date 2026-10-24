@@ -1,10 +1,12 @@
 # README：AI-native OS 與最新原生桌面畫面
 
-狀態：實作中。主追蹤 #196；owner 於 Telegram 33723 指定 AI-native OS 定位、33697 要求另開平行任務與最新桌面截圖。來源基準 main@5d6a282；若 UI 基準變更，擷取前再對齊。
+狀態：原生截圖與 README 整合完成，待 parent 檢視與資格審查。主追蹤 #196；owner 於 Telegram 33723 指定 AI-native OS 定位、33697 要求另開平行任務與最新桌面截圖。文字起始基準 main@5d6a282；本次原生擷取基準 main@1d055ce。
 
 第一階段：README 文字 checkpoint 與原生擷取環境預檢已完成；提交後由 parent push 並開 Draft。第二階段仍需準備缺少的 Wayfire／本版建置產物、啟動隔離工作階段、擷取與檢查真實畫面，之後才進行完整審查。本階段未擷取產品圖片，不代表 #196 已完成。
 
 第二階段預檢（2026-10-25）：來源已對齊並匯出 main@9a5504a（含已合併的 #194 啟動器變更）。允許查找的公開建置輸出未找到可重用的 Wayfire runtime，主機亦缺少 Wayland、Pixman、libinput 等建置標頭與 pkg-config 模組；依任務停止條件暫停擷取。未啟動桌面、未產生 PNG，README 維持文字版；真實截圖與圖片整合仍待具備相符 runtime 的隔離環境完成，PR #198 保持 Draft。
+
+第三階段（2026-10-25）：依 coordinator 新授權，以獨立 Ubuntu 26.04 容器補足相依項，從 main@1d055ce 建置 Core／hostd 與內建套件，啟動原生 Shell、私有 D-Bus 與 Wayfire pixman 工作階段。已回讀 Core／Shell 狀態、擷取並目視檢查個人化設定與網格啟動器兩張正式圖片，整合 caption／alt；task-owned 程序群組與容器均清理並回讀消失。原始圖片、完整來源與命令證據留 repo 外。這是桌面擷取證據，不是 OS 映像、登入管理器、模型或硬體驗收；GitHub render、parent 視覺確認與獨立審查仍待完成。
 
 ## 成果與範圍
 
