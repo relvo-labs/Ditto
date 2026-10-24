@@ -3,6 +3,7 @@ Backdrop 1.0 ../../../jelly/Backdrop.qml
 Badge 1.0 ../../../ui/Badge.qml
 Button 1.0 ../../../ui/Button.qml
 ChangeCard 1.0 ../../../change/ChangeCard.qml
+ChangeReads 1.0 ../../../change/ChangeReads.qml
 ChangeText 1.0 ../../../change/ChangeText.qml
 Choice 1.0 ../../../ui/Choice.qml
 Diagnostics 1.0 ../../../ui/Diagnostics.qml

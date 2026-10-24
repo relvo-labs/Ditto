@@ -54,6 +54,11 @@ use crate::{
     sdnotify,
 };
 
+/// How many committed changes of a deleted Profile Core publishes again as
+/// `change_updated` (#171); the largest window one `changes.list` call
+/// serves. Past it, `changes` subscribers are asked to read again instead.
+pub(crate) const DELETION_REFRESH_LIMIT: u32 = 200;
+
 /// A change request as the router hands it over. Subject and origin come from
 /// the connection, never from the caller's parameters.
 #[derive(Clone, Debug)]
@@ -1914,6 +1919,83 @@ impl Coordinator {
         )
     }
 
+    /// Soft-delete a Profile that is not the active one
+    /// (`desktop.profiles.delete`). Its changes stay in history and now read
+    /// `profile_deleted`; views that already hold one (a history row, an
+    /// open card, a chat card) learn of it from `change_updated`, published
+    /// again for each committed change of the Profile, read the way
+    /// `changes.get` reads it (#171). Changes that did not commit promise
+    /// neither undo nor a later apply, so they are not sent.
+    ///
+    /// Refused (`conflict`, `change_in_progress`) while a change of the
+    /// Profile still waits to be kept or reverted: its timed revert edits
+    /// that Profile's document, which a deleted Profile no longer has, so
+    /// the countdown could never settle. The check and the delete run in
+    /// this one coordinator turn, as the countdown does, so they cannot race.
+    pub fn delete_profile(
+        &mut self,
+        profile_id: &str,
+    ) -> Result<ditto_protocol::profile::ProfileSummary, CoreError> {
+        self.delete_profile_refreshing(profile_id, DELETION_REFRESH_LIMIT)
+    }
+
+    /// `delete_profile` with the bound on how many changes are published
+    /// again. Past it, or when they cannot be read, every `changes`
+    /// subscriber is asked to read again (`resync_required`) instead of
+    /// being sent a flood or a partial set.
+    pub(crate) fn delete_profile_refreshing(
+        &mut self,
+        profile_id: &str,
+        limit: u32,
+    ) -> Result<ditto_protocol::profile::ProfileSummary, CoreError> {
+        let profile = profiles::get(self.store.connection(), profile_id)?;
+        if !profile.active {
+            if let Some(change_id) =
+                changes::pending_confirmation_of(self.store.connection(), profile_id)?
+            {
+                return Err(CoreError::conflict(
+                    ConflictReason::ChangeInProgress,
+                    format!(
+                        "the composition has a change being tried out ({change_id}); it must be kept or reverted first, and reverts by itself when its countdown ends"
+                    ),
+                ));
+            }
+        }
+        let deleted = match self.store.write(|tx| profiles::soft_delete(tx, profile_id)) {
+            Ok(deleted) => deleted,
+            Err(StoreError::Conflict(message)) => {
+                return Err(CoreError::conflict(ConflictReason::ProfileInUse, message))
+            }
+            Err(error) => return Err(error.into()),
+        };
+        match changes::committed_of(self.store.connection(), profile_id, limit.saturating_add(1)) {
+            Ok(committed) if committed.len() <= limit as usize => {
+                // Oldest first, the order they were made in.
+                for stored in committed.iter().rev() {
+                    self.core.publish(DesktopEventPayload::ChangeUpdated {
+                        change: Box::new(stored.record.summary()),
+                    });
+                }
+            }
+            Ok(_) => self
+                .core
+                .resync_topic(ditto_protocol::EventTopic::Changes, "profile_deleted"),
+            Err(error) => {
+                crate::log::event(
+                    "profile.delete_refresh_failed",
+                    &[
+                        ("profile_id", profile_id),
+                        ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
+                    ],
+                );
+                self.core
+                    .resync_topic(ditto_protocol::EventTopic::Changes, "profile_deleted");
+            }
+        }
+        Ok(deleted)
+    }
+
     /// Undo (CHG-04): the newest committed change reverts to its base; an
     /// older one only when no newer change touched the same paths, otherwise
     /// "undo the newer change first".
@@ -1935,6 +2017,18 @@ impl Coordinator {
                 ConflictReason::AlreadyTerminal,
                 "only a committed change can be undone",
             ));
+        }
+        // The delete is soft: the change stays in history, but its Profile
+        // has no document left to undo it in, and a switch cannot go back
+        // to it (protocol 0.2 §8.6, #171). Refused before anything is written.
+        match profiles::get(self.store.connection(), &stored.record.profile_id) {
+            Err(StoreError::NotFound(_)) => {
+                return Err(CoreError::not_found(
+                    "the composition this change was made in has been deleted; the change cannot be undone",
+                ))
+            }
+            Err(error) => return Err(error.into()),
+            Ok(_) => {}
         }
         let origin = ChangeOrigin::Undo {
             undoes: change_id.into(),

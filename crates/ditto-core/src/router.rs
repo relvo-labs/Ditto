@@ -1541,20 +1541,12 @@ fn profiles_rename(core: &Arc<Core>, input: ProfilesRenameInput) -> Handled {
 }
 
 fn profiles_delete(core: &Arc<Core>, input: ProfileIdInput) -> Handled {
-    let outcome = core
+    let deleted = core
         .coordinate(Duration::from_secs(5), move |c| {
-            c.store()
-                .write(|tx| profiles::soft_delete(tx, &input.profile_id))
+            c.delete_profile(&input.profile_id)
         })
-        .map_err(|_| CoreError::internal("coordinator unavailable"))?;
-    match outcome {
-        Ok(profile) => verified(profile),
-        Err(ditto_store::StoreError::Conflict(message)) => Err(CoreError::conflict(
-            ditto_protocol::ConflictReason::ProfileInUse,
-            message,
-        )),
-        Err(error) => Err(error.into()),
-    }
+        .map_err(|_| CoreError::internal("coordinator unavailable"))??;
+    verified(deleted)
 }
 
 fn document_for(

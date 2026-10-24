@@ -384,6 +384,9 @@ pub struct ChangeSummary {
     /// As on [`ChangeRecord::saved_only`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub saved_only: Option<SavedOnly>,
+    /// As on [`ChangeRecord::profile_deleted`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub profile_deleted: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -458,6 +461,12 @@ pub struct ChangeRecord {
     /// `state` and `result` still say what happened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub saved_only: Option<SavedOnly>,
+    /// The change's Profile has been deleted since (#171), read when the
+    /// record is read (the delete is soft; the record stays). The Profile
+    /// cannot be switched to any more, so nothing of it applies again, and
+    /// undo is refused (protocol 0.2 §8.6). Left out while false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub profile_deleted: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -475,6 +484,7 @@ impl ChangeRecord {
             committed_revision: self.committed_revision.clone(),
             confirmation: self.confirmation.clone(),
             saved_only: self.saved_only.clone(),
+            profile_deleted: self.profile_deleted,
             created_at: self.created_at.clone(),
             updated_at: self.updated_at.clone(),
         }

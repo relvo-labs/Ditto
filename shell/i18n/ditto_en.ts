@@ -534,6 +534,34 @@
         <translation>Created</translation>
     </message>
     <message>
+        <source>已保存（組合已刪除）</source>
+        <translation>Saved (composition deleted)</translation>
+    </message>
+    <message>
+        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>Saved. This composition has since been deleted, so it will not apply and cannot be undone.</translation>
+    </message>
+    <message>
+        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
+        <translation>Applied and confirmed. This composition has since been deleted, so it cannot be undone.</translation>
+    </message>
+    <message>
+        <source>曾存到「%1」（已刪除）</source>
+        <translation>Was saved to “%1” (deleted)</translation>
+    </message>
+    <message>
+        <source>曾存到「%1」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>Was saved to “%1”. Nothing on the desktop changed; this composition has been deleted, so it will not apply and cannot be undone.</translation>
+    </message>
+    <message>
+        <source>曾存到另一個組合（已刪除）</source>
+        <translation>Was saved to another composition (deleted)</translation>
+    </message>
+    <message>
+        <source>曾存到另一個組合，桌面沒有改變；那個組合已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>Was saved to another composition. Nothing on the desktop changed; that composition has been deleted, so it will not apply and cannot be undone.</translation>
+    </message>
+    <message>
         <source>未保留，自動回復</source>
         <translation>Not kept, reverted automatically</translation>
     </message>
@@ -958,6 +986,10 @@
 </context>
 <context>
     <name>CompositionCenter</name>
+    <message>
+        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
+        <translation>“%1” still has a change being tried out, so it cannot be deleted yet. Keep or revert it first, or wait for it to revert by itself, then delete it.</translation>
+    </message>
     <message>
         <source>「%1」的版本</source>
         <translation>Versions of “%1”</translation>

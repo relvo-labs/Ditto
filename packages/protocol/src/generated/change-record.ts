@@ -181,6 +181,13 @@ export interface ChangeRecord {
   operations?: OperationSummary[];
   ops: ChangeOp[];
   origin: ChangeOrigin;
+  /**
+   * The change's Profile has been deleted since (#171), read when the
+   * record is read (the delete is soft; the record stays). The Profile
+   * cannot be switched to any more, so nothing of it applies again, and
+   * undo is refused (protocol 0.2 §8.6). Left out while false.
+   */
+  profile_deleted?: boolean;
   profile_id: string;
   /**
    * Every preflight failure, when rejected.

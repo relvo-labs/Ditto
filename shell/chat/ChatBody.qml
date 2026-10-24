@@ -58,28 +58,42 @@ Item {
         return true;
     }
 
-    /// Change records by id, read once per card from Core.
+    /// Change records by id, read from Core once per card, and again when
+    /// Core says the change was updated or after a resync (a Profile may
+    /// have been deleted, #171). ChangeReads keeps a late answer from
+    /// undoing a newer one.
     property var records: ({})
     function record(changeId) {
         if (records[changeId] !== undefined) {
             return records[changeId];
         }
         records[changeId] = null;
-        client.capability("desktop.changes.get", { change_id: changeId }, function (result) {
-            const table = Object.assign({}, window.records);
-            table[changeId] = result;
-            window.records = table;
-        });
+        reads.request(changeId);
         return null;
+    }
+    ChangeReads {
+        id: reads
+        client: window.client
+        onRead: function (changeId, record) {
+            const table = Object.assign({}, window.records);
+            table[changeId] = record;
+            window.records = table;
+        }
     }
     Connections {
         target: window.client
+        // change_updated carries a summary, which has no card or items: it
+        // updates the record at once, and the full record is read again.
         function onChangeUpdated(change) {
-            if (window.records[change.change_id] !== undefined) {
+            if (reads.holds(change.change_id)) {
                 const table = Object.assign({}, window.records);
-                table[change.change_id] = change;
+                table[change.change_id] = Object.assign({}, window.records[change.change_id] || {}, change);
                 window.records = table;
+                reads.refresh(change.change_id);
             }
+        }
+        function onCapabilitiesReloaded() {
+            reads.refreshAll();
         }
     }
 
@@ -626,11 +640,12 @@ Item {
                     tokens: window.tokens
                     record: row.modelData.type === "tool/result" ? window.record(row.modelData.data.change_id) : null
                 }
-                // Undo is a new change through Core, offered on what committed.
+                // Undo is a new change through Core, offered on what committed
+                // and Core can still undo (ChangeText.undoable).
                 Button {
                     id: undo
                     anchors.top: card.bottom
-                    visible: !!card.record && card.record.state === "committed" && !window.compact
+                    visible: card.undoable && !window.compact
                     height: visible ? implicitHeight : 0
                     tokens: window.tokens
                     kind: "subtle"

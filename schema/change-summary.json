@@ -302,6 +302,10 @@
     "origin": {
       "$ref": "#/$defs/ChangeOrigin"
     },
+    "profile_deleted": {
+      "description": "As on [`ChangeRecord::profile_deleted`].",
+      "type": "boolean"
+    },
     "profile_id": {
       "type": "string"
     },

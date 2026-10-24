@@ -27,6 +27,10 @@ TestCase {
             property var requests: []
             property bool online: true
             property string status: ""
+            /// desktop.profiles.delete fails with this error when set.
+            property var deleteError: null
+            function errorText(error) { return "generic: " + (error && error.name); }
+            function diagnosticText(error) { return error ? error.name : ""; }
             property var tr: QtObject {
                 function slotName(slot) { return slot; }
                 function packageName(id) { return id; }
@@ -64,6 +68,10 @@ TestCase {
                 else if (name === "desktop.permissions.list") done({grants: []});
                 else if (name === "desktop.plugins.development.list") done({artifacts: []});
                 else if (name === "desktop.jobs.list") done({jobs: []});
+                else if (name === "desktop.profiles.delete") {
+                    if (deleteError) fail(deleteError);
+                    else done({profile_id: args.profile_id, name: "Test"});
+                }
             }
         }
     }
@@ -432,5 +440,609 @@ TestCase {
         s.host.rollback("background");
         verify(fallback.shown);
         verify(!s.host.backgroundShown);
+    }
+
+    // #171: the history pages (built-in and packaged, as staged) and the
+    // chat's change card follow Core's record-level `profile_deleted`: no
+    // undo button and no undo promise for a change whose Profile is deleted,
+    // whether it was saved_only or applied, both when the record is read
+    // fresh and when the view already holds it as the Profile is deleted
+    // (Core then publishes change_updated for those changes).
+    Component {
+        id: historyClientFactory
+        QtObject {
+            property var summaries: []
+            property var records: ({})
+            property bool online: true
+            property var packages: []
+            property var gets: []
+            property var tr: QtObject {
+                function slotName(slot) { return slot; }
+                function packageName(id) { return id; }
+                function has(key) { return false; }
+            }
+            signal capabilitiesReloaded()
+            signal changeUpdated(var change)
+            signal profileChanged(var profile)
+            signal disconnected()
+            function t(source) { return source; }
+            function key(source, args) { return source; }
+            function join(values) { return values.join(", "); }
+            function errorText(error) { return String(error); }
+            function diagnosticText(error) { return ""; }
+            function newKey(prefix) { return prefix + "-fixture"; }
+            function watchTopics(topics, event, resync, ready, fail) {}
+            function capabilityAvailable(name) { return false; }
+            /// While true, reads wait in `held` until the test answers them,
+            /// in any order, with what Core had when the read was sent.
+            property bool hold: false
+            property var held: []
+            function capability(name, args, done, fail) {
+                let value;
+                if (name === "desktop.changes.list") {
+                    // As Core: newest first, `limit` rows older than `before`.
+                    let list = summaries;
+                    if (args.before !== undefined) list = list.slice(list.findIndex(summary => summary.change_id === args.before) + 1);
+                    value = {changes: list.slice(0, args.limit)};
+                }
+                else if (name === "desktop.changes.get") {
+                    gets = gets.concat([args.change_id]);
+                    value = records[args.change_id];
+                } else return;
+                if (hold) held = held.concat([{name: name, changeId: args.change_id, done: done, fail: fail, value: value}]);
+                else if (name === "desktop.changes.list") done(value);
+                // Answered later, as over the socket.
+                else Qt.callLater(() => done(value));
+            }
+            /// Fail the held call `call` now.
+            function answerFailure(call, error) {
+                held = held.filter(other => other !== call);
+                call.fail(error);
+            }
+            function heldGets() { return held.filter(call => call.name === "desktop.changes.get"); }
+            function heldLists() { return held.filter(call => call.name === "desktop.changes.list"); }
+            /// Answer the held call `call` now, with a copy of what was read
+            /// then (so a view that applied it holds a new object).
+            function answer(call) {
+                held = held.filter(other => other !== call);
+                call.done(JSON.parse(JSON.stringify(call.value)));
+            }
+            function undoChange(changeId, done, fail) {}
+            /// What Core does when the Profile is deleted: every read now
+            /// carries profile_deleted, and change_updated goes out for the
+            /// committed changes of that Profile.
+            function deleteProfile(profileId, quietly) {
+                const table = {};
+                for (const id in records) {
+                    table[id] = Object.assign({}, records[id], records[id].profile_id === profileId ? {profile_deleted: true} : {});
+                }
+                records = table;
+                summaries = summaries.map(summary => summary.profile_id === profileId ? Object.assign({}, summary, {profile_deleted: true}) : summary);
+                // Quietly: as when Core asks subscribers to resync instead.
+                if (quietly) return;
+                for (const id in records) {
+                    if (records[id].profile_id === profileId) changeUpdated(summaryOf(records[id]));
+                }
+            }
+            function summaryOf(record) {
+                const summary = {};
+                for (const field of ["change_id", "profile_id", "state", "result", "origin", "hot_swap_level", "committed_revision",
+                                     "confirmation", "saved_only", "profile_deleted", "created_at", "updated_at"]) {
+                    if (record[field] !== undefined) summary[field] = record[field];
+                }
+                summary.title_key = record.card.title_key;
+                return summary;
+            }
+        }
+    }
+    Component { id: chatFactory; Chat.ChatBody {} }
+    readonly property var savedToDev: ({reason: "inactive_profile", profile_name: "開發"})
+    function historyRecord(changeId, profileId, savedOnly, deleted) {
+        const record = {change_id: changeId, profile_id: profileId, state: "committed", result: "succeeded", origin: {kind: "cli"},
+            hot_swap_level: "instant", committed_revision: "rev-1", confirmation: {state: "not_required"},
+            created_at: "2026-10-23T00:00:00.000Z", updated_at: "2026-10-23T00:00:00.000Z",
+            base_revision: "rev-0", idempotency_key: null, ops: [],
+            card: {kind: "appearance", title_key: "change.title.appearance", title_args: {}, items: []},
+            reasons: [], items: [], operations: []};
+        if (savedOnly) record.saved_only = savedOnly;
+        if (deleted) record.profile_deleted = true;
+        return record;
+    }
+    /// A client holding these records, newest first in the history list.
+    function historyClient(records) {
+        const client = createTemporaryObject(historyClientFactory, testCase);
+        const table = {};
+        for (const record of records) table[record.change_id] = record;
+        client.records = table;
+        client.summaries = records.map(record => client.summaryOf(record));
+        return client;
+    }
+    function itemsWithText(item, text) {
+        let found = item.text === text ? [item] : [];
+        for (let i = 0; i < item.children.length; ++i) found = found.concat(itemsWithText(item.children[i], text));
+        return found;
+    }
+    /// Buttons only (a Button has an accessibleName), not their labels.
+    function buttonsWithText(item, text) {
+        return itemsWithText(item, text).filter(found => found.accessibleName !== undefined);
+    }
+    function historyPage(url, client) {
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const component = Qt.createComponent(Qt.resolvedUrl(url));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: client, tokens: tokens, width: 900, height: 900});
+        verify(page !== null);
+        tryCompare(page.changes, "length", Math.min(client.summaries.length, 30));
+        return page;
+    }
+    function historyPages_data() {
+        return [
+            {tag: "built-in", url: "../shell/centers/HistoryCenter.qml"},
+            {tag: "packaged", url: "../shell/providers/settings_history/qml/HistoryPage.qml"}
+        ];
+    }
+    function test_history_pages_hide_undo_for_a_deleted_profile_data() { return historyPages_data(); }
+    function test_history_pages_hide_undo_for_a_deleted_profile(data) {
+        const client = historyClient([
+            historyRecord("chg-03", "prf-dev", savedToDev, true),
+            historyRecord("chg-02", "prf-old", null, true),
+            historyRecord("chg-01", "prf-dev2", savedToDev, false)]);
+        const page = historyPage(data.url, client);
+        for (const id of ["chg-03", "chg-02", "chg-01"]) page.open(id);
+        tryVerify(() => ["chg-03", "chg-02", "chg-01"].every(id => !!page.expanded[id]));
+        wait(0);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
+        verify(itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        // Rows follow the list order.
+        const undo = buttonsWithText(page, "撤銷這次變更");
+        compare(undo.length, 3);
+        verify(!undo[0].visible, "undo offered for a saved change of a deleted Profile");
+        verify(!undo[1].visible, "undo offered for an applied change of a deleted Profile");
+        verify(undo[2].visible, "undo missing for a change of an existing Profile");
+        page.destroy();
+        wait(0);
+    }
+    function test_open_history_pages_follow_a_profile_deletion_data() { return historyPages_data(); }
+    function test_open_history_pages_follow_a_profile_deletion(data) {
+        const client = historyClient([
+            historyRecord("chg-03", "prf-other", null, false),
+            historyRecord("chg-02", "prf-dev", savedToDev, false),
+            historyRecord("chg-01", "prf-dev", null, false)]);
+        // Older than the loaded rows: not in this view.
+        client.records = Object.assign({"chg-00": historyRecord("chg-00", "prf-dev", null, false)}, client.records);
+        const page = historyPage(data.url, client);
+        page.open("chg-02");
+        page.open("chg-01");
+        tryVerify(() => !!page.expanded["chg-02"] && !!page.expanded["chg-01"]);
+        wait(0);
+        // One per row (rows follow the list order); the unopened row has none shown.
+        let undo = buttonsWithText(page, "撤銷這次變更");
+        compare(undo.length, 3);
+        verify(!undo[0].visible && undo[1].visible && undo[2].visible);
+        verify(itemsWithText(page, "已存到「開發」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。").length === 1);
+        verify(itemsWithText(page, "已套用並確認生效。可以撤銷。").length === 1);
+
+        client.deleteProfile("prf-dev");
+        // The page is not recreated; its rows and open cards read again.
+        tryVerify(() => itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        tryVerify(() => itemsWithText(page, "曾存到「開發」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。").length === 1);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
+        compare(itemsWithText(page, "已存到「開發」，桌面沒有改變；切換到這個組合時才會套用。可以撤銷。").length, 0);
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        undo = buttonsWithText(page, "撤銷這次變更");
+        compare(undo.length, 3);
+        verify(undo.every(button => !button.visible), "undo still offered after the Profile was deleted");
+        // An older change the page never loaded is not put at the top.
+        compare(page.changes.map(change => change.change_id), ["chg-03", "chg-02", "chg-01"]);
+        verify(page.changes[1].profile_deleted === true && page.changes[2].profile_deleted === true);
+        verify(page.changes[0].profile_deleted === undefined);
+        page.destroy();
+        wait(0);
+    }
+    function test_an_open_chat_card_follows_a_profile_deletion() {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const conversation = createTemporaryObject(conversationFactory, testCase, {client: client});
+        const chat = createTemporaryObject(chatFactory, testCase, {client: client, tokens: tokens, conversation: conversation,
+            width: 800, height: 700});
+        verify(chat !== null);
+        conversation.events = [{type: "tool/result", data: {change_id: "chg-01"}}];
+        tryVerify(() => buttonsWithText(chat, "撤銷這項變更").length === 1 && buttonsWithText(chat, "撤銷這項變更")[0].visible);
+        const undo = buttonsWithText(chat, "撤銷這項變更")[0];
+        verify(itemsWithText(chat, "已套用並確認生效。可以撤銷。").length === 1);
+        const reads = client.gets.length;
+
+        client.deleteProfile("prf-dev");
+        // The same card and button: the record is read again from Core.
+        tryVerify(() => !undo.visible, 3000, "undo still offered after the Profile was deleted");
+        compare(buttonsWithText(chat, "撤銷這項變更")[0], undo);
+        verify(client.gets.length > reads);
+        verify(itemsWithText(chat, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        compare(itemsWithText(chat, "已套用並確認生效。可以撤銷。").length, 0);
+        // The full record (with its card) is kept, not the summary.
+        verify(!!chat.records["chg-01"].card);
+        compare(chat.records["chg-01"].profile_deleted, true);
+        chat.destroy();
+        wait(0);
+    }
+
+    // #171 R2: answers come back in any order. A read sent before the
+    // Profile was deleted that lands after the deletion update (and after a
+    // resync) must not bring back the undo promise or button, and overlapping
+    // updates of one change send a bounded number of reads.
+    function test_open_history_pages_ignore_a_late_answer_from_before_the_delete_data() { return historyPages_data(); }
+    function test_open_history_pages_ignore_a_late_answer_from_before_the_delete(data) {
+        const client = historyClient([historyRecord("chg-02", "prf-dev", savedToDev, false),
+                                      historyRecord("chg-01", "prf-dev", null, false)]);
+        const page = historyPage(data.url, client);
+        page.open("chg-02");
+        page.open("chg-01");
+        tryVerify(() => !!page.expanded["chg-02"] && !!page.expanded["chg-01"]);
+        client.hold = true;
+        // Something re-reads both records and the list before the delete (a
+        // confirm, a reconnect).
+        client.changeUpdated(client.summaryOf(client.records["chg-02"]));
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        client.capabilitiesReloaded();
+        compare(client.heldGets().length, 2);
+        compare(client.heldLists().length, 1);
+        client.deleteProfile("prf-dev");
+        client.capabilitiesReloaded();
+        // Each change: one read out, one queued, whatever arrived meanwhile;
+        // the list likewise.
+        compare(client.heldGets().length, 2, "overlapping reads were not coalesced");
+        compare(client.heldLists().length, 1, "overlapping list reads were not coalesced");
+        // The update itself already says the Profile is deleted.
+        let undo = buttonsWithText(page, "撤銷這次變更");
+        verify(undo.every(button => !button.visible));
+        // The old answers land late, the list read before the delete too.
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(page.expanded["chg-02"].profile_deleted, true);
+        compare(page.expanded["chg-01"].profile_deleted, true);
+        undo = buttonsWithText(page, "撤銷這次變更");
+        verify(undo.every(button => !button.visible), "a late answer brought undo back");
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1, "a late list answer undid the row");
+        // Then the reads sent after the delete.
+        compare(client.heldGets().length, 2);
+        compare(client.heldLists().length, 1);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(client.held.length, 0);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible));
+        verify(itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length === 1);
+        page.destroy();
+        wait(0);
+    }
+    function test_open_history_pages_drop_a_late_answer_after_a_resync_data() { return historyPages_data(); }
+    function test_open_history_pages_drop_a_late_answer_after_a_resync(data) {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const page = historyPage(data.url, client);
+        page.open("chg-01");
+        tryVerify(() => !!page.expanded["chg-01"]);
+        client.hold = true;
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        const before = page.expanded["chg-01"];
+        // Core could not publish the changes, so it asked for a resync.
+        client.deleteProfile("prf-dev", true);
+        client.capabilitiesReloaded();
+        compare(client.heldGets().length, 1);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(page.expanded["chg-01"], before, "a stale answer was applied after the resync");
+        compare(client.heldGets().length, 1, "no read after the resync");
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(page.expanded["chg-01"].profile_deleted, true);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible));
+        page.destroy();
+        wait(0);
+    }
+    function test_an_open_chat_card_ignores_a_late_answer_from_before_the_delete() {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const tokens = createTemporaryObject(tokenFactory, testCase);
+        const conversation = createTemporaryObject(conversationFactory, testCase, {client: client});
+        const chat = createTemporaryObject(chatFactory, testCase, {client: client, tokens: tokens, conversation: conversation,
+            width: 800, height: 700});
+        conversation.events = [{type: "tool/result", data: {change_id: "chg-01"}}];
+        tryVerify(() => buttonsWithText(chat, "撤銷這項變更").length === 1 && buttonsWithText(chat, "撤銷這項變更")[0].visible);
+        const undo = buttonsWithText(chat, "撤銷這項變更")[0];
+        client.hold = true;
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        compare(client.heldGets().length, 1);
+        client.deleteProfile("prf-dev");
+        client.changeUpdated(client.summaryOf(client.records["chg-01"]));
+        client.capabilitiesReloaded();
+        compare(client.heldGets().length, 1, "overlapping reads were not coalesced");
+        verify(!undo.visible);
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(chat.records["chg-01"].profile_deleted, true);
+        verify(!undo.visible, "a late answer brought undo back");
+        compare(itemsWithText(chat, "已套用並確認生效。可以撤銷。").length, 0);
+        compare(client.heldGets().length, 1);
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(client.held.length, 0);
+        verify(!undo.visible);
+        verify(!!chat.records["chg-01"].card);
+        // A resync alone, with an old answer out: dropped, then read again.
+        const second = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const chat2 = createTemporaryObject(chatFactory, testCase, {client: second, tokens: tokens,
+            conversation: createTemporaryObject(conversationFactory, testCase, {client: second}), width: 800, height: 700});
+        chat2.conversation.events = [{type: "tool/result", data: {change_id: "chg-01"}}];
+        tryVerify(() => buttonsWithText(chat2, "撤銷這項變更").length === 1 && buttonsWithText(chat2, "撤銷這項變更")[0].visible);
+        second.hold = true;
+        second.changeUpdated(second.summaryOf(second.records["chg-01"]));
+        const kept = chat2.records["chg-01"];
+        second.deleteProfile("prf-dev", true);
+        second.capabilitiesReloaded();
+        compare(second.heldGets().length, 1);
+        second.answer(second.heldGets()[0]);
+        wait(0);
+        compare(chat2.records["chg-01"], kept, "a stale answer was applied after the resync");
+        compare(second.heldGets().length, 1, "no read after the resync");
+        second.answer(second.heldGets()[0]);
+        wait(0);
+        compare(chat2.records["chg-01"].profile_deleted, true);
+        verify(!buttonsWithText(chat2, "撤銷這項變更")[0].visible);
+        verify(kept !== chat2.records["chg-01"]);
+        chat2.destroy();
+        chat.destroy();
+        wait(0);
+    }
+
+    // #171 R2: Core refuses to delete a Profile whose preview still counts
+    // down (conflict, change_in_progress). Both Composition Centres say why,
+    // and what to do, in product words.
+    function test_composition_centres_explain_a_delete_refused_for_a_preview_data() {
+        return [
+            {tag: "built-in", url: "../shell/centers/CompositionCenter.qml"},
+            {tag: "packaged", url: "../shell/providers/settings_composition/qml/CompositionCenter.qml"}
+        ];
+    }
+    function test_composition_centres_explain_a_delete_refused_for_a_preview(data) {
+        const s = setup();
+        const component = Qt.createComponent(Qt.resolvedUrl(data.url));
+        compare(component.status, Component.Ready, component.errorString());
+        const page = createTemporaryObject(component, testCase, {client: s.client, tokens: s.tokens, width: 900, height: 900});
+        verify(page !== null);
+        const refusal = "「開發」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。";
+        s.client.deleteError = {name: "conflict", code: -32006, message: "diagnostic",
+            data: {reason: "change_in_progress"}};
+        page.deleteProfile({profile_id: "prf-dev", name: "開發"});
+        compare(page.notice, refusal);
+        tryVerify(() => itemsWithText(page, refusal).some(item => item.visible));
+        compare(page.diagnostic, "conflict");
+        // Other refusals keep the client's wording.
+        s.client.deleteError = {name: "conflict", code: -32006, message: "diagnostic", data: {reason: "profile_in_use"}};
+        page.deleteProfile({profile_id: "prf-dev", name: "開發"});
+        compare(page.notice, "generic: conflict");
+        page.destroy();
+        wait(0);
+    }
+
+    // #171 R3: a record the page is still opening (its first read not yet
+    // answered) is held too: an update or a resync before that answer makes
+    // it stale, and exactly one more read follows.
+    function test_history_pages_drop_a_late_first_answer_data() {
+        return [
+            {tag: "built-in update", url: "../shell/centers/HistoryCenter.qml", resync: false},
+            {tag: "built-in resync", url: "../shell/centers/HistoryCenter.qml", resync: true},
+            {tag: "packaged update", url: "../shell/providers/settings_history/qml/HistoryPage.qml", resync: false},
+            {tag: "packaged resync", url: "../shell/providers/settings_history/qml/HistoryPage.qml", resync: true}
+        ];
+    }
+    function test_history_pages_drop_a_late_first_answer(data) {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", null, false)]);
+        const page = historyPage(data.url, client);
+        client.hold = true;
+        page.open("chg-01");
+        compare(client.heldGets().length, 1);
+        const reads = client.gets.length;
+        if (data.resync) {
+            client.deleteProfile("prf-dev", true);
+            client.capabilitiesReloaded();
+            client.answer(client.heldLists()[0]);
+        } else {
+            client.deleteProfile("prf-dev");
+        }
+        compare(client.heldGets().length, 1, "a read was sent beside the first one");
+        // The first answer, taken before the delete, lands late.
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!page.expanded["chg-01"] || page.expanded["chg-01"].profile_deleted === true,
+               "the late first answer was applied");
+        compare(client.heldGets().length, 1);
+        compare(client.gets.length, reads + 1, "not exactly one more read");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(client.held.length, 0);
+        compare(page.expanded["chg-01"].profile_deleted, true);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible));
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        page.destroy();
+        wait(0);
+    }
+    // #171 R3: a list read that fails does not drop the list read queued
+    // behind it, and only a failure of a current read is reported.
+    function test_history_pages_keep_a_queued_list_read_after_a_failure_data() { return historyPages_data(); }
+    function test_history_pages_keep_a_queued_list_read_after_a_failure(data) {
+        const client = historyClient([historyRecord("chg-01", "prf-dev", savedToDev, false)]);
+        const page = historyPage(data.url, client);
+        client.hold = true;
+        client.capabilitiesReloaded();
+        compare(client.heldLists().length, 1);
+        client.deleteProfile("prf-dev", true);
+        client.capabilitiesReloaded();
+        compare(client.heldLists().length, 1, "list reads were not coalesced");
+        // The older list read fails after the resync queued a fresh one.
+        client.answerFailure(client.heldLists()[0], {name: "timeout", code: -32004, message: "late"});
+        compare(page.notice, "", "a stale failure was reported");
+        compare(client.heldLists().length, 1, "the queued list read was dropped");
+        client.answer(client.heldLists()[0]);
+        wait(0);
+        compare(page.changes[0].profile_deleted, true);
+        verify(itemsWithText(page, "曾存到「開發」（已刪除）").length >= 1);
+        // A failure of the current read is reported.
+        client.capabilitiesReloaded();
+        const failure = {name: "timeout", code: -32004, message: "now"};
+        client.answerFailure(client.heldLists()[0], failure);
+        compare(page.notice, client.errorText(failure));
+        compare(client.held.length, 0);
+        page.destroy();
+        wait(0);
+    }
+
+    // #171 R4: a record whose row leaves the list when the list is replaced
+    // is released (its read forgotten, its open card dropped), and an update
+    // for a record the page holds is never skipped. Sixty changes, newest
+    // first; only chg-010 is on the Profile that gets deleted.
+    function sixtyChanges() {
+        const records = [];
+        for (let n = 60; n >= 1; --n) {
+            const changeId = "chg-" + String(n).padStart(3, "0");
+            records.push(historyRecord(changeId, changeId === "chg-010" ? "prf-dev" : "prf-other", null, false));
+        }
+        return records;
+    }
+    function test_history_pages_release_a_record_whose_row_leaves_the_list_data() { return historyPages_data(); }
+    function test_history_pages_release_a_record_whose_row_leaves_the_list(data) {
+        const client = historyClient(sixtyChanges());
+        const page = historyPage(data.url, client);
+        page.loadMore();
+        compare(page.changes.length, 60);
+        // An older row opens; its first read is still out.
+        client.hold = true;
+        page.open("chg-010");
+        compare(client.heldGets().length, 1);
+        // A reload (as after an undo) replaces the list with the newest 30.
+        page.reload();
+        client.answer(client.heldLists()[0]);
+        compare(page.changes.length, 30);
+        const reads = client.gets.length;
+        // The Profile is deleted; Core publishes chg-010 again.
+        client.deleteProfile("prf-dev");
+        // The first answer, taken before the delete, lands late.
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!page.expanded["chg-010"], "a record whose row left the list kept its card");
+        compare(client.held.length, 0, "a read was sent for a released record");
+        compare(client.gets.length, reads);
+        // "Load older" brings the row back closed, as Core reads it now.
+        client.hold = false;
+        page.loadMore();
+        compare(page.changes.length, 60);
+        compare(page.changes.find(change => change.change_id === "chg-010").profile_deleted, true);
+        verify(!page.expanded["chg-010"], "the row came back with the card it had before the delete");
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible), "undo offered for a row that came back");
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        // Opening it reads it afresh: deleted, no undo.
+        page.open("chg-010");
+        tryVerify(() => !!page.expanded["chg-010"]);
+        compare(page.expanded["chg-010"].profile_deleted, true);
+        wait(0);
+        verify(buttonsWithText(page, "撤銷這次變更").every(button => !button.visible), "undo offered after the Profile was deleted");
+        compare(itemsWithText(page, "已套用並確認生效。這個組合之後已刪除，所以不能撤銷。").length, 1);
+        compare(itemsWithText(page, "已套用並確認生效。可以撤銷。").length, 0);
+        page.destroy();
+        wait(0);
+    }
+    function test_history_pages_never_skip_an_update_for_a_held_record_data() { return historyPages_data(); }
+    function test_history_pages_never_skip_an_update_for_a_held_record(data) {
+        // No list path leaves a held record unlisted any more (the list
+        // replacement releases it); this pins the rule on its own: the page
+        // holds chg-010 although it lists only the newest 30.
+        const client = historyClient(sixtyChanges());
+        const page = historyPage(data.url, client);
+        client.hold = true;
+        page.open("chg-010");
+        compare(client.heldGets().length, 1);
+        const reads = client.gets.length;
+        client.deleteProfile("prf-dev");
+        compare(client.heldGets().length, 1, "a read was sent beside the first one");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!page.expanded["chg-010"] || page.expanded["chg-010"].profile_deleted === true,
+               "an update for a held record was skipped");
+        compare(client.heldGets().length, 1);
+        compare(client.gets.length, reads + 1, "not exactly one more read");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        compare(client.held.length, 0);
+        compare(page.expanded["chg-010"].profile_deleted, true);
+        // Older than the loaded rows: still not put on top.
+        compare(page.changes.length, 30);
+        compare(page.changes[0].change_id, "chg-060");
+        page.destroy();
+        wait(0);
+    }
+    // #171 R4: held records stay bounded by the rows listed and open. A
+    // failed first open releases its hold (opening the row again retries);
+    // a resync then reads only the open, listed records.
+    function test_history_pages_keep_held_records_bounded_data() { return historyPages_data(); }
+    function test_history_pages_keep_held_records_bounded(data) {
+        const client = historyClient(sixtyChanges());
+        const page = historyPage(data.url, client);
+        const failure = {name: "timeout", code: -32004, message: "now"};
+        const id = n => "chg-" + String(n).padStart(3, "0");
+        for (let round = 0; round < 3; ++round) {
+            page.loadMore();
+            compare(page.changes.length, 60);
+            client.hold = true;
+            // Round 0 also opens the newest row, which stays listed.
+            if (round === 0) page.open("chg-060");
+            for (let k = 1; k <= 4; ++k) page.open(id(4 * round + k));
+            compare(client.heldGets().length, round === 0 ? 5 : 4);
+            // Of the four older rows, the third and fourth fail to open.
+            for (const call of client.heldGets()) {
+                const failing = call.changeId === id(4 * round + 3) || call.changeId === id(4 * round + 4);
+                if (failing) client.answerFailure(call, failure);
+                else client.answer(call);
+            }
+            wait(0);
+            compare(page.notice, client.errorText(failure), "a current failure was not shown");
+            // A failed open shows no card.
+            verify(!page.expanded[id(4 * round + 3)] && !page.expanded[id(4 * round + 4)]);
+            verify(!!page.expanded[id(4 * round + 1)] && !!page.expanded[id(4 * round + 2)]);
+            // A reload replaces the list with the newest 30.
+            page.reload();
+            client.answer(client.heldLists()[0]);
+            wait(0);
+            compare(page.changes.length, 30);
+            compare(Object.keys(page.expanded), ["chg-060"]);
+            client.hold = false;
+        }
+        // A resync reads the open, listed record only.
+        client.hold = true;
+        client.capabilitiesReloaded();
+        compare(client.heldGets().map(call => call.changeId), ["chg-060"], "a resync read records the page no longer holds");
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(client.held.length, 0);
+        // A row whose first open failed opens again (the read is retried).
+        client.hold = false;
+        page.loadMore();
+        compare(page.changes.length, 60);
+        client.hold = true;
+        page.open(id(3));
+        compare(client.heldGets().map(call => call.changeId), [id(3)], "opening a failed row again sent no read");
+        client.answer(client.heldGets()[0]);
+        wait(0);
+        verify(!!page.expanded[id(3)]);
+        client.capabilitiesReloaded();
+        compare(client.heldGets().map(call => call.changeId).sort(), [id(3), "chg-060"]);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        // That resync's list read replaced the list again: chg-003 left it.
+        compare(Object.keys(page.expanded), ["chg-060"]);
+        client.capabilitiesReloaded();
+        compare(client.heldGets().map(call => call.changeId), ["chg-060"]);
+        for (const call of client.held.slice()) client.answer(call);
+        wait(0);
+        compare(client.held.length, 0);
+        page.destroy();
+        wait(0);
     }
 }

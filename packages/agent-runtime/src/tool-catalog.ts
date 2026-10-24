@@ -53,7 +53,7 @@ export const TOOL_GUIDE:Readonly<Record<string,string>>=Object.freeze({
   'desktop.profiles.create':'Save a new Profile (composition), e.g. from the current one, under a name.',
   'desktop.profiles.duplicate':'Copy an existing Profile under a new name.',
   'desktop.profiles.rename':'Rename a saved Profile (composition); content is unchanged.',
-  'desktop.profiles.delete':'Delete one saved Profile by profile_id; it cannot be undone. The active Profile cannot be deleted. Every deletion waits for the person to allow it; if they refuse, it is not deleted.',
+  'desktop.profiles.delete':'Delete one saved Profile by profile_id; it cannot be undone. The active Profile cannot be deleted, nor one with a change still being tried out (a preview counting down): it must be kept or reverted first, and reverts by itself when its countdown ends. Every deletion waits for the person to allow it; if they refuse, it is not deleted.',
   'desktop.workspaces.activate':'Switch to a workspace (one-off, not saved). Needs approval.',
   'desktop.windows.focus':'Focus a window (one-off, not saved). Needs approval.',
   'desktop.windows.move':'Move one window now (one-off, not saved; saved layouts use region rules). Needs approval.',

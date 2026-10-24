@@ -27,10 +27,35 @@ Flickable {
     property string notice: ""
     property string diagnostic: ""
     property bool more: true
+    /// Every change_updated and resync starts a new list generation: a list
+    /// answer from an older one may undo what that update said, so the list
+    /// is read again instead (#171). One list read is out at a time.
+    property int listGeneration: 0
+    property bool listing: false
+    property bool listAgain: false
 
     ChangeText {
         id: words
         client: page.client
+    }
+
+    // Open records, read so that a late answer never undoes a newer one.
+    ChangeReads {
+        id: reads
+        client: page.client
+        onRead: function (changeId, record) {
+            const table = Object.assign({}, page.expanded);
+            table[changeId] = record;
+            page.expanded = table;
+        }
+        onFailed: function (changeId, error) {
+            page.fail(error);
+            // A first open that failed holds nothing: the row stays closed
+            // and opening it again retries.
+            if (!page.expanded[changeId]) {
+                reads.forget(changeId);
+            }
+        }
     }
 
     function t(source) {
@@ -42,18 +67,70 @@ Flickable {
         diagnostic = client.diagnosticText(error);
     }
 
+    /// The list is replaced (not extended): a record whose row leaves it is
+    /// released, its read forgotten and its open card dropped. The row comes
+    /// back closed with a later page, and opening it reads it afresh.
+    function replaceList(list) {
+        changes = list;
+        const listed = new Set(list.map(change => change.change_id));
+        reads.retain(Array.from(listed));
+        const table = Object.assign({}, expanded);
+        let dropped = false;
+        for (const changeId of Object.keys(table)) {
+            if (!listed.has(changeId)) {
+                delete table[changeId];
+                dropped = true;
+            }
+        }
+        if (dropped) {
+            expanded = table;
+        }
+    }
+
     function reload() {
+        if (listing) {
+            listAgain = true;
+            return;
+        }
+        listing = true;
+        const generation = listGeneration;
         client.capability("desktop.changes.list", { limit: 30 }, function (result) {
-            page.changes = result.changes;
-            page.more = result.changes.length === 30;
-        }, fail);
+            page.listing = false;
+            if (generation === page.listGeneration) {
+                page.replaceList(result.changes);
+                page.more = result.changes.length === 30;
+            } else {
+                page.listAgain = true;
+            }
+            if (page.listAgain) {
+                page.listAgain = false;
+                page.reload();
+            }
+        }, function (error) {
+            page.listing = false;
+            // Only a failure of a current read is news; a read queued behind
+            // this one still goes out.
+            if (generation === page.listGeneration) {
+                page.fail(error);
+            }
+            if (page.listAgain || generation !== page.listGeneration) {
+                page.listAgain = false;
+                page.reload();
+            }
+        });
     }
 
     function loadMore() {
         if (changes.length === 0) {
             return;
         }
+        const generation = listGeneration;
         client.capability("desktop.changes.list", { limit: 30, before: changes[changes.length - 1].change_id }, function (result) {
+            // Sent before a newer update: read the same page again.
+            if (generation !== page.listGeneration) {
+                page.loadMore();
+                return;
+            }
             page.changes = page.changes.concat(result.changes);
             page.more = result.changes.length === 30;
         }, fail);
@@ -61,20 +138,17 @@ Flickable {
 
     function open(changeId) {
         if (expanded[changeId]) {
+            reads.forget(changeId);
             const table = Object.assign({}, expanded);
             delete table[changeId];
             expanded = table;
             return;
         }
-        refresh(changeId);
+        reads.request(changeId);
     }
 
     function refresh(changeId) {
-        client.capability("desktop.changes.get", { change_id: changeId }, function (record) {
-            const table = Object.assign({}, page.expanded);
-            table[changeId] = record;
-            page.expanded = table;
-        }, fail);
+        reads.refresh(changeId);
     }
 
     function undo(record) {
@@ -90,21 +164,42 @@ Flickable {
 
     Connections {
         target: page.client
-        // After a resync or a reconnect: changes made meanwhile are listed.
+        // After a resync or a reconnect: changes made meanwhile are listed,
+        // and open records are read again (a Profile may have been deleted).
         function onCapabilitiesReloaded() {
+            page.listGeneration++;
             page.reload();
+            // Open records, and those whose first read is still out.
+            reads.refreshAll();
         }
         function onChangeUpdated(change) {
+            page.listGeneration++;
+            // Records the page holds first, listed or not, so that no
+            // update for one is skipped.
+            if (page.expanded[change.change_id]) {
+                // The update is newer than the open record: it applies at
+                // once (the record keeps its card and items).
+                const table = Object.assign({}, page.expanded);
+                table[change.change_id] = Object.assign({}, page.expanded[change.change_id], change);
+                page.expanded = table;
+            }
+            // Open, or opening with its first read still out: read again,
+            // and an answer to a read sent before this is not applied.
+            if (reads.holds(change.change_id)) {
+                page.refresh(change.change_id);
+            }
             const index = page.changes.findIndex(item => item.change_id === change.change_id);
             if (index < 0) {
+                // Older than the loaded rows (Core publishes a deleted
+                // Profile's changes again): read with its page, not put on top.
+                if (page.changes.length > 0 && change.change_id < page.changes[page.changes.length - 1].change_id) {
+                    return;
+                }
                 page.changes = [change].concat(page.changes);
             } else {
                 const list = page.changes.slice();
                 list[index] = change;
                 page.changes = list;
-            }
-            if (page.expanded[change.change_id]) {
-                page.refresh(change.change_id);
             }
         }
     }
@@ -248,12 +343,12 @@ Flickable {
                         visible: !!changeRow.record
                         spacing: page.tokens.space
 
-                        // Undo exists only for a change that took effect. An
+                        // Undo exists only for a change that took effect and
+                        // that Core can still undo (ChangeText.undoable). An
                         // unknown result has no retry here: what is true is
                         // read back first, then decided.
                         Button {
-                            visible: !!changeRow.record && changeRow.record.state === "committed"
-                                && !(changeRow.record.confirmation && changeRow.record.confirmation.state === "reverted")
+                            visible: words.undoable(changeRow.record)
                             tokens: page.tokens
                             text: page.t(qsTr("撤銷這次變更"))
                             onClicked: page.undo(changeRow.record)

@@ -1,0 +1,139 @@
+import QtQuick
+
+/// Reads full change records (`desktop.changes.get`) for a view that keeps
+/// them: the history pages' open cards and the chat's change cards (#171).
+///
+/// Core answers requests concurrently, so an answer can land after newer
+/// news about the same change. Per change id there is a generation: every
+/// `change_updated` and every resync starts a new one (`refresh`), and an
+/// answer is applied only if no generation began after its read was sent.
+/// Reads of one change are coalesced: at most one in flight and one more
+/// queued behind it, however many updates arrive meanwhile. A change is held
+/// from its first request until `forget` (or `retain` without it), answered
+/// or not, so an update or a resync that arrives before the first answer
+/// still makes it stale. What is kept per change is bounded by the changes
+/// held or with a read still out.
+QtObject {
+    id: reads
+
+    required property var client
+
+    /// A current record of `changeId`.
+    signal read(string changeId, var record)
+    /// A current read of `changeId` failed.
+    signal failed(string changeId, var error)
+
+    // Bookkeeping only; nothing binds to these.
+    property var generations: ({})   // change id → current generation
+    property var inFlight: ({})      // change id → generation the read was sent in
+    property var queued: ({})        // change id → true: read again once the read out lands
+    property var held: ({})          // change id → true: requested and not forgotten
+
+    function generation(changeId) {
+        return generations[changeId] || 0;
+    }
+
+    /// Whether the view holds `changeId`: requested (answered or not) and
+    /// not forgotten. Updates and resyncs concern exactly these.
+    function holds(changeId) {
+        return held[changeId] === true;
+    }
+
+    function heldIds() {
+        return Object.keys(held);
+    }
+
+    /// Read `changeId` unless a read of the current generation is already out.
+    function request(changeId) {
+        held[changeId] = true;
+        if (inFlight[changeId] !== undefined) {
+            if (inFlight[changeId] !== generation(changeId)) {
+                queued[changeId] = true;
+            }
+            return;
+        }
+        send(changeId);
+    }
+
+    /// Core said `changeId` changed (`change_updated`): answers to reads
+    /// sent before now are stale. Read it again.
+    function refresh(changeId) {
+        held[changeId] = true;
+        generations[changeId] = generation(changeId) + 1;
+        request(changeId);
+    }
+
+    /// After a resync: everything the view holds is read again.
+    function refreshAll() {
+        for (const changeId of heldIds()) {
+            refresh(changeId);
+        }
+    }
+
+    /// The view no longer holds `changeId` (a card closed): a read out is
+    /// not applied and nothing queued is sent.
+    function forget(changeId) {
+        delete queued[changeId];
+        delete held[changeId];
+        if (inFlight[changeId] === undefined) {
+            // No answer can still land: nothing to tell apart.
+            delete generations[changeId];
+        } else {
+            generations[changeId] = generation(changeId) + 1;
+        }
+    }
+
+    /// The view now shows only `changeIds` (its list was replaced): every
+    /// other change it held is forgotten. Returns the ids released.
+    function retain(changeIds) {
+        const kept = new Set(changeIds);
+        const released = heldIds().filter(changeId => !kept.has(changeId));
+        for (const changeId of released) {
+            forget(changeId);
+        }
+        return released;
+    }
+
+    function reset() {
+        generations = {};
+        inFlight = {};
+        queued = {};
+        held = {};
+    }
+
+    function send(changeId) {
+        const sent = generation(changeId);
+        inFlight[changeId] = sent;
+        client.capability("desktop.changes.get", { change_id: changeId }, function (record) {
+            settle(changeId, sent, record, null);
+        }, function (error) {
+            settle(changeId, sent, null, error);
+        });
+    }
+
+    function settle(changeId, sent, record, error) {
+        if (inFlight[changeId] === sent) {
+            delete inFlight[changeId];
+        }
+        if (!holds(changeId)) {
+            // Forgotten while out: not applied, and nothing more is kept.
+            if (inFlight[changeId] === undefined) {
+                delete generations[changeId];
+            }
+            return;
+        }
+        const current = sent === generation(changeId);
+        if (queued[changeId]) {
+            delete queued[changeId];
+            send(changeId);
+        }
+        if (!current) {
+            return;
+        }
+        if (error) {
+            failed(changeId, error);
+        } else {
+            read(changeId, record);
+        }
+    }
+}

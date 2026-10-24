@@ -534,6 +534,34 @@
         <translation>新建立</translation>
     </message>
     <message>
+        <source>已保存（組合已刪除）</source>
+        <translation>已保存（組合已刪除）</translation>
+    </message>
+    <message>
+        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</translation>
+    </message>
+    <message>
+        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
+        <translation>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</translation>
+    </message>
+    <message>
+        <source>曾存到「%1」（已刪除）</source>
+        <translation>曾存到「%1」（已刪除）</translation>
+    </message>
+    <message>
+        <source>曾存到「%1」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>曾存到「%1」，桌面沒有改變；這個組合已刪除，所以不會再套用，也不能撤銷。</translation>
+    </message>
+    <message>
+        <source>曾存到另一個組合（已刪除）</source>
+        <translation>曾存到另一個組合（已刪除）</translation>
+    </message>
+    <message>
+        <source>曾存到另一個組合，桌面沒有改變；那個組合已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>曾存到另一個組合，桌面沒有改變；那個組合已刪除，所以不會再套用，也不能撤銷。</translation>
+    </message>
+    <message>
         <source>未保留，自動回復</source>
         <translation>未保留，自動回復</translation>
     </message>
@@ -958,6 +986,10 @@
 </context>
 <context>
     <name>CompositionCenter</name>
+    <message>
+        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
+        <translation>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</translation>
+    </message>
     <message>
         <source>「%1」的版本</source>
         <translation>「%1」的版本</translation>

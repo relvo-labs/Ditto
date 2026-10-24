@@ -646,6 +646,11 @@ fn root(label: &str) -> PathBuf {
 }
 
 fn start_at(root: &Path, rescue: bool) -> Arc<Core> {
+    start_configured(root, rescue, |_| {})
+}
+
+/// `start_at`, with the test's own changes to the config applied last.
+fn start_configured(root: &Path, rescue: bool, tweak: impl FnOnce(&mut CoreConfig)) -> Arc<Core> {
     let builtin = root.join("builtin");
     if !builtin.exists() {
         builtin_packages(&builtin);
@@ -660,6 +665,7 @@ fn start_at(root: &Path, rescue: bool) -> Arc<Core> {
     if rescue {
         config.mode = ditto_protocol::rpc::CoreMode::Rescue;
     }
+    tweak(&mut config);
     let (compositor, _events) = FixtureCompositor::paired();
     let session = Arc::new(Session::new(Box::new(compositor)));
     let system: Arc<dyn ditto_system::SystemServices> = Arc::new(

@@ -88,6 +88,10 @@ export interface ChangeSummary {
   created_at: string;
   hot_swap_level: HotSwapLevel;
   origin: ChangeOrigin;
+  /**
+   * As on [`ChangeRecord::profile_deleted`].
+   */
+  profile_deleted?: boolean;
   profile_id: string;
   result?: ResultKind | null;
   /**

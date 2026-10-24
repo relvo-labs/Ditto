@@ -262,6 +262,7 @@ mod tests {
             ("outputs.notice_failed", Some("failed")),
             ("shell.start_failed", Some(io_code)),
             ("shell.rescue_ui_failed", Some(io_code)),
+            ("profile.delete_refresh_failed", Some(store_code)),
         ];
         for (event, code) in sites {
             let mut fields = vec![

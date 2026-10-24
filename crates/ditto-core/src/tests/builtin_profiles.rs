@@ -6,6 +6,11 @@ use ditto_protocol::profile::{ProfileDocument, RevisionOrigin};
 use ditto_store::profiles;
 
 pub(super) fn shipped_harness(label: &str) -> Harness {
+    shipped_harness_with(label, |_| {})
+}
+
+/// `shipped_harness`, with the test's own changes to the Core config.
+pub(super) fn shipped_harness_with(label: &str, tweak: impl FnOnce(&mut CoreConfig)) -> Harness {
     let root = root(label);
     let builtin = root.join("builtin");
     std::fs::create_dir_all(&builtin).unwrap();
@@ -30,7 +35,7 @@ pub(super) fn shipped_harness(label: &str) -> Harness {
         }
         pack(&builtin, &manifest);
     }
-    let core = start_at(&root, false);
+    let core = start_configured(&root, false, tweak);
     Harness { core, root }
 }
 
