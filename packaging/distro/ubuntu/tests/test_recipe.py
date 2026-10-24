@@ -20,10 +20,87 @@ from unittest import mock
 
 RECIPE = Path(os.environ.get("DITTO_RECIPE_UNDER_TEST", Path(__file__).resolve().parents[1]))
 REPO = Path(__file__).resolve().parents[4]
+# Contract value: symlinks followed across the WHOLE unit alias chain (parent
+# and leaf components together, never reset per layer). Linux MAXSYMLINKS.
+UNIT_ALIAS_MAX_HOPS = 40
+# Filesystem calls one in-process resolution may make. A valid chain at the hop
+# limit needs a few hundred; a resolver that resets or forgets its budget loops
+# forever, so the recorder fails it here instead of growing without bound.
+RESOLVER_OPERATION_BUDGET = 4096
+SNAPSHOT = "20261020T000000Z"
+# Target packages providing Quickshell's direct sonames from the first real
+# target readback (libunwind.so.8 was "not found"); remaining sonames arrive as
+# dependencies. Source-only contract: not evidence that a target resolves them.
+QUICKSHELL_TARGET_PACKAGES = {
+    "libunwind8", "libjemalloc2", "libgbm1", "libegl1", "libpipewire-0.3-0t64",
+    "libpolkit-agent-1-0", "libqt6waylandclient6", "libqt6widgets6", "libqt6core6t64",
+    "libqt6gui6", "libqt6qml6", "libqt6quick6"}
+TIMERS = ("fstrim", "dpkg-db-backup", "motd-news")
 
 
 def call(*args):
     return subprocess.run([str(a) for a in args], text=True, capture_output=True, timeout=30)
+
+
+def load_module(name, path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@contextlib.contextmanager
+def confined_filesystem_access(root, never_open=()):
+    """Record every path the resolver touches; fail on any access outside root.
+
+    readlink/open must stay inside root. Metadata on root's own ancestors is
+    not a host same-name read and is tolerated. Paths in never_open must never
+    be opened (a FIFO open would block)."""
+    import builtins
+    root = str(root)
+    touched, opened = [], []
+    never_open = {str(path) for path in never_open}
+    originals = {"lstat": os.lstat, "stat": os.stat, "readlink": os.readlink, "open": os.open}
+    original_io_open = io.open
+
+    def record(operation, path):
+        if isinstance(path, int):
+            return
+        text = os.fsdecode(os.fspath(path))
+        touched.append((operation, text))
+        if len(touched) > RESOLVER_OPERATION_BUDGET:
+            raise AssertionError("unit resolver exceeded its filesystem operation budget")
+        if operation == "open":
+            opened.append(text)
+            if text in never_open:
+                raise AssertionError("non-regular unit target was opened")
+
+    def wrap(name):
+        def wrapper(path, *args, **kwargs):
+            record(name, path)
+            return originals[name](path, *args, **kwargs)
+        return wrapper
+
+    def io_open(path, *args, **kwargs):
+        record("open", path)
+        return original_io_open(path, *args, **kwargs)
+
+    def inside(operation, path):
+        if path == root or path.startswith(root + "/"):
+            return True
+        ancestor = path == "/" or root.startswith(path.rstrip("/") + "/")
+        return operation in ("lstat", "stat") and ancestor
+
+    with contextlib.ExitStack() as stack:
+        for name in originals:
+            stack.enter_context(mock.patch.object(os, name, wrap(name)))
+        stack.enter_context(mock.patch.object(io, "open", io_open))
+        stack.enter_context(mock.patch.object(builtins, "open", io_open))
+        yield touched, opened
+    outside = sorted({operation for operation, path in touched if not inside(operation, path)})
+    if outside:
+        raise AssertionError(f"resolver used {outside} outside the image root")
 
 
 class RecipeTests(unittest.TestCase):
@@ -85,12 +162,12 @@ class RecipeTests(unittest.TestCase):
                 "wayfire_revision": "d39902379c5737eebe1dc3a830659fa3f0fa22e0",
                 "files": files, "symlinks": links}
 
-    def generate(self, expected=0, archive=None, commit=None, lock=None, flags=()):
+    def generate(self, expected=0, archive=None, commit=None, lock=None, flags=(), recipe=RECIPE):
         lock = lock or self.lock(archive, commit)
         lock_path = self.root / f"lock-{next(self.counter)}.json"
         lock_path.write_text(json.dumps(lock))
         output = self.root / f"output-{next(self.counter)}"
-        result = call(sys.executable, RECIPE / "generate.py", "--source-tar", archive or self.archive,
+        result = call(sys.executable, recipe / "generate.py", "--source-tar", archive or self.archive,
                       "--source-commit", commit or self.commit, "--source-sha256", lock["source_sha256"],
                       "--runtime-tree", self.tree, "--runtime-lock", lock_path,
                       "--version", "1", "--output", output, *flags)
@@ -99,10 +176,53 @@ class RecipeTests(unittest.TestCase):
             self.assertFalse(output.exists(), result.stderr)
         return output, result
 
-    def scan(self, expected=0, flags=()):
-        result = call(sys.executable, RECIPE / "scan-pristine-rootfs.py", self.root / "image", *flags)
+    def scan(self, expected=0, flags=(), image=None, recipe=RECIPE):
+        result = call(sys.executable, recipe / "scan-pristine-rootfs.py", image or self.root / "image", *flags)
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return json.loads(result.stdout)
+
+    def pristine_image(self, name):
+        image = self.root / name
+        self.put("usr/lib/os-release", "IMAGE_ID=ditto\n", image)
+        self.put("etc/shadow", "root:!:1:0:99999:7:::\n", image)
+        self.put("etc/passwd", "root:x:0:0:root:/root:/bin/bash\n", image)
+        return image
+
+    @staticmethod
+    def link(root, name, target):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.symlink_to(target)
+        return path
+
+    def merged_usr_image(self, name, lib_target="usr/lib"):
+        """Ubuntu-shaped merged /usr: lib -> usr/lib and real vendor timers."""
+        image = self.pristine_image(name)
+        expected = {}
+        for timer in TIMERS:
+            body = f"[Timer]\n# task-owned {timer} fixture\nOnCalendar=daily\n"
+            self.put(f"usr/lib/systemd/system/{timer}.timer", body, image)
+            rel = f"etc/systemd/system/timers.target.wants/{timer}.timer"
+            self.link(image, rel, f"/lib/systemd/system/{timer}.timer")
+            expected[rel] = body.encode()
+        self.link(image, "lib", lib_target)
+        return image, expected
+
+    def resolve_unit(self, image, rel, never_open=()):
+        scanner = load_module("pristine", RECIPE / "scan-pristine-rootfs.py")
+        with confined_filesystem_access(image, never_open):
+            try:
+                return scanner.unit_link_contents(image, rel)
+            except (ValueError, OSError) as error:
+                self.fail(f"valid in-image alias rejected ({type(error).__name__}: {error})")
+
+    def assert_unit_rejected(self, image, rel, message=None, never_open=()):
+        scanner = load_module("pristine", RECIPE / "scan-pristine-rootfs.py")
+        with confined_filesystem_access(image, never_open):
+            with self.assertRaises((ValueError, OSError)) as caught:
+                scanner.unit_link_contents(image, rel)
+        if message:
+            self.assertRegex(str(caught.exception), message)
 
     def test_clean_locked(self):
         self.scan()
@@ -272,6 +392,232 @@ class RecipeTests(unittest.TestCase):
         outside.mkdir()
         (self.root / "image/etc/greetd").symlink_to(outside, target_is_directory=True)
         self.scan(1)
+        # B1: the three real timers.target.wants aliases resolve through the
+        # image's own merged-/usr parent link (relative and image-absolute).
+        for lib_target in ("usr/lib", "/usr/lib"):
+            with self.subTest(lib=lib_target):
+                image, expected = self.merged_usr_image(f"merged-{next(self.counter)}", lib_target)
+                vendor = image / "usr/lib/systemd/system"
+                self.put("fixture.service", "[Service]\nExecStart=/bin/true\n", vendor)
+                self.link(vendor, "fixture-alias.service", "fixture.service")
+                expected["usr/lib/systemd/system/fixture-alias.service"] = b"[Service]\nExecStart=/bin/true\n"
+                # Relative leaf that climbs to the image root, then uses the lib alias.
+                rel = "etc/systemd/system/multi-user.target.wants/relative.service"
+                self.link(image, rel, "../../../../lib/systemd/system/fixture.service")
+                expected[rel] = expected["usr/lib/systemd/system/fixture-alias.service"]
+                # Multi-hop: parent alias -> parent alias, then a leaf alias.
+                self.link(image, "compat", "lib")
+                self.link(vendor, "legacy-fstrim.timer", "fstrim.timer")
+                rel = "etc/systemd/system/timers.target.wants/multihop.timer"
+                self.link(image, rel, "/compat/systemd/system/legacy-fstrim.timer")
+                expected[rel] = expected["etc/systemd/system/timers.target.wants/fstrim.timer"]
+                for rel, data in expected.items():
+                    self.assertEqual(self.resolve_unit(image, rel), data, rel)
+                report = self.scan(image=image)
+                self.assertEqual(report["authentication_config"], [])
+        # A genuinely separate physical lib directory is read for itself.
+        image = self.pristine_image("physical-lib")
+        self.put("usr/lib/systemd/system/fstrim.timer", "[Timer]\n# merged copy\n", image)
+        physical = self.put("lib/systemd/system/fstrim.timer", "[Timer]\n# physical copy\n", image)
+        rel = "etc/systemd/system/timers.target.wants/fstrim.timer"
+        self.link(image, rel, "/lib/systemd/system/fstrim.timer")
+        self.assertEqual(self.resolve_unit(image, rel), b"[Timer]\n# physical copy\n")
+        self.scan(image=image)
+        physical.write_text("[Service]\nExecStart=-/sbin/agetty --autologin root tty1\n")
+        self.assertIn(rel, self.scan(1, image=image)["authentication_config"])
+
+    def test_unit_resolver_order_and_confinement(self):
+        # B2: parent links are expanded before a following '..'; two distinct
+        # in-image destinations prove the actual resolution order.
+        image, _ = self.merged_usr_image("order")
+        self.put("usr/lib/systemd/order.timer", "[Timer]\n# expanded parent\n", image)
+        self.put("order.timer", "[Timer]\n# lexical normalisation\n", image)
+        self.link(image, "units", "usr/lib/systemd/system")
+        wants = "etc/systemd/system/timers.target.wants/"
+        self.link(image, wants + "order.timer", "/units/../order.timer")
+        self.assertEqual(self.resolve_unit(image, wants + "order.timer"), b"[Timer]\n# expanded parent\n")
+        # A valid chain may pass through the same parent alias more than once.
+        self.link(image, wants + "repeat.timer", "/lib/../../lib/systemd/system/fstrim.timer")
+        self.assertEqual(self.resolve_unit(image, wants + "repeat.timer"),
+                         (image / "usr/lib/systemd/system/fstrim.timer").read_bytes())
+        # Escapes after expansion, relative and absolute, and lexical-only traps.
+        self.link(image, "rootlink", "/")
+        self.link(image, "up", "../..")
+        escapes = {"relative.timer": "../../../../../../outside",
+                   "absolute.timer": "/../outside",
+                   "expanded.timer": "/units/../../../../../outside",
+                   "rootdotdot.timer": "/rootlink/../order.timer",
+                   "updir.timer": "/up/order.timer"}
+        for name, target in escapes.items():
+            self.link(image, wants + name, target)
+        cycles = {"self.timer": "self.timer", "pair-a.timer": "pair-b.timer",
+                  "pair-b.timer": "pair-a.timer", "parent.timer": "/ploop/x.timer",
+                  "parent-pair.timer": "/pa/x.timer", "mixed.timer": "/mixdir/x"}
+        self.link(image, "ploop", "ploop")
+        self.link(image, "pa", "pb")
+        self.link(image, "pb", "pa")
+        self.link(image, "mixdir", wants + "mixed.timer")
+        for name, target in cycles.items():
+            self.link(image, wants + name, target)
+        for name in escapes:
+            with self.subTest(escape=name):
+                self.assert_unit_rejected(image, wants + name, "outside image")
+        for name in cycles:
+            with self.subTest(cycle=name):
+                self.assert_unit_rejected(image, wants + name, "cycle/depth")
+        report = self.scan(1, image=image)
+        rejected = {wants + name for name in [*escapes, *cycles]}
+        self.assertEqual(set(report["authentication_config"]), rejected)
+
+    def build_alias_chain(self, image, tag, parent_hops, leaf_hops):
+        """Return an alias whose resolution follows parent_hops + leaf_hops links."""
+        self.put(f"usr/lib/systemd/system/depth-{tag}.timer", "[Timer]\n# depth target\n", image)
+        directory = "/usr/lib/systemd/system"
+        for index in range(1, parent_hops + 1):
+            self.link(image, f"p-{tag}-{index}",
+                      "usr/lib/systemd/system" if index == 1 else f"p-{tag}-{index - 1}")
+            directory = f"/p-{tag}-{index}"
+        wants = "etc/systemd/system/timers.target.wants/"
+        for index in range(1, leaf_hops + 1):
+            self.link(image, f"{wants}a-{tag}-{index}.timer",
+                      f"{directory}/depth-{tag}.timer" if index == 1 else f"a-{tag}-{index - 1}.timer")
+        return f"{wants}a-{tag}-{leaf_hops}.timer"
+
+    def test_unit_resolver_cumulative_hop_bound(self):
+        # B2/B3: the bound covers the whole chain; it is never reset per layer.
+        limit = UNIT_ALIAS_MAX_HOPS
+        image = self.pristine_image("depth")
+        accepted = [self.build_alias_chain(image, "leaf-max", 0, limit),
+                    self.build_alias_chain(image, "parent-max", limit - 1, 1),
+                    self.build_alias_chain(image, "split-max", limit // 2, limit // 2)]
+        rejected = [self.build_alias_chain(image, "leaf-over", 0, limit + 1),
+                    self.build_alias_chain(image, "parent-over", limit, 1),
+                    self.build_alias_chain(image, "split-over", limit // 2 + 1, limit // 2)]
+        for rel in accepted:
+            with self.subTest(accepted=rel):
+                self.assertEqual(self.resolve_unit(image, rel), b"[Timer]\n# depth target\n")
+        for rel in rejected:
+            with self.subTest(rejected=rel):
+                self.assert_unit_rejected(image, rel, "cycle/depth")
+        report = self.scan(1, image=image)
+        self.assertEqual(set(report["authentication_config"]), set(rejected))
+
+    def test_unit_resolver_terminals_and_errors_fail_closed(self):
+        # B3: dangling, missing, non-regular terminals/components, OSError.
+        image, _ = self.merged_usr_image("terminals")
+        vendor = image / "usr/lib/systemd/system"
+        fifo = vendor / "fifo.timer"
+        os.mkfifo(fifo)
+        sentinel = self.put("outside-sentinel.timer",
+                            "[Service]\nExecStart=-/sbin/agetty --autologin root tty1\n", self.root)
+        self.link(image, "gone", "missing-directory")
+        wants = "etc/systemd/system/timers.target.wants/"
+        rows = {"dangling-leaf.timer": "missing.timer",
+                "dangling-parent.timer": "/gone/systemd/system/fstrim.timer",
+                "missing-middle.timer": "/usr/lib/nonexistent/system/fstrim.timer",
+                "terminal-directory.timer": "/usr/lib/systemd/system",
+                "terminal-directory-alias.timer": "/lib/systemd/system",
+                "regular-middle.timer": "/lib/systemd/system/fstrim.timer/child",
+                "fifo-direct.timer": "../../../../usr/lib/systemd/system/fifo.timer",
+                "fifo-alias.timer": "/lib/systemd/system/fifo.timer",
+                "fifo-middle.timer": "/lib/systemd/system/fifo.timer/child",
+                "host-absolute.timer": str(sentinel)}
+        for name, target in rows.items():
+            self.link(image, wants + name, target)
+        for name in rows:
+            with self.subTest(row=name):
+                self.assert_unit_rejected(image, wants + name, never_open=[fifo])
+        # The FIFO is skipped, never opened; a regression would block here.
+        report = self.scan(1, image=image)
+        self.assertEqual(set(report["authentication_config"]), {wants + name for name in rows})
+        self.assertNotIn("autologin", json.dumps(report))
+        # Controlled OSError on lstat, readlink and the final read: rejected,
+        # reported without exception text.
+        scanner = load_module("pristine", RECIPE / "scan-pristine-rootfs.py")
+        self.put("opt/units/error.timer", "[Timer]\n# readable bytes\n", image)
+        error_rel = wants + "error.timer"
+        self.link(image, error_rel, "/opt/units/error.timer")
+        self.assertEqual(self.resolve_unit(image, error_rel), b"[Timer]\n# readable bytes\n")
+        failing = {"lstat": image / "opt/units", "readlink": image / "lib",
+                   "open": image / "opt/units/error.timer"}
+        import builtins
+        for operation, target in failing.items():
+            with self.subTest(oserror=operation):
+                def failing_call(original, _target=str(target)):
+                    def fail(path, *args, **kwargs):
+                        if not isinstance(path, int) and os.fsdecode(os.fspath(path)) == _target:
+                            raise PermissionError("synthetic secret exception text")
+                        return original(path, *args, **kwargs)
+                    return fail
+                rel = error_rel if operation != "readlink" else wants + "fstrim.timer"
+                patches = [mock.patch.object(os, operation, failing_call(getattr(os, operation)))]
+                if operation == "open":
+                    # Any read API, so the row does not depend on how bytes are read.
+                    patches += [mock.patch.object(io, "open", failing_call(io.open)),
+                                mock.patch.object(builtins, "open", failing_call(io.open))]
+                with contextlib.ExitStack() as stack:
+                    for patch in patches:
+                        stack.enter_context(patch)
+                    with self.assertRaises(OSError):
+                        scanner.unit_link_contents(image, rel)
+                    output = io.StringIO()
+                    with mock.patch.object(sys, "argv", ["scan", str(image)]), \
+                            contextlib.redirect_stdout(output):
+                        self.assertEqual(scanner.main(), 1)
+                report = json.loads(output.getvalue())
+                self.assertIn(rel, report["authentication_config"])
+                self.assertNotIn("synthetic secret", output.getvalue())
+
+    def test_unit_masks_and_authentication_through_aliases(self):
+        # B4: exact /dev/null leaf masks, direct or at the end of a valid chain.
+        image, _ = self.merged_usr_image("masks")
+        system = "etc/systemd/system/"
+        self.link(image, system + "getty@tty1.service", "/dev/null")
+        self.link(image, system + "chain-mask.service", "chain-mask-2.service")
+        self.link(image, system + "chain-mask-2.service", "/dev/null")
+        self.link(image, "usr/lib/systemd/system/vendor-mask.service", "/dev/null")
+        self.link(image, system + "merged-mask.service", "/lib/systemd/system/vendor-mask.service")
+        masks = ["getty@tty1.service", "chain-mask.service", "merged-mask.service"]
+        for name in masks:
+            with self.subTest(mask=name):
+                self.assertEqual(self.resolve_unit(image, system + name), b"")
+        self.assertEqual(self.scan(image=image)["authentication_config"], [])
+        # /dev/null is not a parent-component, other-device or spelling exception.
+        not_masks = {"null-parent.service": "/dev/null/child", "zero.service": "/dev/zero",
+                     "dot-null.service": "/dev/./null", "double-null.service": "/dev//null",
+                     "relative-null.service": "../../../dev/null",
+                     "null-trailing.service": "/dev/null/"}
+        self.link(image, "devlink", "/dev")
+        not_masks["devlink.service"] = "/devlink/null"
+        for name, target in not_masks.items():
+            self.link(image, system + name, target)
+        for name in not_masks:
+            with self.subTest(not_mask=name):
+                self.assert_unit_rejected(image, system + name)
+        # Autologin reached through merged-/usr, mixed chains and a destination
+        # outside the ordinary unit directories is still rejected at the alias.
+        autologin = "[Service]\nExecStart=-/sbin/agetty --autologin root tty1\n"
+        self.put("usr/lib/systemd/system/getty-auto.service", autologin, image)
+        self.link(image, "usr/lib/systemd/system/x-auto.service", "getty-auto.service")
+        self.link(image, "compat", "lib")
+        self.put("opt/vendor/evil.service", "[Service]\nExecStart=/bin/login -f root\n", image)
+        self.link(image, "optlink", "opt/vendor")
+        auth = {"getty.target.wants/getty@tty2.service": "/lib/systemd/system/getty-auto.service",
+                "mixed-auto.service": "/compat/systemd/system/x-auto.service",
+                "outside-dirs.service": "/opt/vendor/evil.service",
+                "outside-alias.service": "/optlink/../vendor/evil.service"}
+        for name, target in auth.items():
+            self.link(image, system + name, target)
+        # Identity and authentication symlinks to /dev/null keep their findings.
+        self.link(image, "etc/sudoers.d/masked", "/dev/null")
+        self.link(image, "etc/greetd/config.toml", "/dev/null")
+        report = self.scan(1, image=image)
+        flagged = set(report["authentication_config"])
+        self.assertLessEqual({system + name for name in [*not_masks, *auth]}, flagged)
+        self.assertLessEqual({"etc/sudoers.d/masked", "etc/greetd/config.toml"}, flagged)
+        self.assertTrue(flagged.isdisjoint({system + name for name in masks}))
+        self.assertTrue(flagged.isdisjoint(f"etc/systemd/system/timers.target.wants/{t}.timer"
+                                           for t in TIMERS))
 
     def test_sudo_include_cannot_hide_rules(self):
         self.put("etc/sudoers", "@include /etc/custom-rule\n", self.root / "image")
@@ -296,6 +642,64 @@ class RecipeTests(unittest.TestCase):
             path.unlink()
         self.put("usr/lib/fixture", "build-marker", self.root / "image")
         self.scan(1, ("--forbid", "build-marker"))
+        (self.root / "image/usr/lib/fixture").unlink()
+        # C1: producer-shaped NUL-separated strings, as rustc embeds panic and
+        # debug paths. Neutral remapped paths and the generic /home/ root pass;
+        # this synthetic control is NOT evidence that a real remap succeeded.
+        image = self.root / "image"
+        release = "usr/lib/ditto/target/release/"
+        owned = [release + name for name in ("ditto-core", "dittoctl", "ditto-test-host", "ditto-worker")]
+        neutral = b"\x7fELF\x02\x01\x01\x00\x00" + b"\x00".join((
+            b"/rustc/0123456789abcdef0123456789abcdef01234567/library/core/src/panicking.rs",
+            b"/ditto/source/crates/ditto-core/src/main.rs",
+            b"/cargo/registry/src/index.crates.io-0000000000000000/serde-1.0.0/src/de/mod.rs",
+            b"/rustup/toolchain/lib/rustlib/src/rust/library/std/src/thread/mod.rs",
+            b"/home/", b"@{HOMEDIRS}=/home/")) + b"\x00"
+        for rel in owned:
+            (image / rel).parent.mkdir(parents=True, exist_ok=True)
+            (image / rel).write_bytes(neutral)
+        self.assertEqual(self.scan()["literal_matches"], [])
+        markers = (b"/home/producer/ditto/crates/ditto-core/src/main.rs",
+                   b"/home/producer/.cargo/registry/src/index/serde-1.0.0/src/lib.rs",
+                   b"/data/runner/agent-runs/task/repo/crates/core/src/lib.rs",
+                   b"/data/runner/worktrees/ditto/crates/core/src/lib.rs",
+                   b"/data/runner/ditto-runs/run/crates/core/src/lib.rs",
+                   b"/data/runner/cache/scratch/target/release/build/out.rs")
+        others = ["usr/lib/fixture-unknown", "usr/lib/ditto-node/bin/node",
+                  "usr/share/doc/vendor-fixture/examples/README"]
+        for rel in [*owned, *others]:
+            for marker in markers:
+                with self.subTest(path=rel, marker=marker):
+                    original = (image / rel).read_bytes() if (image / rel).exists() else None
+                    (image / rel).parent.mkdir(parents=True, exist_ok=True)
+                    (image / rel).write_bytes(neutral[:-1] + b"\x00" + marker + b"\x00")
+                    self.assertEqual(self.scan(1)["literal_matches"], [rel])
+                    if original is None:
+                        (image / rel).unlink()
+                    else:
+                        (image / rel).write_bytes(original)
+        link = image / (release + "ditto-core-debug")
+        for marker in markers:
+            with self.subTest(link=marker):
+                link.symlink_to(marker.decode())
+                self.assertEqual(self.scan(1)["literal_matches"], [release + "ditto-core-debug"])
+                link.unlink()
+        # Registering an owned artifact's hash (or the marker's) as a "public
+        # fixture" does not mask a producer leak; neither does the GnuTLS path.
+        polluted = neutral + markers[0] + b"\x00"
+        recipe = self.root / "recipe-with-registered-hash"
+        recipe.mkdir()
+        shutil.copy2(RECIPE / "scan-pristine-rootfs.py", recipe)
+        approved = json.loads((RECIPE / "public-selftest-key-sha256.json").read_text())
+        approved += [hashlib.sha256(polluted).hexdigest(), hashlib.sha256(markers[0]).hexdigest()]
+        (recipe / "public-selftest-key-sha256.json").write_text(json.dumps(approved))
+        (image / owned[0]).write_bytes(polluted)
+        gnutls = "usr/lib/x86_64-linux-gnu/libgnutls.so.30.41.1"
+        (image / gnutls).parent.mkdir(parents=True, exist_ok=True)
+        (image / gnutls).write_bytes(polluted)
+        report = self.scan(1, recipe=recipe)
+        self.assertEqual(sorted(report["literal_matches"]), sorted([owned[0], gnutls]))
+        self.assertEqual(report["public_fixtures"], [])
 
     def test_matching_source_control(self):
         output, _ = self.generate()
@@ -854,6 +1258,90 @@ runpy.run_path(sys.argv[0], run_name='__main__')
             self.assertEqual(inputs["mode"], mode)
             self.assertEqual("LIBGL_ALWAYS_SOFTWARE=1" in launcher, bool(flags))
             self.assertEqual("WLR_RENDERER_ALLOW_SOFTWARE=1" in launcher, bool(flags))
+
+    # Every generator mode. There is no fault-injection mode in this generator;
+    # dev-software-render is listed as a mode here, not as fault evidence.
+    MODES = (((), "normal"), (("--dev-software-render",), "dev-software-render"))
+
+    def closure_violations(self, recipe=RECIPE):
+        """Parse the generator's actual mkosi.conf in every mode; list violations."""
+        violations, closures = [], {}
+        for flags, mode in self.MODES:
+            output, _ = self.generate(flags=flags, recipe=recipe)
+            conf = configparser.ConfigParser(interpolation=None, strict=True)
+            conf.optionxform = str
+            conf.read(output / "mkosi.conf")
+            packages = conf["Content"]["Packages"].split(",")
+            inputs = json.loads((output / "extra/usr/share/ditto/image-inputs.json").read_text())
+            if conf["Distribution"]["Snapshot"] != SNAPSHOT or inputs["snapshot"] != SNAPSHOT:
+                violations.append(f"{mode}: snapshot is not {SNAPSHOT}")
+            if inputs["mode"] != mode:
+                violations.append(f"{mode}: recorded mode differs")
+            if len(packages) != len(set(packages)) or not all(packages):
+                violations.append(f"{mode}: duplicate or empty package entry")
+            missing = QUICKSHELL_TARGET_PACKAGES - set(packages)
+            if missing:
+                violations.append(f"{mode}: Quickshell target closure lacks {sorted(missing)}")
+            if "linux-image-7.0.0-38-generic" not in packages:
+                violations.append(f"{mode}: kernel pin missing")
+            # Distro libraries arrive as packages, never through the runtime tree.
+            staged = [p.name for p in (output / "runtime").rglob("*")]
+            if any(name.startswith("libunwind") for name in staged):
+                violations.append(f"{mode}: distro libunwind staged in runtime tree")
+            closures[mode] = packages
+        if len(set(map(tuple, closures.values()))) != 1:
+            violations.append("generator modes produce different package closures")
+        return violations, closures
+
+    def test_target_package_closure_includes_libunwind_in_every_mode(self):
+        violations, closures = self.closure_violations()
+        self.assertEqual(violations, [])
+        declared = [line for line in (RECIPE / "packages.txt").read_text().splitlines()
+                    if line and not line.startswith("#")]
+        for mode, packages in closures.items():
+            self.assertEqual(packages, declared, mode)
+
+    def test_closure_contract_detects_missing_or_single_mode_fix(self):
+        # Controls for the contract itself on task-owned recipe copies.
+        rows = {}
+        recipe = self.root / "recipe-without-unwind"
+        shutil.copytree(RECIPE, recipe, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+        packages = recipe / "packages.txt"
+        packages.write_text("".join(line + "\n" for line in packages.read_text().splitlines()
+                                    if line != "libunwind8"))
+        rows["missing"] = recipe
+        recipe = self.root / "recipe-dev-only-unwind"
+        shutil.copytree(rows["missing"], recipe)
+        generator = recipe / "generate.py"
+        anchor = '        put("mkosi.conf", f"""[Distribution]'
+        text = generator.read_text()
+        self.assertEqual(text.count(anchor), 1)
+        generator.write_text(text.replace(anchor, "        if args.dev_software_render:\n"
+                                          "            packages.append(\"libunwind8\")\n" + anchor))
+        rows["dev-only"] = recipe
+        for name, recipe in rows.items():
+            with self.subTest(row=name):
+                violations, _ = self.closure_violations(recipe)
+                self.assertTrue(any("libunwind8" in row for row in violations), violations)
+                if name == "dev-only":
+                    self.assertIn("generator modes produce different package closures", violations)
+
+    def test_distro_unwind_library_is_not_runtime_admitted(self):
+        # The fix is a target package; runtime system-library admission stays closed.
+        for name in ("libunwind.so.8", "libunwind.so.8.2.0"):
+            with self.subTest(name=name):
+                path = self.put("usr/lib/x86_64-linux-gnu/" + name, "synthetic distro library", self.tree)
+                _, result = self.generate(2)
+                self.assertIn("not admitted", result.stderr)
+                lock = call(sys.executable, RECIPE / "lock-runtime.py", "--runtime-tree", self.tree,
+                            "--source-commit", self.commit, "--source-sha256", self.lock()["source_sha256"])
+                self.assertEqual(lock.returncode, 2, lock.stderr)
+                self.assertIn("not admitted", lock.stderr)
+                path.unlink()
+        lib = self.put("usr/lib/x86_64-linux-gnu/libwf-config.so.0", "synthetic library", self.tree)
+        (lib.parent / "libunwind.so.8").symlink_to(lib.name)
+        _, result = self.generate(2)
+        self.assertIn("not admitted", result.stderr)
 
 
 class DecisionTableTests(unittest.TestCase):

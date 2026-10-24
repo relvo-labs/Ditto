@@ -141,34 +141,57 @@ def check_sudo_includes(root, report):
             report["authentication_config"].append(rel)
 
 
+# Symlinks followed across one whole unit alias chain, parent and leaf
+# components together; never reset per component (Linux MAXSYMLINKS).
+UNIT_ALIAS_MAX_HOPS = 40
+
+
 def unit_link_contents(root, rel):
-    """Read unit aliases inside the image; /dev/null is a systemd mask."""
-    current = rel
-    seen = set()
-    for _ in range(64):
-        if current in seen:
-            raise ValueError("unit alias cycle")
-        seen.add(current)
-        path = root / current
-        if any(parent.is_symlink() for parent in path.parents if parent != root):
-            raise ValueError("unit alias parent symlink")
-        if not path.is_symlink():
-            return path.read_bytes()
-        target = path.readlink().as_posix()
-        if target == "/dev/null":
-            return b""
-        parts = [] if target.startswith("/") else list(Path(current).parent.parts)
-        for part in target.split("/"):
-            if part in ("", "."):
-                continue
-            if part == "..":
-                if not parts:
-                    raise ValueError("unit alias outside image")
-                parts.pop()
-            else:
-                parts.append(part)
-        current = "/".join(parts)
-    raise ValueError("unit alias depth")
+    """Read a unit alias in IMAGE coordinates; exact leaf /dev/null is a mask.
+
+    Every component is resolved under root, including merged-/usr parent links
+    such as lib -> usr/lib: an absolute target restarts at the image root, never
+    at the host's. A parent link is expanded before any following '..'. Escapes,
+    cycles/over-long chains, dangling or missing components and non-regular
+    destinations raise; types are checked before opening, so a FIFO is never
+    opened. OSError propagates for the caller to report without its text.
+    """
+    pending, parts, hops = rel.split("/"), [], 0
+    while pending:
+        part = pending.pop(0)
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError("unit alias outside image")
+            parts.pop()
+            continue
+        path = root.joinpath(*parts, part)
+        mode = os.lstat(path).st_mode
+        if stat.S_ISLNK(mode):
+            hops += 1
+            if hops > UNIT_ALIAS_MAX_HOPS:
+                raise ValueError("unit alias cycle/depth")
+            target = os.readlink(path)
+            if not pending and target == "/dev/null":
+                return b""
+            if target.startswith("/"):
+                parts = []
+            pending = target.split("/") + pending
+        elif pending and not stat.S_ISDIR(mode):
+            raise ValueError("unit alias component is not a directory")
+        elif not pending and not stat.S_ISREG(mode):
+            raise ValueError("unit alias destination is not a regular file")
+        else:
+            parts.append(part)
+    if not parts:
+        raise ValueError("unit alias destination is not a regular file")
+    descriptor = os.open(root.joinpath(*parts),
+                         os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with open(descriptor, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("unit alias destination is not a regular file")
+        return stream.read()
 
 
 def main():
