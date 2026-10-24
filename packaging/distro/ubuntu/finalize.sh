@@ -3,6 +3,10 @@
 set -euo pipefail
 root="${BUILDROOT:?mkosi BUILDROOT is required}"
 [[ "$root" == /* && "$root" != / ]]
+source_dir="${SRCDIR:?mkosi SRCDIR is required}"
+# ExtraTrees contains only source/config. Preflight target ownership before payload copy.
+python3 "$source_dir/apply-runtime.py" --root "$root" \
+    --runtime-tree "$source_dir/runtime" --runtime-lock "$root/usr/share/ditto/runtime-lock.json"
 commit="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["source_commit"])' "$root/usr/share/ditto/image-inputs.json")"
 printf '\nDITTO_SOURCE_COMMIT=%s\n' "$commit" >> "$root/usr/lib/os-release"
 printf 'ditto\n' > "$root/etc/hostname"

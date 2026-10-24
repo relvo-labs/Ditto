@@ -6,7 +6,7 @@
 
 owner 於 2026-10-23 要求 A／B 同時提供，2026-10-24 決定先做 Ubuntu。A 採 Ubuntu 26.04＋mkosi＋systemd-sysupdate `/usr` A/B；B 是既有 Ubuntu Desktop 加裝版（#174），與 A 並行並共用套件。Fedora bootc 暫停、保留證據、不再投入實作，不做 Fedora 既有桌面加裝版。
 
-本 ADR **部分修訂** #158／D-18：2026-10-21 的完整發行版方向對 A 保留，2026-10-23 新增 B 加裝套件；[D-49](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 的 MVP 接受不變。選型不等於更新、安裝器、Secure Boot、NVIDIA 或硬體接受。授權來源為 [#148 owner 留言](https://github.com/relvo-labs/Ditto/issues/148#issuecomment-6384379418) 及本次 writer brief；離線 issue 快照較早，未包含新留言，未在線重查。
+本 ADR **部分修訂** #158／D-18：2026-10-21 的完整發行版方向對 A 保留，2026-10-23 新增 B 加裝套件；[D-49](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 的 MVP 接受不變。選型不等於更新、安裝器、Secure Boot、NVIDIA 或硬體接受。權威為專案 owner 2026-10-24 對話，由 coordinator 轉錄於 [#148 留言](https://github.com/relvo-labs/Ditto/issues/148#issuecomment-6384379418)；parent 已重新核對作者與全文。回讀與歷史證據位置見 [D-51 §依據](../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md#依據)。
 
 ## A：完整映像（#158）
 
@@ -14,10 +14,10 @@ mkosi 建置 amd64／UEFI 開發候選，repart 建立 ESP、可寫 root/state�
 
 | 層／權威 | 內容與寫入邊界 |
 | --- | --- |
-| B 底座（base；不是交付形式 B） | kernel、firmware、UKI／initramfs、systemd、可信 Wayfire／Qt／Quickshell／Core、鎖定與最小救援。僅受控映像更新器寫 inactive slot／ESP；助手不能原地改 `/usr` |
-| A 助手層（assistant；不是交付形式 A） | 另行版本化的 user-space 部署；Core 協調安裝交易、授權與能力綁定。未信任 QML／Cordis／原生程式在獨立程序與 OS 隔離內，不載入主 Shell／可信 hostd |
-| D 資料 | 可寫 `/etc`、`/var`、`/home`；Core 唯一寫 Profile／revision／grants／operation，插件資料經 Core 介面，秘密在系統 keyring。宿主僅持投影，Agent 只提計畫 |
-| R 救援 | 隨可信底座交付，無 Node／主 Shell／生成碼仍能操作；保護最近可用版本，檢查 store 相容性後才啟動舊 Core |
+| 底座層 | kernel、firmware、UKI／initramfs、systemd、可信 Wayfire／Qt／Quickshell／Core、鎖定與最小救援。僅受控映像更新器寫 inactive slot／ESP；助手不能原地改 `/usr` |
+| 助手層 | 另行版本化的 user-space 部署；Core 協調安裝交易、授權與能力綁定。未信任 QML／Cordis／原生程式在獨立程序與 OS 隔離內，不載入主 Shell／可信 hostd |
+| 資料層 | 可寫 `/etc`、`/var`、`/home`；Core 唯一寫 Profile／revision／grants／operation，插件資料經 Core 介面，秘密在系統 keyring。宿主僅持投影，Agent 只提計畫 |
+| 救援層 | 隨可信底座交付，無 Node／主 Shell／生成碼仍能操作；保護最近可用版本，檢查 store 相容性後才啟動舊 Core |
 
 UKI cmdline 配對 state label 與精確 `/usr` 版本 label；sysupdate 將 `/usr` payload 寫 inactive partition，UKI 寫 ESP。產品 transfer 必須同版本成組、保護 running slot、保留上一個 good 版本。D03 實作 boot counting；D03／D05 定義 health 回讀，只有健康且 store 相容才 bless。失敗須有重開／watchdog policy，boot counting 本身不能解決 hang。PoC 的兩次 tries 是測試值，產品次數與時窗待核定。
 
@@ -61,14 +61,8 @@ D04 是來源配方與套件 manifest 的唯一責任方：按 Ubuntu suite／�
 
 ## 依據、未選方案與限制
 
-本次讀取的本機證據根目錄為 `/data/hermes/ditto-runs/`：
+證據位置、來源 commit／映像 hash 與驗證範圍見 [D-51 §依據](../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md#依據)。Ubuntu UAT 是 virtio-vga＋llvmpipe 軟體繪製，非實體 GPU 驗收；UAT 用 autologin，repo 的 agreety 密碼登入未實測。Fedora UAT 的 TPM2 封存解鎖是另外實作、可移植至 Ubuntu 的測試 harness，不是 Fedora 底座的固有優勢。owner 外部 client 與人工接受仍 pending。
 
-- `distro-poc/CRITERIA.md`、`ubuntu/README.md` 及 `ubuntu/evidence/` C2–C9：2026-10-22 OVMF/KVM、mkosi 26-3、snapshot `20261020T000000Z`，UEFI／UKI、kernel `7.0.0-38-generic`、systemd `259.9-0ubuntu0.1`、ABI 8；sysupdate v1→v2、手動回退、health 兩次失敗後自動回 good v2，state markers 保留。soft-reboot 沒有換槽；未簽章 transfer 僅供 PoC，一次故障循環不代表 hang／斷電矩陣通過。
-- `distro-desktop-uat-20261024/ubuntu/work/README.md`、`evidence/result.json`、`parent-live-verification.json`：source `48593c3383353e25f07b6f247ae834cb92064911`（未含 #185），完整 DRM session、Foot／設定／portal／PipeWire 與測試 client 影像／鍵盤、冷開機重連已驗；keyring 冷開機後 locked。UAT 未重驗完整更新／回退，owner 外部 client 人工接受仍 pending。
-- Fedora 暫停而未否決：`distro-poc/fedora/round2/README.md` C1–C10 通過；`distro-desktop-uat-20261024/fedora/evidence/result.json` 有標準 bootc install、SELinux Enforcing／0 AVC、host＋TPM2 credential 解鎖 keyring。owner 集中 Ubuntu，避免同時維護兩個底座；這些有效比較證據保留。
-
-Ubuntu UAT 最終 `ditto-uat-ubuntu.raw` SHA256 為 `ee181cd8ee3f2a7a2b2d7fabf270865f67352d771645b6c53c4b2d01890a321d`；[repo 配方](../../packaging/distro/ubuntu/README.md) 由該 run 抽取並去除測試設定，尚未重跑，此 hash 不是 repo 重建證據。原 PoC source `d063f0357bfd3dc96e707072fe9e74c8722e3c98` 也與 UAT／本分支不同。pristine scan 無個人路徑與未核准 key，GnuTLS 公開 self-test blocks 按完整 SHA256 核准，不代表全面秘密偵測。
-
-D02–D10 可依 Ubuntu 方向開工，各切片出口仍待證據。Secure Boot、verity、認證更新通道、安裝器、NVIDIA／硬體、音效、效能、第二人重建與完整故障矩陣均未核定。Qt pin 與 source-built Wayfire 的安全維護由 D04／D12 接手。G0 參考機與 G3 固定模板證據仍保留原範圍。工期依剩餘工作另估。
+[repo 配方](../../packaging/distro/ubuntu/README.md) 由 UAT 抽取、尚未重建或開機資格驗證；一般模式與明確 dev 軟體繪製模式都保留這項限制。選型只解除方向等待，依賴就緒的契約切片才可開始；D08 仍須兩個 ready 切片，D10 仍須候選與證據。Secure Boot、verity、認證更新通道、安裝器、NVIDIA／硬體、音效、效能、第二人重建與完整故障矩陣均未核定。Qt pin 與 source-built Wayfire 的安全維護由 D04／D12 接手，G0／G3 歷史範圍不變，工期依剩餘工作另估。
 
 尚待 owner 核定 B suite／GA-HWE／通道／EOL、更新託管與維護責任、Secure Boot 金鑰路線、精確硬體、健康時窗／重試與資料保留政策；不重問 Ubuntu 優先與雙形式方向。

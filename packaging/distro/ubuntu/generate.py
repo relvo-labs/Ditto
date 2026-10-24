@@ -4,11 +4,12 @@
 import argparse
 import hashlib
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import re
 import shutil
 import tarfile
 import tempfile
+from runtime_policy import validate
 
 
 def digest(path):
@@ -26,6 +27,8 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--snapshot", default="20261020T000000Z")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--dev-software-render", action="store_true",
+                        help="TEST ONLY: allow software rendering in the generated session")
     args = parser.parse_args()
     for value, pattern in ((args.version, r"[0-9][A-Za-z0-9.\-]{0,31}"),
                            (args.snapshot, r"[0-9]{8}T[0-9]{6}Z"),
@@ -48,52 +51,16 @@ def main():
     if set(lock) - (expected.keys() | {"files", "symlinks"}):
         parser.error("runtime lock contains unsupported metadata")
 
-    # Explicit destination allowlist. No whole machine/cache tree is copied.
     runtime_files = lock.get("files", {})
     runtime_links = lock.get("symlinks", {})
-    if not isinstance(runtime_files, dict) or not isinstance(runtime_links, dict):
-        parser.error("runtime files/symlinks must be objects")
+    try:
+        validate(lock, args.runtime_tree)
+    except (ValueError, OSError) as error:
+        parser.error(str(error))
+    with tarfile.open(args.source_tar) as archive:
+        if archive.pax_headers.get("comment") != args.source_commit:
+            parser.error("source git archive PAX comment does not match source commit")
 
-    def allowed(name):
-        path = PurePosixPath(name)
-        return (not path.is_absolute() and ".." not in path.parts and
-                (name in {"usr/bin/quickshell", "usr/bin/wayfire",
-                          "usr/local/libexec/xdg-desktop-portal-wlr",
-                          "usr/lib/ditto-node/bin/node"} or
-                 name.startswith(("usr/lib/ditto/target/release/",
-                                  "usr/lib/ditto/packages/host-runtime/dist/",
-                                  "usr/lib/ditto/packages/agent-runtime/dist/",
-                                  "usr/lib/ditto/target/ditto-packages/",
-                                  "usr/lib/x86_64-linux-gnu/",
-                                  "usr/lib/wayfire/",
-                                  "usr/share/wayfire/", "usr/include/wayfire/",
-                                  "usr/share/doc/ditto-runtime/"))))
-
-    for name, sha in runtime_files.items():
-        source = args.runtime_tree / name
-        if (not allowed(name) or source.is_symlink() or
-                not source.is_file() or not re.fullmatch(r"[0-9a-f]{64}", sha) or
-                digest(source) != sha):
-            parser.error(f"invalid runtime file or digest: {name}")
-    for name, target in runtime_links.items():
-        link = args.runtime_tree / name
-        if (not allowed(name) or not isinstance(target, str) or
-                not link.is_symlink() or link.readlink().as_posix() != target):
-            parser.error(f"invalid runtime symlink: {name}")
-        # Resolve against an image root, not against the build host.
-        resolved = PurePosixPath(target) if target.startswith("/") else PurePosixPath(name).parent / target
-        parts = []
-        for part in resolved.parts:
-            if part in ("/", "."):
-                continue
-            if part == "..":
-                if not parts:
-                    parser.error(f"escaping runtime link: {name}")
-                parts.pop()
-            else:
-                parts.append(part)
-        if "/".join(parts) not in runtime_files:
-            parser.error(f"runtime link target must be a listed file: {name}")
     required = {"usr/bin/quickshell", "usr/bin/wayfire",
                 "usr/lib/ditto-node/bin/node", "usr/local/libexec/xdg-desktop-portal-wlr"}
     required |= {f"usr/lib/ditto/target/release/{name}" for name in
@@ -138,11 +105,11 @@ def main():
         profile.parent.mkdir(parents=True)
         shutil.copy2(source / "tests/g0/input-method/fcitx5-profile", profile)
         for name in runtime_files:
-            dest = extra / name
+            dest = output / "runtime" / name
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(args.runtime_tree / name, dest)
         for name, target in runtime_links.items():
-            dest = extra / name
+            dest = output / "runtime" / name
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.symlink_to(target)
         flags = " ".join(line.split("#")[0].strip() for line in
@@ -182,18 +149,31 @@ vt = 1
 command = "/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session"
 user = "_greetd"
 """)
-        # Generalize the successful tty conflict/udev patch; no device PCI address.
+        if args.dev_software_render:
+            launcher = output / "extra/usr/local/libexec/ditto-image-session"
+            launcher.write_text(launcher.read_text().replace(
+                "exec /usr/local/libexec/ditto-session",
+                "# TEST ONLY: GPU-less development run\n"
+                "export WLR_RENDERER_ALLOW_SOFTWARE=1 LIBGL_ALWAYS_SOFTWARE=1\n"
+                "exec /usr/local/libexec/ditto-session"))
+        # Actual bounded device readiness; settling udev alone is not equivalent.
         put("extra/etc/systemd/system/greetd.service.d/seat.conf", """[Unit]
 Conflicts=getty@tty1.service
 After=systemd-udev-settle.service
 Wants=systemd-udev-settle.service
+[Service]
+ExecStartPre=/usr/lib/ditto/wait-drm
 """)
         put("extra/usr/lib/systemd/network/20-wired.network", "[Match]\nName=en* eth*\n[Network]\nDHCP=yes\n")
         shutil.copytree(here / "repart.d", output / "mkosi.repart")
         shutil.copytree(here / "overlay", extra, dirs_exist_ok=True)
         shutil.copy2(here / "finalize.sh", output / "finalize.sh")
+        for helper in ("apply-runtime.py", "runtime_policy.py"):
+            shutil.copy2(here / helper, output / helper)
+        put("extra/usr/lib/ditto/wait-drm", (here / "wait-drm.py").read_text(), 0o755)
         put("extra/usr/share/ditto/image-inputs.json", json.dumps(expected | {"version": args.version,
-            "runtime_lock_sha256": digest(args.runtime_lock)}, indent=2) + "\n")
+            "runtime_lock_sha256": digest(args.runtime_lock),
+            "mode": "dev-software-render" if args.dev_software_render else "normal"}, indent=2) + "\n")
         put("extra/usr/share/ditto/runtime-lock.json", json.dumps(lock, indent=2) + "\n")
         packages = [line for line in (here / "packages.txt").read_text().splitlines()
                     if line and not line.startswith("#")]
@@ -219,6 +199,8 @@ FinalizeScripts=finalize.sh
 Bootable=yes
 Bootloader=systemd-boot
 KernelCommandLine=console=tty0 rw root=PARTLABEL=ditto-state mount.usr=PARTLABEL=ditto-usr-%v mount.usrflags=ro rd.systemd.gpt_auto=no systemd.gpt_auto=no
+[Build]
+BuildSources=.
 [Validation]
 SecureBoot=no
 """)

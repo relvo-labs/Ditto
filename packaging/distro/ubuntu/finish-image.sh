@@ -28,8 +28,9 @@ trap cleanup EXIT
 mount "${loop_device}p2" "$mount_dir"
 mount -o ro "${loop_device}p3" "$mount_dir/usr"
 mount "${loop_device}p1" "$mount_dir/boot"
-# tty conflict and generic udev readiness live in the generator, before splitting.
+# tty conflict and bounded DRM readiness live in the generator, before splitting.
 # No post-build /usr patch: split payloads must match the disk.
+python3 "$here/apply-runtime.py" --root "$mount_dir" --runtime-lock "$mount_dir/usr/share/ditto/runtime-lock.json"
 bootctl --root="$mount_dir" --esp-path=/boot --no-variables install
 test -s "$mount_dir/boot/EFI/BOOT/BOOTX64.EFI"
 find "$mount_dir/boot/EFI/Linux" -maxdepth 1 -name '*.efi' -type f -print -quit | grep -q .

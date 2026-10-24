@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import stat
+from runtime_policy import validate
 
 
 def main():
@@ -27,11 +28,16 @@ def main():
                 files[name] = hashlib.file_digest(stream, "sha256").hexdigest()
         elif not path.is_dir():
             parser.error(f"unsupported runtime object: {name}")
-    print(json.dumps({"source_commit": args.source_commit, "source_sha256": args.source_sha256,
+    lock = {"source_commit": args.source_commit, "source_sha256": args.source_sha256,
                       "snapshot": args.snapshot, "qt": "6.10.2", "node": "22.23.2", "rust": "1.98.1",
                       "quickshell_revision": "1a4716cde794a59928d9d9fc15f2afc7a95de360",
                       "wayfire_revision": "d39902379c5737eebe1dc3a830659fa3f0fa22e0",
-                      "files": files, "symlinks": links}, indent=2))
+                      "files": files, "symlinks": links}
+    try:
+        validate(lock, args.runtime_tree)
+    except (ValueError, OSError) as error:
+        parser.error(str(error))
+    print(json.dumps(lock, indent=2))
 
 
 if __name__ == "__main__":
