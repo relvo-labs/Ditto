@@ -13,6 +13,8 @@ import "../fixtures" as Fixtures
 // staging.json). Each scene is drawn from each tree with that tree's own
 // Tokens and the same fixture data, and the pixels must be equal. Same method
 // as tst_legacy.qml. Development evidence: offscreen software renderer.
+// #183 adds a search label and field in every theme: only Plugin Center rows
+// use the separately specified historical-plus-controls oracle tree.
 TestCase {
     id: testCase
     name: "UiStyleOffMatchesBase"
@@ -78,8 +80,8 @@ TestCase {
     function clear() {
         cleanup();
     }
-    function same(label, render) {
-        const before = render("base");
+    function same(label, render, expectedTree) {
+        const before = render(expectedTree || "base");
         clear();
         const after = render("current");
         clear();
@@ -150,9 +152,46 @@ TestCase {
         same("centers " + row.tag, tree => {
             const tokens = tokensOf(tree, row.appearance);
             make(tree, "shell/centers/Centers.qml", Object.assign({ client: client, tokens: tokens, page: row.page },
-                tree === "base" ? {conversation: offConversation} : {aiSettings: offConversation}));
+                tree === "current" ? {aiSettings: offConversation} : {conversation: offConversation}));
             return snapshot();
-        });
+        }, row.page === "plugins" ? "plugin-search" : "base");
+    }
+
+    // The pixel oracle above specifies appearance only; this separate test
+    // exercises the production search in every historical comparison mode.
+    function test_plugin_search_in_legacy_modes_data() { return appearances; }
+    function test_plugin_search_in_legacy_modes(row) {
+        const tokens = tokensOf("current", row.value);
+        const center = make("current", "shell/centers/Centers.qml", {client: client, tokens: tokens, page: "plugins", aiSettings: offConversation});
+        const page = center.currentPageItem;
+        verify(page !== null);
+        const field = findChild(page, "pluginSearchField");
+        const rows = findChild(page, "installedPluginRows");
+        const empty = findChild(page, "pluginSearchEmpty");
+        verify(field && field.visible && field.width > 0 && field.height > 0);
+        compare(field.accessibleName, "搜尋已安裝的插件");
+        compare(page.jelly, false);
+        const original = JSON.stringify([page.packages, page.entries]);
+        const reads = client.reads.length;
+        const writes = client.calls.length;
+        tryCompare(rows, "count", client.installed.length);
+        field.focusInput();
+        keyClick(Qt.Key_E);
+        keyClick(Qt.Key_Minus);
+        keyClick(Qt.Key_D);
+        tryCompare(rows, "count", 1); // e-dock, the package's active entry
+        compare(rows.itemAt(0).modelData.package_id, "ditto.dock.pill");
+        field.text = "<b>不存在</b>";
+        tryCompare(rows, "count", 0);
+        verify(empty.visible);
+        compare(empty.textFormat, Text.PlainText);
+        keyClick(Qt.Key_Escape);
+        compare(field.text, "");
+        tryCompare(rows, "count", client.installed.length);
+        verify(!empty.visible);
+        compare(JSON.stringify([page.packages, page.entries]), original);
+        compare(client.reads.length, reads);
+        compare(client.calls.length, writes);
     }
 
     // ---- chat and approval -------------------------------------------------------------

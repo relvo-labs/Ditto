@@ -33,3 +33,12 @@ G4 視覺 fixture 的 Centers 輸入同樣改為 `aiSettings`；舊版像素對�
 
 R1 修正另驗證兩個控制器的 inline facade 各自綁定擁有者；AI 內建頁與套件在未提供 facade 時，
 逐一觸發所有按鈕、選項與開關，不產生動作或 TypeError／ReferenceError。
+
+#183 R1：外部套件測試以 manifest 的版本建立 archive／解包路徑，不再假設五頁都是 1.0.0。
+插件頁供應者因新增搜尋升至 1.1.0；runtime fixture 從實際解包的 manifest 建立完整 PackageSummary，
+以 production-shaped EntryStatus（無虛構名稱欄位）與 manifest 描述驗證套件 ID、條目 ID、描述、無結果，
+並在查詢不變時切換 zh-TW／en，確認真正 `root:/sdk/Ditto/Ui` 的 PluginFilter 執行、重新篩選且不呼叫 Core。
+兩份實際頁面的 markup、符號、引號與 CJK 查詢另以表格檢查 `Text.PlainText` 及字面匹配。
+
+部署限制：新 archive 是 `ditto.settings.plugins-1.1.0.dittopkg`。安裝新版不會自動改變既有 Profile 的精確版本綁定；
+仍固定 1.0.0 的條目須經明確的既有升版 ChangeSet 才啟用新版。本修復不更動 live Profile，也不處理 #144。

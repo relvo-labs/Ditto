@@ -2990,6 +2990,10 @@
         <translation>可填的位置</translation>
     </message>
     <message>
+        <source>名稱、ID、說明或條目</source>
+        <translation>名稱、ID、說明或條目</translation>
+    </message>
+    <message>
         <source>啟動原因：%1</source>
         <translation>啟動原因：%1</translation>
     </message>
@@ -3114,6 +3118,10 @@
         <translation>插件服務宿主</translation>
     </message>
     <message>
+        <source>搜尋已安裝的插件</source>
+        <translation>搜尋已安裝的插件</translation>
+    </message>
+    <message>
         <source>撤銷這項授權</source>
         <translation>撤銷這項授權</translation>
     </message>
@@ -3156,6 +3164,10 @@
     <message>
         <source>沒有啟動成功</source>
         <translation>沒有啟動成功</translation>
+    </message>
+    <message>
+        <source>沒有符合「%1」的插件。</source>
+        <translation>沒有符合「%1」的插件。</translation>
     </message>
     <message>
         <source>無法讀取這個套件</source>
