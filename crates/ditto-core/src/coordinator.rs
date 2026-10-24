@@ -21,8 +21,9 @@ use std::{
 use ditto_protocol::{
     catalog,
     change::{
-        ChangeMode, ChangeOp, ChangeOrigin, ChangeRecord, ChangeState, Confirmation, HotSwapLevel,
-        OutcomeItem, OutcomeStatus, PreflightCode, SavedOnlyReason,
+        ChangeMode, ChangeOp, ChangeOrigin, ChangeRecord, ChangeState, Confirmation,
+        ConfirmationEndReason, HotSwapLevel, OutcomeItem, OutcomeStatus, PreflightCode,
+        SavedOnlyReason,
     },
     ids,
     participant::{
@@ -313,6 +314,7 @@ impl Coordinator {
             self.core.hosts.ensure_started();
         }
         self.recover();
+        self.recover_deleted_previews();
         // Every in-flight ChangeSet now has its outcome: settle the tool
         // calls whose result was lost with what Core can prove, never by
         // running them again (G2-AGENT-10).
@@ -1801,6 +1803,10 @@ impl Coordinator {
                 })?;
             }
             Confirmation::Confirmed { .. } | Confirmation::NotRequired => {}
+            Confirmation::Ended { .. } => return Err(CoreError::conflict(
+                ConflictReason::AlreadyTerminal,
+                "the preview already ended without reverting because its composition was deleted",
+            )),
             Confirmation::Reverted { .. } => {
                 return Err(CoreError::conflict(
                     ConflictReason::AlreadyTerminal,
@@ -1822,14 +1828,20 @@ impl Coordinator {
         if !matches!(stored.record.confirmation, Confirmation::Pending { .. }) {
             return;
         }
-        let outcome = self.revert(
-            &stored,
-            ChangeOrigin::TimedRevert {
-                reverts: change_id.into(),
-            },
-        );
+        let outcome = if stored.record.profile_deleted {
+            self.end_deleted_preview(&stored).map(|()| None)
+        } else {
+            self.revert(
+                &stored,
+                ChangeOrigin::TimedRevert {
+                    reverts: change_id.into(),
+                },
+            )
+            .map(Some)
+        };
         match outcome {
-            Ok(record) => {
+            Ok(None) => {}
+            Ok(Some(record)) => {
                 let _ = self.store.write(|tx| {
                     if let Some(revision) = &stored.record.committed_revision {
                         profiles::set_pending_confirmation(tx, revision, false)?;
@@ -1855,6 +1867,33 @@ impl Coordinator {
                 ],
             ),
         }
+    }
+
+    /// A pre-#171 database can contain this state. Settle the confirmation
+    /// and its revision flag atomically, without creating a revert change,
+    /// moving any head, or contacting a participant.
+    fn end_deleted_preview(&mut self, stored: &StoredChange) -> Result<(), CoreError> {
+        let change_id = &stored.record.change_id;
+        self.store.write(|tx| {
+            if let Some(revision) = &stored.record.committed_revision {
+                profiles::set_pending_confirmation(tx, revision, false)?;
+            }
+            changes::set_confirmation(
+                tx,
+                change_id,
+                &Confirmation::Ended {
+                    at: ditto_store::time::now(),
+                    reason: ConfirmationEndReason::ProfileDeleted,
+                },
+            )
+        })?;
+        let record = self.record(change_id)?;
+        self.announce(&record);
+        crate::log::event(
+            "change.preview_ended",
+            &[("change_id", change_id), ("reason_code", "profile_deleted")],
+        );
+        Ok(())
     }
 
     /// Cancel before or during a pending confirmation. A change already past
@@ -2332,6 +2371,51 @@ impl Coordinator {
     }
 
     // ---- recovery ---------------------------------------------------------------
+
+    /// Committed confirmations are not in `in_flight`. Restore countdowns
+    /// only for legacy deleted Profiles; the broader live-Profile restart
+    /// gap is outside #175. Elapsed deadlines settle before boot completes.
+    fn recover_deleted_previews(&mut self) {
+        let pending = match changes::pending_deleted_previews(self.store.connection()) {
+            Ok(pending) => pending,
+            Err(error) => {
+                crate::log::event(
+                    "recovery.deleted_previews_read_failed",
+                    &[
+                        ("reason", &error.to_string()),
+                        ("reason_code", crate::log::store_error_code(&error)),
+                    ],
+                );
+                return;
+            }
+        };
+        for stored in pending {
+            let Confirmation::Pending { deadline } = &stored.record.confirmation else {
+                continue;
+            };
+            let Some(deadline) = ditto_store::time::parse_unix_millis(deadline) else {
+                crate::log::event(
+                    "recovery.invalid_confirmation_deadline",
+                    &[
+                        ("change_id", &stored.record.change_id),
+                        ("reason_code", "invalid"),
+                    ],
+                );
+                continue;
+            };
+            let remaining = deadline.saturating_sub(ditto_store::time::unix_millis_now());
+            if remaining <= 0 {
+                self.confirm_deadline(&stored.record.change_id);
+            } else {
+                self.schedule(
+                    Duration::from_millis(remaining as u64),
+                    TimerKind::ConfirmDeadline,
+                    &stored.record.change_id,
+                    "",
+                );
+            }
+        }
+    }
 
     /// Boot recovery (plan/03/02 §13): no change is left between states.
     /// Nothing with side effects is retried; what cannot be decided from a

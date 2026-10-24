@@ -337,9 +337,27 @@ pub struct OutcomeItem {
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum Confirmation {
     NotRequired,
-    Pending { deadline: String },
-    Confirmed { at: String },
-    Reverted { by_change: String },
+    Pending {
+        deadline: String,
+    },
+    Confirmed {
+        at: String,
+    },
+    Reverted {
+        by_change: String,
+    },
+    /// The countdown ended without a revert. The committed change remains
+    /// historical fact; this does not claim that its settings were restored.
+    Ended {
+        at: String,
+        reason: ConfirmationEndReason,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfirmationEndReason {
+    ProfileDeleted,
 }
 
 /// The change card: prototype contract (kind, title, items, footnote), with

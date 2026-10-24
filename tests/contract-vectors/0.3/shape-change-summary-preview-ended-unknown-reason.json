@@ -1,0 +1,26 @@
+{
+ "kind": "shape",
+ "description": "#175：ended 的 reason 是封閉集合，未知原因必須拒絕。",
+ "type": "change-summary",
+ "valid": false,
+ "value": {
+  "change_id": "chg-01M5KQSRKJZ9SGQFT6APYPYPPA",
+  "profile_id": "prf-01M5KQSRHXBJMCS80YTK7ST6JG",
+  "state": "committed",
+  "result": "succeeded",
+  "origin": {
+   "kind": "cli"
+  },
+  "hot_swap_level": "instant",
+  "title_key": "change.title.appearance",
+  "committed_revision": "rev-01M5KQSRKJZ9SGQFT6APYPYPPB",
+  "confirmation": {
+   "state": "ended",
+   "at": "2026-10-24T00:00:00.000Z",
+   "reason": "unknown"
+  },
+  "created_at": "2026-10-23T00:00:00.000Z",
+  "updated_at": "2026-10-23T00:00:00.000Z",
+  "profile_deleted": true
+ }
+}

@@ -4535,8 +4535,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -5430,8 +5457,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -6188,8 +6242,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "HotSwapLevel": {
             "enum": [
@@ -6757,8 +6838,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -7654,8 +7762,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -8550,8 +8685,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -12203,8 +12365,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -16280,8 +16469,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -17177,8 +17393,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -18137,8 +18380,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,
@@ -28681,8 +28951,35 @@
                   "by_change"
                 ],
                 "type": "object"
+              },
+              {
+                "description": "The countdown ended without a revert. The committed change remains\nhistorical fact; this does not claim that its settings were restored.",
+                "properties": {
+                  "at": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "$ref": "#/$defs/ConfirmationEndReason"
+                  },
+                  "state": {
+                    "const": "ended",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "state",
+                  "at",
+                  "reason"
+                ],
+                "type": "object"
               }
             ]
+          },
+          "ConfirmationEndReason": {
+            "enum": [
+              "profile_deleted"
+            ],
+            "type": "string"
           },
           "DiffItem": {
             "additionalProperties": false,

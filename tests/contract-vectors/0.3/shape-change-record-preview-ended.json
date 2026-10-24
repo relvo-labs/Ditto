@@ -1,0 +1,44 @@
+{
+ "kind": "shape",
+ "description": "#175：舊資料庫中的試看所屬 Profile 已刪除；倒數結束但沒有回復，原提交紀錄不改寫。",
+ "type": "change-record",
+ "valid": true,
+ "value": {
+  "change_id": "chg-01M5KQSRKJZ9SGQFT6APYPYPPA",
+  "profile_id": "prf-01M5KQSRHXBJMCS80YTK7ST6JG",
+  "base_revision": "rev-01M5KQSRHXBJMCS80YTK7ST6JH",
+  "committed_revision": "rev-01M5KQSRKJZ9SGQFT6APYPYPPB",
+  "state": "committed",
+  "result": "succeeded",
+  "hot_swap_level": "instant",
+  "origin": {
+   "kind": "cli"
+  },
+  "idempotency_key": null,
+  "ops": [
+   {
+    "op": "set_value",
+    "path": "/appearance/tokens/accent",
+    "before": "#b9a4ff",
+    "after": "#123456"
+   }
+  ],
+  "card": {
+   "kind": "appearance",
+   "title_key": "change.title.appearance",
+   "title_args": {},
+   "items": []
+  },
+  "reasons": [],
+  "items": [],
+  "confirmation": {
+   "state": "ended",
+   "at": "2026-10-24T00:00:00.000Z",
+   "reason": "profile_deleted"
+  },
+  "operations": [],
+  "created_at": "2026-10-23T00:00:00.000Z",
+  "updated_at": "2026-10-23T00:00:00.000Z",
+  "profile_deleted": true
+ }
+}

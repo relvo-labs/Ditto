@@ -484,6 +484,8 @@ QtObject {
         if (change.confirmation && change.confirmation.state === "pending") {
             table[change.change_id] = change;
         } else {
+            // Includes ended/profile_deleted: Core settled the countdown
+            // without a revert, so the preview bar must release this change.
             delete table[change.change_id];
         }
         pendingConfirmations = table;

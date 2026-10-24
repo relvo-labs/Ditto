@@ -21,6 +21,10 @@ QtObject {
         return !!record && !!record.confirmation && record.confirmation.state === "pending";
     }
 
+    function endedConfirmation(record) {
+        return !!record && !!record.confirmation && record.confirmation.state === "ended";
+    }
+
     /// A `scheduled` result is saved but not in effect: at the next login
     /// (session_restart level) or back in normal mode (a service change made
     /// in rescue mode). A summary has no items, so its hot-swap level decides.
@@ -64,6 +68,7 @@ QtObject {
     function undoable(record) {
         return !!record && record.state === "committed"
             && !(record.confirmation && record.confirmation.state === "reverted")
+            && !endedConfirmation(record)
             && !profileDeleted(record);
     }
 
@@ -71,6 +76,9 @@ QtObject {
     function stateLabel(record) {
         if (!record) {
             return "";
+        }
+        if (endedConfirmation(record)) {
+            return t(qsTr("試看已結束"));
         }
         switch (record.state) {
         case "draft":
@@ -123,6 +131,9 @@ QtObject {
         if (!record) {
             return "neutral";
         }
+        if (endedConfirmation(record)) {
+            return "neutral";
+        }
         switch (record.state) {
         case "committed":
             if (savedOnly(record) && profileDeleted(record)) {
@@ -154,6 +165,9 @@ QtObject {
     function outcomeSentence(record) {
         if (!record) {
             return "";
+        }
+        if (endedConfirmation(record)) {
+            return t(qsTr("試看已結束；這個組合已刪除，所以沒有回復。"));
         }
         switch (record.state) {
         case "committed":

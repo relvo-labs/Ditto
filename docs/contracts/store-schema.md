@@ -42,6 +42,8 @@
 
 `changesets.saved_only`（schema 6，可為 NULL，只接受 `inactive_profile`）：變更寫進非作用中的 Profile、沒有套用到桌面時，在提交的同一交易寫入（[protocol-0.2 §8.2](protocol-0.2.md#82-狀態與結果類別)）。遷移只加欄位，不回填：schema 6 之前寫入的列一律是 NULL。NULL 只表示沒有這個標記，不代表變更已套用到桌面（舊列中也有被拒絕、已排程等結果），變更的結果仍以 `state` 與 `result` 為準。與先前各版相同，v5 build 不能開啟 v6，遷移前的整庫備份照常保留。讀取紀錄時，`saved_only.profile_name` 與紀錄層級的 `profile_deleted`（#171，每筆紀錄都算，不只 `saved_only`）都由 `profiles` 的同一列算出（`name`、`deleted_at IS NOT NULL`），不論該 Profile 是否已軟刪除；兩者都不存進 `changesets`，所以沒有新的遷移。
 
+`changesets.confirmation_json` 的 `ended { at, reason: profile_deleted }`（#175）：舊資料中已刪除 Profile 的試看倒數到期或被取消時，Core 在同一交易寫入此確認終態並清除 `revision_flags.pending_confirmation`。只結束確認，不改寫交易結果、不產生回復 revision；沿用 JSON 欄位，schema 仍為 6，沒有遷移。新 build 可讀舊 JSON；舊 build 不認得新 enum 分支，不能承諾它能讀回 `ended`。
+
 ## 3. 寫入順序與故障語意
 
 - **先寫紀錄再做副作用。** Coordinator 每次改狀態都先提交該轉換，再呼叫參與者；每一步參與者呼叫在 `operations` 先記 `started` 再送出。Core 在任何時點被殺，重啟後都能從資料庫知道做到哪裡。

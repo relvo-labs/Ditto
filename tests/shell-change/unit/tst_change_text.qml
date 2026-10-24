@@ -208,4 +208,23 @@ TestCase {
         const rejected = { state: "rejected", result: "failed", confirmation: { state: "not_required" } };
         compare(words.stateLabel(rejected), "未通過檢查");
     }
+    function test_an_ended_preview_promises_no_revert_or_confirmation_action() {
+        for (const record of [appliedDeletedRecord(), savedSummary()]) {
+            record.confirmation = { state: "ended", at: "2026-10-24T00:00:00.000Z", reason: "profile_deleted" };
+            record.profile_deleted = true;
+            compare(words.stateLabel(record), "試看已結束");
+            compare(words.outcomeSentence(record), "試看已結束；這個組合已刪除，所以沒有回復。");
+            compare(words.tone(record), "neutral");
+            verify(!words.pendingConfirmation(record));
+            verify(!words.undoable(record));
+            verify(words.terminal(record));
+            for (const said of [words.stateLabel(record), words.outcomeSentence(record)]) {
+                verify(said.indexOf("保留") < 0, said);
+                verify(said.indexOf("取消") < 0, said);
+                verify(said.indexOf("逾時") < 0, said);
+                verify(said.indexOf("已回復") < 0, said);
+            }
+        }
+    }
+
 }

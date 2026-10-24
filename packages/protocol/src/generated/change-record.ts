@@ -20,7 +20,14 @@ export type Confirmation =
       by_change: string;
       state: 'reverted';
       [k: string]: unknown;
+    }
+  | {
+      at: string;
+      reason: ConfirmationEndReason;
+      state: 'ended';
+      [k: string]: unknown;
     };
+export type ConfirmationEndReason = 'profile_deleted';
 export type HotSwapLevel = 'instant' | 'controlled_handoff' | 'host_restart' | 'session_restart';
 export type OutcomeStatus = ('applied' | 'failed' | 'restored' | 'not_restored' | 'pending') | 'scheduled';
 /**

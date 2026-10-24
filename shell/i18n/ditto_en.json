@@ -481,6 +481,8 @@
   "試看": "Try it",
   "試看中，等待保留": "Trying, waiting to be kept",
   "試看列": "Try-it bar",
+  "試看已結束": "Preview ended",
+  "試看已結束；這個組合已刪除，所以沒有回復。": "The preview ended; this composition was deleted, so nothing was reverted.",
   "語法檢查": "Checking syntax",
   "語言": "Language",
   "請先輸入名稱": "Enter a name first",

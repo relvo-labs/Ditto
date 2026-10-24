@@ -689,6 +689,14 @@
         <source>（無）</source>
         <translation>（無）</translation>
     </message>
+    <message>
+        <source>試看已結束</source>
+        <translation>試看已結束</translation>
+    </message>
+    <message>
+        <source>試看已結束；這個組合已刪除，所以沒有回復。</source>
+        <translation>試看已結束；這個組合已刪除，所以沒有回復。</translation>
+    </message>
 </context>
 <context>
     <name>ChatBody</name>

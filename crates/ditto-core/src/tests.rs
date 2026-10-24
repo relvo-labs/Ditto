@@ -4,9 +4,9 @@
 //! back, so a lying fake is how readback mismatches are tested.
 
 mod builtin_profiles;
-mod deleted_preview;
 mod config_schema_coordinator;
 mod config_schema_preflight;
+mod deleted_preview;
 mod generation_transactions;
 mod inactive_profile;
 mod shell_extensions;

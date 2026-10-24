@@ -243,6 +243,21 @@ pub fn pending_confirmation_of(
         .optional()?)
 }
 
+/// Legacy previews whose Profile was deleted before #171's delete guard.
+/// Committed changes are outside `in_flight`; Core restores only these
+/// countdowns at boot (#175), without changing live-Profile recovery.
+pub fn pending_deleted_previews(connection: &Connection) -> StoreResult<Vec<StoredChange>> {
+    let mut statement = connection.prepare(&format!(
+        "SELECT {COLUMNS} FROM changesets WHERE state = 'committed'
+           AND json_extract(confirmation_json, '$.state') = 'pending'
+           AND EXISTS (SELECT 1 FROM profiles p WHERE p.profile_id = changesets.profile_id
+                       AND p.deleted_at IS NOT NULL)
+         ORDER BY change_id"
+    ))?;
+    let rows = statement.query_map([], row)?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
 /// Changes a crash may have left between states.
 pub fn in_flight(connection: &Connection) -> StoreResult<Vec<StoredChange>> {
     let mut statement = connection.prepare(&format!(

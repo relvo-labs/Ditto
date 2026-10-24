@@ -9,4 +9,4 @@ qt="${QT_PREFIX:?QT_PREFIX required}"
 mkdir -p "$out"
 cd "$root"
 export QT_QPA_PLATFORM=offscreen
-"$qt/bin/qmltestrunner" -import "$root/tests/g4/visual/stubs" -input "$here/unit" > "$out/change-text.log" 2>&1
+"$qt/bin/qmltestrunner" -import "$root/tests/g4/visual/stubs" -import "$here/stubs" -input "$here/unit" > "$out/change-text.log" 2>&1

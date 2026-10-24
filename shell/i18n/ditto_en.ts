@@ -689,6 +689,14 @@
         <source>（無）</source>
         <translation>(none)</translation>
     </message>
+    <message>
+        <source>試看已結束</source>
+        <translation>Preview ended</translation>
+    </message>
+    <message>
+        <source>試看已結束；這個組合已刪除，所以沒有回復。</source>
+        <translation>The preview ended; this composition was deleted, so nothing was reverted.</translation>
+    </message>
 </context>
 <context>
     <name>ChatBody</name>

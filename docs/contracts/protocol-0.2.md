@@ -187,6 +187,8 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 
 `result = scheduled`：變更已存成 revision（`state = committed`、head 已移動），但**還沒有任何東西生效**——`items[]` 全部是 `scheduled`，原因 `next_login`（§8.4 的 `session_restart`）或 `rescue_mode`（救援模式下只動到 hostd 的變更，回到一般模式時生效）。介面只能呈現為「待下次登入套用」或「回到一般模式後套用」，不得寫成已套用。判定規則在 `ditto_protocol::change::result_of`，store 的 `result_kind` 欄與回應用同一條。
 
+`confirmation` 是獨立於交易 `state`／`result` 的確認狀態，紀錄與摘要相同：`not_required`、`pending { deadline }`、`confirmed { at }`、`reverted { by_change }`、`ended { at, reason }`。`ended` 表示倒數已結束、沒有執行回復，`reason` 是封閉集合，目前只有 `profile_deleted`（#175，§8.5）；原變更仍是 `committed`，不把過去的提交改寫成失敗或已回復。
+
 ### 8.3 預檢
 
 `draft → validated` 依序執行十三項，**全部跑完**才回報（一次看到所有問題），任一失敗即 `rejected`，回應為 `preflight_rejected`，`data.reasons[]` 每項：
@@ -227,7 +229,11 @@ rejected             aborted   rolling_back ─► rolled_back ｜ partially_app
 - 全部一致 → 同一個 SQLite 交易內 INSERT 新 revision、移動 head、`committed`，發布 `change_updated` 與 `profile_changed`。
 - 限時回復（CHG-09）：主要快捷鍵、輸出縮放與排列、鍵盤配置、減少透明度關閉。提交後 `confirmation = { "state": "pending", "deadline": "<ISO 8601>" }`，15 秒內 `desktop.changes.confirm` 才轉為 `confirmed`；逾時由 Core 的計時器自動產生 `origin = timed_revert` 的回復變更。**Shell 死掉不會中斷倒數。** 倒數期間若已切換到別的 Profile，回復變更只改原 Profile 的文件，桌面不動（§8.1）。
 - 試看（`mode: preview`）：與限時回復同一機制，差別只在「一律倒數」與歷史中的來源描述。
-- 倒數中的變更所屬的 Profile 不能刪除（#171）：`desktop.profiles.delete` 回 `conflict`（`change_in_progress`），`message` 說明要先保留或回復，或等倒數結束自動回復，什麼都不刪、不發布事件。限時回復改的是那個 Profile 的文件，刪除後就沒有文件可回復，倒數會一直停在 `pending`。檢查與刪除在同一個 Core 協調回合內進行，和倒數不會互相競爭。刪除作用中的 Profile 仍是 `profile_in_use`。
+- 倒數中的變更所屬的 Profile 不能刪除（#171）：`desktop.profiles.delete` 回 `conflict`（`change_in_progress`），`message` 說明要先保留或回復，或等倒數結束自動回復，什麼都不刪、不發布事件。限時回復改的是那個 Profile 的文件，舊版在刪除後找不到可回復的 Profile，倒數會一直停在 `pending`；舊資料的收尾見下一項。檢查與刪除在同一個 Core 協調回合內進行，和倒數不會互相競爭。刪除作用中的 Profile 仍是 `profile_in_use`。
+
+- 舊資料庫中 Profile 已軟刪除、確認仍是 `pending`（#175）：倒數到期或 `desktop.changes.cancel` 時，Core 把確認改為 `{ "state": "ended", "at": "<ISO 8601>", "reason": "profile_deleted" }`，並在同一 SQLite 交易清除該變更所提交 revision 的 `pending_confirmation`。不建立回復 ChangeSet、不移動任何 head、不呼叫參與者、不改變目前桌面；發布 `change_updated`，記錄 `change.preview_ended`（`reason_code = profile_deleted`）。介面說「試看已結束；這個組合已刪除，所以沒有回復。」，不得繼續倒數、承諾逾時回復或提供保留／取消。已 `ended` 再呼叫 `confirm` 或 `cancel` 都回 `conflict`（`already_terminal`），不改寫原紀錄；尚未結束時的 `confirm` 仍可轉成 `confirmed`。
+- 啟動時只為上述已刪除 Profile 的已提交 `pending` 變更恢復倒數：期限已過的在 boot 完成前轉為同一 `ended`，未到期的重新掛上剩餘時間的 Core 計時器。**已知限制**：既有 boot／recover 不會為仍存在的 Profile 重新掛確認計時器；本次不修改這個較廣的重啟缺口。
+- 相容性：`ended` 是新增 wire enum 分支，舊讀者會拒絕它，不能宣稱向後相容；新讀者仍接受原本四種確認狀態。取捨與 `saved_only`／`profile_deleted` 相同，本次不另改協定版本或其他版本。確認存於 `changesets.confirmation_json`，不新增 store migration。
 
 ### 8.6 撤銷
 
