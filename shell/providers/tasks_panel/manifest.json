@@ -7,7 +7,7 @@
     "en": "Tasks panel"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "顯示與編輯待辦服務的項目。",

@@ -7,7 +7,7 @@
     "en": "Pill dock"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "停靠在左側或底部的膠囊，顯示釘選的應用與執行中指示。",

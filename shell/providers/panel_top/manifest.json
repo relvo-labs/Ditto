@@ -7,7 +7,7 @@
     "en": "Top panel"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "工作區、作用中視窗、音量、網路、時鐘與 Ditto 選單。",

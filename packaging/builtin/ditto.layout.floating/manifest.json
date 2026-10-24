@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "name": { "zh-TW": "浮動視窗", "en": "Floating windows" },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": { "zh-TW": "布局策略：浮動視窗。由 Core 經合成器轉接套用。", "en": "Layout strategy: Floating windows, applied by Core through the compositor adapter." },
   "plugin_kind": "declarative_bundle",

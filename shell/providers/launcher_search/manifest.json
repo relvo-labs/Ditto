@@ -7,7 +7,7 @@
     "en": "Search launcher"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "中央搜尋框，輸入即搜。",

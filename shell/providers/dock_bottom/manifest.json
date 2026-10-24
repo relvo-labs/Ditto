@@ -7,7 +7,7 @@
     "en": "Window list dock"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "底部置中，列出執行中的視窗。",

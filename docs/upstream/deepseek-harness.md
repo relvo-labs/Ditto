@@ -63,7 +63,7 @@ Ditto 是獨立專案，與 DeepSeek 沒有隸屬關係，也沒有取得 DeepSe
 ## 5. 授權與署名義務
 
 - 每份複製的 Harness 或 Cordis 程式碼都要保留上游 `LICENSE`。目前 `packages/host-runtime/vendor/*/LICENSE` 隨原始碼保存，G2 的 `packages/agent-runtime/vendor/harness/LICENSE` 隨 PR #13 加入；內嵌 vendored Cordis 的 bundle 由 `packages/host-runtime/scripts/notice.mjs` 在檔頭加上授權聲明。
-- 本紀錄只說明啟發與來源，不改變任何授權義務。Ditto 自己的專案授權尚未指定（見 README）。
+- 本紀錄只說明啟發與來源，不改變上游授權義務。Ditto 自有程式碼已依 [D-52](../../docs/product/2026-10-25-d52-mit-license.md) 採 [MIT](../../LICENSE)；第三方程式碼仍依各自授權。
 - 發行前的完整授權盤點屬 G4-PLAT-04，由 `ditto-release-audit` 彙整。
 - 引用 Harness 時，使用上游 README 提供的格式：
 

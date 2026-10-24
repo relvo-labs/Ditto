@@ -118,7 +118,9 @@ AI-native OS 描述的是整個工作環境的互動與控制方式。Linux 核�
 
 Ditto 的組合設計深受 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 啟發，桌面服務宿主沿用其 vendored [Cordis](https://github.com/cordiverse/cordis) fork。概念借鑑、實際取用程式碼與 Ditto 自行新增的桌面交易／回讀能力分別記錄在[來源導覽](docs/upstream/deepseek-harness.md)、[Cordis 移植紀錄](docs/upstream/cordis-port.md)與 [Agent 值模組移植紀錄](docs/upstream/harness-g2-port.md)。
 
-Ditto 是獨立專案，與 DeepSeek 沒有隸屬或背書關係。Ditto 自有程式碼目前未指定開源授權（[Cargo.toml](Cargo.toml) 為 `UNLICENSED`）；DeepSeek Harness 採 MIT，實際取用的上游程式碼仍須保留各自的 LICENSE／NOTICE。相關法律裁定依 [D-49](.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 由 owner 負責。
+Ditto 是獨立專案，與 DeepSeek 沒有隸屬或背書關係。Ditto 自有程式碼依 owner 2026-10-25 的 [D-52 決定](docs/product/2026-10-25-d52-mit-license.md) 採 [MIT 授權](LICENSE)，著作權為 `2026 Ditto contributors`。Linux、Ubuntu、Qt、Wayfire 等相依元件、第三方插件與素材仍依各自授權；上游程式碼的 LICENSE／NOTICE 必須保留。名稱、商標、角色與美術素材、owner／使用者生成物不因本決定而取得 MIT 授權；完整映像與第三方義務也未因此完成法律審查。其餘法律裁定仍依 [D-49](.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 由 owner 負責。
+
+來源授權一致性檢查：依 `.nvmrc` 啟用 Node 後，執行 `node scripts/check-license.mjs` 與 `node --test scripts/check-license.test.mjs`。此檢查不代替發行包的完整授權盤點。
 
 ---
 

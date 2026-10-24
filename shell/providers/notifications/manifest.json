@@ -7,7 +7,7 @@
     "en": "Notification area"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "顯示、合併與關閉通知；規則由通知策略服務決定。",
