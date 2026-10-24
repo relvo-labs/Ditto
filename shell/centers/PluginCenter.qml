@@ -371,6 +371,7 @@ Flickable {
                 width: parent.width
                 wrapMode: Text.WordWrap
                 text: page.t(qsTr("沒有符合「%1」的插件。")).arg(pluginSearch.text)
+                textFormat: Text.PlainText
                 color: page.tokens.appInkMuted
                 font.pixelSize: page.tokens.appFontBody
                 Accessible.role: Accessible.StaticText

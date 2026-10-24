@@ -92,6 +92,46 @@ TestCase {
             {tag: "packaged", url: "../shell/providers/settings_plugins/qml/PluginCenter.qml"}
         ];
     }
+    function test_literal_query_data() {
+        const rows = [];
+        for (const page of test_pages_data()) {
+            for (const query of [
+                {tag: "bold", text: "<b>foo</b>"},
+                {tag: "image", text: "<img src='missing.png'>"},
+                {tag: "ampersand", text: "&"},
+                {tag: "quotes", text: "\"quoted\" 'query'"},
+                {tag: "cjk", text: "沒有這個插件"}
+            ]) rows.push({tag: page.tag + "/" + query.tag, url: page.url, query: query.text});
+        }
+        return rows;
+    }
+    function test_literal_query(data) {
+        const component = Qt.createComponent(Qt.resolvedUrl(data.url));
+        compare(component.status, Component.Ready, component.errorString());
+        const client = createTemporaryObject(clientFactory, testCase);
+        const page = createTemporaryObject(component, testCase, {client: client, tokens: tokens, width: 1000, height: 760});
+        verify(page !== null);
+        page.packages = [summary()];
+        const original = JSON.stringify(page.packages);
+        const calls = client.calls.length;
+        const field = findChild(page, "pluginSearchField");
+        const empty = findChild(page, "pluginSearchEmpty");
+        const rows = findChild(page, "installedPluginRows");
+        field.text = data.query;
+        tryCompare(rows, "count", 0);
+        verify(empty.visible);
+        compare(empty.text, "沒有符合「" + data.query + "」的插件。");
+        compare(empty.textFormat, Text.PlainText, "queries must never be interpreted as markup");
+        compare(JSON.stringify(page.packages), original);
+        // The very same characters are a literal match when supplied as a name.
+        page.packages = [Object.assign(summary(), {name: data.query})];
+        tryCompare(rows, "count", 1);
+        verify(!empty.visible);
+        field.text = "";
+        tryCompare(rows, "count", 1);
+        compare(client.calls.length, calls);
+        page.destroy();
+    }
     function test_pages(data) {
         const component = Qt.createComponent(Qt.resolvedUrl(data.url));
         compare(component.status, Component.Ready, component.errorString());

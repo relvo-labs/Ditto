@@ -4,6 +4,7 @@
 // DITTO_UI_STYLE and require the same pixels:
 //   .staged/ui116/base/shell/…     the files at BASE (87a2462, PR #115)
 //   .staged/ui116/current/shell/…  the working tree
+//   .staged/ui116/plugin-search/… BASE plus the explicit #183 controls fixture
 //   .staged/ui116/<sha7>/shell/…   each ref given on the command line (a RED run)
 // and, for unit/tst_ui_style_frameless.qml, `<tree>-native` for the current
 // tree and each given ref: the same files with Centers, ChatWindow and
@@ -49,11 +50,26 @@ for (const path of [...dirs, ...files]) {
 }
 
 const report = [];
+// #183: a separate Plugin Center oracle, built only from pinned historical
+// sources plus a reviewed static specification of the two accepted controls.
+// Keep BASE and its other page/control/chat/Dock comparisons untouched.
+cpSync(join(out, 'base'), join(out, 'plugin-search'), { recursive: true });
+const pluginPage = 'shell/centers/PluginCenter.qml';
+const pluginPath = join(out, 'plugin-search', pluginPage);
+const pluginSource = readFileSync(pluginPath, 'utf8');
+const pluginFixture = readFileSync(join(here, 'fixtures/plugin-search-controls.qml.inc'), 'utf8');
+const packageList = '            Repeater {\n                model: page.packages';
+if (pluginSource.split(packageList).length !== 2) throw new Error('Historical Plugin Center package list changed');
+const pluginExpected = pluginSource.replace(packageList, pluginFixture + packageList);
+writeFileSync(pluginPath, pluginExpected);
+report.push({ tree: 'plugin-search', file: pluginPage, source_ref: BASE, source_sha256: sha(pluginSource),
+  fixture: 'fixtures/plugin-search-controls.qml.inc', fixture_sha256: sha(pluginFixture),
+  staged_sha256: sha(pluginExpected), adaptation: 'Only the accepted search label and empty field are added to the historical installed list' });
 const walk = (dir) => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
   return statSync(path).isDirectory() ? walk(path) : [path];
 });
-for (const tree of ['base', 'current', ...extra]) {
+for (const tree of ['base', 'plugin-search', 'current', ...extra]) {
   for (const path of walk(join(out, tree)).filter((p) => p.endsWith('.qml'))) {
     const source = readFileSync(path, 'utf8');
     const removed = [];

@@ -21,18 +21,24 @@ cp "$root/tests/shell-extensions/real-load.qml" "$evidence/real/shell.qml"
 : > "$evidence/real-load.log"
 for page in history composition plugins personalization ai; do
     source_dir="$root/shell/providers/settings_$page"
-    package_dir="$evidence/package-store/ditto.settings.$page/1.0.0"
+    version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$source_dir/manifest.json")"
+    package_dir="$evidence/package-store/ditto.settings.$page/$version"
     mkdir -p "$package_dir"
-    archive="$evidence/ditto.settings.$page-1.0.0.dittopkg"
+    archive="$evidence/ditto.settings.$page-$version.dittopkg"
     tar --zstd -cf "$archive" -C "$source_dir" manifest.json qml
     tar --zstd -xf "$archive" -C "$package_dir"
     # Production loads by absolute file URL from a store outside the config root.
     page_url="$(python3 -c 'import json; from pathlib import Path; import sys; p = Path(sys.argv[1]); print((p / json.loads((p / "manifest.json").read_text())["qml_entry"]).as_uri())' "$package_dir")"
+    plugin_manifest="$(cat "$package_dir/manifest.json")"
+    plugin_sha256="$(sha256sum "$archive" | cut -d' ' -f1)"
     set +e
-    DITTO_TEST_PAGE_ID="$page" DITTO_TEST_PAGE_URL="$page_url" LD_LIBRARY_PATH="${DITTO_QS_LD_LIBRARY_PATH:?source the runner environment first}" timeout 15 "$qt/bin/quickshell" -p "$evidence/real/shell.qml" > "$evidence/real-load-$page.log" 2>&1
+    DITTO_TEST_PAGE_ID="$page" DITTO_TEST_PAGE_URL="$page_url" DITTO_TEST_PLUGIN_MANIFEST="$plugin_manifest" DITTO_TEST_PLUGIN_SHA256="$plugin_sha256" LD_LIBRARY_PATH="${DITTO_QS_LD_LIBRARY_PATH:?source the runner environment first}" timeout 15 "$qt/bin/quickshell" -p "$evidence/real/shell.qml" > "$evidence/real-load-$page.log" 2>&1
     code=$?
     set -e
     cat "$evidence/real-load-$page.log" | tee -a "$evidence/real-load.log"
     [[ $code -eq 0 ]] || exit "$code"
     grep -aq "REAL_PAGE_READY root:/sdk/Ditto/Ui packaged $page" "$evidence/real-load-$page.log"
+    if [[ "$page" == plugins ]]; then
+        grep -aq "REAL_PLUGIN_SEARCH_READY root:/sdk/Ditto/Ui ditto.settings.plugins@$version checks=8" "$evidence/real-load-$page.log"
+    fi
 done
