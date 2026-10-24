@@ -21,9 +21,10 @@ cp "$root/tests/shell-extensions/real-load.qml" "$evidence/real/shell.qml"
 : > "$evidence/real-load.log"
 for page in history composition plugins personalization ai; do
     source_dir="$root/shell/providers/settings_$page"
-    package_dir="$evidence/package-store/ditto.settings.$page/1.0.0"
+    version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$source_dir/manifest.json")"
+  package_dir="$evidence/package-store/ditto.settings.$page/$version"
     mkdir -p "$package_dir"
-    archive="$evidence/ditto.settings.$page-1.0.0.dittopkg"
+    archive="$evidence/ditto.settings.$page-$version.dittopkg"
     tar --zstd -cf "$archive" -C "$source_dir" manifest.json qml
     tar --zstd -xf "$archive" -C "$package_dir"
     # Production loads by absolute file URL from a store outside the config root.

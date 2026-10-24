@@ -458,6 +458,14 @@
         <translation>Bottom left</translation>
     </message>
     <message>
+        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
+        <translation>Saved. This composition has since been deleted, so it will not apply and cannot be undone.</translation>
+    </message>
+    <message>
+        <source>已保存（組合已刪除）</source>
+        <translation>Saved (composition deleted)</translation>
+    </message>
+    <message>
         <source>已保存，還沒有生效：下次登入時才會套用。</source>
         <translation>Saved, not in effect yet: it is applied at the next login.</translation>
     </message>
@@ -472,6 +480,10 @@
     <message>
         <source>已套用並確認生效。可以撤銷。</source>
         <translation>Applied and confirmed. You can undo it.</translation>
+    </message>
+    <message>
+        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
+        <translation>Applied and confirmed. This composition has since been deleted, so it cannot be undone.</translation>
     </message>
     <message>
         <source>已套用，正在試看。按「保留」才會留下；取消或逾時會自動回復。</source>
@@ -532,18 +544,6 @@
     <message>
         <source>新建立</source>
         <translation>Created</translation>
-    </message>
-    <message>
-        <source>已保存（組合已刪除）</source>
-        <translation>Saved (composition deleted)</translation>
-    </message>
-    <message>
-        <source>已保存。這個組合之後已刪除，所以不會再套用，也不能撤銷。</source>
-        <translation>Saved. This composition has since been deleted, so it will not apply and cannot be undone.</translation>
-    </message>
-    <message>
-        <source>已套用並確認生效。這個組合之後已刪除，所以不能撤銷。</source>
-        <translation>Applied and confirmed. This composition has since been deleted, so it cannot be undone.</translation>
     </message>
     <message>
         <source>曾存到「%1」（已刪除）</source>
@@ -987,12 +987,12 @@
 <context>
     <name>CompositionCenter</name>
     <message>
-        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
-        <translation>“%1” still has a change being tried out, so it cannot be deleted yet. Keep or revert it first, or wait for it to revert by itself, then delete it.</translation>
-    </message>
-    <message>
         <source>「%1」的版本</source>
         <translation>Versions of “%1”</translation>
+    </message>
+    <message>
+        <source>「%1」還有一項正在試看的變更，現在不能刪除。請先保留或回復它，或等它自動回復後再刪除。</source>
+        <translation>“%1” still has a change being tried out, so it cannot be deleted yet. Keep or revert it first, or wait for it to revert by itself, then delete it.</translation>
     </message>
     <message>
         <source>下方顯示這個組合的版本</source>
@@ -1346,10 +1346,6 @@
         <translation>No model connected yet; the desktop works as usual</translation>
     </message>
     <message>
-        <source>模型後端無法使用</source>
-        <translation>The model backend is unavailable</translation>
-    </message>
-    <message>
         <source>模型沒有回應；桌面沒有被改動，可以再試一次</source>
         <translation>The model did not answer; nothing on the desktop changed. You can try again</translation>
     </message>
@@ -1394,16 +1390,16 @@
         <translation>Could not read AI settings; reopening reads them again</translation>
     </message>
     <message>
+        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
+        <translation>The Codex model list could not be read. Verify the supported Codex file and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
         <source>登入未完成，請重新嘗試。</source>
         <translation>Sign-in did not complete. Please try again.</translation>
     </message>
     <message>
         <source>目前無法確認這次登入結果；帳號狀態仍以連線讀取為準。</source>
         <translation>This sign-in result is unknown. Account status still depends on the connection readback.</translation>
-    </message>
-    <message>
-        <source>無法讀取 Codex 的模型清單；請核對 Ditto 支援的 Codex 檔案並重新執行 Ditto 安裝程式，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
-        <translation>The Codex model list could not be read. Verify the supported Codex file and rerun the Ditto installer, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
     <message>
         <source>目前選的模型或思考深度不支援；請在 AI 設定改選後再試。</source>
@@ -1418,10 +1414,6 @@
         <translation>Subscription quota used up; try again after it resets</translation>
     </message>
     <message>
-        <source>這次登入已逾期，請重新開始。</source>
-        <translation>This sign-in expired. Please start again.</translation>
-    </message>
-    <message>
         <source>這台電腦無法安全隔離 Codex；請升級系統核心或調整系統的安全隔離設定後重新登入，或在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>This computer cannot safely isolate Codex. Upgrade the system kernel or adjust its isolation settings, then sign in again, or use an API key in AI settings. You can keep using the desktop.</translation>
     </message>
@@ -1432,6 +1424,10 @@
     <message>
         <source>這台電腦目前無法使用 Codex 訂閱；可能尚未安裝 Ditto 支援的版本，或啟動失敗。請安裝或修復 Codex，再重新執行 Ditto 安裝程式並登入桌面；也可以在 AI 設定改用 API 金鑰。桌面仍可照常操作。</source>
         <translation>Codex subscriptions are currently unavailable on this computer. A supported version may be missing or could not start. Install or repair Codex, rerun the Ditto installer, then sign in to the desktop again, or use an API key in AI settings. You can keep using the desktop.</translation>
+    </message>
+    <message>
+        <source>這次登入已逾期，請重新開始。</source>
+        <translation>This sign-in expired. Please start again.</translation>
     </message>
     <message>
         <source>需要你的確認</source>
@@ -2104,6 +2100,10 @@
         <translation>Tasks service</translation>
     </message>
     <message>
+        <source>slot.ui.background</source>
+        <translation>Desktop background</translation>
+    </message>
+    <message>
         <source>slot.ui.dock</source>
         <translation>Dock</translation>
     </message>
@@ -2122,6 +2122,10 @@
     <message>
         <source>slot.ui.panel_top</source>
         <translation>Top panel</translation>
+    </message>
+    <message>
+        <source>slot.ui.settings_page</source>
+        <translation>Settings pages</translation>
     </message>
     <message>
         <source>slot.ui.status_item</source>
@@ -2199,20 +2203,28 @@
         <source>unavailable.system_unavailable</source>
         <translation>A system service is not answering</translation>
     </message>
-    <message>
-        <source>slot.ui.background</source>
-        <translation>Desktop background</translation>
-    </message>
-    <message>
-        <source>slot.ui.settings_page</source>
-        <translation>Settings pages</translation>
-    </message>
 </context>
 <context>
     <name>DockBottom</name>
     <message>
+        <source>%1：%2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>工作區 %1</source>
+        <translation>Workspace %1</translation>
+    </message>
+    <message>
+        <source>未命名應用程式</source>
+        <translation>Unnamed application</translation>
+    </message>
+    <message>
         <source>目前沒有執行中的視窗</source>
         <translation>No windows are open</translation>
+    </message>
+    <message>
+        <source>網頁應用程式</source>
+        <translation>Web app</translation>
     </message>
     <message>
         <source>關閉</source>
@@ -2223,28 +2235,12 @@
         <translation> (focused)</translation>
     </message>
     <message>
-        <source>%1：%2</source>
-        <translation>%1: %2</translation>
-    </message>
-    <message>
-        <source>未命名應用程式</source>
-        <translation>Unnamed application</translation>
-    </message>
-    <message>
-        <source>網頁應用程式</source>
-        <translation>Web app</translation>
-    </message>
-    <message>
-        <source>（已最小化）</source>
-        <translation> (minimized)</translation>
-    </message>
-    <message>
         <source>（工作區 %1）</source>
         <translation> (workspace %1)</translation>
     </message>
     <message>
-        <source>工作區 %1</source>
-        <translation>Workspace %1</translation>
+        <source>（已最小化）</source>
+        <translation> (minimized)</translation>
     </message>
 </context>
 <context>
@@ -2469,6 +2465,45 @@
     </message>
 </context>
 <context>
+    <name>HistoryPage</name>
+    <message>
+        <source>保留</source>
+        <translation>Keep</translation>
+    </message>
+    <message>
+        <source>取消並回復</source>
+        <translation>Cancel and revert</translation>
+    </message>
+    <message>
+        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
+        <translation>Undone. The undo is recorded as a change of its own.</translation>
+    </message>
+    <message>
+        <source>撤銷這次變更</source>
+        <translation>Undo this change</translation>
+    </message>
+    <message>
+        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
+        <translation>Every change to the desktop is recorded here, including the ones that did not apply. Undo goes back one step at a time; newer changes have to be undone first.</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>變更紀錄</source>
+        <translation>Change history</translation>
+    </message>
+    <message>
+        <source>載入較早的紀錄</source>
+        <translation>Load older entries</translation>
+    </message>
+    <message>
+        <source>還沒有任何變更。</source>
+        <translation>No changes yet.</translation>
+    </message>
+</context>
+<context>
     <name>LauncherGrid</name>
     <message>
         <source>全部</source>
@@ -2479,12 +2514,28 @@
         <translation>Applications</translation>
     </message>
     <message>
-        <source>應用程式清單暫不可用</source>
-        <translation>The application list is unavailable right now</translation>
+        <source>應用程式清單暫不可用；請關閉後重新開啟。</source>
+        <translation>The application list is unavailable right now. Close and reopen the launcher to try again.</translation>
+    </message>
+    <message>
+        <source>搜尋應用程式</source>
+        <translation>Search applications</translation>
+    </message>
+    <message>
+        <source>搜尋暫不可用；請修改搜尋文字後重試。</source>
+        <translation>Search is unavailable right now. Change the search text to try again.</translation>
+    </message>
+    <message>
+        <source>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</source>
+        <translation>Arrow keys to choose, Enter to open, Esc to clear search, then Esc again to close</translation>
     </message>
     <message>
         <source>方向鍵選擇，Enter 開啟，PageUp／PageDown 換類別，Esc 關閉</source>
         <translation>Arrow keys to choose, Enter to open, PageUp/PageDown to change category, Esc to close</translation>
+    </message>
+    <message>
+        <source>正在搜尋應用程式</source>
+        <translation>Searching applications</translation>
     </message>
     <message>
         <source>正在讀取應用程式清單</source>
@@ -2495,36 +2546,16 @@
         <translation>No applications found</translation>
     </message>
     <message>
-        <source>無法啟動「%1」</source>
-        <translation>Could not start “%1”</translation>
-    </message>
-    <message>
-        <source>搜尋應用程式</source>
-        <translation>Search applications</translation>
-    </message>
-    <message>
-        <source>輸入應用程式名稱</source>
-        <translation>Type an application name</translation>
-    </message>
-    <message>
-        <source>正在搜尋應用程式</source>
-        <translation>Searching applications</translation>
-    </message>
-    <message>
         <source>沒有符合的應用程式</source>
         <translation>No matching applications</translation>
     </message>
     <message>
-        <source>搜尋暫不可用；請修改搜尋文字後重試。</source>
-        <translation>Search is unavailable right now. Change the search text to try again.</translation>
+        <source>無法啟動「%1」</source>
+        <translation>Could not start “%1”</translation>
     </message>
     <message>
-        <source>應用程式清單暫不可用；請關閉後重新開啟。</source>
-        <translation>The application list is unavailable right now. Close and reopen the launcher to try again.</translation>
-    </message>
-    <message>
-        <source>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</source>
-        <translation>Arrow keys to choose, Enter to open, Esc to clear search, then Esc again to close</translation>
+        <source>輸入應用程式名稱</source>
+        <translation>Type an application name</translation>
     </message>
 </context>
 <context>
@@ -2707,16 +2738,8 @@
         <translation>Low-power style (no blur, no shadows)</translation>
     </message>
     <message>
-        <source>例如 Super+Space</source>
-        <translation>e.g. Super+Space</translation>
-    </message>
-    <message>
         <source>個人化設定</source>
         <translation>Personalization</translation>
-    </message>
-    <message>
-        <source>加入</source>
-        <translation>Add</translation>
     </message>
     <message>
         <source>動畫</source>
@@ -2771,24 +2794,12 @@
         <translation>Bottom left</translation>
     </message>
     <message>
-        <source>已生效</source>
-        <translation>In effect</translation>
-    </message>
-    <message>
         <source>強調色</source>
         <translation>Accent color</translation>
     </message>
     <message>
         <source>強調色 %1</source>
         <translation>Accent colour %1</translation>
-    </message>
-    <message>
-        <source>快捷鍵</source>
-        <translation>Shortcuts</translation>
-    </message>
-    <message>
-        <source>快捷鍵由 Ditto 綁定到視窗管理。同一組按鍵只能有一個用途；衝突會在套用前被擋下並說明。</source>
-        <translation>Ditto binds shortcuts in the window manager. A key combination can have one use only; a conflict is stopped and explained before anything is applied.</translation>
     </message>
     <message>
         <source>指定的螢幕 %1 沒有連接，所以先放在主螢幕。</source>
@@ -2801,10 +2812,6 @@
     <message>
         <source>最大</source>
         <translation>Largest</translation>
-    </message>
-    <message>
-        <source>未生效</source>
-        <translation>Not in effect</translation>
     </message>
     <message>
         <source>標準</source>
@@ -2831,14 +2838,6 @@
         <translation>The character is not shown right now.</translation>
     </message>
     <message>
-        <source>移除</source>
-        <translation>Remove</translation>
-    </message>
-    <message>
-        <source>系統保留</source>
-        <translation>Reserved by the system</translation>
-    </message>
-    <message>
         <source>系統已設定減少動畫，這裡關閉也不會恢復動畫。系統設定在桌面啟動時讀取。</source>
         <translation>The system asks for reduced motion, so turning it off here does not bring motion back. The system setting is read when the desktop starts.</translation>
     </message>
@@ -2853,10 +2852,6 @@
     <message>
         <source>螢幕</source>
         <translation>Screen</translation>
-    </message>
-    <message>
-        <source>衝突</source>
-        <translation>Conflict</translation>
     </message>
     <message>
         <source>角色</source>
@@ -3262,6 +3257,132 @@
     </message>
 </context>
 <context>
+    <name>SettingsPageContainer</name>
+    <message>
+        <source>這個頁面無法載入。請在插件中心停用它，或稍後再試。</source>
+        <translation>This page could not load. Disable it in the plugin center, or try again later.</translation>
+    </message>
+</context>
+<context>
+    <name>ShortcutSettings</name>
+    <message>
+        <source>例如 Super+Space</source>
+        <translation>e.g. Super+Space</translation>
+    </message>
+    <message>
+        <source>儲存結果未知。輸入已保留，請重新讀取狀態並查看變更紀錄，勿重複套用。</source>
+        <translation>The save result is unknown. Your input is kept. Refresh and check change history before applying again.</translation>
+    </message>
+    <message>
+        <source>先選用途，再設定按鍵。系統保留的快捷鍵無法更改。</source>
+        <translation>Choose an action, then its keys. System shortcuts cannot be changed.</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>套用並試用</source>
+        <translation>Apply and try</translation>
+    </message>
+    <message>
+        <source>尚未儲存。已保留輸入，請查看原因後再試。</source>
+        <translation>Not saved. Your input is kept. Check the reason before trying again.</translation>
+    </message>
+    <message>
+        <source>尚無法確認儲存結果。輸入已保留，請重新讀取狀態。</source>
+        <translation>The save could not be verified. Your input is kept. Refresh the status.</translation>
+    </message>
+    <message>
+        <source>已生效</source>
+        <translation>In effect</translation>
+    </message>
+    <message>
+        <source>快捷鍵</source>
+        <translation>Shortcuts</translation>
+    </message>
+    <message>
+        <source>快捷鍵已儲存。可在變更紀錄中撤銷。</source>
+        <translation>Shortcut saved. You can undo it in change history.</translation>
+    </message>
+    <message>
+        <source>按鍵組合</source>
+        <translation>Key combination</translation>
+    </message>
+    <message>
+        <source>新增快捷鍵</source>
+        <translation>Add shortcut</translation>
+    </message>
+    <message>
+        <source>未生效</source>
+        <translation>Not in effect</translation>
+    </message>
+    <message>
+        <source>正在套用快捷鍵…輸入會保留到確認完成。</source>
+        <translation>Applying shortcuts… Your input stays until confirmation is complete.</translation>
+    </message>
+    <message>
+        <source>用途</source>
+        <translation>Action</translation>
+    </message>
+    <message>
+        <source>目前僅在桌面介面有鍵盤焦點時可用，尚未綁定全域快捷鍵。</source>
+        <translation>Available only while the desktop interface has keyboard focus. Global shortcuts are not bound.</translation>
+    </message>
+    <message>
+        <source>移除</source>
+        <translation>Remove</translation>
+    </message>
+    <message>
+        <source>空白鍵</source>
+        <translation>Space</translation>
+    </message>
+    <message>
+        <source>系統保留</source>
+        <translation>Reserved by the system</translation>
+    </message>
+    <message>
+        <source>編輯</source>
+        <translation>Edit</translation>
+    </message>
+    <message>
+        <source>編輯 %1</source>
+        <translation>Edit %1</translation>
+    </message>
+    <message>
+        <source>衝突</source>
+        <translation>Conflict</translation>
+    </message>
+    <message>
+        <source>診斷</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <source>請試用快捷鍵，再按「保留」。倒數結束會還原，輸入仍會保留。</source>
+        <translation>Try the shortcut, then choose Keep. When time runs out, it reverts and your input stays.</translation>
+    </message>
+    <message>
+        <source>請輸入按鍵名稱，例如 Super+Space。這裡不會擷取全域按鍵；衝突仍由系統在套用前檢查。</source>
+        <translation>Type key names, e.g. Super+Space. This field does not capture global keys; the system checks conflicts before applying.</translation>
+    </message>
+    <message>
+        <source>這次變更未保留。輸入仍在，可修改後再試。</source>
+        <translation>This change was not kept. Your input is still here to edit and try again.</translation>
+    </message>
+    <message>
+        <source>這組按鍵已用於「%1」。請換一組。</source>
+        <translation>These keys are already used for “%1”. Choose another combination.</translation>
+    </message>
+    <message>
+        <source>這組按鍵由系統保留：%1。請換一組。</source>
+        <translation>These keys are reserved for %1. Choose another combination.</translation>
+    </message>
+    <message>
+        <source>重新讀取狀態</source>
+        <translation>Refresh status</translation>
+    </message>
+</context>
+<context>
     <name>StatusArea</name>
     <message>
         <source>狀態列項目</source>
@@ -3493,52 +3614,6 @@
     <message>
         <source>顯示診斷</source>
         <translation>Show diagnostics</translation>
-    </message>
-</context>
-<context>
-    <name>HistoryPage</name>
-    <message>
-        <source>保留</source>
-        <translation>Keep</translation>
-    </message>
-    <message>
-        <source>取消並回復</source>
-        <translation>Cancel and revert</translation>
-    </message>
-    <message>
-        <source>已撤銷。撤銷本身也記錄成一筆變更。</source>
-        <translation>Undone. The undo is recorded as a change of its own.</translation>
-    </message>
-    <message>
-        <source>撤銷這次變更</source>
-        <translation>Undo this change</translation>
-    </message>
-    <message>
-        <source>每一次改變桌面都記在這裡，包含沒有套用成功的。撤銷會一步一步往回，較新的變更要先撤銷。</source>
-        <translation>Every change to the desktop is recorded here, including the ones that did not apply. Undo goes back one step at a time; newer changes have to be undone first.</translation>
-    </message>
-    <message>
-        <source>診斷</source>
-        <translation>Diagnostics</translation>
-    </message>
-    <message>
-        <source>變更紀錄</source>
-        <translation>Change history</translation>
-    </message>
-    <message>
-        <source>載入較早的紀錄</source>
-        <translation>Load older entries</translation>
-    </message>
-    <message>
-        <source>還沒有任何變更。</source>
-        <translation>No changes yet.</translation>
-    </message>
-</context>
-<context>
-    <name>SettingsPageContainer</name>
-    <message>
-        <source>這個頁面無法載入。請在插件中心停用它，或稍後再試。</source>
-        <translation>This page could not load. Disable it in the plugin center, or try again later.</translation>
     </message>
 </context>
 </TS>
