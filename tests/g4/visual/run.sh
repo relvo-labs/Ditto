@@ -42,6 +42,12 @@ echo "== unit tests"
 "$runner" -import "$here/stubs" -input "$here/unit" 2>&1 | tee "$evidence/unit-tests.log"
 status=${PIPESTATUS[0]}
 [[ $status -eq 0 ]] || { echo "unit tests failed ($status)"; exit "$status"; }
+# #188: the launcher unit regressions again at device pixel ratio 2 (icon
+# decode size follows the ratio; keyboard and plain-text rows are unchanged).
+QT_SCALE_FACTOR=2 "$runner" -import "$here/stubs" -input "$here/unit/tst_launcher_grid.qml" 2>&1 \
+  | tee "$evidence/unit-launcher-2x.log"
+status=${PIPESTATUS[0]}
+[[ $status -eq 0 ]] || { echo "2x launcher unit tests failed ($status)"; exit "$status"; }
 grep 'CONTRAST ' "$evidence/unit-tests.log" | sed 's/.*CONTRAST //' > "$evidence/contrast.txt"
 # #105 C4 state table (real Yaru, pixels at 3:1 and 4.5:1) and C1 narrow steps.
 grep 'STATUS_STATE ' "$evidence/unit-tests.log" | sed 's/.*STATUS_STATE //' > "$evidence/status-states.jsonl"
@@ -68,13 +74,20 @@ QT_SCALE_FACTOR=2 "$runner" -import "$here/stubs" -input "$here/capture/tst_hidp
 status=${PIPESTATUS[0]}
 [[ $status -eq 0 ]] || { echo "2x capture failed ($status)"; exit "$status"; }
 # #184: grid search, cross-category results and missing-icon fallback at 2x.
+# #188: absolute-path raster PNG (grid and search launcher) and load error.
 QT_SCALE_FACTOR=2 "$runner" -import "$here/stubs" -input "$here/capture/tst_launcher_grid_capture.qml" 2>&1 \
   | tee "$evidence/launcher-grid-hidpi-2x.log"
 status=${PIPESTATUS[0]}
-[[ $status -eq 0 ]] || { echo "2x launcher capture failed ($status)"; exit "$status"; }
-cp "$here/.staged/out/"launcher-grid-*.png "$evidence/"
+cp "$here/.staged/out/"launcher-grid-*.png "$here/.staged/out/"launcher-search-*.png "$evidence/"
 grep 'LAUNCHER_META ' "$evidence/capture.log" "$evidence/launcher-grid-hidpi-2x.log" \
   | sed 's/.*LAUNCHER_META //' > "$evidence/launcher-grid-scenes.jsonl"
+# Capture sizes (2560x1600 at 2x), device-pixel decode size and raster
+# sharpness against a direct raster of the same PNG.
+"$python" "$here/capture/check_launcher_icons.py" "$evidence" "$evidence/capture.log" "$evidence/launcher-grid-hidpi-2x.log" \
+  | tee "$evidence/launcher-icons.log"
+icons=${PIPESTATUS[0]}
+[[ $status -eq 0 ]] || { echo "2x launcher capture failed ($status)"; exit "$status"; }
+[[ $icons -eq 0 ]] || { echo "launcher icon check failed ($icons)"; exit "$icons"; }
 "$python" "$here/capture/check_hidpi.py" "$evidence" "$evidence/capture.log" "$evidence/capture-hidpi-2x.log" \
   | tee "$evidence/hidpi.log"
 status=${PIPESTATUS[0]}

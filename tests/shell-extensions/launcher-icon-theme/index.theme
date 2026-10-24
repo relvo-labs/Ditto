@@ -1,0 +1,10 @@
+[Icon Theme]
+Name=DittoLauncherTest
+Comment=Launcher icon regression fixture (#188); the PNG is copied in by run.sh
+Inherits=hicolor
+Directories=256x256/apps
+
+[256x256/apps]
+Size=256
+Context=Applications
+Type=Fixed
