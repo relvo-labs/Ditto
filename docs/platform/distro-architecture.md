@@ -1,6 +1,6 @@
 # Ditto 發行版架構：完整映像與 Ubuntu 加裝版
 
-狀態：2026-10-24 owner 已核定 Ubuntu 底座與雙形式；下列介面為實作交接規格，尚非發布或安全驗收。D-51 指定紀錄路徑 `.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md` 受本次 sandbox 寫入限制，完整草稿保存在 task evidence 的 `d51-draft.md`，待 parent 落入指定位置。
+狀態：2026-10-24 owner 已核定 Ubuntu 底座與雙形式；下列介面為實作交接規格，尚非發布或安全驗收。決策紀錄見 [D-51](../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md)。
 
 ## 結論與日期界線
 
