@@ -2498,6 +2498,34 @@
         <source>無法啟動「%1」</source>
         <translation>無法啟動「%1」</translation>
     </message>
+    <message>
+        <source>搜尋應用程式</source>
+        <translation>搜尋應用程式</translation>
+    </message>
+    <message>
+        <source>輸入應用程式名稱</source>
+        <translation>輸入應用程式名稱</translation>
+    </message>
+    <message>
+        <source>正在搜尋應用程式</source>
+        <translation>正在搜尋應用程式</translation>
+    </message>
+    <message>
+        <source>沒有符合的應用程式</source>
+        <translation>沒有符合的應用程式</translation>
+    </message>
+    <message>
+        <source>搜尋暫不可用；請修改搜尋文字後重試。</source>
+        <translation>搜尋暫不可用；請修改搜尋文字後重試。</translation>
+    </message>
+    <message>
+        <source>應用程式清單暫不可用；請關閉後重新開啟。</source>
+        <translation>應用程式清單暫不可用；請關閉後重新開啟。</translation>
+    </message>
+    <message>
+        <source>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</source>
+        <translation>方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉</translation>
+    </message>
 </context>
 <context>
     <name>LauncherSearch</name>

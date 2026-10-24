@@ -67,6 +67,14 @@ QT_SCALE_FACTOR=2 "$runner" -import "$here/stubs" -input "$here/capture/tst_hidp
   | tee "$evidence/capture-hidpi-2x.log"
 status=${PIPESTATUS[0]}
 [[ $status -eq 0 ]] || { echo "2x capture failed ($status)"; exit "$status"; }
+# #184: grid search, cross-category results and missing-icon fallback at 2x.
+QT_SCALE_FACTOR=2 "$runner" -import "$here/stubs" -input "$here/capture/tst_launcher_grid_capture.qml" 2>&1 \
+  | tee "$evidence/launcher-grid-hidpi-2x.log"
+status=${PIPESTATUS[0]}
+[[ $status -eq 0 ]] || { echo "2x launcher capture failed ($status)"; exit "$status"; }
+cp "$here/.staged/out/"launcher-grid-*.png "$evidence/"
+grep 'LAUNCHER_META ' "$evidence/capture.log" "$evidence/launcher-grid-hidpi-2x.log" \
+  | sed 's/.*LAUNCHER_META //' > "$evidence/launcher-grid-scenes.jsonl"
 "$python" "$here/capture/check_hidpi.py" "$evidence" "$evidence/capture.log" "$evidence/capture-hidpi-2x.log" \
   | tee "$evidence/hidpi.log"
 status=${PIPESTATUS[0]}
