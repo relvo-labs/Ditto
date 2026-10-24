@@ -480,10 +480,16 @@ TestCase {
             function capability(name, args, done, fail) {
                 let value;
                 if (name === "desktop.changes.list") {
-                    // As Core: newest first, `limit` rows older than `before`.
+                    // As Core (`ditto-store::changes::list`): newest first,
+                    // kept rows have `change_id < before` in SQLite TEXT
+                    // (string) order — `before` need not be a change_id that
+                    // is itself in the list (#176). `limit` defaults to 50
+                    // and is capped at 200, as `ditto-core::router::
+                    // changes_list`.
                     let list = summaries;
-                    if (args.before !== undefined) list = list.slice(list.findIndex(summary => summary.change_id === args.before) + 1);
-                    value = {changes: list.slice(0, args.limit)};
+                    if (args.before !== undefined) list = list.filter(summary => summary.change_id < args.before);
+                    const limit = Math.min(args.limit === undefined ? 50 : args.limit, 200);
+                    value = {changes: list.slice(0, limit)};
                 }
                 else if (name === "desktop.changes.get") {
                     gets = gets.concat([args.change_id]);
@@ -556,6 +562,58 @@ TestCase {
         client.records = table;
         client.summaries = records.map(record => client.summaryOf(record));
         return client;
+    }
+    /// Minimal records for each id, newest first as given; used to probe the
+    /// `desktop.changes.list` stub's paging directly, without any UI page.
+    function idRecords(ids) {
+        return ids.map(id => historyRecord(id, "prf-dev", null, false));
+    }
+    /// `count` zero-padded ids, newest ("chg-<count>") first.
+    function manyIds(count) {
+        const ids = [];
+        for (let n = count; n >= 1; --n) ids.push("chg-" + String(n).padStart(3, "0"));
+        return ids;
+    }
+    /// #176: Core (`ditto-store::changes::list`) filters by `change_id <
+    /// before` in SQLite TEXT (string) order, then `ditto-core::router::
+    /// changes_list` applies `limit.unwrap_or(50).min(200)`. The stub must
+    /// match both exactly, not just when `before` happens to be a change_id
+    /// that is in the list.
+    function test_changes_list_stub_cursor_not_a_member_excludes_by_string_order() {
+        // IDs 060, 040, 020; cursor 050 is not a member but falls between
+        // 060 and 040. Core returns everything with change_id < "050".
+        const client = historyClient(idRecords(["chg-060", "chg-040", "chg-020"]));
+        let result = null;
+        client.capability("desktop.changes.list", {before: "chg-050"}, r => result = r);
+        compare(result.changes.map(c => c.change_id), ["chg-040", "chg-020"]);
+    }
+    function test_changes_list_stub_cursor_older_than_all_returns_nothing() {
+        const client = historyClient(idRecords(["chg-060", "chg-040", "chg-020"]));
+        let result = null;
+        client.capability("desktop.changes.list", {before: "chg-010"}, r => result = r);
+        compare(result.changes.map(c => c.change_id), []);
+    }
+    function test_changes_list_stub_cursor_equal_to_a_member_excludes_it_and_newer() {
+        const client = historyClient(idRecords(["chg-060", "chg-040", "chg-020"]));
+        let result = null;
+        client.capability("desktop.changes.list", {before: "chg-040"}, r => result = r);
+        compare(result.changes.map(c => c.change_id), ["chg-020"]);
+    }
+    function test_changes_list_stub_defaults_missing_limit_to_fifty() {
+        const ids = manyIds(250);
+        const client = historyClient(idRecords(ids));
+        let result = null;
+        client.capability("desktop.changes.list", {}, r => result = r);
+        compare(result.changes.length, 50);
+        compare(result.changes.map(c => c.change_id), ids.slice(0, 50));
+    }
+    function test_changes_list_stub_caps_a_large_limit_at_two_hundred() {
+        const ids = manyIds(250);
+        const client = historyClient(idRecords(ids));
+        let result = null;
+        client.capability("desktop.changes.list", {limit: 500}, r => result = r);
+        compare(result.changes.length, 200);
+        compare(result.changes.map(c => c.change_id), ids.slice(0, 200));
     }
     function itemsWithText(item, text) {
         let found = item.text === text ? [item] : [];
