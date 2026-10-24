@@ -107,31 +107,89 @@ def validate(lock, tree=None):
     return sorted(names)
 
 
+def target_entry(root, name):
+    """Resolve parent aliases in image coordinates, leaving the entry itself intact.
+
+    Never use Path.resolve on image links: an absolute link belongs to the image,
+    not the build host. Resolve before processing '..', and bound alias cycles.
+    """
+    pending, parts, hops = name.split("/"), [], 0
+    while pending:
+        part = pending.pop(0)
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError("target package path escapes image")
+            parts.pop()
+            continue
+        if "\x00" in part:
+            raise ValueError("invalid target package path")
+        path = root.joinpath(*parts, part)
+        if pending and path.is_symlink():
+            hops += 1
+            if hops > 64:
+                raise ValueError("target package parent alias cycle/depth")
+            target = path.readlink().as_posix()
+            if target.startswith("/"):
+                parts = []
+            pending = target.split("/") + pending
+        else:
+            parts.append(part)
+    return "/" + "/".join(parts)
+
+
 def check_target_ownership(root, names):
     """Query only the installed TARGET database, never the builder's default DB."""
     root = root.absolute()
-    if root == Path("/") or root.is_symlink():
+    if root.resolve() == Path("/") or root.is_symlink() or not root.is_dir():
         raise ValueError("refusing host root as a runtime target")
     admindir = confined_path(root, "var/lib/dpkg/status").parent
     if not (admindir / "status").is_file() or (admindir / "status").is_symlink():
         raise ValueError("target dpkg status database missing or unsafe")
+    info = admindir / "info"
+    if (info.is_symlink() or (info.exists() and not info.is_dir()) or
+            any(path.is_symlink() or not path.is_file() for path in info.glob("*.list")) or
+            (admindir / "diversions").is_symlink()):
+        raise ValueError("target dpkg ownership database missing or unsafe")
     command = ["dpkg-query", f"--admindir={admindir}"]
     env = os.environ | {"LC_ALL": "C"}
     probe = subprocess.run(command + ["-W"], text=True, capture_output=True, env=env, timeout=30)
     if probe.returncode or probe.stderr:
         raise ValueError("target dpkg database query failed")
+    # The target database supplies ALL owned spellings, including aliases outside
+    # merged-/usr. Derive identity from this image's actual parent links, never
+    # from a hard-coded /bin or /lib substitution. A separate real /bin is distinct.
+    destinations = {}
     for name in names:
         confined_path(root, name)
-        paths = ["/" + name]
-        # Account for package file lists using the legacy merged-/usr spelling.
-        if name.startswith("usr/lib/") and (root / "lib").is_symlink():
-            if (root / "lib").readlink().as_posix() in ("usr/lib", "/usr/lib"):
-                paths.append("/" + name.removeprefix("usr/"))
-        for path in paths:
-            result = subprocess.run(command + ["-S", path], text=True, capture_output=True,
-                                    env=env, timeout=30)
-            if result.returncode == 0:
-                raise ValueError(f"runtime path owned by an installed target package: {name}")
-            expected = f"dpkg-query: no path found matching pattern {path}\n"
-            if result.returncode != 1 or result.stdout or result.stderr != expected:
-                raise ValueError(f"target dpkg ownership query failed closed: {name}")
+        destinations[target_entry(root, name)] = name
+    catalog = subprocess.run(command + ["-S", "*"], text=True, capture_output=True,
+                             env=env, timeout=30)
+    if catalog.returncode == 1 and not catalog.stdout and catalog.stderr == "dpkg-query: no path found matching pattern *\n":
+        owned_paths = []
+    elif catalog.returncode == 0 and not catalog.stderr and catalog.stdout:
+        owned_paths = []
+        for line in catalog.stdout.splitlines():
+            # Also handles dpkg's diversion descriptions and multi-owner lines.
+            owner, separator, suffix = line.partition(": /")
+            if not owner or not separator or not suffix:
+                raise ValueError("target dpkg ownership catalog failed closed")
+            owned_paths.append("/" + suffix)
+    else:
+        raise ValueError("target dpkg ownership catalog query failed closed")
+    basenames = {PurePosixPath(name).name for name in names}
+    for path in owned_paths:
+        if PurePosixPath(path).name in basenames:
+            entry = target_entry(root, path)
+            if entry in destinations:
+                raise ValueError("runtime path owned by an installed target package: " + destinations[entry])
+    for name in names:
+        path = "/" + name
+        result = subprocess.run(command + ["-S", path], text=True, capture_output=True,
+                                env=env, timeout=30)
+        if result.returncode == 0:
+            raise ValueError(f"runtime path owned by an installed target package: {name}")
+        expected = f"dpkg-query: no path found matching pattern {path}\n"
+        if result.returncode != 1 or result.stdout or result.stderr != expected:
+            raise ValueError(f"target dpkg ownership query failed closed: {name}")

@@ -1,6 +1,7 @@
 """Filesystem/metadata regressions only: no guest, runtime binary or root mount."""
 
 import configparser
+import contextlib
 import hashlib
 import io
 import itertools
@@ -15,6 +16,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 RECIPE = Path(os.environ.get("DITTO_RECIPE_UNDER_TEST", Path(__file__).resolve().parents[1]))
 REPO = Path(__file__).resolve().parents[4]
@@ -45,6 +47,7 @@ class RecipeTests(unittest.TestCase):
         self.tree = self.root / "runtime"
         self.put("usr/lib/os-release", "IMAGE_ID=ditto\n", self.root / "image")
         self.put("etc/shadow", "root:!:1:0:99999:7:::\n", self.root / "image")
+        self.put("etc/passwd", "root:x:0:0:root:/root:/bin/bash\n", self.root / "image")
         names = ["usr/bin/quickshell", "usr/bin/wayfire", "usr/lib/ditto-node/bin/node",
                  "usr/local/libexec/xdg-desktop-portal-wlr",
                  "usr/lib/ditto/packages/host-runtime/dist/ditto-hostd.mjs",
@@ -103,6 +106,116 @@ class RecipeTests(unittest.TestCase):
 
     def test_clean_locked(self):
         self.scan()
+
+    def test_empty_root_passwd_with_locked_shadow(self):
+        self.put("etc/passwd", "root::0:0:root:/root:/bin/bash\n", self.root / "image")
+        report = self.scan(1)
+        self.assertIn("etc/passwd", report["identity_files"])
+        self.assertEqual(report["errors"], [])
+
+    def test_empty_extra_account_passwd(self):
+        self.put("etc/passwd", "root:x:0:0:root:/root:/bin/bash\nfixture::1000:1000::/nonexistent:/usr/sbin/nologin\n", self.root / "image")
+        # Exact refined witness: locked root shadow, extra passwd account only.
+        report = self.scan(1)
+        self.assertIn("etc/passwd", report["identity_files"])
+        self.assertEqual(report["errors"], [])
+
+    def test_passwd_active_fields_and_privacy(self):
+        for field in ("synthetic-hash", "!synthetic-hash", "*synthetic-hash", "X", "!!synthetic-hash"):
+            with self.subTest(field=field):
+                self.put("etc/passwd", f"root:{field}:0:0:root:/root:/bin/bash\n", self.root / "image")
+                report = self.scan(1)
+                self.assertIn("etc/passwd", report["identity_files"])
+                self.assertNotIn("synthetic-hash", json.dumps(report))
+                self.assertEqual(report["errors"], [])
+
+    def test_distro_account_pairs_and_locked_fields(self):
+        for field in ("x", "!", "!!", "*", "!*", "***"):
+            with self.subTest(field=field):
+                self.put("etc/passwd", f"root:{field}:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n_greetd:x:999:999::/nonexistent:/usr/sbin/nologin\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\n", self.root / "image")
+                self.put("etc/shadow", "root:!:1:0:99999:7:::\ndaemon:*:1:0:99999:7:::\n_greetd:!!:::::::\nnobody:!*:1:0:99999:7:::\n", self.root / "image")
+                self.scan()
+
+    def test_account_mapping_missing_duplicate_and_malformed(self):
+        passwd = "root:x:0:0:root:/root:/bin/bash\n"
+        shadow = "root:!:1:0:99999:7:::\n"
+        cases = [
+            (passwd + "daemon:x:1:1::/usr/sbin:/usr/sbin/nologin\n", shadow, "etc/passwd"),
+            (passwd, shadow + "daemon:*:1:0:99999:7:::\n", "etc/shadow"),
+            (passwd * 2, shadow, "etc/passwd"),
+            ("daemon:x:1:1::/usr/sbin:/usr/sbin/nologin\n", shadow, "etc/passwd"),
+            (passwd, "daemon:*:1:0:99999:7:::\n", "etc/shadow"),
+            ("root:x:0:0:root:/root\n", shadow, "etc/passwd"),
+            ("root:x:bad:0:root:/root:/bin/bash\n", shadow, "etc/passwd"),
+            ("root:x:0::root:/root:/bin/bash\n", shadow, "etc/passwd"),
+            (passwd + "\n", shadow, "etc/passwd"),
+            (passwd.replace("root:/root", "bad\x00:/root"), shadow, "etc/passwd"),
+            (passwd, shadow.replace(":1:", ":bad:"), "etc/shadow"),
+        ]
+        for index, (pw, sh, bad) in enumerate(cases):
+            with self.subTest(row=index):
+                self.put("etc/passwd", pw, self.root / "image")
+                self.put("etc/shadow", sh, self.root / "image")
+                report = self.scan(1)
+                self.assertIn(bad, report["identity_files"])
+                self.assertEqual(report["errors"], [])
+
+    def test_account_files_missing_and_unsafe_links(self):
+        for name in ("passwd", "shadow"):
+            path = self.root / "image/etc" / name
+            original = path.read_bytes()
+            for kind in ("missing", "relative", "absolute", "dangling", "directory", "nonutf8"):
+                with self.subTest(file=name, kind=kind):
+                    path.unlink()
+                    if kind == "relative":
+                        self.put("account-copy", original.decode(), path.parent)
+                        path.symlink_to("account-copy")
+                    elif kind == "absolute":
+                        path.symlink_to("/dev/null")
+                    elif kind == "dangling":
+                        path.symlink_to("missing-account")
+                    elif kind == "directory":
+                        path.mkdir()
+                    elif kind == "nonutf8":
+                        path.write_bytes(b"\xff")
+                    try:
+                        report = self.scan(1)
+                        self.assertTrue(any(row["file"] == "etc/" + name for row in report["errors"]) or
+                                        "etc/" + name in report["identity_files"])
+                    finally:
+                        if path.is_dir() and not path.is_symlink():
+                            path.rmdir()
+                        elif path.exists() or path.is_symlink():
+                            path.unlink()
+                        path.write_bytes(original)
+
+    def test_account_parent_link_and_unreadable_fail_closed(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("pristine", RECIPE / "scan-pristine-rootfs.py")
+        scanner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(scanner)
+        # Real entry-point control for an unsafe parent; no host account file read.
+        etc = self.root / "image/etc"
+        moved = self.root / "account-dir"
+        etc.rename(moved)
+        etc.symlink_to(moved)
+        self.scan(1)
+        etc.unlink()
+        moved.rename(etc)
+        # Permission bits are ineffective for root runners. Inject an actual read
+        # failure at the filesystem API, without a privileged account/session.
+        original_read = Path.read_bytes
+        def unreadable(path):
+            if path.name == "passwd":
+                raise PermissionError("synthetic private value must not escape")
+            return original_read(path)
+        output = io.StringIO()
+        with mock.patch.object(Path, "read_bytes", unreadable), mock.patch.object(
+                sys, "argv", ["scan", str(self.root / "image")]), contextlib.redirect_stdout(output):
+            self.assertEqual(scanner.main(), 1)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["errors"][0]["file"], "etc/passwd")
+        self.assertNotIn("synthetic private", json.dumps(report))
 
     def test_shadow_rejects_empty_active_malformed_and_duplicate(self):
         for line in ("root::1:0:99999:7:::\n", "root:synthetic-hash:1:0:99999:7:::\n",
@@ -303,6 +416,149 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         result = call(sys.executable, RECIPE / "apply-runtime.py", "--root", target, "--runtime-lock", lock_path)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def apply_fixture(self, case, owned, aliases=(), candidate="usr/bin/wayfire", expected=2):
+        """Actual entry + real target dpkg DB; no fixture binary is executable."""
+        self.assertIsNotNone(shutil.which("dpkg-query"), "real target dpkg-query required")
+        target = self.root / case
+        self.put("var/lib/dpkg/status", "Package: fixture\nStatus: install ok installed\nArchitecture: amd64\nVersion: 1\nMaintainer: Fixture <fixture@example.invalid>\nDescription: task-owned fixture\n\n", target)
+        self.put("var/lib/dpkg/info/fixture.list", owned + "\n", target)
+        for name, value in aliases:
+            path = target / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.symlink_to(value)
+        original = self.put(candidate, "original task-owned target fixture\n", target)
+        lock_path = self.root / f"apply-{next(self.counter)}.json"
+        lock_path.write_text(json.dumps(self.lock()))
+        query = call("dpkg-query", "--admindir=" + str(target / "var/lib/dpkg"), "-S", owned)
+        self.assertEqual(query.returncode, 0, query.stderr)
+        before = sorted(p.relative_to(target).as_posix() for p in target.rglob("*"))
+        result = call(sys.executable, RECIPE / "apply-runtime.py", "--root", target,
+                      "--runtime-lock", lock_path, "--runtime-tree", self.tree)
+        self.assertEqual(result.returncode, expected, result.stderr)
+        if expected:
+            self.assertIn("owned by an installed target", result.stderr)
+            self.assertEqual(original.read_text(), "original task-owned target fixture\n")
+            self.assertEqual(sorted(p.relative_to(target).as_posix() for p in target.rglob("*")), before)
+        return target, result
+
+    def test_owned_bin_relative_and_image_absolute_aliases(self):
+        for index, value in enumerate(("usr/bin", "/usr/bin", "./usr/bin", "usr/../usr/bin")):
+            with self.subTest(target=value):
+                self.apply_fixture(f"bin-{index}", "/bin/wayfire", [("bin", value)])
+
+    def test_owned_nested_chained_aliases(self):
+        cases = [
+            [("opt/desktop", "/usr/bin")],
+            [("opt/desktop", "../compat/bin"), ("compat/bin", "/usr/bin")],
+            [("opt/desktop", "../compat/bin/../bin"), ("compat", "usr")],
+        ]
+        for index, aliases in enumerate(cases):
+            with self.subTest(row=index):
+                self.apply_fixture(f"nested-{index}", "/opt/desktop/wayfire", aliases)
+
+    def test_late_alias_collision_preflights_all_payloads(self):
+        self.apply_fixture("late-alias", "/legacy/share/doc/ditto-runtime/NOTICE",
+                           [("legacy", "/usr")], "usr/share/doc/ditto-runtime/NOTICE")
+
+    def test_symlink_runtime_entries_are_owned_too(self):
+        lib = self.put("usr/lib/x86_64-linux-gnu/libwf-config.so.0", "synthetic library", self.tree)
+        (lib.parent / "libwf-config.so").symlink_to(lib.name)
+        # The owned link need not exist yet: installed package authority still wins.
+        self.apply_fixture("owned-link", "/compat/x86_64-linux-gnu/libwf-config.so",
+                           [("compat", "/usr/lib")], "usr/bin/wayfire")
+
+    def test_distinct_bin_directory_is_not_an_alias(self):
+        target = self.root / "distinct"
+        legacy = self.put("bin/wayfire", "distinct package fixture\n", target)
+        self.apply_fixture("distinct", "/bin/wayfire", expected=0)
+        self.assertEqual(legacy.read_text(), "distinct package fixture\n")
+        self.assertEqual((target / "usr/bin/wayfire").read_bytes(), (self.tree / "usr/bin/wayfire").read_bytes())
+
+    def test_unowned_alias_control(self):
+        self.apply_fixture("unowned-alias", "/bin/unrelated", [("bin", "/usr/bin")], expected=0)
+
+    def test_alias_query_and_target_confinement_fail_closed(self):
+        for index, value in enumerate(("loop", "../../outside", "/host/../../outside")):
+            with self.subTest(target=value):
+                target = self.root / f"bad-alias-{index}"
+                self.put("var/lib/dpkg/status", "Package: fixture\nStatus: install ok installed\nArchitecture: amd64\nVersion: 1\nMaintainer: Fixture <fixture@example.invalid>\nDescription: fixture\n\n", target)
+                self.put("var/lib/dpkg/info/fixture.list", "/loop/wayfire\n", target)
+                (target / "loop").symlink_to(value)
+                lock = self.root / f"bad-alias-{index}.json"
+                lock.write_text(json.dumps(self.lock()))
+                result = call(sys.executable, RECIPE / "apply-runtime.py", "--root", target,
+                              "--runtime-lock", lock, "--runtime-tree", self.tree)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertRegex(result.stderr, "alias cycle/depth|escapes image")
+                self.assertFalse((target / "usr/bin/quickshell").exists())
+
+    def test_target_database_and_host_root_refusals(self):
+        lock = self.root / "database-lock.json"
+        lock.write_text(json.dumps(self.lock()))
+        for kind in ("missing", "malformed", "symlink-status", "symlink-parent", "target-parent",
+                     "symlink-info", "symlink-list", "symlink-diversions"):
+            with self.subTest(kind=kind):
+                target = self.root / ("db-" + kind)
+                target.mkdir()
+                if kind == "missing":
+                    pass
+                elif kind == "malformed":
+                    self.put("var/lib/dpkg/status", "not a package database\n", target)
+                else:
+                    self.put("var/lib/dpkg/status", "", target)
+                    self.put("var/lib/dpkg/info/fixture.list", "", target)
+                    if kind == "symlink-status":
+                        (target / "var/lib/dpkg/status").unlink()
+                        (target / "var/lib/dpkg/status").symlink_to("/dev/null")
+                    elif kind == "symlink-parent":
+                        (target / "var").rename(target / "elsewhere")
+                        (target / "var").symlink_to("elsewhere")
+                    elif kind == "target-parent":
+                        (target / "usr").symlink_to("/usr")
+                    elif kind == "symlink-info":
+                        (target / "var/lib/dpkg/info").rename(target / "saved-info")
+                        (target / "var/lib/dpkg/info").symlink_to("../../../saved-info")
+                    elif kind == "symlink-list":
+                        (target / "var/lib/dpkg/info/fixture.list").unlink()
+                        (target / "var/lib/dpkg/info/fixture.list").symlink_to("../../../../list-outside")
+                        self.put("list-outside", "", target)
+                    elif kind == "symlink-diversions":
+                        (target / "var/lib/dpkg/diversions").symlink_to("../../../diversions-outside")
+                        self.put("diversions-outside", "", target)
+                result = call(sys.executable, RECIPE / "apply-runtime.py", "--root", target,
+                              "--runtime-lock", lock, "--runtime-tree", self.tree)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertRegex(result.stderr, "dpkg|parent symlink")
+                if kind != "target-parent":
+                    self.assertFalse((target / "usr/bin/quickshell").exists())
+        # Valid runtime prerequisites ensure this reaches the host-root guard.
+        for target in ("/",):
+            result = call(sys.executable, RECIPE / "apply-runtime.py", "--root", target,
+                          "--runtime-lock", lock, "--runtime-tree", self.tree)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("refusing host root", result.stderr)
+
+    def test_target_query_failures_never_admit_runtime(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("policy", RECIPE / "runtime_policy.py")
+        policy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy)
+        target = self.root / "query-target"
+        self.put("var/lib/dpkg/status", "", target)
+        def query(command, **kwargs):
+            self.assertIn("--admindir=" + str(target / "var/lib/dpkg"), command)
+            if "-W" in command:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return subprocess.CompletedProcess(command, 1, "", "unexpected query error\n")
+        with mock.patch.object(policy.subprocess, "run", query):
+            with self.assertRaisesRegex(ValueError, "query failed closed"):
+                policy.check_target_ownership(target, ["usr/bin/wayfire"])
+        # Noncanonical host-root spelling must be refused before any query. This
+        # mock makes it impossible for the frozen RED run to read the host DB.
+        with mock.patch.object(policy.subprocess, "run", side_effect=AssertionError("host DB query attempted")):
+            with self.assertRaisesRegex(ValueError, "refusing host root"):
+                policy.check_target_ownership(Path("/usr/.."), ["usr/bin/wayfire"])
 
     def test_drm_present_delayed_absent_and_unit_wiring(self):
         cards = self.root / "drm"

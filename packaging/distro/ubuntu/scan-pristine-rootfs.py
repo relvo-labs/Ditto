@@ -11,20 +11,49 @@ import stat
 import tomllib
 import shlex
 
-def unsafe_shadow(data):
+def account_records(data, shadow):
+    """Parse pristine account metadata without ever returning credential values."""
     try:
-        lines = data.decode("utf-8").splitlines()
+        text = data.decode("utf-8")
+        lines = text.removesuffix("\n").split("\n")
         accounts = set()
         for line in lines:
             fields = line.split(":")
-            if (len(fields) != 9 or not re.fullmatch(r"[a-z_][a-z0-9_-]*[$]?", fields[0]) or
-                    fields[0] in accounts or not re.fullmatch(r"[!*]+", fields[1]) or
-                    any(value and not value.isdecimal() for value in fields[2:8]) or fields[8]):
-                return True
+            if (len(fields) != (9 if shadow else 7) or
+                    any(ord(char) < 32 or ord(char) == 127 for char in line) or
+                    not re.fullmatch(r"[a-z_][a-z0-9_-]*[$]?", fields[0]) or fields[0] in accounts):
+                return None
+            locked = re.fullmatch(r"[!*]+", fields[1]) is not None
+            if shadow:
+                if (not locked or any(value and not re.fullmatch(r"[0-9]+", value)
+                                      for value in fields[2:8]) or fields[8]):
+                    return None
+            elif ((fields[1] != "x" and not locked) or
+                  any(not re.fullmatch(r"[0-9]+", value) for value in fields[2:4])):
+                return None
             accounts.add(fields[0])
-        return "root" not in accounts
+        return accounts if "root" in accounts else None
     except UnicodeError:
-        return True
+        return None
+
+
+def check_accounts(root, report):
+    accounts = {}
+    for rel in ("etc/passwd", "etc/shadow"):
+        path = root / rel
+        try:
+            if (any(parent.is_symlink() for parent in (path, path.parent)) or
+                    not stat.S_ISREG(path.lstat().st_mode)):
+                raise ValueError("unsafe account file")
+            records = account_records(path.read_bytes(), shadow=(rel == "etc/shadow"))
+            if records is None:
+                report["identity_files"].append(rel)
+            else:
+                accounts[rel] = records
+        except (OSError, ValueError):
+            report["errors"].append({"file": rel, "error": "required account file missing, unreadable or unsafe"})
+    if len(accounts) == 2 and accounts["etc/passwd"] != accounts["etc/shadow"]:
+        report["identity_files"].extend(("etc/passwd", "etc/shadow"))
 
 
 def authentication_path(rel):
@@ -163,9 +192,10 @@ def main():
     report = {"regular_files": 0, "bytes_scanned": 0, "literal_matches": [],
               "unapproved_keys": [], "public_fixtures": [], "identity_files": [],
               "authentication_config": [], "errors": []}
-    for required in ("usr/lib/os-release", "etc/shadow"):
+    for required in ("usr/lib/os-release",):
         if not (root / required).is_file():
             report["errors"].append({"file": required, "error": "required pristine root file missing"})
+    check_accounts(root, report)
 
     def walk_error(error):
         report["errors"].append({"file": str(error.filename), "errno": error.errno})
@@ -192,7 +222,7 @@ def main():
                                 report["authentication_config"].append(rel)
                         except (ValueError, OSError):
                             report["authentication_config"].append(rel)
-                    elif rel == "etc/shadow" or authentication_path(rel):
+                    elif rel in {"etc/passwd", "etc/shadow"} or authentication_path(rel):
                         report["authentication_config"].append(rel)
                     if (any(term in os.fsencode(path.readlink()) for term in terms) or
                             producer_path.search(os.fsencode(path.readlink()))):
@@ -217,8 +247,6 @@ def main():
                         (rel.startswith("etc/ssh/ssh_host_") and "key" in name) or
                         (rel == "etc/machine-id" and data.strip()) or
                         rel == "var/lib/systemd/random-seed"):
-                    report["identity_files"].append(rel)
-                if rel == "etc/shadow" and unsafe_shadow(data):
                     report["identity_files"].append(rel)
             except OSError as error:
                 report["errors"].append({"file": rel, "errno": error.errno})
