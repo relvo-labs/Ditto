@@ -21,7 +21,7 @@ owner 於 2026-10-25 指示繼續 Ditto 工作，並先補 MIT 授權；[#200](h
 
 ## 影響
 
-- Cargo workspace、第一方 Node 套件及可交付自有 builtin manifest 對齊 MIT；保留所有版本、private 旗標、lockfile、第三方 LICENSE／NOTICE 與測試資料語意。owner／使用者生成物的預設 `UNLICENSED` 不變。
+- Cargo workspace、第一方 Node 套件及可交付自有 builtin manifest 對齊 MIT；15 個授權變更的 builtin manifest 保持 ID 並各遞增 patch 版本，其他 workspace 版本、private 旗標、lockfile、第三方 LICENSE／NOTICE 與合成測試資料語意保留。owner／使用者生成物的預設 `UNLICENSED` 不變。
 - Linux、Ubuntu、Qt、Wayfire、第三方插件與素材不重新授權。名稱、商標、角色、美術素材、商業模式、Codex 再散布及完整映像的其餘法律裁定仍由 owner 負責；#51 未因此完成。
-- `scripts/build-builtin-packages.sh` 會將 manifest 納入 `.dittopkg`；`crates/ditto-store/src/packages.rs::insert` 拒絕相同 id／version 的不同內容。本次只修來源 metadata，保留版本，不打包、不安裝、不改 registry／Profile。下次重新打包／散布前須分配新版本並驗證升版；既有套件與歷史 revision 不得覆寫。
+- `scripts/build-builtin-packages.sh` 會將 manifest 納入 `.dittopkg`；`crates/ditto-store/src/packages.rs::insert` 拒絕相同 id／version 的不同內容。授權 metadata 會改變 archived bytes，因此本次即完成 15 個 builtin 的來源 patch 升版，並同步真實來源 fixture 與現行 archive 消費端；不把版本處理延後至散布。沒有啟用或改寫任何已安裝使用者 Profile／registry；既有精確版本綁定、套件與歷史 revision 保留，日後啟用新版本仍須經既有明確升版流程。來源 guard／fresh checkout 檢查與實際 archive 建置分開報告，原生工具缺席不視為建置通過。
 - 授權一致性由 `node scripts/check-license.mjs` 與 `node --test scripts/check-license.test.mjs` 檢查，不代替發行包盤點、獨立審查或 Ready 裁定。
