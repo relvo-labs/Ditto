@@ -27,6 +27,8 @@ Scope {
     property int generation: 0
     property int session: 0
     property string listStatus: ""
+    /// The last keyboard selection change, as sent to assistive technology.
+    property string selectionAnnouncement: ""
     readonly property bool searching: query.text.trim().length > 0
 
     /// Main categories of the freedesktop menu specification, in page order.
@@ -68,6 +70,7 @@ Scope {
         apps = [];
         results = [];
         categoryIndex = 0;
+        selectionAnnouncement = "";
         Qt.callLater(() => { if (provider.isOpen) query.forceActiveFocus(); });
         listStatus = t(qsTr("正在讀取應用程式清單"));
         status = listStatus;
@@ -119,12 +122,40 @@ Scope {
         }
     }
 
-    function handleKey(event) {
+    /// Where Left/Right goes while the search field has focus (#187):
+    /// "ime" while the input method composes; "field" to edit the text (a
+    /// modifier held, text selected, or a caret that can still move that
+    /// way); otherwise "grid". Assumes left-to-right caret movement.
+    function arrowTarget(key, modifiers, composing, cursor, length, hasSelection) {
+        if (composing) return "ime";
+        if (modifiers & (Qt.ShiftModifier | Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) return "field";
+        if (hasSelection) return "field";
+        if (key === Qt.Key_Left && cursor > 0) return "field";
+        if (key === Qt.Key_Right && cursor < length) return "field";
+        return "grid";
+    }
+
+    /// Tells assistive technology which app is selected: focus stays in the
+    /// search field, so a selection change alone is not read out. The name
+    /// is substituted last, so placeholders in it stay as written.
+    function announceSelection() {
+        const app = visibleApps[grid.currentIndex];
+        if (!app) return;
+        selectionAnnouncement = t(qsTr("%3，第 %1 項，共 %2 項"))
+            .arg(grid.currentIndex + 1).arg(visibleApps.length).arg(app.name);
+        grid.Accessible.announce(selectionAnnouncement, Accessible.Assertive);
+    }
+
+    function handleKey(event, fromField) {
         if (query.inputMethodComposing) return;
         const columns = Math.max(1, Math.floor(grid.width / grid.cellWidth));
         let step = 0;
-        if (event.key === Qt.Key_Left) step = -1;
-        else if (event.key === Qt.Key_Right) step = 1;
+        if (event.key === Qt.Key_Left || event.key === Qt.Key_Right) {
+            // Not accepted: the search field moves the caret or selects.
+            if (fromField && arrowTarget(event.key, event.modifiers, false, query.cursorPosition,
+                    query.text.length, query.selectedText.length > 0) !== "grid") return;
+            step = event.key === Qt.Key_Left ? -1 : 1;
+        }
         else if (event.key === Qt.Key_Up) step = -columns;
         else if (event.key === Qt.Key_Down) step = columns;
         else if (event.key === Qt.Key_Escape) clearOrClose();
@@ -135,8 +166,10 @@ Scope {
             grid.currentIndex = 0;
         } else return;
         if (step !== 0 && visibleApps.length > 0) {
+            const previous = grid.currentIndex;
             grid.currentIndex = Math.max(0, Math.min(visibleApps.length - 1, grid.currentIndex + step));
             grid.positionViewAtIndex(grid.currentIndex, GridView.Contain);
+            if (grid.currentIndex !== previous) announceSelection();
         }
         event.accepted = true;
     }
@@ -217,7 +250,9 @@ Scope {
             anchors.margins: 72
             focus: true
 
-            Keys.onPressed: event => provider.handleKey(event)
+            // Keys the search field leaves for itself bubble up here; only
+            // handle them when the field does not have focus.
+            Keys.onPressed: event => { if (!query.activeFocus) provider.handleKey(event, false); }
 
             Rectangle {
                 id: searchBox
@@ -244,11 +279,12 @@ Scope {
                     Accessible.role: Accessible.EditableText
                     Accessible.name: provider.t(qsTr("搜尋應用程式"))
                     onTextChanged: provider.search(text)
-                    Keys.onPressed: event => provider.handleKey(event)
+                    Keys.onPressed: event => provider.handleKey(event, true)
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: query.text.length === 0
+                        textFormat: Text.PlainText
                         text: provider.t(qsTr("輸入應用程式名稱"))
                         color: provider.tokens.foregroundMuted
                         font.pixelSize: provider.tokens.fontBody
@@ -280,6 +316,7 @@ Scope {
                         Text {
                             id: tabLabel
                             anchors.centerIn: parent
+                            textFormat: Text.PlainText
                             text: provider.categoryLabel(categoryTab.modelData)
                             color: categoryTab.index === provider.categoryIndex ? provider.tokens.accentForeground : provider.tokens.foreground
                             font.pixelSize: provider.tokens.fontBody
@@ -302,6 +339,8 @@ Scope {
                 anchors.top: tabs.bottom
                 anchors.topMargin: provider.tokens.space
                 anchors.horizontalCenter: parent.horizontalCenter
+                // The status can carry an app name (a launch error): never rich text.
+                textFormat: Text.PlainText
                 text: provider.status.length > 0 ? provider.status
                     : provider.searching ? provider.t(qsTr("方向鍵選擇，Enter 開啟，Esc 清除搜尋，再按一次關閉"))
                     : provider.t(qsTr("方向鍵選擇，Enter 開啟，PageUp／PageDown 換類別，Esc 關閉"))
@@ -350,7 +389,10 @@ Scope {
                             objectName: "launcherGridIcon"
                             anchors.fill: parent
                             source: provider.iconSource(tile.modelData.icon)
-                            sourceSize: Qt.size(48, 48)
+                            // Decode at device pixels: a raster PNG decoded at
+                            // 48 px is stretched and blurred on a 2x output (#188).
+                            sourceSize: Qt.size(Math.ceil(48 * Screen.devicePixelRatio),
+                                                Math.ceil(48 * Screen.devicePixelRatio))
                             fillMode: Image.PreserveAspectFit
                             visible: !provider.iconFallback(source, status)
                         }
@@ -359,6 +401,7 @@ Scope {
                             objectName: "launcherGridIconFallback"
                             anchors.centerIn: parent
                             visible: provider.iconFallback(appIcon.source, appIcon.status)
+                            textFormat: Text.PlainText
                             text: tile.modelData.name.substring(0, 1)
                             color: provider.tokens.accentForeground
                             font.pixelSize: provider.tokens.fontTitle
@@ -373,6 +416,8 @@ Scope {
                         anchors.horizontalCenter: parent.horizontalCenter
                         horizontalAlignment: Text.AlignHCenter
                         elide: Text.ElideRight
+                        // App names come from desktop entries: never rich text (#189).
+                        textFormat: Text.PlainText
                         text: tile.modelData.name
                         color: provider.tokens.foreground
                         font.pixelSize: provider.tokens.fontBody
