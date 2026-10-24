@@ -2471,6 +2471,10 @@
 <context>
     <name>LauncherGrid</name>
     <message>
+        <source>%3，第 %1 項，共 %2 項</source>
+        <translation>%3, %1 of %2</translation>
+    </message>
+    <message>
         <source>全部</source>
         <translation>All</translation>
     </message>

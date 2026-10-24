@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.launcher.grid",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": {
     "zh-TW": "網格式啟動器",
     "en": "Grid launcher"
