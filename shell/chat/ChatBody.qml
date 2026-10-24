@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Dialogs
 import Quickshell
@@ -267,21 +268,22 @@ Item {
                 Repeater {
                     model: history.open ? window.conversation.sessions.slice(0, 12) : []
                     Row {
+                        id: sessionRow
                         required property var modelData
                         spacing: window.tokens.spaceTight
                         Button {
                             tokens: window.tokens
-                            kind: modelData.session_id === window.conversation.sessionId ? "secondary" : "subtle"
-                            text: (modelData.title || window.t(qsTr("對話"))) + "  " + modelData.created_at.slice(5, 16).replace("T", " ")
-                            onClicked: { window.conversation.selectSession(modelData.session_id, modelData.next_seq); history.open = false; }
+                            kind: sessionRow.modelData.session_id === window.conversation.sessionId ? "secondary" : "subtle"
+                            text: (sessionRow.modelData.title || window.t(qsTr("對話"))) + "  " + sessionRow.modelData.created_at.slice(5, 16).replace("T", " ")
+                            onClicked: { window.conversation.selectSession(sessionRow.modelData.session_id, sessionRow.modelData.next_seq); history.open = false; }
                         }
                         Button {
                             tokens: window.tokens
                             kind: "subtle"
                             text: "✕"
                             accessibleName: window.t(qsTr("刪除這段對話（桌面維持原樣）"))
-                            enabled: modelData.session_id !== window.conversation.sessionId || !window.conversation.turnActive
-                            onClicked: window.conversation.deleteSession(modelData.session_id)
+                            enabled: sessionRow.modelData.session_id !== window.conversation.sessionId || !window.conversation.turnActive
+                            onClicked: window.conversation.deleteSession(sessionRow.modelData.session_id)
                         }
                     }
                 }
@@ -501,7 +503,7 @@ Item {
                         wrapMode: Text.WordWrap
                         color: window.tokens.appInk
                         font.pixelSize: window.tokens.appFontBody
-                        font.family: window.tokens.fontFamily.length > 0 ? window.tokens.fontFamily : Qt.application.font.family
+                        font.family: window.tokens.fontFamily.length > 0 ? window.tokens.fontFamily : Application.font.family
                     }
                     onClicked: {
                         window.conversation.draft = modelData.text;

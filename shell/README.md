@@ -101,6 +101,8 @@ Quickshell／QML 的桌面工作階段。對應 [plan/03/04](../plan/03/04-shell
 
 供應者以絕對 `file://` URL 載入。Quickshell 0.3.1 的離屏實測可解析同目錄型別、套件內相對子目錄與絕對目錄 import；跨出設定目錄的相對 import 與沒有 qmldir 的 `root:/` 目錄解析不完整。不得 import Shell 私有相對路徑；共用元件使用 `import "root:/sdk/Ditto/Ui"`（Shell 擁有的 `qmldir`，引用原始 ui/change 元件，不複製）。真實登入與同 URL 改檔後熱換尚待驗證。
 
+靜態檢查使用 `node scripts/lint-shell-qml.mjs "$QT_PREFIX"`。Qt 6.10.2 的 qmllint 不認得 Quickshell 的 `root:` URL；單加 `-I shell/sdk` 或 `-i shell/sdk/Ditto/Ui/qmldir` 仍會回報未知 import 語法。腳本只在暫存來源樹把 `root:/sdk/…` 目錄 import 映射到同樹的 SDK `file://` URL，沿用原始 qmldir 與相對元件路徑，不改套件執行期 import。診斷保留來源行號並顯示原始路徑；暫存樹在檢查後刪除。`HistoryCenter.qml`、`ChatBody.qml`、套件 `HistoryPage.qml` 的警告上限各為 0，增加即失敗；其餘 Shell 檔案保留 `--max-warnings -1` 並輸出警告。排除路徑沿用既有 workflow。
+
 `ui.settings_page` 是多條目 area：manifest 的 `settings_page` 宣告 `page_id`、`title_key`、`order`、可選 `category`。prepare 只編譯，commit 登錄導覽，按 `(order, page_id)` 排序。同 id 取代內建頁，額外 id 附加；建立失敗時回到同 id 內建頁，沒有內建頁則顯示錯誤。根為 `Item`，只在設定視窗開啟時建立，接收 `client`、`tokens`、`config`、`pageId`、`entryId`；可選 `flickable` 提供捲動與焦點揭露。`mounted && visible` 表示已登錄，`page_state` 的 `registered/open` 只供觀測。
 
 P03a 官方頁套件為 `ditto.settings.composition`、`ditto.settings.plugins`、`ditto.settings.history`（order 10／20／30），對應的 CompositionCenter、PluginCenter、HistoryCenter 保留為可信備援。插件頁的 GeneratedArtifacts 由 SDK qmldir 引用 Shell 原檔，沒有副本。P03b 加入 `ditto.settings.personalization`、`ditto.settings.ai`（order 40／50），PersonalizationCenter、AISettings 同樣保留為可信備援。個人化套件移除只有宣告、未讀取的 `providers`，不增加輸入。`build-builtin-packages.sh` 自動探索這些套件；本切片不加入預設綁定，採用留待 P06。
