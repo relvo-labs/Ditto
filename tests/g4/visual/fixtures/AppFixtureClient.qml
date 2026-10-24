@@ -68,12 +68,12 @@ QtObject {
         { profile_id: "p-present", name: "簡報", active: false, updated_at: "2026-10-19T08:14:00Z" }
     ]
     readonly property var entries: [
-        { entry_id: "e-panel", package: "ditto.panel.top", version: "1.1.0", host: "qml", config: {}, disabled: false },
+        { entry_id: "e-panel", package: "ditto.panel.top", version: packageVersion("ditto.panel.top"), host: "qml", config: {}, disabled: false },
         { entry_id: "e-dock", package: "ditto.dock.pill", version: packageVersion("ditto.dock.pill"), host: "qml", config: {}, disabled: false },
-        { entry_id: "e-launch", package: "ditto.launcher.search", version: "1.1.0", host: "qml", config: {}, disabled: false },
-        { entry_id: "e-tasks", package: "ditto.tasks.panel", version: "1.1.0", host: "qml", config: {}, disabled: false },
-        { entry_id: "e-notif", package: "ditto.notifications.area", version: "1.1.0", host: "qml", config: {}, disabled: false },
-        { entry_id: "e-layout", package: "ditto.layout.floating", version: "1.0.0", host: "core_builtin", config: {}, disabled: false }
+        { entry_id: "e-launch", package: "ditto.launcher.search", version: packageVersion("ditto.launcher.search"), host: "qml", config: {}, disabled: false },
+        { entry_id: "e-tasks", package: "ditto.tasks.panel", version: packageVersion("ditto.tasks.panel"), host: "qml", config: {}, disabled: false },
+        { entry_id: "e-notif", package: "ditto.notifications.area", version: packageVersion("ditto.notifications.area"), host: "qml", config: {}, disabled: false },
+        { entry_id: "e-layout", package: "ditto.layout.floating", version: packageVersion("ditto.layout.floating"), host: "core_builtin", config: {}, disabled: false }
     ]
     readonly property var document: ({
         slots: { "ui.panel_top": "e-panel", "ui.dock": "e-dock", "ui.launcher": "e-launch",
@@ -92,9 +92,19 @@ QtObject {
         ["ditto.tasks.panel", ["ui.tasks_panel"]], ["ditto.notifications.area", ["ui.notifications"]]
     ]
 
-    // Static visual fixture metadata mirrors the current Dock manifests.
+    // Static visual fixture metadata mirrors the current source manifests;
+    // scripts/check-license.test.mjs checks every entry and installed package.
     function packageVersion(id) {
-        return id === "ditto.dock.pill" ? "1.1.1" : id === "ditto.dock.bottom" ? "1.1.2" : "1.1.0";
+        return {
+            "ditto.panel.top": "1.1.2",
+            "ditto.dock.pill": "1.1.2",
+            "ditto.dock.bottom": "1.1.3",
+            "ditto.launcher.search": "1.1.3",
+            "ditto.launcher.grid": "1.2.2",
+            "ditto.tasks.panel": "1.1.1",
+            "ditto.notifications.area": "1.1.1",
+            "ditto.layout.floating": "1.1.1"
+        }[id];
     }
 
     /// The appearance tokens `desktop.appearance.get` answers with; a test

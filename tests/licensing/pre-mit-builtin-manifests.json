@@ -1,0 +1,96 @@
+{
+  "source_revision": "cd8a3a8a27a951660be8bd1cc7b0e27c67aa9f12",
+  "note": "Immutable pre-MIT manifest bytes. A changed manifest must use a different version with the same ID. This fixture records prior identities, not a pin to any current release version.",
+  "packages": [
+    {
+      "path": "packaging/builtin/ditto.layout.floating/manifest.json",
+      "id": "ditto.layout.floating",
+      "version": "1.1.0",
+      "sha256": "9a8d32c557fd3360bb182211ad7280369ab12f05c4c5b272160f05f30e2cba69"
+    },
+    {
+      "path": "packaging/builtin/ditto.layout.simple-tile/manifest.json",
+      "id": "ditto.layout.simple-tile",
+      "version": "1.1.0",
+      "sha256": "1c7807a6e7f19cd4c0281313bc73b873b43ac0f39381477528fc72778bc9cc86"
+    },
+    {
+      "path": "shell/providers/background_default/manifest.json",
+      "id": "ditto.background.default",
+      "version": "1.0.0",
+      "sha256": "6e5bf9cb649604e8e9ffeef12041de5a14eb9de891f9d662cf72ace9ea7e1a8d"
+    },
+    {
+      "path": "shell/providers/dock_bottom/manifest.json",
+      "id": "ditto.dock.bottom",
+      "version": "1.1.2",
+      "sha256": "01e1f599f17c1c6168b3f9f7a9a956711bdff0f16db1d32e46455fd86a0c0015"
+    },
+    {
+      "path": "shell/providers/dock_pill/manifest.json",
+      "id": "ditto.dock.pill",
+      "version": "1.1.1",
+      "sha256": "34561d7af923818c5240b3145cc8db0356d15e9902fbccbf710acb7b23010f5e"
+    },
+    {
+      "path": "shell/providers/launcher_grid/manifest.json",
+      "id": "ditto.launcher.grid",
+      "version": "1.2.1",
+      "sha256": "6989fb8a859a367bb7fbf66f021e2fb2b054da709d8fc1233e65da48473e2961"
+    },
+    {
+      "path": "shell/providers/launcher_search/manifest.json",
+      "id": "ditto.launcher.search",
+      "version": "1.1.2",
+      "sha256": "9c949860059ea96d7ffd2a30d0b8421e9c94f9c4aed32d12c69583d74ecbc9fd"
+    },
+    {
+      "path": "shell/providers/notifications/manifest.json",
+      "id": "ditto.notifications.area",
+      "version": "1.1.0",
+      "sha256": "ba5f9d57320856b51786e294eeb622622dd8e21758552c8a66ec3a13255b9d6a"
+    },
+    {
+      "path": "shell/providers/panel_top/manifest.json",
+      "id": "ditto.panel.top",
+      "version": "1.1.1",
+      "sha256": "828c41ec115c91a2a01570b9cd9cb6d426be2d295ad80836bae64c9b9ecea4e7"
+    },
+    {
+      "path": "shell/providers/settings_ai/manifest.json",
+      "id": "ditto.settings.ai",
+      "version": "1.0.0",
+      "sha256": "f2e1cf0a329009215fa2ac10050a0ea01fb3be000c44c12be9f409706bffecd6"
+    },
+    {
+      "path": "shell/providers/settings_composition/manifest.json",
+      "id": "ditto.settings.composition",
+      "version": "1.0.0",
+      "sha256": "f50a9d9599c3ca1784ba227016985b0564831c3e666205c08992ead56bfb9b13"
+    },
+    {
+      "path": "shell/providers/settings_history/manifest.json",
+      "id": "ditto.settings.history",
+      "version": "1.0.0",
+      "sha256": "165e6eaf80264b1cfd4e2ee9854337a462e646917e9d74f8633276dcaf090749"
+    },
+    {
+      "path": "shell/providers/settings_personalization/manifest.json",
+      "id": "ditto.settings.personalization",
+      "version": "1.0.0",
+      "sha256": "bb6ac4f38334805fb6d2925f881aeb62077fa4beda4f8a0176bc863335578d6a"
+    },
+    {
+      "path": "shell/providers/settings_plugins/manifest.json",
+      "id": "ditto.settings.plugins",
+      "version": "1.1.0",
+      "sha256": "c430cfc8da8541151e6338cc74205a6535d0e9c1ad759b1ea88f2f6e680f86e7"
+    },
+    {
+      "path": "shell/providers/tasks_panel/manifest.json",
+      "id": "ditto.tasks.panel",
+      "version": "1.1.0",
+      "sha256": "e661e1f147c8c31984faebc059a9706754ccb3eb827de74f824f29e08ab6fd5e"
+    }
+  ]
+}

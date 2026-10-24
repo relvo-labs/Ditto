@@ -1,13 +1,13 @@
 {
   "manifest_version": 1,
   "id": "ditto.launcher.grid",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "name": {
     "zh-TW": "網格式啟動器",
     "en": "Grid launcher"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "description": {
     "zh-TW": "依類別瀏覽應用程式，或輸入文字搜尋全部類別；方向鍵選擇。",

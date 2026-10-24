@@ -1,13 +1,13 @@
 {
   "manifest_version": 1,
   "id": "ditto.settings.personalization",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": {
     "zh-TW": "個人化設定",
     "en": "Personalization"
   },
   "author": "Ditto",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "source": "builtin",
   "plugin_kind": "qml_provider",
   "host_kind": "qml",
