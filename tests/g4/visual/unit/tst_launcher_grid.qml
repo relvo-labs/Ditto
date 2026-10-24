@@ -284,8 +284,29 @@ TestCase {
         const component = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/LauncherSearch.qml"));
         compare(component.status, Component.Ready, component.errorString());
         const created = component.createObject(testCase, { client: client, tokens: tokens, shown: true });
-        created.open();
+        verify(created !== null, "search launcher created");
+        providerMethod(created, "open")();
         return created;
+    }
+    // createObject() is typed QObject; a provider function is reached only
+    // when it exists, bound to that provider. A missing name throws.
+    function providerMethod(provider, name) {
+        const method = provider[name];
+        if (typeof method !== "function")
+            throw new Error("launcher provider has no function " + name + "()");
+        return method.bind(provider);
+    }
+    function test_provider_method_accessor() {
+        const searchLauncher = makeSearchLauncher();
+        verify(searchLauncher.isOpen, "open() reached the actual search launcher");
+        providerMethod(searchLauncher, "close")();
+        verify(!searchLauncher.isOpen, "close() is bound to the launcher it was read from");
+        for (const name of ["noSuchMethod", "isOpen"]) {
+            let refused = "";
+            try { providerMethod(searchLauncher, name); } catch (error) { refused = error.message; }
+            compare(refused, "launcher provider has no function " + name + "()");
+        }
+        searchLauncher.release(); searchLauncher.destroy();
     }
 
     // ---- #187: Left/Right edit text first, then move the grid ----------
