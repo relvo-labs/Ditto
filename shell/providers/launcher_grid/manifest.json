@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "id": "ditto.launcher.grid",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": {
     "zh-TW": "網格式啟動器",
     "en": "Grid launcher"
@@ -10,8 +10,8 @@
   "license": "UNLICENSED",
   "source": "builtin",
   "description": {
-    "zh-TW": "全螢幕網格，依類別分頁；方向鍵選擇。",
-    "en": "Full-screen grid by category; arrow keys to choose."
+    "zh-TW": "依類別瀏覽應用程式，或輸入文字搜尋全部類別；方向鍵選擇。",
+    "en": "Browse apps by category or type to search all categories; arrow keys to choose."
   },
   "plugin_kind": "qml_provider",
   "host_kind": "qml",

@@ -20,13 +20,15 @@ Repair round 1b 已獲協調者授權，只修改 Avatar awaiting 問號的前�
 | `legacy-soft-jelly`、`legacy-no-theme` | 舊主題的活動工作區與有焦點的 Dock 項目 |
 | `accent-controls-<theme>` | primary／danger Button、非 neutral Badge、已選 Choice、已開 Toggle |
 | `accent-Centers-<theme>` | 管理中心目前頁籤，以及組合頁共用控制項 |
-| `accent-LauncherGrid-<theme>` | 目前分類與應用程式首字 |
+| `accent-LauncherGrid-<theme>` | 搜尋欄、目前分類與應用程式首字回退 |
 | `accent-LauncherSearch-<theme>` | 已選搜尋結果 |
 | `accent-TasksPanel-<theme>` | 示範資料標籤（使用 warning 背景） |
 
 `<theme>` 為 `no-theme`、`soft-jelly`、`soft-jelly-light`。後四類使用標明的 fixture 資料；管理中心的 Core 呼叫回報不可用，沒有實際寫入。FloatingWindow 替身只呈現內容；不驗證原生視窗行為。原始 PNG 在 `.staged/out/`，擷取後可複製到證據目錄；PanelTop 的時鐘是擷取當下時間，比較時須另辨識時鐘差異。
 
 狀態元件的控制項圖與 TasksPanel 圖另外擷取 `-reduced-transparency`、`-low-power` 兩種後綴，覆蓋全部三種主題。
+
+#184 的 `unit/tst_launcher_grid.qml` 使用實際網格啟動器與可控制回覆順序的 Core 替身，檢查搜尋參數、跨類別排序、過期成功／錯誤回覆、清除與關閉、預設 Enter、四方向鍵，以及圖示載入與首字回退。`capture/tst_launcher_grid_capture.qml` 擷取 `launcher-grid-{normal,search,no-icon}-{1,2}x.png`，由 `run.sh` 複製到證據目錄；`launcher-grid-scenes.jsonl` 記錄查詢、結果、圖示來源與裝置縮放。資料是標明的 fixture，沒有查詢實際應用索引；不代表實體 HiDPI 座位驗收。
 
 ## #116 Soft Jelly 應用風格（三種可選，預設 J1）
 

@@ -74,6 +74,8 @@ TestCase {
             // LauncherGrid.qml: hint (foregroundMuted), names (foreground) and
             // the current tile's focus border straight on the scrim.
             "launcher_grid.scrim": over(t.scrim, t.scrim.a, canvas),
+            // Grid query field: opaque surfaceStrong above the scrim.
+            "launcher_grid.field": strong,
             // LauncherSearch.qml: query field (surface) on its panel (surfaceStrong).
             "launcher_search.field": over(t.surface, t.surface.a, strong),
             // NotificationArea.qml: card (surfaceStrong × surfaceOpacity).
