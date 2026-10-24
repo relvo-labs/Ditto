@@ -55,6 +55,8 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 
 `runtime_policy.py` 同時供 lock generation、generator、apply 與 finish audit 使用。runtime 不透過 ExtraTrees 覆寫套件：先 stage 在 generated project 的 `runtime/`，finalizer 以 `dpkg-query --admindir=$BUILDROOT/var/lib/dpkg` 檢查全部路徑（包含 link）。target 的 merged-/usr 等別名依映像內實際 parent symlink 解析，再比對 target package 歸屬；獨立的實體 `/bin` 不會直接視為 `/usr/bin`。任一已被套件擁有或 query 異常（含逾時）即以 exit 2 拒絕，全部通過才 copy；既有 regular-file 目的地的 `st_nlink > 1` 也在任何 copy 前拒絕，避免改寫共用的套件 inode。finish 再對 mounted target DB 與實際 payload hashes 做唯讀 audit。這些查詢不讀 builder 的預設 dpkg DB；preflight 拒絕不得被忽略。真實映像的 catalog 查詢耗時尚待 #148／#151 重建時量測，#199 保留該項驗收。
 
+套件預檢允許缺少 `updates/`；存在時必須是真實目錄，並以 `lstat` 檢查所有直接 journal entries，在任何 dpkg 查詢前拒絕 symlink（包含懸空或循環）與非 regular file（例如目錄、FIFO），不遞迴追蹤。正常的 regular numeric journal 仍可使用。這是限定的 metadata 預檢，並非完整 dpkg metadata graph 的隔離保證；`arch`／`triggers` 等既有追蹤項仍待處理。
+
 此 generator 從 source tar 安裝 Shell、固定 session／units 與 Fcitx profile，替換 checkout 路徑為 `/usr/lib/ditto`。runtime pins 固定 Qt 6.10.2、Rust 1.98.1、Node 22.23.2；這些欄位是輸入聲明，仍需 binary／ELF／QML 實測。此抽取版本沿 Ubuntu UAT 使用 snapshot `/usr` Qt，不引入另一份私有 Qt；正式跨 suite runtime 決策交 D04。
 
 ## Boot 與 pristine 檢查

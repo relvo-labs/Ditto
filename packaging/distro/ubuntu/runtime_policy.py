@@ -4,6 +4,7 @@ import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import subprocess
 
 NATIVE = {"ditto-core", "ditto-worker", "ditto-confine", "ditto-supervisor", "dittoctl",
@@ -152,8 +153,15 @@ def check_target_ownership(root, names):
     if (info.is_symlink() or (info.exists() and not info.is_dir()) or
             any(path.is_symlink() or not path.is_file() for path in info.glob("*.list")) or
             (admindir / "diversions").is_symlink() or
-            (admindir / "updates").is_symlink() or (info / "format").is_symlink()):
+            (info / "format").is_symlink()):
         raise ValueError("target dpkg ownership database missing or unsafe")
+    updates = admindir / "updates"
+    # dpkg reads numeric journals even for -W. Inspect every direct entry with
+    # lstat so no journal symlink or special file reaches any dpkg command.
+    if (updates.is_symlink() or (updates.exists() and
+            (not updates.is_dir() or
+             any(not stat.S_ISREG(path.lstat().st_mode) for path in updates.iterdir())))):
+        raise ValueError("target dpkg ownership database missing or unsafe: updates journal")
     command = ["dpkg-query", f"--admindir={admindir}"]
     env = os.environ | {"LC_ALL": "C"}
     probe = subprocess.run(command + ["-W"], text=True, capture_output=True, env=env, timeout=30)
