@@ -73,6 +73,14 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 
 `public-selftest-key-sha256.json` 僅核准 GnuTLS `usr/lib/x86_64-linux-gnu/libgnutls.so.30.41.1` 七份公開 upstream self-test 的完整 block hash，不按 library 路徑全面豁免。原 PoC 的 source commit `4e84948a5e89689edbab2c5920db7fc32f31a985`、blob `914b94a5903e45af1560b603cf7ca20e5b2f8e24` 及來源分類見 [D-51 §依據](../../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md#依據)。升版出現新 block 必須重新分類。
 
+`public-producer-path-fixtures.json` 依 [#205 owner 裁定](https://github.com/relvo-labs/Ditto/issues/205#issuecomment-6389746879) 登錄已獨立核對來源的公開套件／vendor bytes。這些檔案含具名 home 樣式字串，但字串屬於上游範例、上游美術中繼資料或上游官方建置環境，不是 Ditto 建置者的路徑。只有映像路徑**與**完整檔案 SHA256（及大小）都和唯一 entry 精確吻合的 regular file，其 producer-path 命中才改列 `public_producer_fixtures`，報告保留路徑、hash、來源與驗證層級，不輸出命中內容。邊界如下：
+
+- 不看檔名、目錄、prefix 或套件歸屬，也不改 producer 規則。改動任一 byte、截斷、附加資料、換路徑或換版本，都會回到 `literal_matches`。
+- 同一檔案的 `--forbid`、私鑰（GnuTLS 規則範圍不變）、autologin／免密 sudo、identity 與讀取錯誤檢查照常執行並失敗。分類只處理 producer-path 這一項命中。
+- manifest 缺失、不可讀、JSON 錯誤、重複 key、重複或衝突 entry、無效 digest、缺來源／版本、非 canonical path，或含 Ditto 自有安裝路徑（`usr/lib/ditto/`、`usr/share/ditto/`、`usr/share/doc/ditto-runtime/`、`usr/local/libexec/`），都使 scan 失敗，且不分類任何檔案。自有產物只能用 remap 重建解決；`usr/lib/ditto-node/bin/node` 是 Node.js 官方 binary，不屬自有產物。
+- 目前 8 項的驗證層級不同。7 個 Ubuntu 檔案為 `signed-snapshot-index`：由 snapshot `20261020T000000Z` 的 `.deb` 解出後雜湊相同；`.deb` 雜湊列於 Packages.xz，該 Packages.xz 列於 gpgv 驗證通過的 InRelease。Node 22.23.2 為 `https-shasums-pgp-unverified`：tarball 內 `bin/node` 雜湊相同，tarball 符合以 HTTPS 取得的 SHASUMS256，但 **SHASUMS256 的 PGP 簽章尚未驗證**。
+- 升版或換 snapshot 後，bytes 不同就不會吻合，必須重新取得來源並逐檔核對後再登錄。原始 `.deb`／tarball 不納入 repo。
+
 ## DEV／VM 與 TEST ONLY 驗證入口
 
 一般輸出不設定強制軟體繪製。GPU-less VM 要另加 `--dev-software-render` 產生獨立測試候選，launcher 才設定 `WLR_RENDERER_ALLOW_SOFTWARE=1 LIBGL_ALWAYS_SOFTWARE=1`；`image-inputs.json` 記錄 `mode=dev-software-render`，一般為 `mode=normal`。此旗標不是產品預設，也不授權將測試候選發布。原 UAT 是 virtio-vga＋llvmpipe 軟體繪製；一般模式在 GPU-less VM 預期無法提供該桌面。兩種新輸出都尚未開機資格驗證。
@@ -89,7 +97,7 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 
 - 尚無從 repo 路徑重建、通過 finish／pristine scan 並開機驗證的映像；目前只有靜態／合成輸入檢查與下列 #205 第一輪失敗結果。原 UAT 完整桌面可用，不代表抽取配方已可重建。
 - [#205](https://github.com/relvo-labs/Ditto/issues/205) 第一輪以固定來源與 snapshot `20261020T000000Z` 完成 normal image construction，但 target runtime（Quickshell 缺 `libunwind.so.8`）與 pristine scan 均失敗，未開機、未發行。本次只修正 source：target 套件加入 `libunwind8`（snapshot 歸屬 `libunwind8:amd64 1.8.3-0ubuntu1`，不放進 runtime tree）、unit alias 改在映像內解析、native 建置要求 path remap。新映像仍須重建，並完成 finish／pristine scan、完整 staged ELF 集合的 target 依賴回讀，以及 remapped runtime 實際被新映像使用的回讀；source 測試通過不代表映像通過。
-- 第一輪 scan 另有 8 個套件／vendor 檔案命中具名 home 樣式：adduser 兩個範例、`asoundrc.txt`、util-linux `deprecated.txt`、xkeyboard-config `symbols/se`、Fcitx5 SVG 圖示、`libgtk-3` 與隨附 Node。本次不放寬 producer 規則，不跳過目錄或檔名，所以新映像的 scan 仍會因這些命中失敗。owner 已在 [#205 留言](https://github.com/relvo-labs/Ditto/issues/205#issuecomment-6389746879) 核准由後續 D 處理：逐檔核對精確來源、版本與完整內容 hash，建立 manifest。完成前這些命中不算已核准。
+- 第一輪 scan 另有 8 個套件／vendor 檔案命中具名 home 樣式：adduser 兩個範例、`asoundrc.txt`、util-linux `deprecated.txt`、xkeyboard-config `symbols/se`、Fcitx5 SVG 圖示、`libgtk-3` 與隨附 Node。依 [#205 owner 裁定](https://github.com/relvo-labs/Ditto/issues/205#issuecomment-6389746879)，這 8 項已逐檔核對來源，並登錄於 `public-producer-path-fixtures.json`。目前只以合成 fixture，以及由已核對的上游 bytes 組成的 task-owned 目錄驗證過；新映像必須含完全相同的 bytes，才會在 scan 中吻合，這點尚待重建後實掃確認。Node 的 PGP 簽章仍未驗證。
 - 未提供 runtime 全流程乾淨建置／builder 工具鏈快照、第二人重建或 bit-for-bit reproducibility。原 UAT 使用 pinned Quickshell cache binary 並留 PoC label。
 - 尚無產品 sysupdate transfers、簽章／通道、Secure Boot、verity、boot counting／health-gated bless 接線；PoC 的未簽章本機 transfer 沒有帶進來。安裝 systemd-container 只提供 sysupdate binary，不代表更新可用。
 - 完整 reboot 才是已觀察到的換槽方法；Ubuntu PoC soft-reboot 未切 `/usr`。新 image 未重驗更新／手動或自動回退、hang／斷電矩陣與 shared state schema 相容。

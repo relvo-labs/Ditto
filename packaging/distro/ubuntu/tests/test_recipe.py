@@ -36,6 +36,29 @@ QUICKSHELL_TARGET_PACKAGES = {
     "libpolkit-agent-1-0", "libqt6waylandclient6", "libqt6widgets6", "libqt6core6t64",
     "libqt6gui6", "libqt6qml6", "libqt6quick6"}
 TIMERS = ("fstrim", "dpkg-db-backup", "motd-news")
+PUBLIC_PRODUCER_MANIFEST = "public-producer-path-fixtures.json"
+# The eight package/vendor hits of the first #205 real-image scan; the four
+# owned Rust artifacts of that scan are deliberately absent (remap instead).
+REAL_PUBLIC_PRODUCER_PATHS = {
+    "usr/share/doc/adduser/examples/adduser.local.conf",
+    "usr/share/doc/adduser/examples/README",
+    "usr/share/doc/libasound2t64/examples/asoundrc.txt",
+    "usr/share/doc/util-linux/deprecated.txt",
+    "usr/share/xkeyboard-config-2/symbols/se",
+    "usr/share/icons/hicolor/scalable/apps/org.fcitx.Fcitx5.svg",
+    "usr/lib/x86_64-linux-gnu/libgtk-3.so.0.2420.32",
+    "usr/lib/ditto-node/bin/node"}
+OWNED_IMAGE_PREFIXES = ("usr/lib/ditto/", "usr/share/ditto/", "usr/share/doc/ditto-runtime/",
+                        "usr/local/libexec/")
+# Synthetic public fixture: a producer-path hit that is NOT Ditto's.
+UPSTREAM_REL = "usr/share/doc/vendor-fixture/examples/asoundrc.txt"
+UPSTREAM_BYTES = b"# upstream example\npcm.level {\n\tlib /home/upstream-author/scopes/level.so\n}\n"
+SYNTHETIC_KEY = ("-----BEGIN " + "PRIVATE KEY-----\nU1lOVEhFVElDS0VZ\nTk9UQVJFQUxLRVk=\n"
+                 "-----END " + "PRIVATE KEY-----\n").encode()
+
+
+def sha256_hex(data):
+    return hashlib.sha256(data).hexdigest()
 
 
 def call(*args):
@@ -700,6 +723,254 @@ class RecipeTests(unittest.TestCase):
         report = self.scan(1, recipe=recipe)
         self.assertEqual(sorted(report["literal_matches"]), sorted([owned[0], gnutls]))
         self.assertEqual(report["public_fixtures"], [])
+        # Nor does registering the owned artifact in the public producer-path
+        # manifest: an owned path makes the whole manifest invalid (fail closed).
+        manifest = json.loads((RECIPE / PUBLIC_PRODUCER_MANIFEST).read_text()) \
+            if (RECIPE / PUBLIC_PRODUCER_MANIFEST).is_file() else self.fixture_manifest()
+        manifest["entries"].append(self.fixture_entry(owned[0], polluted))
+        (recipe / PUBLIC_PRODUCER_MANIFEST).write_text(json.dumps(manifest))
+        report = self.scan(1, recipe=recipe)
+        self.assertEqual(sorted(report["literal_matches"]), sorted([owned[0], gnutls]))
+        self.assertEqual(report.get("public_producer_fixtures"), [])
+        self.assertIn(PUBLIC_PRODUCER_MANIFEST, [row["file"] for row in report["errors"]])
+
+    @staticmethod
+    def fixture_entry(rel=UPSTREAM_REL, data=UPSTREAM_BYTES, kind="ubuntu-deb"):
+        if kind == "ubuntu-deb":
+            source = {"kind": "ubuntu-deb", "package": "vendor-fixture", "version": "1.0-1",
+                      "deb": "pool/main/v/vendor-fixture/vendor-fixture_1.0-1_all.deb",
+                      "deb_sha256": "a" * 64,
+                      "packages_index": "https://snapshot.example.invalid/main/binary-amd64/Packages.xz",
+                      "index_sha256": "b" * 64}
+            level = "signed-snapshot-index"
+        else:
+            source = {"kind": "upstream-archive", "name": "node", "version": "0.0.1",
+                      "url": "https://dist.example.invalid/node-v0.0.1-linux-x64.tar.xz",
+                      "member": "node-v0.0.1-linux-x64/bin/node", "archive_sha256": "c" * 64,
+                      "shasums_url": "https://dist.example.invalid/SHASUMS256.txt"}
+            level = "https-shasums-pgp-unverified"
+        return {"path": rel, "sha256": sha256_hex(data), "bytes": len(data), "source": source,
+                "verification": {"level": level, "detail": "synthetic task-owned fixture"},
+                "classification": "synthetic upstream example, not a Ditto producer path"}
+
+    def fixture_manifest(self, *entries):
+        return {"schema": 1, "authority": "synthetic task-owned manifest",
+                "entries": list(entries) or [self.fixture_entry()]}
+
+    def fixture_recipe(self, manifest):
+        """Task-owned scanner copy; manifest is an object, raw text, None (absent) or 'directory'."""
+        recipe = self.root / f"fixture-recipe-{next(self.counter)}"
+        recipe.mkdir()
+        for name in ("scan-pristine-rootfs.py", "public-selftest-key-sha256.json"):
+            shutil.copy2(RECIPE / name, recipe)
+        path = recipe / PUBLIC_PRODUCER_MANIFEST
+        if manifest == "directory":
+            path.mkdir()
+        elif isinstance(manifest, str):
+            path.write_text(manifest)
+        elif manifest is not None:
+            path.write_text(json.dumps(manifest))
+        return recipe
+
+    def fixture_image(self, files):
+        image = self.pristine_image(f"public-{next(self.counter)}")
+        for rel, data in files.items():
+            (image / rel).parent.mkdir(parents=True, exist_ok=True)
+            (image / rel).write_bytes(data)
+        return image
+
+    def assert_no_content(self, report):
+        text = json.dumps(report)
+        for secret in ("upstream-author", "U1lOVEhFVElDS0VZ", "NOPASSWD", "autologin"):
+            self.assertNotIn(secret, text)
+
+    def test_public_producer_fixture_exact_match_is_classified(self):
+        # D1/D2 positive: one unique, complete entry; the report keeps path,
+        # source identity and hash, never the matched content.
+        node = b"\x7fELF\x02\x01\x01\x00\x00/home/iojs-like/build/node\x00"
+        node_rel = "usr/lib/ditto-node/bin/node"
+        recipe = self.fixture_recipe(self.fixture_manifest(
+            self.fixture_entry(), self.fixture_entry(node_rel, node, "upstream-archive")))
+        image = self.fixture_image({UPSTREAM_REL: UPSTREAM_BYTES, node_rel: node})
+        report = self.scan(image=image, recipe=recipe)
+        self.assertEqual(report["literal_matches"], [])
+        self.assertEqual(report["errors"], [])
+        rows = {row["file"]: row for row in report.get("public_producer_fixtures", [])}
+        self.assertEqual(set(rows), {UPSTREAM_REL, node_rel})
+        self.assertEqual(rows[UPSTREAM_REL]["sha256"], sha256_hex(UPSTREAM_BYTES))
+        self.assertEqual((rows[UPSTREAM_REL]["source"]["package"], rows[UPSTREAM_REL]["source"]["version"]),
+                         ("vendor-fixture", "1.0-1"))
+        self.assertEqual(rows[UPSTREAM_REL]["verification"], "signed-snapshot-index")
+        self.assertEqual(rows[node_rel]["verification"], "https-shasums-pgp-unverified")
+        self.assertNotIn("iojs-like", json.dumps(report))
+        self.assert_no_content(report)
+        # Control: the committed manifest does not cover this synthetic path.
+        self.assertEqual(sorted(self.scan(1, image=image)["literal_matches"]), sorted([UPSTREAM_REL, node_rel]))
+
+    def test_public_producer_fixture_requires_exact_path_and_bytes(self):
+        # D1 negatives: only the exact path AND the complete bytes classify.
+        other = "usr/share/doc/other-vendor/examples/asoundrc.txt"
+        modified = UPSTREAM_BYTES.replace(b"upstream example", b"upstream exbmple")
+        rows = {
+            "one-byte": ({UPSTREAM_REL: modified}, [self.fixture_entry()], UPSTREAM_REL),
+            "truncated": ({UPSTREAM_REL: UPSTREAM_BYTES[:-1]}, [self.fixture_entry()], UPSTREAM_REL),
+            "appended-private": ({UPSTREAM_REL: UPSTREAM_BYTES + b"/home/producer/ditto\n"},
+                                 [self.fixture_entry()], UPSTREAM_REL),
+            "appended-neutral": ({UPSTREAM_REL: UPSTREAM_BYTES + b"\n"}, [self.fixture_entry()], UPSTREAM_REL),
+            "same-bytes-other-path": ({other: UPSTREAM_BYTES}, [self.fixture_entry()], other),
+            "unknown-file-same-pattern": ({"usr/lib/fixture-unknown": b"/home/upstream-author/scopes\n"},
+                                          [self.fixture_entry()], "usr/lib/fixture-unknown"),
+            "directory-prefix-entry": ({UPSTREAM_REL: UPSTREAM_BYTES},
+                                       [self.fixture_entry(str(Path(UPSTREAM_REL).parent))], UPSTREAM_REL),
+            "size-mismatch": ({UPSTREAM_REL: UPSTREAM_BYTES},
+                              [self.fixture_entry() | {"bytes": len(UPSTREAM_BYTES) + 1}], UPSTREAM_REL),
+            "partial-string-hash": ({UPSTREAM_REL: UPSTREAM_BYTES},
+                                    [self.fixture_entry() | {"sha256": sha256_hex(b"/home/upstream-author")}],
+                                    UPSTREAM_REL),
+        }
+        for name, (files, entries, rel) in rows.items():
+            with self.subTest(row=name):
+                report = self.scan(1, image=self.fixture_image(files),
+                                   recipe=self.fixture_recipe(self.fixture_manifest(*entries)))
+                self.assertEqual(report["literal_matches"], [rel])
+                self.assertEqual(report.get("public_producer_fixtures"), [])
+                self.assertEqual(report["errors"], [])
+
+    def test_public_producer_manifest_fails_closed(self):
+        # D2: any manifest defect fails the scan and classifies nothing.
+        entry = self.fixture_entry()
+        good = self.fixture_manifest(entry)
+
+        def with_entry(**changes):
+            return self.fixture_manifest(entry | changes)
+
+        def with_source(drop=None, **changes):
+            source = entry["source"] | changes
+            source.pop(drop, None)
+            return with_entry(source=source)
+
+        text = json.dumps(good)
+        rows = {
+            "absent": None, "directory": "directory", "not-json": "{not json",
+            "empty-file": "", "top-level-list": [entry],
+            "duplicate-top-key": text.replace('"schema": 1', '"schema": 1, "schema": 1'),
+            "duplicate-entry-key": text.replace('"bytes": ', '"bytes": 1, "bytes": '),
+            "nan-bytes": text.replace(f'"bytes": {len(UPSTREAM_BYTES)}', '"bytes": NaN'),
+            "duplicate-entry": self.fixture_manifest(entry, entry),
+            "conflicting-entry": self.fixture_manifest(entry, entry | {"sha256": "d" * 64}),
+            "empty-entries": {**good, "entries": []},
+            "unknown-schema": {**good, "schema": 2},
+            "unknown-top-key": {**good, "extra": True},
+            "unknown-entry-key": with_entry(note="x"),
+            "uppercase-digest": with_entry(sha256=entry["sha256"].upper()),
+            "short-digest": with_entry(sha256=entry["sha256"][:63]),
+            "non-hex-digest": with_entry(sha256="g" * 64),
+            "bad-deb-digest": with_source(deb_sha256="xyz"),
+            "bytes-bool": with_entry(bytes=True), "bytes-string": with_entry(bytes="77"),
+            "bytes-zero": with_entry(bytes=0), "bytes-negative": with_entry(bytes=-1),
+            "missing-source": self.fixture_manifest({k: v for k, v in entry.items() if k != "source"}),
+            "missing-version": with_source(drop="version"),
+            "empty-version": with_source(version=""),
+            "missing-package": with_source(drop="package"),
+            "unknown-source-kind": with_source(kind="ppa"),
+            "level-mismatch": with_entry(verification={"level": "https-shasums-pgp-unverified",
+                                                       "detail": "x"}),
+            "missing-classification": self.fixture_manifest(
+                {k: v for k, v in entry.items() if k != "classification"}),
+            "empty-classification": with_entry(classification=""),
+        }
+        for index, path in enumerate(("/" + UPSTREAM_REL, UPSTREAM_REL.replace("/", "//", 1),
+                                      "usr/./" + UPSTREAM_REL[4:], "usr/../" + UPSTREAM_REL,
+                                      UPSTREAM_REL + "/", UPSTREAM_REL.replace("/", "\\", 1),
+                                      UPSTREAM_REL + "\x00")):
+            rows[f"non-canonical-{index}"] = with_entry(path=path)
+        for path in ("usr/lib/ditto/target/release/ditto-core", "usr/lib/ditto/target/release/dittoctl",
+                     "usr/share/ditto/runtime-lock.json", "usr/local/libexec/ditto-session",
+                     "usr/share/doc/ditto-runtime/NOTICE"):
+            rows["owned-" + path] = self.fixture_manifest(entry, self.fixture_entry(path))
+        image = self.fixture_image({UPSTREAM_REL: UPSTREAM_BYTES})
+        self.assertEqual(self.scan(image=image, recipe=self.fixture_recipe(good))["literal_matches"], [])
+        for name, manifest in rows.items():
+            with self.subTest(row=name):
+                result = call(sys.executable, self.fixture_recipe(manifest) / "scan-pristine-rootfs.py", image)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                report = json.loads(result.stdout)
+                self.assertIn(PUBLIC_PRODUCER_MANIFEST, [row["file"] for row in report["errors"]])
+                self.assertEqual(report["literal_matches"], [UPSTREAM_REL])
+                self.assertEqual(report["public_producer_fixtures"], [])
+                self.assert_no_content(report)
+
+    def test_public_producer_fixture_does_not_dominate_other_checks(self):
+        # D3: an exact manifest match only reclassifies the producer-path hit.
+        home = b"# from /home/upstream-author/src\n"
+        rows = {
+            "forbid": (UPSTREAM_REL, UPSTREAM_BYTES, ("--forbid", "upstream-author"), "literal_matches"),
+            "private-key": (UPSTREAM_REL, UPSTREAM_BYTES + SYNTHETIC_KEY, (), "unapproved_keys"),
+            "nopasswd": ("etc/sudoers.d/vendor-fixture", home + b"fixture ALL=(ALL) NOPASSWD: ALL\n", (),
+                         "authentication_config"),
+            "autologin": ("etc/systemd/system/getty@tty1.service.d/vendor.conf",
+                          home + b"[Service]\nExecStart=-/sbin/agetty --autologin root tty1\n", (),
+                          "authentication_config"),
+            "identity": ("etc/ssh/ssh_host_ed25519_key", home, (), "identity_files"),
+            "gnutls-extra-key": ("usr/lib/x86_64-linux-gnu/libgnutls.so.30.41.1", home + SYNTHETIC_KEY, (),
+                                 "unapproved_keys"),
+        }
+        for name, (rel, data, flags, finding) in rows.items():
+            with self.subTest(row=name):
+                recipe = self.fixture_recipe(self.fixture_manifest(self.fixture_entry(rel, data)))
+                report = self.scan(1, flags, image=self.fixture_image({rel: data}), recipe=recipe)
+                self.assertIn(rel, report[finding])
+                self.assertEqual(report["errors"], [])
+                self.assertEqual(report["public_fixtures"], [])
+                if name == "forbid":
+                    self.assertEqual(report.get("public_producer_fixtures"), [])
+                self.assert_no_content(report)
+        # A read error is reported, never classified, and leaks no exception text.
+        recipe = self.fixture_recipe(self.fixture_manifest())
+        image = self.fixture_image({UPSTREAM_REL: UPSTREAM_BYTES})
+        scanner = load_module("pristine_fixture", recipe / "scan-pristine-rootfs.py")
+        original_read = Path.read_bytes
+
+        def unreadable(path):
+            if path.as_posix().endswith(UPSTREAM_REL):
+                raise PermissionError("synthetic secret exception text")
+            return original_read(path)
+        output = io.StringIO()
+        with mock.patch.object(Path, "read_bytes", unreadable), mock.patch.object(
+                sys, "argv", ["scan", str(image)]), contextlib.redirect_stdout(output):
+            self.assertEqual(scanner.main(), 1)
+        report = json.loads(output.getvalue())
+        self.assertIn(UPSTREAM_REL, [row["file"] for row in report["errors"]])
+        self.assertEqual(report.get("public_producer_fixtures"), [])
+        self.assertNotIn("synthetic secret", output.getvalue())
+
+    def test_committed_public_producer_manifest(self):
+        # D1: the committed manifest lists exactly the eight independently
+        # source-verified public hits, no owned artifact, and Node's weaker
+        # verification level stays explicit.
+        manifest = RECIPE / PUBLIC_PRODUCER_MANIFEST
+        self.assertTrue(manifest.is_file(), "public producer-path manifest missing")
+        scanner = load_module("pristine", RECIPE / "scan-pristine-rootfs.py")
+        fixtures = scanner.load_public_producer_fixtures(manifest)
+        self.assertEqual(set(fixtures), REAL_PUBLIC_PRODUCER_PATHS)
+        self.assertFalse(any(path.startswith(OWNED_IMAGE_PREFIXES) for path in fixtures))
+        for path, entry in fixtures.items():
+            with self.subTest(path=path):
+                if path == "usr/lib/ditto-node/bin/node":
+                    self.assertEqual(entry["source"]["kind"], "upstream-archive")
+                    self.assertEqual(entry["source"]["version"], "22.23.2")
+                    self.assertEqual(entry["verification"]["level"], "https-shasums-pgp-unverified")
+                    self.assertIn("PGP", entry["verification"]["detail"])
+                else:
+                    self.assertEqual(entry["source"]["kind"], "ubuntu-deb")
+                    self.assertIn("20261020T000000Z", entry["source"]["packages_index"])
+                    self.assertEqual(entry["verification"]["level"], "signed-snapshot-index")
+        # Different bytes at a registered path stay a literal finding.
+        rel = "usr/lib/x86_64-linux-gnu/libgtk-3.so.0.2420.32"
+        report = self.scan(1, image=self.fixture_image({rel: b"\x00/home/upstream-author/icons\x00"}))
+        self.assertEqual(report["literal_matches"], [rel])
+        self.assertEqual(report.get("public_producer_fixtures"), [])
 
     def test_matching_source_control(self):
         output, _ = self.generate()

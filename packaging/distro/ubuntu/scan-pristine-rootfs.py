@@ -194,6 +194,82 @@ def unit_link_contents(root, rel):
         return stream.read()
 
 
+# Exact public producer-path fixtures (#205 owner decision): only a regular file
+# whose image path AND complete bytes equal one manifest entry has its
+# producer-path hit reported as public instead of literal. Every other check
+# still runs on those bytes.
+PUBLIC_PRODUCER_MANIFEST = "public-producer-path-fixtures.json"
+# Ditto's own install locations hold Ditto-built bytes: never registrable.
+OWNED_IMAGE_PREFIXES = ("usr/lib/ditto/", "usr/share/ditto/", "usr/share/doc/ditto-runtime/",
+                        "usr/local/libexec/")
+SOURCE_KINDS = {
+    "ubuntu-deb": ({"kind", "package", "version", "deb", "deb_sha256", "packages_index", "index_sha256"},
+                   "signed-snapshot-index"),
+    "upstream-archive": ({"kind", "name", "version", "url", "member", "archive_sha256", "shasums_url"},
+                         "https-shasums-pgp-unverified"),
+}
+SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def _unique_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_constant(_name):
+    raise ValueError("non-finite JSON number")
+
+
+def canonical_image_path(path):
+    return (isinstance(path, str) and not path.startswith("/") and
+            not any(ord(char) < 32 or char in "\\\x7f" for char in path) and
+            all(part not in ("", ".", "..") for part in path.split("/")))
+
+
+def load_public_producer_fixtures(path):
+    """Return {image path: entry}; any missing, malformed or ambiguous data raises ValueError."""
+    def text(value):
+        return isinstance(value, str) and value != "" and value == value.strip()
+
+    try:
+        manifest = json.loads(path.read_bytes().decode("utf-8"), object_pairs_hook=_unique_keys,
+                              parse_constant=_reject_constant)
+    except (OSError, UnicodeError, RecursionError) as error:
+        raise ValueError("manifest unreadable") from error
+    if (not isinstance(manifest, dict) or set(manifest) != {"schema", "authority", "entries"} or
+            manifest["schema"] != 1 or not text(manifest["authority"]) or
+            not isinstance(manifest["entries"], list) or not manifest["entries"]):
+        raise ValueError("manifest structure")
+    fixtures = {}
+    for entry in manifest["entries"]:
+        if (not isinstance(entry, dict) or
+                set(entry) != {"path", "sha256", "bytes", "source", "verification", "classification"}):
+            raise ValueError("entry fields")
+        path_value, source, verification = entry["path"], entry["source"], entry["verification"]
+        if (not canonical_image_path(path_value) or path_value in fixtures or
+                (path_value + "/").startswith(OWNED_IMAGE_PREFIXES)):
+            raise ValueError("entry path not canonical, duplicated or Ditto-owned")
+        if (not isinstance(entry["sha256"], str) or not SHA256_HEX.fullmatch(entry["sha256"]) or
+                type(entry["bytes"]) is not int or entry["bytes"] <= 0 or
+                not text(entry["classification"])):
+            raise ValueError("entry digest, size or classification")
+        kind = source.get("kind") if isinstance(source, dict) else None
+        if kind not in SOURCE_KINDS or set(source) != SOURCE_KINDS[kind][0]:
+            raise ValueError("entry source")
+        if not all(text(value) for value in source.values()) or not all(
+                SHA256_HEX.fullmatch(source[key]) for key in source if key.endswith("_sha256")):
+            raise ValueError("entry source values")
+        if (not isinstance(verification, dict) or set(verification) != {"level", "detail"} or
+                verification["level"] != SOURCE_KINDS[kind][1] or not text(verification["detail"])):
+            raise ValueError("entry verification")
+        fixtures[path_value] = entry
+    return fixtures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
@@ -213,8 +289,15 @@ def main():
     private = re.compile(rb"-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----\r?\n"
                          rb"(?:[A-Za-z0-9+/=]+\r?\n){2,}-----END \1-----")
     report = {"regular_files": 0, "bytes_scanned": 0, "literal_matches": [],
-              "unapproved_keys": [], "public_fixtures": [], "identity_files": [],
-              "authentication_config": [], "errors": []}
+              "unapproved_keys": [], "public_fixtures": [], "public_producer_fixtures": [],
+              "identity_files": [], "authentication_config": [], "errors": []}
+    try:
+        producer_fixtures = load_public_producer_fixtures(Path(__file__).parent / PUBLIC_PRODUCER_MANIFEST)
+    except ValueError:
+        # Fail closed: nothing is classified and the scan cannot succeed.
+        producer_fixtures = {}
+        report["errors"].append({"file": PUBLIC_PRODUCER_MANIFEST,
+                                 "error": "public producer fixture manifest missing, unreadable or invalid"})
     for required in ("usr/lib/os-release",):
         if not (root / required).is_file():
             report["errors"].append({"file": required, "error": "required pristine root file missing"})
@@ -256,8 +339,17 @@ def main():
                 data = path.read_bytes()
                 report["regular_files"] += 1
                 report["bytes_scanned"] += len(data)
-                if any(term in data for term in terms) or producer_path.search(data):
+                if any(term in data for term in terms):
                     report["literal_matches"].append(rel)
+                elif producer_path.search(data):
+                    fixture = producer_fixtures.get(rel)
+                    if (fixture and len(data) == fixture["bytes"] and
+                            hashlib.sha256(data).hexdigest() == fixture["sha256"]):
+                        report["public_producer_fixtures"].append({
+                            "file": rel, "sha256": fixture["sha256"], "source": fixture["source"],
+                            "verification": fixture["verification"]["level"]})
+                    else:
+                        report["literal_matches"].append(rel)
                 if authentication_path(rel) and unsafe_authentication(rel, data):
                     report["authentication_config"].append(rel)
                 hashes = {hashlib.sha256(m.group()).hexdigest() for m in private.finditer(data)}
