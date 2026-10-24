@@ -9,6 +9,8 @@
 
 這份矩陣只界定 G0 出口證據的可比範圍，**不限制開發機**。其他 Linux 機器可建置、跑單元／契約測試、開發 Shell 與 Core；其產物標為 development evidence。只有通過參考指紋 preflight 的實體機可產生 EX-01／03／04／05／08／09 證據，同一組三次重複不得混用機器。
 
+2026-10-24 owner 選定發行版 A 底座為 **Ubuntu 26.04＋mkosi＋systemd-sysupdate `/usr` A/B**，B 為並行的既有 Ubuntu Desktop 加裝版（#174）。Fedora bootc 暫停，保留證據；不做 Fedora 加裝版。見[雙形式 ADR](distro-architecture.md)。這不更新下列 G0 凍結指紋，也不接受 Secure Boot、NVIDIA、安裝器、更新／回退或硬體。B 的 24.04 HWE 優先、26.04 後續仍是提案；suite／架構／GDM／GA-HWE／preview-stable／EOL 待 #149 與 owner 核定，現無 B stable 支援承諾。
+
 ## 1. 參考平台
 
 | 維度 | 凍結值 | 證據／範圍 |

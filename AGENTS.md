@@ -39,6 +39,8 @@ G3 計畫與獨立基礎設施見 [plan/05](plan/05/README.md)，主追蹤為 is
 
 ## 專案現況
 
+2026-10-24 owner 決定先做 Ubuntu：A 採 Ubuntu 26.04＋mkosi＋systemd-sysupdate `/usr` A/B，B 既有 Ubuntu Desktop 加裝版（#174）並行共用包；Fedora bootc 暫停、證據保留，不做 Fedora 加裝版。見[雙形式 ADR](docs/platform/distro-architecture.md) 與 [Ubuntu 配方](packaging/distro/ubuntu/README.md)。這是底座決策，不是更新／回退、安裝器、Secure Boot、NVIDIA 或硬體接受；repo 配方尚未重跑，D-51 指定紀錄位置受本次 runner 寫入限制、草稿待落檔。G0 參考機與 MVP／G3 歷史證據仍保留原範圍。
+
 **G0、G1 已完成（2026-10-07 owner 實際使用裁定 [D-38](.agents/notes/decisions/2026-10-07-d38-g0-g1-owner-acceptance.md)），G2 功能由 owner 依 [D-46](.agents/notes/decisions/2026-10-13-d46-g2-functional-acceptance-and-g3-integration.md) 接受，G3 依 [D-47](.agents/notes/decisions/2026-10-17-d47-g3-exit-vm-evidence.md) 接受出口，PR #40 已合併；G4 規劃見 [plan/06](plan/06/README.md)、[#42](https://github.com/relvo-labs/Ditto/issues/42)；2026-10-21 owner 依 [D-49](.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 判定 MVP 可接受（出口證據缺口保留），下一步改做完整 Linux 發行版。** 原生 Core、交易與儲存、Cordis hostd、可替換 QML 供應者、管理中心、救援與鎖定均已落地。G2 在分支 `codex/g2-agent-foundation`：Agent 與 `ditto-confine` 內的 Codex app-server、對話、approval、context、工作池、區域布局與語意任務集已有開發證據；真實訂閱、語意集及參考機冷登入量測已有證據，D-44 後端先採 1G 寬鬆上限；剩餘項目由 #35～#39 追蹤，逐項見 [G2 評審紀錄](.agents/notes/gate-reviews/G2-exit.md)。
 
 G3 分支 `codex/g3-restricted-generation` 已接正式生成能力、隔離原生驗證／預覽、固定模板 Shell 解譯、啟用與資料回退；實體座位的真模型、鍵盤取消、資料回退、逐關故障、OS 超限存活及三態信任矩陣已有證據，並修正逾時關卡遺失與失敗文案。見 [實體驗收](.agents/notes/gate-reviews/G3-reference-seat-2026-10-14.md) 與 [G3 評審紀錄](.agents/notes/gate-reviews/G3-exit.md)；G3 出口依 D-47 通過，未涵蓋部分交接 G4。
