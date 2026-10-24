@@ -16,6 +16,7 @@ TestCase {
     Item { id: desktop; width: 1280; height: 800 }
     Jelly.Tokens { id: tokens }
     property var launcher: null
+    property var searchProvider: null
     readonly property var apps: [
         { app_id: "z", name: "Zulu editor", icon: "fixture", categories: ["Development"] },
         { app_id: "a", name: "Alpha browser", icon: "", categories: ["Network"] }
@@ -58,6 +59,7 @@ TestCase {
         wait(30);
     }
     function cleanup() {
+        if (searchProvider) { searchProvider.release(); searchProvider.destroy(); searchProvider = null; }
         if (launcher) { launcher.release(); launcher.destroy(); launcher = null; }
         wait(0);
     }
@@ -224,8 +226,8 @@ TestCase {
         ];
     }
     function textShowing(root, text) {
-        // Any Text that displays this string, found without relying on objectName.
-        if (!root) return null;
+        // Search only the supplied provider content, excluding hidden subtrees.
+        if (!root || !root.visible) return null;
         if (root.text === text && root.textFormat !== undefined && root.font !== undefined) return root;
         for (const child of root.children || []) {
             const found = textShowing(child, text);
@@ -233,8 +235,23 @@ TestCase {
         }
         return null;
     }
-    function verifyPlain(label, text, what) {
+    function providerContent(provider) {
+        // Scope owns the PanelWindow; its visual content is reparented to
+        // desktop by the stub, so desktop ancestry alone cannot identify it.
+        const surfaces = provider.children.filter(child => child.contentItem !== undefined);
+        compare(surfaces.length, 1, "provider owns exactly one panel surface");
+        const content = surfaces[0].contentItem;
+        compare(content.parent, desktop, "owned panel is attached to the test desktop");
+        return content;
+    }
+    function verifyPlain(label, text, what, content) {
         verify(label !== null, what + " shows the string");
+        let ancestor = label;
+        while (ancestor && ancestor !== content) ancestor = ancestor.parent;
+        compare(ancestor, content, what + " belongs to the expected provider content");
+        verify(content.visible && label.visible, what + " is visible");
+        verify(label.width > 0 && label.height > 0 && label.opacity > 0, what + " has visible geometry");
+        verify(waitForRendering(label), what + " is rendered");
         plainReference.font = label.font;
         plainReference.text = text;
         // Rendered as rich text, tags vanish, entities collapse and <br> adds a line.
@@ -247,8 +264,9 @@ TestCase {
         const app = { app_id: "n", name: row.name, icon: "", categories: [] };
         search("name").ok({ apps: [app] });
         const grid = findChild(desktop, "launcherGridApps");
+        const gridContent = providerContent(launcher);
         tryVerify(() => grid.itemAtIndex(0) !== null);
-        verifyPlain(textShowing(grid.itemAtIndex(0), row.name), row.name, "grid tile name");
+        verifyPlain(textShowing(grid.itemAtIndex(0), row.name), row.name, "grid tile name", gridContent);
         const letter = findChild(grid.itemAtIndex(0), "launcherGridIconFallback");
         compare(letter.text, row.name.substring(0, 1));
         compare(letter.textFormat, Text.PlainText, "grid fallback letter is plain text");
@@ -259,32 +277,36 @@ TestCase {
             keyClick(Qt.Key_Return);
             const expected = (language === "en" ? "Could not start “%1”" : "無法啟動「%1」").arg(row.name);
             compare(launcher.status, expected);
-            waitForRendering(desktop);
-            verifyPlain(textShowing(desktop, expected), expected, "grid launch error (" + language + ")");
+            verifyPlain(textShowing(gridContent, expected), expected, "grid launch error (" + language + ")", gridContent);
         }
         // Launcher B: result row, fallback letter and launch error.
         launcher.release();
+        verify(!gridContent.visible, "released grid content remains hidden on desktop");
+        compare(textShowing(gridContent, row.name), null, "hidden grid name cannot be a display witness");
         const search_ = makeSearchLauncher();
+        const searchContent = providerContent(search_);
+        verify(searchContent !== gridContent, "search owns a different panel from the released grid");
+        verify(search_.shown && search_.isOpen && searchContent.visible, "search provider is open and visible");
         search_.results = [app];
-        tryVerify(() => textShowing(desktop, row.name) !== null);
-        verifyPlain(textShowing(desktop, row.name), row.name, "search result name");
-        compare(findChild(desktop, "launcherSearchIconFallback").textFormat, Text.PlainText,
-            "search fallback letter is plain text");
+        tryVerify(() => textShowing(searchContent, row.name) !== null);
+        verifyPlain(textShowing(searchContent, row.name), row.name, "search result name", searchContent);
+        const searchLetter = findChild(searchContent, "launcherSearchIconFallback");
+        compare(searchLetter.text, row.name.substring(0, 1));
+        verifyPlain(searchLetter, row.name.substring(0, 1), "search fallback letter", searchContent);
         for (const language of ["zh-TW", "en"]) {
             client.language = language;
             search_.launch(app);
             const expected = (language === "en" ? "Could not start “%1”" : "無法啟動「%1」").arg(row.name);
             compare(search_.status, expected);
-            waitForRendering(desktop);
-            verifyPlain(textShowing(desktop, expected), expected, "search launch error (" + language + ")");
+            verifyPlain(textShowing(searchContent, expected), expected, "search launch error (" + language + ")", searchContent);
         }
-        search_.release(); search_.destroy();
     }
     function makeSearchLauncher() {
         const component = Qt.createComponent(Qt.resolvedUrl("../.staged/providers/LauncherSearch.qml"));
         compare(component.status, Component.Ready, component.errorString());
         const created = component.createObject(testCase, { client: client, tokens: tokens, shown: true });
         verify(created !== null, "search launcher created");
+        searchProvider = created;
         providerMethod(created, "open")();
         return created;
     }
@@ -298,15 +320,17 @@ TestCase {
     }
     function test_provider_method_accessor() {
         const searchLauncher = makeSearchLauncher();
+        const content = providerContent(searchLauncher);
         verify(searchLauncher.isOpen, "open() reached the actual search launcher");
+        verify(content.visible, "owned search panel follows open()");
         providerMethod(searchLauncher, "close")();
         verify(!searchLauncher.isOpen, "close() is bound to the launcher it was read from");
+        verify(!content.visible, "owned search panel follows close()");
         for (const name of ["noSuchMethod", "isOpen"]) {
             let refused = "";
             try { providerMethod(searchLauncher, name); } catch (error) { refused = error.message; }
             compare(refused, "launcher provider has no function " + name + "()");
         }
-        searchLauncher.release(); searchLauncher.destroy();
     }
 
     // ---- #187: Left/Right edit text first, then move the grid ----------
