@@ -27,6 +27,9 @@ Flickable {
 
     property var entries: []
     property var packages: []
+    readonly property var filteredPackages: packages.filter(summary => PluginFilter.matches(
+        summary, manifestOf(summary.package_id, summary.version), entries, pluginSearch.text,
+        value => client.tr.localized(value)))
     property var manifests: ({})
     property var diagnostics: null
     property var grants: []
@@ -345,8 +348,41 @@ Flickable {
             title: page.t(qsTr("已安裝的插件"))
             note: page.t(qsTr("可信的桌面元件在同一個桌面介面程序內執行，彼此沒有隔離；服務類插件共用一個插件服務宿主。"))
 
+            Text {
+                id: searchLabel
+                text: page.t(qsTr("搜尋已安裝的插件"))
+                color: page.tokens.appInk
+                font.pixelSize: page.tokens.appFontBody
+            }
+
+            TextField {
+                id: pluginSearch
+                objectName: "pluginSearchField"
+                width: parent.width
+                tokens: page.tokens
+                accessibleName: searchLabel.text
+                placeholder: page.t(qsTr("名稱、ID、說明或條目"))
+                Keys.onEscapePressed: event => {
+                    text = "";
+                    event.accepted = true;
+                }
+            }
+
+            Text {
+                objectName: "pluginSearchEmpty"
+                visible: pluginSearch.text.trim().length > 0 && page.filteredPackages.length === 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.t(qsTr("沒有符合「%1」的插件。")).arg(pluginSearch.text)
+                color: page.tokens.appInkMuted
+                font.pixelSize: page.tokens.appFontBody
+                Accessible.role: Accessible.StaticText
+                Accessible.name: text
+            }
+
             Repeater {
-                model: page.packages
+                objectName: "installedPluginRows"
+                model: page.filteredPackages
 
                 Rectangle {
                     id: packageRow

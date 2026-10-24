@@ -13,6 +13,7 @@ GeneratedArtifacts 1.0 ../../../centers/GeneratedArtifacts.qml
 JellySurface 1.0 ../../../ui/JellySurface.qml
 ListRow 1.0 ../../../ui/ListRow.qml
 OverflowMenu 1.0 ../../../ui/OverflowMenu.qml
+PluginFilter 1.0 ../../../ui/PluginFilter.js
 PreviewBar 1.0 ../../../change/PreviewBar.qml
 Section 1.0 ../../../ui/Section.qml
 SegmentedControl 1.0 ../../../ui/SegmentedControl.qml

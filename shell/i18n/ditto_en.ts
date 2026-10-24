@@ -2962,6 +2962,10 @@
         <translation>Can fill</translation>
     </message>
     <message>
+        <source>名稱、ID、說明或條目</source>
+        <translation>Name, ID, description or entry</translation>
+    </message>
+    <message>
         <source>啟動原因：%1</source>
         <translation>Started because: %1</translation>
     </message>
@@ -3086,6 +3090,10 @@
         <translation>Plugin-service host</translation>
     </message>
     <message>
+        <source>搜尋已安裝的插件</source>
+        <translation>Search installed plugins</translation>
+    </message>
+    <message>
         <source>撤銷這項授權</source>
         <translation>Revoke this grant</translation>
     </message>
@@ -3128,6 +3136,10 @@
     <message>
         <source>沒有啟動成功</source>
         <translation>Did not start</translation>
+    </message>
+    <message>
+        <source>沒有符合「%1」的插件。</source>
+        <translation>No plugins match “%1”.</translation>
     </message>
     <message>
         <source>無法讀取這個套件</source>

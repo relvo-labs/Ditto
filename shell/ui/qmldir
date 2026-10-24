@@ -7,6 +7,7 @@ GroupedList 1.0 GroupedList.qml
 JellySurface 1.0 JellySurface.qml
 ListRow 1.0 ListRow.qml
 OverflowMenu 1.0 OverflowMenu.qml
+PluginFilter 1.0 PluginFilter.js
 Section 1.0 Section.qml
 SegmentedControl 1.0 SegmentedControl.qml
 StylePicker 1.0 StylePicker.qml
