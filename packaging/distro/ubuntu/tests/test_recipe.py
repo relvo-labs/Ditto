@@ -133,9 +133,17 @@ class RecipeTests(unittest.TestCase):
         cls.shared = tempfile.TemporaryDirectory(prefix="ditto-regression-source-")
         cls.archive = Path(cls.shared.name) / "source.tar"
         cls.commit = call("git", "-C", REPO, "rev-parse", "HEAD").stdout.strip()
-        result = call("git", "-C", REPO, "archive", "--format=tar", "--output", cls.archive, cls.commit)
-        if result.returncode:
-            raise RuntimeError(result.stderr)
+        # A working-tree source fixture exercises uncommitted source changes
+        # too. This is synthetic test input, not a trusted release git archive.
+        paths = call("git", "-C", REPO, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+        if paths.returncode:
+            raise RuntimeError(paths.stderr)
+        with tarfile.open(cls.archive, "w", format=tarfile.PAX_FORMAT,
+                          pax_headers={"comment": cls.commit}) as archive:
+            for name in sorted(set(paths.stdout.split("\0")) - {""}):
+                path = REPO / name
+                if path.is_file() or path.is_symlink():
+                    archive.add(path, arcname=name, recursive=False)
 
     @classmethod
     def tearDownClass(cls):
@@ -1855,8 +1863,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         unit = configparser.ConfigParser()
         unit.read(output / "extra/etc/systemd/system/greetd.service.d/seat.conf")
         helper = unit["Service"]["ExecStartPre"]
-        self.assertEqual(helper, "/usr/lib/ditto/wait-drm")
-        self.assertTrue(os.access(output / "extra" / helper.lstrip("/"), os.X_OK))
+        self.assertEqual(helper, "-/usr/lib/ditto/wait-drm")
+        self.assertTrue(os.access(output / "extra" / helper.lstrip("-/"), os.X_OK))
 
     def test_dev_renderer_mode_is_explicit_and_recorded(self):
         for flags, mode in (((), "normal"), (("--dev-software-render",), "dev-software-render")):
@@ -1950,6 +1958,135 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         (lib.parent / "libunwind.so.8").symlink_to(lib.name)
         _, result = self.generate(2)
         self.assertIn("not admitted", result.stderr)
+
+    def firstboot_archive(self, partial=False):
+        # Synthetic PR A source fixtures only; never build/run an account tool.
+        archive = self.root / f"firstboot-{next(self.counter)}.tar"
+        with tarfile.open(self.archive) as old, tarfile.open(
+                archive, "w", format=tarfile.PAX_FORMAT, pax_headers={"comment": self.commit}) as new:
+            for member in old:
+                new.addfile(member, old.extractfile(member) if member.isfile() else None)
+            files = {"crates/ditto-firstboot-account/Cargo.toml": "# fixture only\n"}
+            if not partial:
+                files |= {"packaging/distro/first-boot/units/ditto-firstboot-account.socket":
+                          "[Socket]\nListenStream=/run/ditto/firstboot-account.sock\n[Install]\nWantedBy=sockets.target\n",
+                          "packaging/distro/first-boot/units/ditto-firstboot-account.service":
+                          "[Service]\nExecStart=/usr/lib/ditto/ditto-firstboot-account\n",
+                          "packaging/distro/first-boot/tmpfiles.d/ditto-firstboot.conf":
+                          "d /var/lib/ditto/firstboot 0700 root root -\n"}
+            for name, value in files.items():
+                data = value.encode()
+                member = tarfile.TarInfo(name)
+                member.size = len(data)
+                new.addfile(member, io.BytesIO(data))
+        return archive
+
+    def test_firstboot_install_and_pending_pr_a_contract(self):
+        output, _ = self.generate()
+        extra = output / "extra"
+        for name in ("ditto-greeter", "wayfire-greeter.ini", "firstboot-fcitx5-profile"):
+            self.assertTrue((extra / "usr/lib/ditto" / name).is_file())
+        self.assertTrue(os.access(extra / "usr/lib/ditto/ditto-greeter", os.X_OK))
+        shell = extra / "usr/lib/ditto/shell/firstboot"
+        self.assertTrue((shell / "shell.qml").is_file())
+        for name in ("core", "jelly", "ui", "i18n", "wallpapers"):
+            self.assertEqual((shell / name).readlink().as_posix(), "../" + name)
+            self.assertTrue((shell / name).is_dir())
+        state = json.loads((extra / "usr/share/ditto/firstboot-integration.json").read_text())
+        self.assertEqual(state, {"enabled": False, "pending": "TODO_FIRSTBOOT_ACCOUNT_PR_A"})
+        conf = (extra / "etc/greetd/config.toml").read_bytes()
+        scanner = load_module("firstboot_scan", RECIPE / "scan-pristine-rootfs.py")
+        self.assertFalse(scanner.unsafe_authentication("etc/greetd/config.toml", conf))
+        self.assertIn(b"/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session", conf)
+
+    def test_firstboot_complete_pr_a_wires_greetd_and_socket(self):
+        archive = self.firstboot_archive()
+        self.put("usr/lib/ditto/target/release/ditto-firstboot-account", "synthetic helper fixture\n", self.tree)
+        output, _ = self.generate(archive=archive)
+        extra = output / "extra"
+        self.assertEqual(json.loads((extra / "usr/share/ditto/firstboot-integration.json").read_text()),
+                         {"enabled": True, "pending": None})
+        import tomllib
+        config = tomllib.loads((extra / "etc/greetd/config.toml").read_text())
+        self.assertEqual(config["default_session"], {"command": "/usr/lib/ditto/ditto-greeter", "user": "_greetd"})
+        link = extra / "usr/lib/ditto/ditto-firstboot-account"
+        self.assertEqual(str(link.readlink()), "target/release/ditto-firstboot-account")
+        for name in ("socket", "service"):
+            self.assertTrue((extra / f"usr/lib/systemd/system/ditto-firstboot-account.{name}").is_file())
+        self.assertTrue((extra / "usr/lib/tmpfiles.d/ditto-firstboot.conf").is_file())
+        # Run the generated finalizer in a temporary image, recording chroot
+        # actions and stubbing runtime apply, never executing the helper.
+        image = self.pristine_image("firstboot-finalizer")
+        for rel in ("etc/ssh", "var/lib/dbus", "etc/systemd/system", "etc/pam.d"):
+            (image / rel).mkdir(parents=True, exist_ok=True)
+        self.put("etc/pam.d/greetd", "# fixture\n", image)
+        self.put("usr/lib/systemd/system/ditto-firstboot-account.socket", "fixture\n", image)
+        helper = self.put("usr/lib/ditto/ditto-firstboot-account", "# fixture only\n", image)
+        helper.chmod(0o755)
+        script = '''
+python3() { if [[ "$1" == -c ]]; then echo synthetic-source-commit; fi; return 0; }
+chroot() { printf '%s\\n' "$*" >> "$BUILDROOT/chroot-actions"; }
+source "$1"
+'''
+        result = subprocess.run(["bash", "-c", script, "finalize-test", str(output / "finalize.sh")],
+                                env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
+                                text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("systemctl enable ditto-firstboot-account.socket", (image / "chroot-actions").read_text())
+
+    def test_firstboot_partial_pr_a_fails_before_output(self):
+        for partial in (True, False):
+            _, result = self.generate(2, archive=self.firstboot_archive(partial))
+            self.assertIn("PR A firstboot artifacts incomplete", result.stderr)
+
+    def test_firstboot_pristine_markers_rejected(self):
+        for name in ("account-created", "pending"):
+            for kind in ("empty", "regular", "dangling", "directory", "parent-link", "fifo"):
+                with self.subTest(marker=name, kind=kind):
+                    image = self.pristine_image(f"marker-{name}-{kind}")
+                    marker = image / "var/lib/ditto/firstboot" / name
+                    marker.parent.mkdir(parents=True)
+                    if kind == "parent-link":
+                        marker.parent.rmdir()
+                        marker.parent.symlink_to("/outside-not-read")
+                    elif kind == "directory":
+                        marker.mkdir()
+                    elif kind == "dangling":
+                        marker.symlink_to("/outside-not-read")
+                    elif kind == "fifo":
+                        os.mkfifo(marker)
+                    else:
+                        marker.write_text("" if kind == "empty" else "fixture\n")
+                    report = self.scan(1, image=image)
+                    self.assertIn("var/lib/ditto/firstboot/" + name, report["identity_files"])
+                    self.assertEqual(report["errors"], [])
+
+    def test_firstboot_greetd_allowlist_is_exact(self):
+        path = "etc/greetd/config.toml"
+        for command, expected in (("/usr/lib/ditto/ditto-greeter", 0),
+                                  ("/usr/lib/ditto/ditto-greeter --autologin", 1),
+                                  ("/usr/lib/ditto/ditto-greeter; /bin/sh", 1),
+                                  ("/usr/lib/ditto/ditto-greeter-other", 1)):
+            self.put(path, '[default_session]\ncommand="' + command + '"\nuser="_greetd"\n', self.root / "image")
+            self.scan(expected)
+        self.put(path, '[default_session]\ncommand="/usr/lib/ditto/ditto-greeter"\nuser="root"\n', self.root / "image")
+        self.scan(1)
+        self.put(path, '[initial_session]\ncommand="/usr/lib/ditto/ditto-greeter"\nuser="_greetd"\n', self.root / "image")
+        self.scan(1)
+
+    def test_firstboot_input_and_accessibility_recipe(self):
+        output, _ = self.generate()
+        text = (output / "mkosi.conf").read_text()
+        for name in ("fcitx5", "fcitx5-chinese-addons", "fcitx5-chewing", "at-spi2-core", "orca", "speech-dispatcher"):
+            self.assertIn(name, text)
+        ini = configparser.ConfigParser()
+        ini.read(output / "extra/usr/lib/ditto/wayfire-greeter.ini")
+        self.assertIn("input-method-v1", ini["core"]["plugins"].split())
+        self.assertEqual(ini["command"]["binding_orca"], "<super> <alt> KEY_S")
+        self.assertEqual(ini["command"]["command_orca"], "orca --replace")
+        profile = configparser.ConfigParser()
+        profile.read(output / "extra/usr/lib/ditto/firstboot-fcitx5-profile")
+        self.assertEqual(profile["Groups/0"]["DefaultIM"], "chewing")
 
 
 class DecisionTableTests(unittest.TestCase):

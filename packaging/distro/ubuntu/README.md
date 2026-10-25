@@ -63,9 +63,9 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 
 ## Boot 與 pristine 檢查
 
-`repart.d/` 維持 ESP＋writable state＋versioned read-only `/usr`＋empty slot。`finalize.sh` 預先整合 tty1 getty conflict 與 greetd PAM Wayland type；generator 保留 udev settle，另以 `wait-drm` 最多等待 30 秒，確認任一 `card[0-9]+` 有 backing device；不固定 PCI／vendor／card 編號，逾時直接使 greetd 啟動失敗。這是可攜化的實際 readiness wait，尚未證明與原 UAT boot 行為等價。`finish-image.sh` 驗 partition labels，唯讀掛載 `/usr`，用 `bootctl --no-variables` 安裝 `EFI/BOOT/BOOTX64.EFI`，不寫 builder EFI NVRAM。不再執行舊 run 的事後 boot patch。
+`repart.d/` 維持 ESP＋writable state＋versioned read-only `/usr`＋empty slot。`finalize.sh` 預先整合 tty1 getty conflict 與 greetd PAM Wayland type；generator 保留 udev settle，另以 `wait-drm` 最多等待 30 秒，確認任一 `card[0-9]+` 有 backing device；不固定 PCI／vendor／card 編號，逾時由非致命的 ExecStartPre 放行，讓 greeter wrapper 可走無 DRM 文字保底。這是可攜化的實際 readiness wait，尚未證明與原 UAT boot 行為等價。`finish-image.sh` 驗 partition labels，唯讀掛載 `/usr`，用 `bootctl --no-variables` 安裝 `EFI/BOOT/BOOTX64.EFI`，不寫 builder EFI NVRAM。不再執行舊 run 的事後 boot patch。
 
-沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清空 machine-id，移除 rootfs 的 `var/lib/systemd/random-seed` 與 ESP 的 `boot/loader/random-seed`；finish 以 `bootctl install --random-seed=no` 避免產生 seed，另刪除 mkosi 已寫入的 ESP seed，確認不存在（含懸空 symlink），失敗即中止。開機時由既有 `systemd-random-seed.service`／`systemd-boot-random-seed.service` 分別管理 rootfs／ESP seed，不新增服務。fstab 與 finish 階段均以 `umask=0077` 掛載 ESP，只限 root 存取。這些是 source 契約，修正後映像尚未重建；首次開機 seed 服務實際成功執行、生成非空且各機不同的 ESP seed，以及 root-only 權限仍待 #207 開機回讀。D06 尚須提供首次帳號建立，直接開機只有登入提示，尚無可用帳號。這不是安裝器。
+沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清空 machine-id，移除 rootfs 的 `var/lib/systemd/random-seed` 與 ESP 的 `boot/loader/random-seed`；finish 以 `bootctl install --random-seed=no` 避免產生 seed，另刪除 mkosi 已寫入的 ESP seed，確認不存在（含懸空 symlink），失敗即中止。開機時由既有 `systemd-random-seed.service`／`systemd-boot-random-seed.service` 分別管理 rootfs／ESP seed，不新增服務。fstab 與 finish 階段均以 `umask=0077` 掛載 ESP，只限 root 存取。這些是 source 契約，修正後映像尚未重建；首次開機 seed 服務實際成功執行、生成非空且各機不同的 ESP seed，以及 root-only 權限仍待 #207 開機回讀。首次帳號畫面與 wrapper 已有來源接線；PR A helper 尚未存在時由具名 TODO 維持 agreety，沒有可用帳號，不能當作可用的首次設定。這不是安裝器。
 
 scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作者／checkout 路徑，全檔比對；預設檢查具名 home 與 build producer 路徑，允許 AppArmor 等 distro 使用的泛用 `/home/` tunable，不按檔名全面排除。報告只輸出路徑／hash，不輸出檔案內容。帳號檢查採 passwd／shadow 聯合驗證：`etc/passwd` 與 `etc/shadow` 均須包含 root、帳號集合必須一致，任一缺檔、不可讀、非 regular file、檔案或 parent symlink、重複帳號、密碼欄位空值／active credential／格式錯誤均失敗；passwd 可用 `x` 指向 shadow，shadow 則只接受真正鎖定的密碼欄位。host keys、authorized keys、known-hosts、非空 machine-id、rootfs／ESP random seed（含空檔）、greetd／getty／GDM 等 active autologin、sudoers（包含 include）免密規則、未核准完整 PEM key blocks 或讀取錯誤也均失敗。ESP seed 的懸空 symlink、指向檔案或目錄的 symlink 與實體目錄也列入 identity 拒絕，不讀取 link 的外部目標。未結構化或其他格式秘密仍需 D11／D12 供應鏈掃描，不將此掃描當完整保證。
 
@@ -83,7 +83,7 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 
 ## DEV／VM 與 TEST ONLY 驗證入口
 
-一般輸出不設定強制軟體繪製。GPU-less VM 要另加 `--dev-software-render` 產生獨立測試候選，launcher 才設定 `WLR_RENDERER_ALLOW_SOFTWARE=1 LIBGL_ALWAYS_SOFTWARE=1`；`image-inputs.json` 記錄 `mode=dev-software-render`，一般為 `mode=normal`。此旗標不是產品預設，也不授權將測試候選發布。原 UAT 是 virtio-vga＋llvmpipe 軟體繪製；一般模式在 GPU-less VM 預期無法提供該桌面。兩種新輸出都尚未開機資格驗證。
+一般桌面輸出不設定強制軟體繪製；首次設定 greeter 有獨立、限定一次的 pixman／Qt software 退路。GPU-less VM 要另加 `--dev-software-render` 產生獨立測試候選，launcher 才設定 `WLR_RENDERER_ALLOW_SOFTWARE=1 LIBGL_ALWAYS_SOFTWARE=1`；`image-inputs.json` 記錄 `mode=dev-software-render`，一般為 `mode=normal`。此旗標不是產品預設，也不授權將測試候選發布。原 UAT 是 virtio-vga＋llvmpipe 軟體繪製；一般模式在 GPU-less VM 預期無法提供該桌面。兩種新輸出都尚未開機資格驗證。
 
 產品 pristine disk 仍沒有帳號、password、authorized key 或 autologin。重建驗證可在**另行授權、可丟棄的獨立測試副本**，透過 console 使用 systemd 內建 debug shell；先對未修改的 pristine disk 跑 finish／scan 並保存 hash，再建立測試副本，不對測試後的副本重新宣稱 pristine。
 
@@ -109,3 +109,24 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 抽取對照：原 `work/build-image.py` → generator／repart／finalize；`finish-image.sh`、`patch-image-boot.sh` → 完成步驟與前置 boot 設定；`scan-pristine-rootfs.py` → 掃描器。`prepare-builder.sh` 與 provisioning 不納入；`build-native.sh`／`build-ui.sh`／`build-desktop.sh`／`build-wayfire*.sh`／`fetch-wayfire-deps.py` 的成功結果轉成明確 runtime 輸入契約，未冒充已移植成乾淨建置管線。
 
 本機回歸入口為 `python3 packaging/distro/ubuntu/tests/test_recipe.py -v`，需要 Git 與真實 `dpkg-query`。測試只使用 task-owned filesystem／dpkg fixtures、source archive 與有界 DRM 假目錄，不啟動 runtime binary、guest 或掛載映像；通過不代表映像已取得資格。
+
+
+## 首次帳號接線（#212，尚待整合 VM）
+
+詳見 [first-boot README](../first-boot/README.md)。generator 一律安裝原生 1A 畫面、
+wrapper、Wayfire 設定與 Chewing profile。`TODO_FIRSTBOOT_ACCOUNT_PR_A` 讓 PR B 先合併時
+仍可建置：PR A 來源 artifacts 全不存在時，greetd 保留舊 agreety，並在映像
+`/usr/share/ditto/firstboot-integration.json` 明記未啟用。只要出現 PR A 任一 artifact，
+就必須具備 crate、兩個 unit、tmpfiles 與同來源 runtime-lock 的 helper binary；不齊即在
+建立 output 前拒絕。齊備時命令改為 `/usr/lib/ditto/ditto-greeter`，finalizer 啟用
+`ditto-firstboot-account.socket`。這不是在 PR B 內提供假 helper。
+
+新增 `fcitx5-chewing`（台灣注音）、`at-spi2-core`、`orca`、`speech-dispatcher`，
+精確套件版本／授權與完整 closure 尚待同 snapshot 新映像的 dpkg manifest 回讀。
+pristine scan 新增拒絕 `var/lib/ditto/firstboot/{account-created,pending}` 的任何存在形式，
+包含空檔、目錄、FIFO、懸空 link 或 unsafe parent；既有檢查沒有移除。
+greetd command 只精確接受既有 agreety 或新 wrapper，不接受附加參數／shell 命令。
+
+Qt offscreen 單元測試只能證明驗證、可存取標記、鍵盤順序與使用 doubles 的狀態機；
+Socket／greetd／PAM 真實協定、GPU／pixman／無 DRM、fcitx5 中文提交、Orca 與音訊、
+登入後的程序清理及重開機，均須兩個 PR 整合後另做 VM 驗收。

@@ -9,6 +9,13 @@ Rectangle {
 
     required property var tokens
     property alias text: input.text
+    property alias inputItem: input
+    property alias inputMethodHints: input.inputMethodHints
+    property alias maximumLength: input.maximumLength
+    property string accessibleDescription: ""
+    property Item accessibleLabel: null
+    property Item nextTabItem: null
+    property Item previousTabItem: null
     property string placeholder: ""
     property string accessibleName: placeholder
     property bool readOnly: false
@@ -48,6 +55,11 @@ Rectangle {
         activeFocusOnTab: true
         Accessible.role: Accessible.EditableText
         Accessible.name: field.accessibleName
+        Accessible.description: field.accessibleDescription
+        Accessible.labelledBy: field.accessibleLabel
+        Accessible.passwordEdit: field.secret
+        KeyNavigation.tab: field.nextTabItem
+        KeyNavigation.backtab: field.previousTabItem
         onAccepted: field.accepted()
 
         Text {

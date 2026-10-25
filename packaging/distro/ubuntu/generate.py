@@ -88,6 +88,19 @@ def main():
         if (not all((source / n).is_dir() for n in needed) or
                 not (source / "tests/g0/input-method/fcitx5-profile").is_file()):
             parser.error("expected a source archive with repository paths at its root")
+        # TODO_FIRSTBOOT_ACCOUNT_PR_A: until PR A merges, keep the legacy
+        # login path buildable. A partial helper delivery must never activate UI.
+        firstboot = source / "packaging/distro/first-boot"
+        helper_sources = [source / "crates/ditto-firstboot-account/Cargo.toml",
+                          firstboot / "units/ditto-firstboot-account.socket",
+                          firstboot / "units/ditto-firstboot-account.service",
+                          firstboot / "tmpfiles.d/ditto-firstboot.conf"]
+        helper_binary = "usr/lib/ditto/target/release/ditto-firstboot-account"
+        enable_firstboot = (any(path.exists() or path.is_symlink() for path in helper_sources)
+                            or helper_binary in runtime_files)
+        if enable_firstboot and (not all(path.is_file() and not path.is_symlink() for path in helper_sources)
+                                 or helper_binary not in runtime_files):
+            parser.error("PR A firstboot artifacts incomplete: need helper binary, crate, units and tmpfiles")
         output = args.output
         output.mkdir(parents=True)
         extra = output / "extra"
@@ -143,10 +156,25 @@ export DITTO_WORKSPACE=/usr/lib/ditto DITTO_QT_PREFIX=/usr DITTO_WAYFIRE_PREFIX=
 export DITTO_DRM_VENDOR=
 exec /usr/local/libexec/ditto-session
 """, 0o755)
-        put("extra/etc/greetd/config.toml", """[terminal]
+        for name, dest, mode in (
+                ("ditto-greeter", "usr/lib/ditto/ditto-greeter", 0o755),
+                ("wayfire-greeter.ini", "usr/lib/ditto/wayfire-greeter.ini", 0o644),
+                ("fcitx5-profile", "usr/lib/ditto/firstboot-fcitx5-profile", 0o644)):
+            put("extra/" + dest, (firstboot / name).read_text(), mode)
+        if enable_firstboot:
+            for unit in ("ditto-firstboot-account.socket", "ditto-firstboot-account.service"):
+                put("extra/usr/lib/systemd/system/" + unit, (firstboot / "units" / unit).read_text())
+            put("extra/usr/lib/tmpfiles.d/ditto-firstboot.conf",
+                (firstboot / "tmpfiles.d/ditto-firstboot.conf").read_text())
+            (extra / "usr/lib/ditto/ditto-firstboot-account").symlink_to("target/release/ditto-firstboot-account")
+        greeter_command = ("/usr/lib/ditto/ditto-greeter" if enable_firstboot else
+                           "/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session")
+        put("extra/usr/share/ditto/firstboot-integration.json", json.dumps({
+            "enabled": enable_firstboot, "pending": None if enable_firstboot else "TODO_FIRSTBOOT_ACCOUNT_PR_A"}) + "\n")
+        put("extra/etc/greetd/config.toml", f"""[terminal]
 vt = 1
 [default_session]
-command = "/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session"
+command = "{greeter_command}"
 user = "_greetd"
 """)
         if args.dev_software_render:
@@ -156,13 +184,13 @@ user = "_greetd"
                 "# TEST ONLY: GPU-less development run\n"
                 "export WLR_RENDERER_ALLOW_SOFTWARE=1 LIBGL_ALWAYS_SOFTWARE=1\n"
                 "exec /usr/local/libexec/ditto-session"))
-        # Actual bounded device readiness; settling udev alone is not equivalent.
+        # Bounded readiness is advisory: no DRM must reach the wrapper/TTY path.
         put("extra/etc/systemd/system/greetd.service.d/seat.conf", """[Unit]
 Conflicts=getty@tty1.service
 After=systemd-udev-settle.service
 Wants=systemd-udev-settle.service
 [Service]
-ExecStartPre=/usr/lib/ditto/wait-drm
+ExecStartPre=-/usr/lib/ditto/wait-drm
 """)
         put("extra/usr/lib/systemd/network/20-wired.network", "[Match]\nName=en* eth*\n[Network]\nDHCP=yes\n")
         shutil.copytree(here / "repart.d", output / "mkosi.repart")

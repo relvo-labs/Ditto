@@ -3557,4 +3557,142 @@
         <translation>這個頁面無法載入。請在插件中心停用它，或稍後再試。</translation>
     </message>
 </context>
+<context>
+    <name>FirstbootScreen</name>
+    <message>
+        <source>Ditto · 首次設定</source>
+        <translation>Ditto · 首次設定</translation>
+    </message>
+    <message>
+        <source>Tab 移動　Enter 確認　Super+Alt+S 開啟螢幕閱讀器　·　沒有預設帳號，不會自動登入</source>
+        <translation>Tab 移動　Enter 確認　Super+Alt+S 開啟螢幕閱讀器　·　沒有預設帳號，不會自動登入</translation>
+    </message>
+    <message>
+        <source>以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元。</source>
+        <translation>以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元。</translation>
+    </message>
+    <message>
+        <source>你的名字</source>
+        <translation>你的名字</translation>
+    </message>
+    <message>
+        <source>兩次密碼不同，請再確認。</source>
+        <translation>兩次密碼不同，請再確認。</translation>
+    </message>
+    <message>
+        <source>兩次輸入相同。</source>
+        <translation>兩次輸入相同。</translation>
+    </message>
+    <message>
+        <source>再輸入一次</source>
+        <translation>再輸入一次</translation>
+    </message>
+    <message>
+        <source>回到登入畫面</source>
+        <translation>回到登入畫面</translation>
+    </message>
+    <message>
+        <source>密碼</source>
+        <translation>密碼</translation>
+    </message>
+    <message>
+        <source>密碼至少 8 個字元</source>
+        <translation>密碼至少 8 個字元</translation>
+    </message>
+    <message>
+        <source>帳號名稱</source>
+        <translation>帳號名稱</translation>
+    </message>
+    <message>
+        <source>帳號已建立，正在驗證登入…</source>
+        <translation>帳號已建立，正在驗證登入…</translation>
+    </message>
+    <message>
+        <source>建立你的帳號</source>
+        <translation>建立你的帳號</translation>
+    </message>
+    <message>
+        <source>建立帳號並進入桌面</source>
+        <translation>建立帳號並進入桌面</translation>
+    </message>
+    <message>
+        <source>建立管理員帳號，驗證密碼後進入桌面。</source>
+        <translation>建立管理員帳號，驗證密碼後進入桌面。</translation>
+    </message>
+    <message>
+        <source>正在啟動 Ditto 桌面…</source>
+        <translation>正在啟動 Ditto 桌面…</translation>
+    </message>
+    <message>
+        <source>正在建立帳號與家目錄…</source>
+        <translation>正在建立帳號與家目錄…</translation>
+    </message>
+    <message>
+        <source>結束首次設定畫面，重新檢查帳號狀態。</source>
+        <translation>結束首次設定畫面，重新檢查帳號狀態。</translation>
+    </message>
+    <message>
+        <source>這個帳號是管理員，可以變更系統設定。</source>
+        <translation>這個帳號是管理員，可以變更系統設定。</translation>
+    </message>
+    <message>
+        <source>這台電腦還沒有帳號。建立後會用剛設定的密碼登入 Ditto 桌面，之後登入與解鎖都用這組密碼。</source>
+        <translation>這台電腦還沒有帳號。建立後會用剛設定的密碼登入 Ditto 桌面，之後登入與解鎖都用這組密碼。</translation>
+    </message>
+    <message>
+        <source>這組密碼比較容易被猜到，建議換成較長的詞句；仍可使用這組密碼建立帳號。</source>
+        <translation>這組密碼比較容易被猜到，建議換成較長的詞句；仍可使用這組密碼建立帳號。</translation>
+    </message>
+    <message>
+        <source>顯示在登入畫面，可用中文，也可以留空。Ctrl+空白切換注音輸入。</source>
+        <translation>顯示在登入畫面，可用中文，也可以留空。Ctrl+空白切換注音輸入。</translation>
+    </message>
+</context>
+<context>
+    <name>Messages</name>
+    <message>
+        <source>名字最多 128 個字元，不能含控制字元或「: , =」，請修改後再試。</source>
+        <translation>名字最多 128 個字元，不能含控制字元或「: , =」，請修改後再試。</translation>
+    </message>
+    <message>
+        <source>密碼不能含換行或空字元，最多 1024 個字元，請重新輸入。</source>
+        <translation>密碼不能含換行或空字元，最多 1024 個字元，請重新輸入。</translation>
+    </message>
+    <message>
+        <source>密碼至少需要 8 個字元，請重新輸入。</source>
+        <translation>密碼至少需要 8 個字元，請重新輸入。</translation>
+    </message>
+    <message>
+        <source>帳號名稱須以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元，並避開系統保留名稱。</source>
+        <translation>帳號名稱須以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元，並避開系統保留名稱。</translation>
+    </message>
+    <message>
+        <source>帳號已建立，但登入驗證失敗。請回到登入畫面，用剛設定的帳號與密碼登入。</source>
+        <translation>帳號已建立，但登入驗證失敗。請回到登入畫面，用剛設定的帳號與密碼登入。</translation>
+    </message>
+    <message>
+        <source>帳號建立失敗，系統無法完整回復。請重新啟動電腦進行復原，暫時不要再次建立帳號。</source>
+        <translation>帳號建立失敗，系統無法完整回復。請重新啟動電腦進行復原，暫時不要再次建立帳號。</translation>
+    </message>
+    <message>
+        <source>帳號沒有建立成功，系統已回復，可以重新填寫再試一次。</source>
+        <translation>帳號沒有建立成功，系統已回復，可以重新填寫再試一次。</translation>
+    </message>
+    <message>
+        <source>目前無法確認帳號是否已建立。請重新啟動電腦，讓系統檢查狀態；不要重複送出。</source>
+        <translation>目前無法確認帳號是否已建立。請重新啟動電腦，讓系統檢查狀態；不要重複送出。</translation>
+    </message>
+    <message>
+        <source>目前的畫面無權建立帳號，請重新啟動電腦後再試。</source>
+        <translation>目前的畫面無權建立帳號，請重新啟動電腦後再試。</translation>
+    </message>
+    <message>
+        <source>這個帳號名稱已被使用，請換一個名稱。</source>
+        <translation>這個帳號名稱已被使用，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>這台電腦已經有帳號，請回到登入畫面登入。</source>
+        <translation>這台電腦已經有帳號，請回到登入畫面登入。</translation>
+    </message>
+</context>
 </TS>

@@ -3557,4 +3557,142 @@
         <translation>This page could not load. Disable it in the plugin center, or try again later.</translation>
     </message>
 </context>
+<context>
+    <name>FirstbootScreen</name>
+    <message>
+        <source>Ditto · 首次設定</source>
+        <translation>Ditto · First-time setup</translation>
+    </message>
+    <message>
+        <source>Tab 移動　Enter 確認　Super+Alt+S 開啟螢幕閱讀器　·　沒有預設帳號，不會自動登入</source>
+        <translation>Tab to move · Enter to confirm · Super+Alt+S to start the screen reader · No default account or automatic sign-in</translation>
+    </message>
+    <message>
+        <source>以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元。</source>
+        <translation>Start with a lowercase letter; use lowercase letters, digits and hyphens, up to 31 characters.</translation>
+    </message>
+    <message>
+        <source>你的名字</source>
+        <translation>Your name</translation>
+    </message>
+    <message>
+        <source>兩次密碼不同，請再確認。</source>
+        <translation>Passwords do not match. Check them again.</translation>
+    </message>
+    <message>
+        <source>兩次輸入相同。</source>
+        <translation>Passwords match.</translation>
+    </message>
+    <message>
+        <source>再輸入一次</source>
+        <translation>Confirm password</translation>
+    </message>
+    <message>
+        <source>回到登入畫面</source>
+        <translation>Return to login</translation>
+    </message>
+    <message>
+        <source>密碼</source>
+        <translation>Password</translation>
+    </message>
+    <message>
+        <source>密碼至少 8 個字元</source>
+        <translation>Use at least 8 characters</translation>
+    </message>
+    <message>
+        <source>帳號名稱</source>
+        <translation>Username</translation>
+    </message>
+    <message>
+        <source>帳號已建立，正在驗證登入…</source>
+        <translation>Account created. Authenticating sign-in…</translation>
+    </message>
+    <message>
+        <source>建立你的帳號</source>
+        <translation>Create your account</translation>
+    </message>
+    <message>
+        <source>建立帳號並進入桌面</source>
+        <translation>Create account and enter desktop</translation>
+    </message>
+    <message>
+        <source>建立管理員帳號，驗證密碼後進入桌面。</source>
+        <translation>Create an administrator account, verify the password and enter the desktop.</translation>
+    </message>
+    <message>
+        <source>正在啟動 Ditto 桌面…</source>
+        <translation>Starting the Ditto desktop…</translation>
+    </message>
+    <message>
+        <source>正在建立帳號與家目錄…</source>
+        <translation>Creating your account and home folder…</translation>
+    </message>
+    <message>
+        <source>結束首次設定畫面，重新檢查帳號狀態。</source>
+        <translation>Close first-time setup and check the account state again.</translation>
+    </message>
+    <message>
+        <source>這個帳號是管理員，可以變更系統設定。</source>
+        <translation>This is an administrator account and can change system settings.</translation>
+    </message>
+    <message>
+        <source>這台電腦還沒有帳號。建立後會用剛設定的密碼登入 Ditto 桌面，之後登入與解鎖都用這組密碼。</source>
+        <translation>This computer has no account yet. Your new password will sign you in to Ditto, and will also be used for future sign-ins and unlocking.</translation>
+    </message>
+    <message>
+        <source>這組密碼比較容易被猜到，建議換成較長的詞句；仍可使用這組密碼建立帳號。</source>
+        <translation>This password is easy to guess. A longer phrase is recommended, but you can still use this password to create the account.</translation>
+    </message>
+    <message>
+        <source>顯示在登入畫面，可用中文，也可以留空。Ctrl+空白切換注音輸入。</source>
+        <translation>Shown on the login screen. Chinese is supported; you can leave this blank. Ctrl+Space switches Zhuyin input.</translation>
+    </message>
+</context>
+<context>
+    <name>Messages</name>
+    <message>
+        <source>名字最多 128 個字元，不能含控制字元或「: , =」，請修改後再試。</source>
+        <translation>Use at most 128 characters for your name, without control characters or “: , =”. Edit it and try again.</translation>
+    </message>
+    <message>
+        <source>密碼不能含換行或空字元，最多 1024 個字元，請重新輸入。</source>
+        <translation>The password must not contain newlines or NUL characters and must be at most 1024 characters. Enter it again.</translation>
+    </message>
+    <message>
+        <source>密碼至少需要 8 個字元，請重新輸入。</source>
+        <translation>Use at least 8 characters for the password.</translation>
+    </message>
+    <message>
+        <source>帳號名稱須以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元，並避開系統保留名稱。</source>
+        <translation>Start with a lowercase letter; use only lowercase letters, digits and hyphens, up to 31 characters. Avoid reserved system names.</translation>
+    </message>
+    <message>
+        <source>帳號已建立，但登入驗證失敗。請回到登入畫面，用剛設定的帳號與密碼登入。</source>
+        <translation>The account was created, but sign-in failed. Return to the login screen and use the username and password you just set.</translation>
+    </message>
+    <message>
+        <source>帳號建立失敗，系統無法完整回復。請重新啟動電腦進行復原，暫時不要再次建立帳號。</source>
+        <translation>Account creation failed and rollback was incomplete. Restart the computer for recovery; do not create another account yet.</translation>
+    </message>
+    <message>
+        <source>帳號沒有建立成功，系統已回復，可以重新填寫再試一次。</source>
+        <translation>The account was not created and the changes have been rolled back. Fill in the form to try again.</translation>
+    </message>
+    <message>
+        <source>目前無法確認帳號是否已建立。請重新啟動電腦，讓系統檢查狀態；不要重複送出。</source>
+        <translation>Account creation could not be confirmed. Restart the computer so the system can check its state; do not submit again.</translation>
+    </message>
+    <message>
+        <source>目前的畫面無權建立帳號，請重新啟動電腦後再試。</source>
+        <translation>This screen is not authorized to create an account. Restart the computer and try again.</translation>
+    </message>
+    <message>
+        <source>這個帳號名稱已被使用，請換一個名稱。</source>
+        <translation>This username is already in use. Choose another name.</translation>
+    </message>
+    <message>
+        <source>這台電腦已經有帳號，請回到登入畫面登入。</source>
+        <translation>This computer already has an account. Return to the login screen to sign in.</translation>
+    </message>
+</context>
 </TS>

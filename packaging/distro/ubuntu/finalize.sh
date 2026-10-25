@@ -24,6 +24,11 @@ chroot "$root" usermod --lock root
 chroot "$root" systemctl disable ssh.service ssh.socket
 chroot "$root" systemctl disable systemd-sysupdate.timer systemd-sysupdate-reboot.timer
 chroot "$root" systemctl enable ditto-ssh-keygen.service systemd-networkd systemd-resolved greetd
+# TODO_FIRSTBOOT_ACCOUNT_PR_A: generator activates this only with all artifacts.
+if [[ -f "$root/usr/lib/systemd/system/ditto-firstboot-account.socket" ]]; then
+    test -x "$root/usr/lib/ditto/ditto-firstboot-account"
+    chroot "$root" systemctl enable ditto-firstboot-account.socket
+fi
 ln -sfn /dev/null "$root/etc/systemd/system/systemd-firstboot.service"
 chroot "$root" systemctl mask getty@tty1.service
 if ! grep -q 'type=wayland' "$root/etc/pam.d/greetd"; then

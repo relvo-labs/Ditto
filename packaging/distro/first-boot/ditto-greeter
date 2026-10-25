@@ -1,0 +1,94 @@
+#!/bin/bash
+# greetd's unprivileged default session. Never accepts credentials in argv/env.
+set -euo pipefail
+self=/usr/lib/ditto/ditto-greeter
+
+human_account_exists() {
+    local uid_min uid_max accounts
+    uid_min=$(awk '$1 == "UID_MIN" { value=$2 } END { print value }' /etc/login.defs)
+    uid_max=$(awk '$1 == "UID_MAX" { value=$2 } END { print value }' /etc/login.defs)
+    [[ $uid_min =~ ^[0-9]+$ && $uid_max =~ ^[0-9]+$ && $uid_min -le $uid_max ]] || return 2
+    accounts=$(getent passwd) || return 2
+    awk -F: -v low="$uid_min" -v high="$uid_max" \
+        '$3 ~ /^[0-9]+$/ && $3 >= low && $3 <= high { found=1 } END { exit !found }' <<< "$accounts"
+}
+login_screen() {
+    exec /usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session
+}
+
+if [[ ${1:-} == --session ]]; then
+    # Called only by the greeter's fixed Wayfire autostart. All children share
+    # this transient D-Bus session; no desktop user configuration is imported.
+    fcitx_pid=
+    cleanup_session() { [[ -z $fcitx_pid ]] || { kill "$fcitx_pid" 2>/dev/null || true; wait "$fcitx_pid" 2>/dev/null || true; }; }
+    trap cleanup_session EXIT
+    fcitx5 --replace &
+    fcitx_pid=$!
+    status=0
+    quickshell -p /usr/lib/ditto/shell/firstboot/shell.qml || status=$?
+    printf '%s\n' "$status" > "${DITTO_GREETER_RESULT:?}"
+    kill -USR1 "${DITTO_GREETER_SUPERVISOR_PID:?}"
+    exit "$status"
+fi
+
+if [[ ${1:-} == --graphical ]]; then
+    export QT_QPA_PLATFORM=wayland QT_QUICK_CONTROLS_STYLE=Basic
+    export QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 XDG_CURRENT_DESKTOP=Wayfire XDG_SESSION_TYPE=wayland
+    # Qt's Wayland text-input-v3 talks to Wayfire's input-method-v1 relay.
+    unset QT_IM_MODULE QT_IM_MODULES
+    export XMODIFIERS=@im=fcitx
+    export XDG_CONFIG_HOME
+    XDG_CONFIG_HOME=$(mktemp -d "${XDG_RUNTIME_DIR:?}/ditto-greeter.XXXXXX")
+    export DITTO_GREETER_RESULT="$XDG_CONFIG_HOME/result" DITTO_GREETER_SUPERVISOR_PID=$$
+    install -d -m 0700 "$XDG_CONFIG_HOME/fcitx5"
+    install -m 0600 /usr/lib/ditto/firstboot-fcitx5-profile "$XDG_CONFIG_HOME/fcitx5/profile"
+    compositor_pid=
+    cleanup_graphical() {
+        if [[ -n $compositor_pid ]]; then
+            kill "$compositor_pid" 2>/dev/null || true
+            wait "$compositor_pid" 2>/dev/null || true
+        fi
+        rm -rf -- "$XDG_CONFIG_HOME"
+    }
+    trap cleanup_graphical EXIT
+    trap '[[ -z $compositor_pid ]] || kill "$compositor_pid" 2>/dev/null || true' USR1
+    trap 'exit 1' TERM INT HUP
+    wayfire --config /usr/lib/ditto/wayfire-greeter.ini &
+    compositor_pid=$!
+    wait "$compositor_pid" || true
+    # A normal compositor exit alone is not proof that the UI launched a session.
+    [[ -f $DITTO_GREETER_RESULT ]] || exit 1
+    read -r status < "$DITTO_GREETER_RESULT"
+    [[ $status =~ ^[0-9]+$ ]] || exit 1
+    exit "$status"
+fi
+
+[[ $# == 0 ]] || exit 2
+if human_account_exists; then
+    login_screen
+else
+    status=$?
+    # A failed account lookup must never be treated as an empty machine.
+    [[ $status == 1 ]] || exit 2
+fi
+has_drm=false
+for device in /sys/class/drm/card[0-9]*/device; do
+    [[ $device =~ /card[0-9]+/device$ && -e $device ]] || continue
+    has_drm=true
+done
+if [[ $has_drm == true ]]; then
+    status=0
+    dbus-run-session -- "$self" --graphical || status=$?
+    [[ $status != 0 ]] || exit 0
+    [[ $status != 10 ]] || exec "$self"
+    # The compositor/Qt failed: exactly one software attempt, then text.
+    status=0
+    WLR_RENDERER=pixman QT_QUICK_BACKEND=software WLR_RENDERER_ALLOW_SOFTWARE=1 \
+        dbus-run-session -- "$self" --graphical || status=$?
+    [[ $status != 0 ]] || exit 0
+    [[ $status != 10 ]] || exec "$self"
+fi
+# The helper's --tty is also an unprivileged socket client, owned by PR A.
+# It reads secrets from the terminal, then ordinary agreety performs PAM login.
+/usr/lib/ditto/ditto-firstboot-account --tty
+login_screen

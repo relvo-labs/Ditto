@@ -71,8 +71,10 @@ def unsafe_authentication(rel, data):
             if "initial_session" in config:
                 return True
             default = config.get("default_session", {})
+            if (default.get("command") == "/usr/lib/ditto/ditto-greeter" and default.get("user") != "_greetd"):
+                return True
             if default and not re.fullmatch(
-                    r"/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session", default.get("command", "")):
+                    r"(?:/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session|/usr/lib/ditto/ditto-greeter)", default.get("command", "")):
                 return True
         continued = text.replace("\\\n", "")
         # A numeric sudo user/group id starts with '#'; it is not a comment.
@@ -304,6 +306,26 @@ def main():
         if not (root / required).is_file():
             report["errors"].append({"file": required, "error": "required pristine root file missing"})
     check_accounts(root, report)
+    # Any marker presence (including a link/directory or unsafe parent) is
+    # machine-specific state. lstat each component; never follow outside root.
+    for marker in ("account-created", "pending"):
+        rel = "var/lib/ditto/firstboot/" + marker
+        path = root
+        for part in Path(rel).parts:
+            path /= part
+            try:
+                mode = path.lstat().st_mode
+            except FileNotFoundError:
+                break
+            except OSError as error:
+                report["errors"].append({"file": rel, "errno": error.errno})
+                break
+            if stat.S_ISLNK(mode) or path == root / rel:
+                report["identity_files"].append(rel)
+                break
+            if not stat.S_ISDIR(mode):
+                report["identity_files"].append(rel)
+                break
 
     def walk_error(error):
         report["errors"].append({"file": str(error.filename), "errno": error.errno})
