@@ -312,12 +312,19 @@ def main():
         for name in dirs:
             path = Path(directory) / name
             rel = path.relative_to(root).as_posix()
+            # os.walk puts directory symlinks here, before pruning them below.
+            if rel == "boot/loader/random-seed":
+                report["identity_files"].append(rel)
             if path.is_symlink() and authentication_path(rel):
                 report["authentication_config"].append(rel)
         dirs[:] = [n for n in dirs if not (Path(directory) / n).is_symlink()]
         for name in files:
             path = Path(directory) / name
             rel = path.relative_to(root).as_posix()
+            # Presence alone is disallowed, even an empty file or dangling link.
+            # Keep scanning regular bytes/link text with all existing rules.
+            if rel == "boot/loader/random-seed":
+                report["identity_files"].append(rel)
             try:
                 if path.is_symlink():
                     if (name in {"authorized_keys", "known_hosts"} or
