@@ -89,6 +89,8 @@ AI-native OS 描述的是整個工作環境的互動與控制方式。Linux 核�
 
 這個入口提供開發導覽；本頁所連結的開發模式入口、主機安裝、登入管理器與上述完整首次操作流程尚未重新驗證。若啟動受阻，先核對工具版本、合成器與 Core／Shell 診斷，不以停用隔離或借用日常 Profile 繞過問題。
 
+Node workspace 型別檢查在根目錄執行 `pnpm typecheck`。pnpm 依 workspace 依賴排序，由 `host-runtime` 先產生一次 `vendor-types/`，下游套件只讀取這份宣告檔；請保留預設排序，不加 `--parallel` 或 `--no-sort`。單獨檢查下游套件時，先執行 `pnpm --filter @ditto/host-runtime vendor-types`，或用 `pnpm --filter '@ditto/svc-tasks...' typecheck` 連同相依套件依序檢查。
+
 ## 依你的工作找文件
 
 | 你要做什麼 | 從這裡開始 |
