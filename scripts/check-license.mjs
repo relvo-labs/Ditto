@@ -17,6 +17,7 @@ const vendorHashes = {
   ...Object.fromEntries(['cordis', 'cosmokit', 'loader', 'schemastery', 'timer']
     .map(name => [`packages/host-runtime/vendor/${name}/LICENSE`, cordisHash])),
 };
+// Enumerated current licensing docs only; never scan user artifacts or all notes.
 const activeDocs = [
   'README.md', 'docs/product/Ditto-PRD-v0.4.0.md',
   'docs/upstream/deepseek-harness.md', 'docs/upstream/g3-adoption.md',
@@ -32,12 +33,30 @@ function section(text, name) {
   return text.split('\n').slice(start + 1).join('\n').split(/^\s*\[/m)[0];
 }
 
-export function activeDocAgrees(text) {
-  return /MIT/.test(text) && ![
-    /自有(?:程式碼|實作)[^。\n|]*(?:未指定|尚無|UNLICENSED)/,
-    /自己的專案授權尚未指定/,
-    /產品授權(?:及|與)商業模式(?:尚未定案|未定案)/,
-  ].some(pattern => pattern.test(text));
+export function activeDocAgrees(text, path = 'README.md') {
+  const links = [...text.matchAll(/\[([^\]\n]+)\]\(([^)\s]+)\)/g)];
+  const decision = resolve(root, '.agents/notes/decisions/2026-10-25-d52-mit-license.md');
+  const hasDecisionLink = links.some(([, label, target]) => /\bD-52\b/.test(label)
+    && !target.startsWith('/') && resolve(root, dirname(path), target) === decision);
+  const prose = text.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, '$1');
+  // Wording/link heuristic for the list above, not a Markdown parser or a
+  // semantic/legal audit: accept an explicit Ditto own-code adoption clause
+  // on one line/table cell, plus a relative D-52 link in that doc. The optional
+  // attribution is limited to D-52 (with an optional dated owner prefix), so
+  // arbitrary words such as 尚未 cannot turn a negation into adoption.
+  // Historical UNLICENSED statements may coexist; third-party MIT cannot
+  // replace this positive clause. New wording needs an explicit test/update.
+  const adoption = /Ditto[ \t]+自有(?:程式碼|實作)(?:已)?[ \t]*(?:依[ \t]*(?:owner[ \t]+[0-9]{4}-[0-9]{2}-[0-9]{2}[ \t]+的[ \t]*)?D-52(?:[ \t]+決定)?[ \t]*)?採(?:用)?[ \t]*(?:根目錄[ \t]*)?MIT\b/u;
+  return hasDecisionLink && adoption.test(prose);
+}
+
+// Bounded SemVer contract: stable MAJOR.MINOR.PATCH only, no leading zeros,
+// prerelease or build suffixes. Reject unsupported forms rather than guess
+// precedence. BigInt avoids precision loss for large numeric components.
+function stableVersion(version) {
+  if (typeof version !== 'string') return null;
+  const match = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.exec(version);
+  return match && match[0] === version ? match.slice(1).map(part => BigInt(part)) : null;
 }
 
 // The fixture records old immutable identities, not the version of the latest
@@ -45,11 +64,14 @@ export function activeDocAgrees(text) {
 export function immutableManifestError(previous, text) {
   const current = JSON.parse(text);
   if (current.id !== previous.id) return 'builtin ID must remain stable';
-  if (typeof current.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(current.version))
-    return 'expected a package version';
-  if (current.version === previous.version && sha256(text) !== previous.sha256)
-    return 'changed archived manifest bytes require a new version';
-  return null;
+  const before = stableVersion(previous.version);
+  const after = stableVersion(current.version);
+  if (!before || !after) return 'expected stable major.minor.patch versions for builtin and baseline';
+  for (let index = 0; index < before.length; index++) {
+    if (after[index] > before[index]) return null;
+    if (after[index] < before[index]) break;
+  }
+  return 'builtin version must be strictly greater than pre-MIT baseline';
 }
 
 export function checkLicense({
@@ -113,8 +135,8 @@ export function checkLicense({
     require(Object.hasOwn(vendorHashes, path), 'new vendor notice needs an explicit upstream audit and hash');
     require(sha256(text) === vendorHashes[path], 'vendor notice differs from pre-MIT baseline');
   });
-  group('active licensing docs', activeDocs, (_path, text) => {
-    require(activeDocAgrees(text), 'active docs must state MIT and remove own-code licensing undecided claims');
+  group('active licensing docs', activeDocs, (path, text) => {
+    require(activeDocAgrees(text, path), 'expected explicit Ditto own-code MIT adoption and a relative D-52 decision link');
   });
   return results;
 }

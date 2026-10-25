@@ -7,7 +7,7 @@
 | 議題 | 本計畫預設／提案 | 阻擋 | 最晚時點 |
 | --- | --- | --- | --- |
 | D-18 安裝與發行形態 | **已決定（[D-49](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md)）**：改做完整 Linux 發行版，另立主規劃；2026-10-24 部分修訂見 [D-51](../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md)（新增 B 加裝套件） | #50 改接發行版規劃 | 已決定 |
-| D-11 產品授權、名稱與角色素材 | **依 [D-49](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 由 owner 處理**；Agent 只整理盤點，不列為阻擋 | — | 發布前（owner） |
+| D-11 產品授權、名稱與角色素材 | 自有程式碼已依 [D-52](../../.agents/notes/decisions/2026-10-25-d52-mit-license.md) 採 MIT；其餘**依 [D-49](../../.agents/notes/decisions/2026-10-21-d49-g4-mvp-owner-acceptance.md) 由 owner 處理**；Agent 只整理盤點，不列為阻擋 | — | 發布前（owner） |
 | D-12 人力與工期 | 82 人週維持提案；依剩餘工作重估 | 排程承諾 | G4 開工評審 |
 | D-06a Core／Shell PSS 預算 | 既有提案與三次冷登入量測 | #53 出口 | #53 凍結量測前 |
 | #41 救援遇到較新生成資料 | 三個選項待選 | #56 AT-16／22 回歸 | #56 前 |
