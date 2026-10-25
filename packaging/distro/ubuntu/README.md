@@ -117,12 +117,15 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 wrapper、Wayfire 設定與 Chewing profile。`TODO_FIRSTBOOT_ACCOUNT_PR_A` 讓 PR B 先合併時
 仍可建置：PR A 來源 artifacts 全不存在時，greetd 保留舊 agreety，並在映像
 `/usr/share/ditto/firstboot-integration.json` 明記未啟用。只要出現 PR A 任一 artifact，
-就必須具備 crate、Unicode NOTICE、四個 unit（socket、service、recover、tty）、tmpfiles 與同來源 runtime-lock 的 helper binary；不齊即在
+就必須具備 crate、Unicode NOTICE、七個 unit（account socket／service、recover、tty、dispatch socket／service、prepare）、固定 root launcher、tmpfiles 與同來源 runtime-lock 的 helper binary；不齊即在
 建立 output 前拒絕。齊備時命令改為 `/usr/lib/ditto/ditto-greeter`，finalizer 啟用
-`ditto-firstboot-account.socket` 與 `ditto-firstboot-account-recover.service`。generator 按實際 unit 建立
+`ditto-firstboot-account.socket`、`ditto-firstboot-tty-dispatch.socket` 與 `ditto-firstboot-account-recover.service`。generator 按實際 unit 建立
 `sockets.target.wants`、`sysinit.target.wants` 與 `greetd.service.wants`；recovery 的
 `Before=greetd.service` 不可改成 greetd 的 Requires。finalizer 移除舊 recovery `.requires` link。
-TTY unit 僅安裝，不預設啟用。這不是在 PR B 內提供假 helper。
+TTY unit 不預設啟用，只有通過 peer／greetd ancestry／root 帳號檢查的固定請求才由 root 排程。
+prepare unit 先停止 greetd/getty、清理 `_greetd` session、接管／切換 tty1，再交給原三項 capabilities 的帳號 TTY unit；結束或失敗後由 OnSuccess／OnFailure 回 greetd 正式 PAM 登入。
+root-owned 的本次開機 latch 與人類確認的最多三次嘗試阻止 respawn loop，重開機才允許再次 handoff。
+這不是在 PR B 內提供假 helper，也不給 greeter 一般 root 命令權限。
 
 新增 `fcitx5-chewing`（台灣注音）、`at-spi2-core`、`orca`、`speech-dispatcher`，
 精確套件版本／授權與完整 closure 尚待同 snapshot 新映像的 dpkg manifest 回讀。
@@ -137,6 +140,6 @@ Socket／greetd／PAM 真實協定、GPU／pixman／無 DRM、fcitx5 中文提�
 整合 #213／#214 後，須從同一來源重建 helper 並更新 runtime lock，使其列入
 `usr/lib/ditto/target/release/ditto-firstboot-account`；舊 lock 缺件會失敗。
 runtime admission／lock 工具已支援該路徑，端到端 producer 仍由 D04 提供；本次未重建 runtime、
-更動 lock hash 或建置真實映像。PR A 的 `--tty` 為 root-only，現有 `_greetd` wrapper
-直接呼叫會被拒絕；須另完成 root TTY unit 啟動與 greetd／tty1 交接，才可接受無 DRM 保底。
+更動 lock hash 或建置真實映像。PR A 的 `--tty` 保持 root-only；wrapper 改送無帳密的固定 handoff。
+原始碼已接 root TTY 啟動及回登入；真實 systemd ordering、可見 controlling VT、帳號工具、復原與 PAM 仍須新建可丟棄 VM 接受。
 登入後須在 VM 確認沒有殘留 `_greetd` 程序，包含 Orca、AT-SPI 與 speech-dispatcher。

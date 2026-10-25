@@ -1,0 +1,267 @@
+#!/usr/bin/python3 -I
+"""Fixed first-boot tty1 handoff. No caller-selected command or account data."""
+import fcntl
+import os
+from pathlib import Path
+import pwd
+import signal
+import socket
+import stat
+import struct
+import subprocess
+import sys
+import time
+
+SOCKET = '/run/ditto/firstboot-tty.sock'
+USED = Path('/run/ditto/firstboot-tty-used')
+HELPER = '/usr/lib/ditto/ditto-firstboot-account'
+TTY_UNIT = 'ditto-firstboot-account-tty.service'
+ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
+
+
+def fixed_output(argv):
+    return subprocess.run(argv, env=ENV, stdin=subprocess.DEVNULL,
+                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                          text=True, check=True, timeout=5).stdout
+
+
+def human_account_exists():
+    """Preflight only. The unchanged helper rechecks under its transaction lock."""
+    bounds = {}
+    for line in Path('/etc/login.defs').read_text().splitlines():
+        words = line.split('#', 1)[0].split()
+        if words and words[0] in ('UID_MIN', 'UID_MAX'):
+            if len(words) != 2 or words[0] in bounds or not words[1].isascii() or not words[1].isdecimal():
+                raise ValueError('invalid bounds')
+            bounds[words[0]] = int(words[1])
+    low, high = bounds['UID_MIN'], bounds['UID_MAX']
+    if not 0 < low <= high < 2**32:
+        raise ValueError('invalid bounds')
+    # Check local passwd even when NSS is misconfigured or omits local files.
+    local = Path('/etc/passwd').read_text()
+    nss = fixed_output(['/usr/bin/getent', 'passwd'])
+    for text in (local, nss):
+        for line in text.splitlines():
+            fields = line.split(':')
+            if len(fields) != 7 or not fields[2].isascii() or not fields[2].isdecimal():
+                raise ValueError('invalid passwd')
+            if low <= int(fields[2]) <= high:
+                return True
+    return False
+
+
+def process_parent(pid):
+    for line in Path(f'/proc/{pid}/status').read_text().splitlines():
+        if line.startswith('PPid:'):
+            return int(line.split()[1])
+    raise ValueError('missing parent')
+
+
+def greeter_uid():
+    uid = pwd.getpwnam('_greetd').pw_uid
+    if not 0 < uid < 2**32:
+        raise ValueError('invalid greeter identity')
+    return uid
+
+
+def trusted_peer(connection):
+    pid, uid, _ = struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+    if uid != greeter_uid():
+        return False
+    # Greeter PAM may move the child into a session scope. Verify ancestry,
+    # not a cgroup spelling which would reject that legitimate session.
+    text = fixed_output(['/usr/bin/systemctl', 'show', '--property=MainPID', '--value', 'greetd.service']).strip()
+    if not text.isascii() or not text.isdecimal() or int(text) <= 1:
+        return False
+    main_pid = int(text)
+    for _ in range(64):
+        if pid == main_pid:
+            return True
+        if pid <= 1:
+            return False
+        pid = process_parent(pid)
+    return False
+
+
+def claim_handoff():
+    # Root owns this boot-only latch. Greeter cannot clear/replay it or choose
+    # a path; it is separate from the helper's persistent transaction markers.
+    for directory in (Path('/run'), USED.parent):
+        mode = directory.lstat()
+        if not stat.S_ISDIR(mode.st_mode) or mode.st_uid != 0 or mode.st_mode & 0o022:
+            raise ValueError('unsafe runtime directory')
+    fd = os.open(USED, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644)
+    with os.fdopen(fd, 'wb') as stream:
+        stream.write(b'tty1\n')
+
+
+def dispatch(connection):
+    """Authenticate before any VT/unit effect; every reply is fixed text."""
+    connection.settimeout(5)
+    try:
+        if not trusted_peer(connection):
+            connection.sendall(b'denied\n')
+            return
+        frame = b''
+        while len(frame) < 5:
+            part = connection.recv(5 - len(frame))
+            if not part:
+                break
+            frame += part
+        if frame != b'tty\n':
+            connection.sendall(b'denied\n')
+            return
+        if human_account_exists() or os.path.lexists(USED):
+            connection.sendall(b'login\n')
+            return
+        claim_handoff()
+        # --no-block queues the stop/start transaction; this dispatcher is not
+        # ordered against greetd and never waits on the service it must stop.
+        subprocess.run(['/usr/bin/systemctl', '--no-block', 'start', TTY_UNIT],
+                       env=ENV, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=True, timeout=5)
+        connection.sendall(b'accepted\n')
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        # Keep a claimed latch on failure: login survives, no respawn storm.
+        try:
+            connection.sendall(b'login\n')
+        except OSError:
+            pass
+
+
+def activated_listener():
+    if os.environ.get('LISTEN_PID') != str(os.getpid()) or os.environ.get('LISTEN_FDS') != '1':
+        raise ValueError('invalid activation')
+    listener = socket.socket(fileno=3)
+    if listener.family != socket.AF_UNIX or listener.type != socket.SOCK_STREAM or not listener.getsockopt(socket.SOL_SOCKET, socket.SO_ACCEPTCONN):
+        raise ValueError('invalid listener')
+    os.set_inheritable(3, False)
+    listener.settimeout(5)
+    return listener
+
+
+def request():
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+        client.settimeout(5)
+        client.connect(SOCKET)
+        client.sendall(b'tty\n')
+        client.shutdown(socket.SHUT_WR)
+        reply = b''
+        while b'\n' not in reply and len(reply) < 32:
+            part = client.recv(32 - len(reply))
+            if not part:
+                break
+            reply += part
+        if reply != b'accepted\n':
+            return 1
+    # Stay in the greeter session until systemd stops its whole cgroup. If the
+    # queued unit fails to stop greetd, return to ordinary login after 15 s.
+    signal.alarm(15)
+    signal.pause()
+    return 1
+
+
+def activate_tty1():
+    if not os.isatty(0) or os.fstat(0).st_rdev != os.makedev(4, 1) or os.tcgetpgrp(0) != os.getpgrp():
+        raise ValueError('tty1 is not controlling foreground terminal')
+    fd = os.open('/dev/tty0', os.O_RDWR | os.O_NOCTTY | os.O_CLOEXEC)
+    def deadline(_signal, _frame):
+        raise TimeoutError('VT switch deadline')
+    previous = signal.signal(signal.SIGALRM, deadline)
+    signal.alarm(5)
+    try:
+        fcntl.ioctl(fd, 0x5606, 1)  # VT_ACTIVATE, fixed VT 1 only.
+        fcntl.ioctl(fd, 0x5607, 1)  # VT_WAITACTIVE: visible before asking for input.
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+        os.close(fd)
+
+
+def retire_greeter():
+    # PAM may put the greeter in a logind scope outside greetd's cgroup. Stop
+    # that fixed service identity too, never a caller-selected user/session.
+    uid = greeter_uid()
+    subprocess.run(['/usr/bin/loginctl', 'terminate-user', '_greetd'], env=ENV,
+                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL, check=False, timeout=10)
+    # logind termination is asynchronous and has no per-UID completion fd.
+    # Bound this metadata-only wait; a remaining process means no VT takeover.
+    deadline = time.monotonic() + 5
+    while True:
+        alive = False
+        for entry in Path('/proc').iterdir():
+            if not entry.name.isdecimal():
+                continue
+            try:
+                text = (entry / 'status').read_text()
+            except FileNotFoundError:
+                continue
+            fields = dict(line.split(':', 1) for line in text.splitlines() if ':' in line)
+            if int(fields['Uid'].split()[0]) == uid and not fields['State'].lstrip().startswith('Z'):
+                alive = True
+                break
+        if not alive:
+            return
+        if time.monotonic() >= deadline:
+            raise ValueError('greeter still running')
+        time.sleep(0.05)
+
+
+def tty_session():
+    # Unit owns tty1 only after greetd/getty stop. All exits close/reset/hangup
+    # through systemd, then OnSuccess/OnFailure starts formal greetd/PAM login.
+    try:
+        if human_account_exists():
+            return 0
+        with open('/dev/tty', 'r+', buffering=1, encoding='utf-8') as tty:
+            for attempt in range(3):
+                if human_account_exists():
+                    return 0
+                subprocess.run([HELPER, '--tty'], env=ENV, check=False)
+                if human_account_exists():
+                    tty.write('An account was found. Returning to sign-in; interrupted setup may still require administrator recovery.\n')
+                    return 0
+                tty.write('Setup has not been confirmed. Recovery may require an administrator; do not delete pending records.\n')
+                if attempt == 2:
+                    break
+                tty.write('Press Enter for one more setup attempt, or Ctrl-D to stop and return to sign-in: ')
+                if tty.readline(32) != '\n':
+                    break
+            tty.write('Setup stopped. Sign-in needs an existing account. Restart to retry setup, or ask an administrator for recovery.\n')
+            tty.write('Press Enter to return to sign-in: ')
+            tty.readline(32)
+        return 0
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError, KeyboardInterrupt):
+        # No assertion that rollback succeeded. Never restart the helper here.
+        print('Setup stopped; account state could not be confirmed. Returning to sign-in. Restart or ask an administrator for recovery.', flush=True)
+        return 1
+
+
+def main(argv):
+    if argv == ['--request']:
+        try:
+            return request()
+        except OSError:
+            return 1
+    if os.geteuid() != 0 or argv not in (['--dispatch'], ['--tty-session'], ['--prepare']):
+        return 77
+    if argv == ['--prepare']:
+        retire_greeter()
+        activate_tty1()
+        return 0
+    if argv == ['--tty-session']:
+        return tty_session()
+    with activated_listener() as listener:
+        connection, _ = listener.accept()
+        with connection:
+            dispatch(connection)
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        print('phase=tty_handoff result=unavailable', file=sys.stderr)
+        sys.exit(1)

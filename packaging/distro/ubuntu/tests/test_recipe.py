@@ -2002,7 +2002,9 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         # Compare installed bytes and enablement against real committed PR A,
         # rather than synthetic two-unit fixtures that miss recovery ordering.
         units = ("ditto-firstboot-account.socket", "ditto-firstboot-account.service",
-                 "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service")
+                 "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
+                 "ditto-firstboot-tty-dispatch.socket", "ditto-firstboot-tty-dispatch.service",
+                 "ditto-firstboot-tty-prepare.service")
         with tarfile.open(self.archive) as source:
             for name in units:
                 original = source.extractfile("packaging/distro/first-boot/units/" + name).read()
@@ -2024,6 +2026,13 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertIn("greetd.service", recovery["Unit"]["Before"].split())
         self.assertFalse((extra / "etc/systemd/system/greetd.service.requires").exists())
         self.assertFalse(any(extra.glob("etc/systemd/system/*.wants/ditto-firstboot-account-tty.service")))
+        launcher = extra / "usr/lib/ditto/ditto-firstboot-tty"
+        self.assertTrue(os.access(launcher, os.X_OK))
+        with tarfile.open(self.archive) as source:
+            self.assertEqual(launcher.read_bytes(),
+                             source.extractfile("packaging/distro/first-boot/ditto-firstboot-tty").read())
+        self.assertIn("ditto-firstboot-tty-dispatch.socket",
+                      (output / "finalize.sh").read_text())
         # Run the generated finalizer in a temporary image, recording chroot
         # actions and stubbing runtime apply, never executing the helper.
         image = self.pristine_image("firstboot-finalizer")
@@ -2044,7 +2053,7 @@ source "$1"
                                 env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
                                 text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("systemctl enable ditto-firstboot-account.socket ditto-firstboot-account-recover.service",
+        self.assertIn("systemctl enable ditto-firstboot-account.socket ditto-firstboot-account-recover.service ditto-firstboot-tty-dispatch.socket",
                       (image / "chroot-actions").read_text())
         self.assertFalse(obsolete.is_symlink())
         for target in ("sysinit.target", "greetd.service"):
@@ -2057,7 +2066,10 @@ source "$1"
                             "packaging/distro/first-boot/tmpfiles.d/ditto-firstboot.conf",
                             *("packaging/distro/first-boot/units/" + name for name in (
                                 "ditto-firstboot-account.socket", "ditto-firstboot-account.service",
-                                "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service")))
+                                "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
+                                "ditto-firstboot-tty-dispatch.socket", "ditto-firstboot-tty-dispatch.service",
+                 "ditto-firstboot-tty-prepare.service")),
+                            "packaging/distro/first-boot/ditto-firstboot-tty")
         for missing in required_sources:
             with self.subTest(missing=missing):
                 _, result = self.generate(2, archive=self.firstboot_archive((missing,)))

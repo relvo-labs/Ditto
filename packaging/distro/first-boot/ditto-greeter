@@ -102,6 +102,12 @@ else
     # A failed account lookup must never be treated as an empty machine.
     [[ $status == 1 ]] || login_screen
 fi
+# Root's boot-only latch prevents replay/respawn after any TTY result, including
+# unit setup failure. It never declares an account successfully provisioned.
+if [[ -e /run/ditto/firstboot-tty-used || -L /run/ditto/firstboot-tty-used ]]; then
+    printf '%s\n' 'Text setup stopped without confirming an account. Sign in with an existing account, or restart to retry setup.'
+    login_screen
+fi
 has_drm=false
 for device in /sys/class/drm/card[0-9]*/device; do
     [[ $device =~ /card[0-9]+/device$ && -e $device ]] || continue
@@ -130,8 +136,9 @@ if [[ $stage == gpu || $stage == software ]]; then
     fi
     exec "$self"
 fi
-# Error/EOF/already_provisioned must not strand tty1. Re-enter the account
-# decision after every text attempt; the helper remains authoritative.
-/usr/lib/ditto/ditto-firstboot-account --tty || true
-unset DITTO_GREETER_STAGE
-exec "$self"
+# Only the fixed root dispatcher can select the TTY unit. It rechecks peer,
+# greetd ancestry and account state, then systemd stops this entire session
+# before taking tty1. Never call the root-only account helper as _greetd.
+/usr/lib/ditto/ditto-firstboot-tty --request || true
+printf '%s\n' 'Account setup could not take over tty1. Returning to sign-in; restart or ask an administrator to retry setup.'
+login_screen

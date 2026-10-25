@@ -12,7 +12,9 @@ import tempfile
 from runtime_policy import validate
 
 FIRSTBOOT_UNITS = ("ditto-firstboot-account.socket", "ditto-firstboot-account.service",
-                   "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service")
+                   "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
+                   "ditto-firstboot-tty-dispatch.socket", "ditto-firstboot-tty-dispatch.service",
+                   "ditto-firstboot-tty-prepare.service")
 
 
 def digest(path):
@@ -102,7 +104,9 @@ def main():
         enable_firstboot = (any(path.exists() or path.is_symlink() for path in helper_sources)
                             or helper_binary in runtime_files or helper_binary in runtime_links)
         if enable_firstboot and (not all(path.is_file() and not path.is_symlink() for path in helper_sources)
-                                 or helper_binary not in runtime_files):
+                                 or helper_binary not in runtime_files
+                                 or not (firstboot / "ditto-firstboot-tty").is_file()
+                                 or (firstboot / "ditto-firstboot-tty").is_symlink()):
             parser.error("PR A firstboot artifacts incomplete: need helper binary, crate, units and tmpfiles")
         output = args.output
         output.mkdir(parents=True)
@@ -165,6 +169,7 @@ exec /usr/local/libexec/ditto-session
                 ("fcitx5-profile", "usr/lib/ditto/firstboot-fcitx5-profile", 0o644)):
             put("extra/" + dest, (firstboot / name).read_text(), mode)
         if enable_firstboot:
+            put("extra/usr/lib/ditto/ditto-firstboot-tty", (firstboot / "ditto-firstboot-tty").read_text(), 0o755)
             for unit in FIRSTBOOT_UNITS:
                 put("extra/usr/lib/systemd/system/" + unit, (firstboot / "units" / unit).read_text())
             put("extra/usr/share/doc/ditto-firstboot-account/UNICODE-NOTICE.txt",
@@ -175,6 +180,7 @@ exec /usr/local/libexec/ditto-session
             # Match the real units' WantedBy. Recovery orders before greetd,
             # but a recovery setup failure must not prevent existing login.
             for target, unit in (("sockets.target", "ditto-firstboot-account.socket"),
+                                 ("sockets.target", "ditto-firstboot-tty-dispatch.socket"),
                                  ("sysinit.target", "ditto-firstboot-account-recover.service"),
                                  ("greetd.service", "ditto-firstboot-account-recover.service")):
                 directory = extra / "etc/systemd/system" / (target + ".wants")
