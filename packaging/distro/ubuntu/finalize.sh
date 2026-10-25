@@ -27,7 +27,9 @@ chroot "$root" systemctl enable ditto-ssh-keygen.service systemd-networkd system
 # TODO_FIRSTBOOT_ACCOUNT_PR_A: generator activates this only with all artifacts.
 if [[ -f "$root/usr/lib/systemd/system/ditto-firstboot-account.socket" ]]; then
     test -x "$root/usr/lib/ditto/ditto-firstboot-account"
-    chroot "$root" systemctl enable ditto-firstboot-account.socket
+    # Remove the obsolete hard dependency only inside the new image root.
+    rm -f "$root/etc/systemd/system/greetd.service.requires/ditto-firstboot-account-recover.service"
+    chroot "$root" systemctl enable ditto-firstboot-account.socket ditto-firstboot-account-recover.service
 fi
 ln -sfn /dev/null "$root/etc/systemd/system/systemd-firstboot.service"
 chroot "$root" systemctl mask getty@tty1.service

@@ -1,0 +1,34 @@
+[Unit]
+Description=Create one Ditto first-boot administrator account
+Requires=ditto-firstboot-account.socket
+After=ditto-firstboot-account.socket
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/lib/ditto/ditto-firstboot-account
+TimeoutStartSec=120s
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/etc /home /var/lib/ditto/firstboot /var/mail
+PrivateNetwork=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+LimitCORE=0
+StandardInput=null
+StandardOutput=null
+StandardError=journal

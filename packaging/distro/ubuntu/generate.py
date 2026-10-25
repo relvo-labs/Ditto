@@ -11,6 +11,9 @@ import tarfile
 import tempfile
 from runtime_policy import validate
 
+FIRSTBOOT_UNITS = ("ditto-firstboot-account.socket", "ditto-firstboot-account.service",
+                   "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service")
+
 
 def digest(path):
     with path.open("rb") as stream:
@@ -88,16 +91,16 @@ def main():
         if (not all((source / n).is_dir() for n in needed) or
                 not (source / "tests/g0/input-method/fcitx5-profile").is_file()):
             parser.error("expected a source archive with repository paths at its root")
-        # TODO_FIRSTBOOT_ACCOUNT_PR_A: until PR A merges, keep the legacy
-        # login path buildable. A partial helper delivery must never activate UI.
+        # TODO_FIRSTBOOT_ACCOUNT_PR_A: retain the all-absent legacy path for
+        # older source archives. Merged sources require the complete delivery.
         firstboot = source / "packaging/distro/first-boot"
         helper_sources = [source / "crates/ditto-firstboot-account/Cargo.toml",
-                          firstboot / "units/ditto-firstboot-account.socket",
-                          firstboot / "units/ditto-firstboot-account.service",
+                          source / "crates/ditto-firstboot-account/UNICODE-NOTICE.txt",
+                          *(firstboot / "units" / unit for unit in FIRSTBOOT_UNITS),
                           firstboot / "tmpfiles.d/ditto-firstboot.conf"]
         helper_binary = "usr/lib/ditto/target/release/ditto-firstboot-account"
         enable_firstboot = (any(path.exists() or path.is_symlink() for path in helper_sources)
-                            or helper_binary in runtime_files)
+                            or helper_binary in runtime_files or helper_binary in runtime_links)
         if enable_firstboot and (not all(path.is_file() and not path.is_symlink() for path in helper_sources)
                                  or helper_binary not in runtime_files):
             parser.error("PR A firstboot artifacts incomplete: need helper binary, crate, units and tmpfiles")
@@ -162,11 +165,21 @@ exec /usr/local/libexec/ditto-session
                 ("fcitx5-profile", "usr/lib/ditto/firstboot-fcitx5-profile", 0o644)):
             put("extra/" + dest, (firstboot / name).read_text(), mode)
         if enable_firstboot:
-            for unit in ("ditto-firstboot-account.socket", "ditto-firstboot-account.service"):
+            for unit in FIRSTBOOT_UNITS:
                 put("extra/usr/lib/systemd/system/" + unit, (firstboot / "units" / unit).read_text())
+            put("extra/usr/share/doc/ditto-firstboot-account/UNICODE-NOTICE.txt",
+                (source / "crates/ditto-firstboot-account/UNICODE-NOTICE.txt").read_text())
             put("extra/usr/lib/tmpfiles.d/ditto-firstboot.conf",
                 (firstboot / "tmpfiles.d/ditto-firstboot.conf").read_text())
             (extra / "usr/lib/ditto/ditto-firstboot-account").symlink_to("target/release/ditto-firstboot-account")
+            # Match the real units' WantedBy. Recovery orders before greetd,
+            # but a recovery setup failure must not prevent existing login.
+            for target, unit in (("sockets.target", "ditto-firstboot-account.socket"),
+                                 ("sysinit.target", "ditto-firstboot-account-recover.service"),
+                                 ("greetd.service", "ditto-firstboot-account-recover.service")):
+                directory = extra / "etc/systemd/system" / (target + ".wants")
+                directory.mkdir(parents=True, exist_ok=True)
+                (directory / unit).symlink_to("/usr/lib/systemd/system/" + unit)
         greeter_command = ("/usr/lib/ditto/ditto-greeter" if enable_firstboot else
                            "/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session")
         put("extra/usr/share/ditto/firstboot-integration.json", json.dumps({

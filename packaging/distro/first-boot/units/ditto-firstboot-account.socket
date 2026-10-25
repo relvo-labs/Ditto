@@ -1,0 +1,17 @@
+[Unit]
+Description=Ditto first-boot account request socket
+ConditionPathExists=!/var/lib/ditto/firstboot/account-created
+Requires=ditto-firstboot-account-recover.service
+After=ditto-firstboot-account-recover.service
+
+[Socket]
+ListenStream=/run/ditto/firstboot-account.sock
+SocketUser=root
+SocketGroup=_greetd
+SocketMode=0660
+DirectoryMode=0755
+Accept=no
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

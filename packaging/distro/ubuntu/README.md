@@ -45,7 +45,7 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 
 | 輸入位置 | 來源／建置要求 |
 | --- | --- |
-| `usr/lib/ditto/target/release/` | 必備 Core、worker、confine、supervisor、dittoctl、test-host、D-Bus proxy、固定 generation runner；native 依 `rust-toolchain.toml`／Cargo.lock 建置，以 compiler path remap（例如 rustc `--remap-path-prefix`）把 source、Cargo registry、toolchain 與建置目錄映射為中性路徑，保留固定 runner 的 Qt pkg-config 建置路徑 |
+| `usr/lib/ditto/target/release/` | 必備 Core、worker、confine、supervisor、dittoctl、test-host、D-Bus proxy、固定 generation runner；含 #213 的來源另須 firstboot-account helper；native 依 `rust-toolchain.toml`／Cargo.lock 建置，以 compiler path remap（例如 rustc `--remap-path-prefix`）把 source、Cargo registry、toolchain 與建置目錄映射為中性路徑，保留固定 runner 的 Qt pkg-config 建置路徑 |
 | `usr/lib/ditto/packages/{host-runtime,agent-runtime}/dist/` | 同 source 的 pnpm frozen-lockfile bundle；保留 bundle 的上游 notice |
 | `usr/lib/ditto/target/ditto-packages/` | `scripts/build-builtin-packages.sh` 的正式包；不得加入驗證 relay 或故障夾具 |
 | `usr/bin/quickshell`、`usr/bin/wayfire`、指定 Wayfire libraries／plugins、`usr/share/wayfire/` | 固定 Quickshell rev `1a4716c…`、Wayfire `d399023…`；系統 libdir 只接受 `libwf-{config,utils,touch,json}.so*`、`libwlroots-0.20.so*` 的數字版本及 Wayfire plugin `.so`，不接受 libc／Qt 等其他 distro libraries；編譯時用中性 source 路徑。Wayfire lock 來源為 `packaging/reference-image/source-builds.lock`，相依版本若調整須在 D04 明列 |
@@ -117,9 +117,12 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 wrapper、Wayfire 設定與 Chewing profile。`TODO_FIRSTBOOT_ACCOUNT_PR_A` 讓 PR B 先合併時
 仍可建置：PR A 來源 artifacts 全不存在時，greetd 保留舊 agreety，並在映像
 `/usr/share/ditto/firstboot-integration.json` 明記未啟用。只要出現 PR A 任一 artifact，
-就必須具備 crate、兩個 unit、tmpfiles 與同來源 runtime-lock 的 helper binary；不齊即在
+就必須具備 crate、Unicode NOTICE、四個 unit（socket、service、recover、tty）、tmpfiles 與同來源 runtime-lock 的 helper binary；不齊即在
 建立 output 前拒絕。齊備時命令改為 `/usr/lib/ditto/ditto-greeter`，finalizer 啟用
-`ditto-firstboot-account.socket`。這不是在 PR B 內提供假 helper。
+`ditto-firstboot-account.socket` 與 `ditto-firstboot-account-recover.service`。generator 按實際 unit 建立
+`sockets.target.wants`、`sysinit.target.wants` 與 `greetd.service.wants`；recovery 的
+`Before=greetd.service` 不可改成 greetd 的 Requires。finalizer 移除舊 recovery `.requires` link。
+TTY unit 僅安裝，不預設啟用。這不是在 PR B 內提供假 helper。
 
 新增 `fcitx5-chewing`（台灣注音）、`at-spi2-core`、`orca`、`speech-dispatcher`，
 精確套件版本／授權與完整 closure 尚待同 snapshot 新映像的 dpkg manifest 回讀。
@@ -133,4 +136,7 @@ Socket／greetd／PAM 真實協定、GPU／pixman／無 DRM、fcitx5 中文提�
 
 整合 #213／#214 後，須從同一來源重建 helper 並更新 runtime lock，使其列入
 `usr/lib/ditto/target/release/ditto-firstboot-account`；舊 lock 缺件會失敗。
+runtime admission／lock 工具已支援該路徑，端到端 producer 仍由 D04 提供；本次未重建 runtime、
+更動 lock hash 或建置真實映像。PR A 的 `--tty` 為 root-only，現有 `_greetd` wrapper
+直接呼叫會被拒絕；須另完成 root TTY unit 啟動與 greetd／tty1 交接，才可接受無 DRM 保底。
 登入後須在 VM 確認沒有殘留 `_greetd` 程序，包含 Orca、AT-SPI 與 speech-dispatcher。

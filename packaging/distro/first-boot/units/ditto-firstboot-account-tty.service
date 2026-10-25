@@ -1,0 +1,42 @@
+[Unit]
+Description=Ditto first-boot account text fallback on tty1
+ConditionPathExists=!/var/lib/ditto/firstboot/account-created
+Requires=ditto-firstboot-account-recover.service
+After=ditto-firstboot-account-recover.service
+Conflicts=greetd.service getty@tty1.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/lib/ditto/ditto-firstboot-account --tty
+# Human input has no deadline. Account transaction recovery still uses pending.
+TimeoutStartSec=infinity
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/etc /home /var/lib/ditto/firstboot /var/mail
+PrivateNetwork=yes
+PrivateTmp=yes
+# The root fallback needs the real controlling tty; PrivateDevices would hide it.
+PrivateDevices=no
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+LimitCORE=0
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+SendSIGHUP=yes
