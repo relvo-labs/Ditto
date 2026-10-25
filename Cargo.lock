@@ -301,6 +301,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ditto-firstboot-account"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ditto-generation"
 version = "0.1.0"
 dependencies = [
