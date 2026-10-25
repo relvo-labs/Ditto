@@ -11,7 +11,7 @@ commit="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourc
 printf '\nDITTO_SOURCE_COMMIT=%s\n' "$commit" >> "$root/usr/lib/os-release"
 printf 'ditto\n' > "$root/etc/hostname"
 printf 'LANG=C.UTF-8\n' > "$root/etc/locale.conf"
-printf '/dev/disk/by-partlabel/ditto-esp /boot vfat defaults 0 2\n' > "$root/etc/fstab"
+printf '/dev/disk/by-partlabel/ditto-esp /boot vfat umask=0077 0 2\n' > "$root/etc/fstab"
 ln -sfn /run/systemd/resolve/stub-resolv.conf "$root/etc/resolv.conf"
 # Package postinst may generate these. Ship no machine-specific host keys/seed.
 rm -f "$root"/etc/ssh/ssh_host_*key* "$root/var/lib/systemd/random-seed"

@@ -6,7 +6,7 @@
 
 ## 最短建置路徑
 
-在另行準備的可丟棄 Ubuntu 26.04 amd64 builder 執行，使用 mkosi `26-3`、Python ≥3.12、bash、util-linux、systemd-boot、dpkg、tar。需要 root 的 mkosi／loop mount 僅在該 builder 內執行。這裡不建立 builder、啟動測試環境或下載私人 cache。
+在另行準備的可丟棄 Ubuntu 26.04 amd64 builder 執行，使用 mkosi `26-3`、Python ≥3.12、bash、util-linux、systemd-boot（builder 的 `bootctl` 須 ≥257）、dpkg、tar。需要 root 的 mkosi／loop mount 僅在該 builder 內執行。這裡不建立 builder、啟動測試環境或下載私人 cache。
 
 先備妥兩項輸入：
 
@@ -37,7 +37,7 @@ sudo timeout 120s bash "$recipe/finish-image.sh" "$build_dir" --forbid "$PWD"
 
 `--output` 必須不存在；用新目錄建立下一版。source tar 的獨立可信 hash 不符、PAX comment 與宣告 commit 不符、runtime 缺檔／digest 不符、pin／snapshot 不一致即停止。PAX comment 只是 archive 的身分一致性檢查，可被偽造；不取代可信來源與獨立核對的 digest。mkosi 套件取得需可用的 snapshot mirror 或預載 cache；本輪沒有執行這一步。`packages.txt` 的 kernel 與 snapshot 是 PoC 鎖；變更 snapshot 時 D02／D04 必須一起核對 kernel／Qt／runtime lock，不代表可任意替換。
 
-成品在 `out/ditto.raw`，另有 mkosi JSON manifest／split partitions／UKI、`packages.tsv`、`pristine-scan.json` 與 `disk.sha256`。finish 步驟會修改 ESP 安裝 fallback EFI，**以完成後 disk hash 為準**；不要使用完成前 mkosi disk checksum 對外發布。每版 lock 同存於映像 `/usr/share/ditto/`。
+成品在 `out/ditto.raw`，另有 mkosi JSON manifest／split partitions／UKI、`packages.tsv`、`pristine-scan.json`、`boot-tool-versions.txt` 與 `disk.sha256`。版本紀錄包含 builder 的 `bootctl --version` 與由映像 dpkg DB 回讀的 systemd 套件版本；`bootctl --root` 仍執行 builder 的 binary。finish 步驟會修改 ESP 安裝 fallback EFI，**以完成後 disk hash 為準**；不要使用完成前 mkosi disk checksum 對外發布。每版 lock 同存於映像 `/usr/share/ditto/`。
 
 ## Runtime tree 與來源責任
 
@@ -65,9 +65,9 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 
 `repart.d/` 維持 ESP＋writable state＋versioned read-only `/usr`＋empty slot。`finalize.sh` 預先整合 tty1 getty conflict 與 greetd PAM Wayland type；generator 保留 udev settle，另以 `wait-drm` 最多等待 30 秒，確認任一 `card[0-9]+` 有 backing device；不固定 PCI／vendor／card 編號，逾時直接使 greetd 啟動失敗。這是可攜化的實際 readiness wait，尚未證明與原 UAT boot 行為等價。`finish-image.sh` 驗 partition labels，唯讀掛載 `/usr`，用 `bootctl --no-variables` 安裝 `EFI/BOOT/BOOTX64.EFI`，不寫 builder EFI NVRAM。不再執行舊 run 的事後 boot patch。
 
-沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清除 machine-id／random seed；D06 尚須提供首次帳號建立，直接開機只有登入提示，尚無可用帳號。這不是安裝器。
+沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清空 machine-id，移除 rootfs 的 `var/lib/systemd/random-seed` 與 ESP 的 `boot/loader/random-seed`；finish 以 `bootctl install --random-seed=no` 避免產生 seed，另刪除 mkosi 已寫入的 ESP seed，確認不存在（含懸空 symlink），失敗即中止。開機時由既有 `systemd-random-seed.service`／`systemd-boot-random-seed.service` 分別管理 rootfs／ESP seed，不新增服務。fstab 與 finish 階段均以 `umask=0077` 掛載 ESP，只限 root 存取。這些是 source 契約，修正後映像尚未重建；首次開機 seed 服務實際成功執行、生成非空且各機不同的 ESP seed，以及 root-only 權限仍待 #207 開機回讀。D06 尚須提供首次帳號建立，直接開機只有登入提示，尚無可用帳號。這不是安裝器。
 
-scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作者／checkout 路徑，全檔比對；預設檢查具名 home 與 build producer 路徑，允許 AppArmor 等 distro 使用的泛用 `/home/` tunable，不按檔名全面排除。報告只輸出路徑／hash，不輸出檔案內容。帳號檢查採 passwd／shadow 聯合驗證：`etc/passwd` 與 `etc/shadow` 均須包含 root、帳號集合必須一致，任一缺檔、不可讀、非 regular file、檔案或 parent symlink、重複帳號、密碼欄位空值／active credential／格式錯誤均失敗；passwd 可用 `x` 指向 shadow，shadow 則只接受真正鎖定的密碼欄位。host keys、authorized keys、known-hosts、非空 machine-id／random seed、greetd／getty／GDM 等 active autologin、sudoers（包含 include）免密規則、未核准完整 PEM key blocks 或讀取錯誤也均失敗。未結構化或其他格式秘密仍需 D11／D12 供應鏈掃描，不將此掃描當完整保證。
+scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作者／checkout 路徑，全檔比對；預設檢查具名 home 與 build producer 路徑，允許 AppArmor 等 distro 使用的泛用 `/home/` tunable，不按檔名全面排除。報告只輸出路徑／hash，不輸出檔案內容。帳號檢查採 passwd／shadow 聯合驗證：`etc/passwd` 與 `etc/shadow` 均須包含 root、帳號集合必須一致，任一缺檔、不可讀、非 regular file、檔案或 parent symlink、重複帳號、密碼欄位空值／active credential／格式錯誤均失敗；passwd 可用 `x` 指向 shadow，shadow 則只接受真正鎖定的密碼欄位。host keys、authorized keys、known-hosts、非空 machine-id、rootfs／ESP random seed（含空檔）、greetd／getty／GDM 等 active autologin、sudoers（包含 include）免密規則、未核准完整 PEM key blocks 或讀取錯誤也均失敗。ESP seed 的懸空 symlink、指向檔案或目錄的 symlink 與實體目錄也列入 identity 拒絕，不讀取 link 的外部目標。未結構化或其他格式秘密仍需 D11／D12 供應鏈掃描，不將此掃描當完整保證。
 
 `etc/systemd/system/` 與 `usr/lib/systemd/system/` 下的 unit symlink 只在映像 root 內逐 component 解析，不讀 builder 的同名路徑：絕對目標從映像 root 起算；merged-/usr 的 `lib -> usr/lib` 等 parent symlink 先展開，再處理其後的 `..`；獨立的實體 `lib/` 讀它自己的內容。整條鏈的 parent 與 leaf symlink 合計最多跟隨 40 次，不逐層重設。越界、循環、超限、懸空、中間 component 不是目錄、終點不是 regular file（FIFO 不開啟）或讀取錯誤，都列入 `authentication_config` 並使 scan 失敗，報告不輸出例外文字。只有 leaf 精確指向 `/dev/null` 才視為 mask；經 alias 抵達的 autologin／`login -f` 內容仍拒絕。
 

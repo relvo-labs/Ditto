@@ -8,6 +8,14 @@ build_dir="$(realpath "$1")"
 shift
 image="$build_dir/out/ditto.raw"
 [[ -f "$image" ]]
+# --root selects the target tree, not its bootctl executable. The builder's
+# bootctl must support --random-seed=no (introduced in systemd 257).
+bootctl_version="$(bootctl --version)"
+printf 'Builder bootctl:\n%s\n' "$bootctl_version" > "$build_dir/out/boot-tool-versions.txt"
+if [[ ! "$bootctl_version" =~ ^systemd[[:space:]]+([0-9]+) ]] || (( BASH_REMATCH[1] < 257 )); then
+    echo 'builder bootctl >=257 is required; see out/boot-tool-versions.txt' >&2
+    exit 2
+fi
 mount_dir="$(mktemp -d)"
 loop_device="$(losetup --find --show --partscan "$image")"
 cleanup() {
@@ -27,11 +35,19 @@ trap cleanup EXIT
 [[ "$(blkid -s PARTLABEL -o value "${loop_device}p4")" == _empty ]]
 mount "${loop_device}p2" "$mount_dir"
 mount -o ro "${loop_device}p3" "$mount_dir/usr"
-mount "${loop_device}p1" "$mount_dir/boot"
+mount -o umask=0077 "${loop_device}p1" "$mount_dir/boot"
+printf '\nImage systemd package:\n' >> "$build_dir/out/boot-tool-versions.txt"
+dpkg-query --admindir="$mount_dir/var/lib/dpkg" -W -f='${binary:Package}\t${Version}\n' systemd >> "$build_dir/out/boot-tool-versions.txt"
+cat "$build_dir/out/boot-tool-versions.txt"
 # tty conflict and bounded DRM readiness live in the generator, before splitting.
 # No post-build /usr patch: split payloads must match the disk.
 python3 "$here/apply-runtime.py" --root "$mount_dir" --runtime-lock "$mount_dir/usr/share/ditto/runtime-lock.json"
-bootctl --root="$mount_dir" --esp-path=/boot --no-variables install
+bootctl --root="$mount_dir" --esp-path=/boot --no-variables --random-seed=no install
+# mkosi may already have written an ESP seed. Never ship a shared seed,
+# including a dangling link; rm failure or any remaining entry aborts finish.
+esp_seed="$mount_dir/boot/loader/random-seed"
+rm -f "$esp_seed"
+[[ ! -e "$esp_seed" && ! -L "$esp_seed" ]]
 test -s "$mount_dir/boot/EFI/BOOT/BOOTX64.EFI"
 find "$mount_dir/boot/EFI/Linux" -maxdepth 1 -name '*.efi' -type f -print -quit | grep -q .
 dpkg-query --admindir="$mount_dir/var/lib/dpkg" -W > "$build_dir/out/packages.tsv"

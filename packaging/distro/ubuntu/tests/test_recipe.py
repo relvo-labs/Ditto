@@ -250,6 +250,141 @@ class RecipeTests(unittest.TestCase):
     def test_clean_locked(self):
         self.scan()
 
+    def test_esp_seed_leaf_types_rejected(self):
+        rel = "boot/loader/random-seed"
+        for kind in ("regular", "empty", "dangling", "file-link", "directory-link", "directory"):
+            with self.subTest(kind=kind):
+                image = self.pristine_image("esp-" + kind)
+                seed = image / rel
+                seed.parent.mkdir(parents=True)
+                if kind in ("regular", "empty"):
+                    seed.write_bytes(b"synthetic seed\n" if kind == "regular" else b"")
+                elif kind == "directory":
+                    seed.mkdir()
+                else:
+                    # External task-owned targets must never be read or walked.
+                    target = self.root / ("outside-" + kind)
+                    if kind == "file-link":
+                        target.write_text("forbidden-seed-target")
+                    elif kind == "directory-link":
+                        target.mkdir()
+                        (target / "sentinel").write_text("forbidden-seed-target")
+                    seed.symlink_to(os.path.relpath(target, seed.parent))
+                report = self.scan(1, ("--forbid", "forbidden-seed-target"), image=image)
+                self.assertEqual(report["identity_files"], [rel])
+                self.assertEqual(report["literal_matches"], [])
+                self.assertEqual(report["errors"], [])
+                if kind.endswith("link"):
+                    self.assertEqual(report["regular_files"], 3)
+
+    def test_esp_seed_absent_and_rootfs_controls(self):
+        image = self.root / "image"
+        self.put("boot/loader/unrelated-seed", "unrelated bytes\n", image)
+        self.put("etc/machine-id", "", image)
+        self.assertEqual(self.scan()["identity_files"], [])
+        rel = "var/lib/systemd/random-seed"
+        seed = image / rel
+        seed.parent.mkdir(parents=True)
+        for kind in ("regular", "empty", "dangling", "file-link"):
+            with self.subTest(kind=kind):
+                if kind in ("regular", "empty"):
+                    seed.write_bytes(b"synthetic rootfs seed\n" if kind == "regular" else b"")
+                else:
+                    seed.symlink_to("missing" if kind == "dangling" else "../../../boot/loader/unrelated-seed")
+                try:
+                    self.assertEqual(self.scan(1)["identity_files"], [rel])
+                finally:
+                    seed.unlink()
+        self.assertEqual(self.scan()["identity_files"], [])
+
+    def test_generated_esp_fstab_root_only(self):
+        output, _ = self.generate()
+        image = self.root / "image"
+        for rel in ("etc/ssh", "var/lib/dbus", "etc/systemd/system", "etc/pam.d"):
+            (image / rel).mkdir(parents=True, exist_ok=True)
+        self.put("etc/pam.d/greetd", "# synthetic PAM\n", image)
+        # Run the generated finalizer with only runtime audit/chroot stubbed;
+        # all its writes stay in the task-owned build root.
+        script = '''
+python3() { if [[ "$1" == -c ]]; then echo synthetic-source-commit; fi; return 0; }
+chroot() { return 0; }
+source "$1"
+'''
+        result = subprocess.run(["bash", "-c", script, "finalize-test", str(output / "finalize.sh")],
+                                env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
+                                text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((image / "etc/fstab").read_text().split(),
+                         ["/dev/disk/by-partlabel/ditto-esp", "/boot", "vfat", "umask=0077", "0", "2"])
+
+    def test_finish_esp_mount_and_version_contract(self):
+        text = (RECIPE / "finish-image.sh").read_text()
+        mount = next(line for line in text.splitlines() if '"${loop_device}p1"' in line and line.startswith("mount "))
+        self.assertIn("-o umask=0077", mount)
+        self.assertIn("bootctl --version", text)
+        self.assertRegex(text, r"dpkg-query[^\n]*--admindir=[^\n]*systemd")
+        self.assertIn("boot-tool-versions.txt", text)
+
+    def test_finish_seed_cleanup_and_failure_paths(self):
+        text = (RECIPE / "finish-image.sh").read_text()
+        # Exercise the real install/cleanup shell step without mounts, root or
+        # EFI access. bootctl is a recording stub; rm/test run on fixture files.
+        step = text[text.index("bootctl --root="):text.index('test -s "$mount_dir/boot/EFI/BOOT/BOOTX64.EFI"')]
+        self.assertIn("--random-seed=no", step)
+        for kind in ("regular", "empty", "dangling", "file-link", "directory-link", "absent",
+                     "remove-fails", "remove-noop", "dangling-noop", "install-fails", "directory"):
+            with self.subTest(kind=kind):
+                image = self.root / ("finish-" + kind)
+                seed = image / "boot/loader/random-seed"
+                seed.parent.mkdir(parents=True)
+                outside = self.put("finish-target-" + kind + "/sentinel", "untouched\n", self.root)
+                if kind in ("dangling", "dangling-noop"):
+                    seed.symlink_to("missing")
+                elif kind in ("file-link", "directory-link"):
+                    seed.symlink_to(outside if kind == "file-link" else outside.parent)
+                elif kind == "directory":
+                    seed.mkdir()
+                elif kind != "absent":
+                    seed.write_bytes(b"" if kind == "empty" else b"synthetic seed\n")
+                log = self.root / (kind + "-bootctl.args")
+                prefix = '''set -euo pipefail
+mount_dir="$1"
+bootctl_log="$2"
+bootctl() { printf '%s\\n' "$@" > "$bootctl_log"; }
+'''
+                if kind == "install-fails":
+                    prefix += 'bootctl() { return 41; }\n'
+                elif kind == "remove-fails":
+                    prefix += 'rm() { return 42; }\n'
+                elif kind in ("remove-noop", "dangling-noop"):
+                    prefix += 'rm() { return 0; }\n'
+                result = call("bash", "-c", prefix + step, "finish-test", image, log)
+                failed = kind in {"remove-fails", "remove-noop", "dangling-noop", "install-fails", "directory"}
+                self.assertEqual(result.returncode != 0, failed, result.stderr)
+                if not failed:
+                    self.assertFalse(seed.exists() or seed.is_symlink())
+                    self.assertEqual(log.read_text().splitlines(),
+                                     [f"--root={image}", "--esp-path=/boot", "--no-variables", "--random-seed=no", "install"])
+                self.assertEqual(outside.read_text(), "untouched\n")
+
+    def test_finish_builder_bootctl_version_gate(self):
+        text = (RECIPE / "finish-image.sh").read_text()
+        self.assertIn("bootctl_version=", text)
+        preflight = text[text.index("bootctl_version="):text.index("mount_dir=")]
+        for version, success in (("systemd 257 (257.9)", True), ("systemd 259 (259.9)", True),
+                                 ("systemd 256 (256.9)", False), ("unexpected", False), ("", False)):
+            with self.subTest(version=version):
+                build = self.root / f"bootctl-version-{next(self.counter)}"
+                (build / "out").mkdir(parents=True)
+                prefix = '''set -euo pipefail
+build_dir="$1"
+version="$2"
+bootctl() { [[ "$*" == --version ]]; printf '%s\\n' "$version"; }
+'''
+                result = call("bash", "-c", prefix + preflight, "version-test", build, version)
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+                self.assertIn(version, (build / "out/boot-tool-versions.txt").read_text())
+
     def test_empty_root_passwd_with_locked_shadow(self):
         self.put("etc/passwd", "root::0:0:root:/root:/bin/bash\n", self.root / "image")
         report = self.scan(1)
