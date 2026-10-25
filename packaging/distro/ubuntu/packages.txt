@@ -76,6 +76,10 @@ libxml2-16
 libevdev2
 liblcms2-2
 libgtk-3-0t64
+# Quickshell needs libunwind.so.8; first real target readback reported it missing.
+# Snapshot owner: libunwind8:amd64 1.8.3-0ubuntu1. Installed as a target package,
+# never copied into the runtime tree.
+libunwind8
 libxcb-randr0
 libxfixes3
 libxcb-shape0

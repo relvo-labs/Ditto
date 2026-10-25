@@ -141,34 +141,135 @@ def check_sudo_includes(root, report):
             report["authentication_config"].append(rel)
 
 
+# Symlinks followed across one whole unit alias chain, parent and leaf
+# components together; never reset per component (Linux MAXSYMLINKS).
+UNIT_ALIAS_MAX_HOPS = 40
+
+
 def unit_link_contents(root, rel):
-    """Read unit aliases inside the image; /dev/null is a systemd mask."""
-    current = rel
-    seen = set()
-    for _ in range(64):
-        if current in seen:
-            raise ValueError("unit alias cycle")
-        seen.add(current)
-        path = root / current
-        if any(parent.is_symlink() for parent in path.parents if parent != root):
-            raise ValueError("unit alias parent symlink")
-        if not path.is_symlink():
-            return path.read_bytes()
-        target = path.readlink().as_posix()
-        if target == "/dev/null":
-            return b""
-        parts = [] if target.startswith("/") else list(Path(current).parent.parts)
-        for part in target.split("/"):
-            if part in ("", "."):
-                continue
-            if part == "..":
-                if not parts:
-                    raise ValueError("unit alias outside image")
-                parts.pop()
-            else:
-                parts.append(part)
-        current = "/".join(parts)
-    raise ValueError("unit alias depth")
+    """Read a unit alias in IMAGE coordinates; exact leaf /dev/null is a mask.
+
+    Every component is resolved under root, including merged-/usr parent links
+    such as lib -> usr/lib: an absolute target restarts at the image root, never
+    at the host's. A parent link is expanded before any following '..'. Escapes,
+    cycles/over-long chains, dangling or missing components and non-regular
+    destinations raise; types are checked before opening, so a FIFO is never
+    opened. OSError propagates for the caller to report without its text.
+    """
+    pending, parts, hops = rel.split("/"), [], 0
+    while pending:
+        part = pending.pop(0)
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError("unit alias outside image")
+            parts.pop()
+            continue
+        path = root.joinpath(*parts, part)
+        mode = os.lstat(path).st_mode
+        if stat.S_ISLNK(mode):
+            hops += 1
+            if hops > UNIT_ALIAS_MAX_HOPS:
+                raise ValueError("unit alias cycle/depth")
+            target = os.readlink(path)
+            if not pending and target == "/dev/null":
+                return b""
+            if target.startswith("/"):
+                parts = []
+            pending = target.split("/") + pending
+        elif pending and not stat.S_ISDIR(mode):
+            raise ValueError("unit alias component is not a directory")
+        elif not pending and not stat.S_ISREG(mode):
+            raise ValueError("unit alias destination is not a regular file")
+        else:
+            parts.append(part)
+    if not parts:
+        raise ValueError("unit alias destination is not a regular file")
+    descriptor = os.open(root.joinpath(*parts),
+                         os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    with open(descriptor, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("unit alias destination is not a regular file")
+        return stream.read()
+
+
+# Exact public producer-path fixtures (#205 owner decision): only a regular file
+# whose image path AND complete bytes equal one manifest entry has its
+# producer-path hit reported as public instead of literal. Every other check
+# still runs on those bytes.
+PUBLIC_PRODUCER_MANIFEST = "public-producer-path-fixtures.json"
+# Ditto's own install locations hold Ditto-built bytes: never registrable.
+OWNED_IMAGE_PREFIXES = ("usr/lib/ditto/", "usr/share/ditto/", "usr/share/doc/ditto-runtime/",
+                        "usr/local/libexec/")
+SOURCE_KINDS = {
+    "ubuntu-deb": ({"kind", "package", "version", "deb", "deb_sha256", "packages_index", "index_sha256"},
+                   "signed-snapshot-index"),
+    "upstream-archive": ({"kind", "name", "version", "url", "member", "archive_sha256", "shasums_url"},
+                         "https-shasums-pgp-unverified"),
+}
+SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def _unique_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_constant(_name):
+    raise ValueError("non-finite JSON number")
+
+
+def canonical_image_path(path):
+    return (isinstance(path, str) and not path.startswith("/") and
+            not any(ord(char) < 32 or char in "\\\x7f" for char in path) and
+            all(part not in ("", ".", "..") for part in path.split("/")))
+
+
+def load_public_producer_fixtures(path):
+    """Return {image path: entry}; any missing, malformed or ambiguous data raises ValueError."""
+    def text(value):
+        return isinstance(value, str) and value != "" and value == value.strip()
+
+    try:
+        manifest = json.loads(path.read_bytes().decode("utf-8"), object_pairs_hook=_unique_keys,
+                              parse_constant=_reject_constant)
+    except (OSError, UnicodeError, RecursionError) as error:
+        raise ValueError("manifest unreadable") from error
+    if (not isinstance(manifest, dict) or set(manifest) != {"schema", "authority", "entries"} or
+            type(manifest["schema"]) is not int or manifest["schema"] != 1 or
+            not text(manifest["authority"]) or
+            not isinstance(manifest["entries"], list) or not manifest["entries"]):
+        raise ValueError("manifest structure")
+    fixtures = {}
+    for entry in manifest["entries"]:
+        if (not isinstance(entry, dict) or
+                set(entry) != {"path", "sha256", "bytes", "source", "verification", "classification"}):
+            raise ValueError("entry fields")
+        path_value, source, verification = entry["path"], entry["source"], entry["verification"]
+        if (not canonical_image_path(path_value) or path_value in fixtures or
+                (path_value + "/").startswith(OWNED_IMAGE_PREFIXES)):
+            raise ValueError("entry path not canonical, duplicated or Ditto-owned")
+        if (not isinstance(entry["sha256"], str) or not SHA256_HEX.fullmatch(entry["sha256"]) or
+                type(entry["bytes"]) is not int or entry["bytes"] <= 0 or
+                not text(entry["classification"])):
+            raise ValueError("entry digest, size or classification")
+        kind = source.get("kind") if isinstance(source, dict) else None
+        if not isinstance(kind, str) or kind not in SOURCE_KINDS or set(source) != SOURCE_KINDS[kind][0]:
+            raise ValueError("entry source")
+        if not all(text(value) for value in source.values()) or not all(
+                SHA256_HEX.fullmatch(source[key]) for key in source if key.endswith("_sha256")):
+            raise ValueError("entry source values")
+        if (not isinstance(verification, dict) or set(verification) != {"level", "detail"} or
+                not isinstance(verification["level"], str) or
+                verification["level"] != SOURCE_KINDS[kind][1] or not text(verification["detail"])):
+            raise ValueError("entry verification")
+        fixtures[path_value] = entry
+    return fixtures
 
 
 def main():
@@ -190,8 +291,15 @@ def main():
     private = re.compile(rb"-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----\r?\n"
                          rb"(?:[A-Za-z0-9+/=]+\r?\n){2,}-----END \1-----")
     report = {"regular_files": 0, "bytes_scanned": 0, "literal_matches": [],
-              "unapproved_keys": [], "public_fixtures": [], "identity_files": [],
-              "authentication_config": [], "errors": []}
+              "unapproved_keys": [], "public_fixtures": [], "public_producer_fixtures": [],
+              "identity_files": [], "authentication_config": [], "errors": []}
+    try:
+        producer_fixtures = load_public_producer_fixtures(Path(__file__).parent / PUBLIC_PRODUCER_MANIFEST)
+    except ValueError:
+        # Fail closed: nothing is classified and the scan cannot succeed.
+        producer_fixtures = {}
+        report["errors"].append({"file": PUBLIC_PRODUCER_MANIFEST,
+                                 "error": "public producer fixture manifest missing, unreadable or invalid"})
     for required in ("usr/lib/os-release",):
         if not (root / required).is_file():
             report["errors"].append({"file": required, "error": "required pristine root file missing"})
@@ -233,8 +341,17 @@ def main():
                 data = path.read_bytes()
                 report["regular_files"] += 1
                 report["bytes_scanned"] += len(data)
-                if any(term in data for term in terms) or producer_path.search(data):
+                if any(term in data for term in terms):
                     report["literal_matches"].append(rel)
+                elif producer_path.search(data):
+                    fixture = producer_fixtures.get(rel)
+                    if (fixture and len(data) == fixture["bytes"] and
+                            hashlib.sha256(data).hexdigest() == fixture["sha256"]):
+                        report["public_producer_fixtures"].append({
+                            "file": rel, "sha256": fixture["sha256"], "source": fixture["source"],
+                            "verification": fixture["verification"]["level"]})
+                    else:
+                        report["literal_matches"].append(rel)
                 if authentication_path(rel) and unsafe_authentication(rel, data):
                     report["authentication_config"].append(rel)
                 hashes = {hashlib.sha256(m.group()).hexdigest() for m in private.finditer(data)}
