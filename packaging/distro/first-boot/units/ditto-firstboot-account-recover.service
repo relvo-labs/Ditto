@@ -40,5 +40,5 @@ StandardOutput=null
 StandardError=journal
 
 [Install]
-RequiredBy=greetd.service
-WantedBy=sysinit.target
+# Login must survive recovery unit setup failure as well as helper failure.
+WantedBy=sysinit.target greetd.service

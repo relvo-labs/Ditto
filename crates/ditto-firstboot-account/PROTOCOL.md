@@ -17,11 +17,13 @@
 
 | 欄位 | 規則 |
 | --- | --- |
-| `display_name` | 可留空；最多 128 個 Unicode scalar、且最多 512 UTF-8 bytes。拒絕所有 Unicode 控制字元與 `:`、`,`、`=`（包括 NUL、LF、CR、Tab）。不靜默修改使用者輸入。 |
+| `display_name` | 可留空；最多 128 個 Unicode scalar、且最多 512 UTF-8 bytes。拒絕 Unicode 17.0 的 Cc（控制）、Cf（格式）、Zl（行分隔）、Zp（段分隔）及 `:`、`,`、`=`，包括 NUL、LF、CR、Tab、U+202E、U+200B、U+2028、U+FEFF。採**拒絕**而非去除；不靜默修改使用者輸入。 |
 | `username` | `^[a-z][a-z0-9-]{0,30}$`；不得與既有使用者、群組、subuid/subgid 條目或 `/home/<name>`、`/var/mail/<name>` 重名，也不得是保留名稱。 |
-| `password` | 至少 8 個 Unicode scalar；最多 **511 UTF-8 bytes**（配合 libxcrypt 的 512-byte 含 NUL 上限）。拒絕 NUL、LF、CR；接受其他字元與合法 JSON escapes。 |
+| `password` | 至少 8 個 Unicode scalar values（不是 UTF-16 units 或 bytes）；最多 **511 UTF-8 bytes**（配合 libxcrypt 的 512-byte 含 NUL 上限）。拒絕 NUL、LF、CR；接受其他字元與合法 JSON escapes。 |
 
-保留名稱的權威清單在 [input.rs](src/input.rs) 的 `RESERVED`：系統／服務帳號、管理與裝置群組（例如 `root`、`sudo`、`admin`、`wheel`、`nobody`、`greetd`、`ditto`、`firstboot`）。`_greetd` 本身不符合名稱格式。
+保留名稱的權威清單在 [input.rs](src/input.rs) 的 `RESERVED` 與 `RESERVED_PREFIXES`：系統／服務帳號、管理與裝置群組（例如 `root`、`sudo`、`admin`、`wheel`、`nobody`、`greetd`、`ditto`、`firstboot`）。同時保留所有 `systemd-*`、`_*` 前綴名稱，以及 `pipewire`、`avahi`、`kvm`、`lpadmin`、`dialout`、`cdrom`、`lxd`、`sambashare` 等常見系統名稱；`_*` 本身也不符合目前名稱格式。
+
+PR B 的長度檢查必須以 Unicode scalar values 計數。`🙂🙂🙂🙂` 是 **4 個 scalar、8 個 UTF-16 units、16 UTF-8 bytes**，必須回 `password_too_short`；`🙂🙂🙂🙂🙂🙂🙂🙂` 才是 8 個 scalar，可建立並顯示弱密碼警告。合法字串可用 JavaScript 的 `Array.from(password).length` 計數，不能用 `password.length`；仍須拒絕不成對 surrogate／非法 UTF-8。顯示名稱也必須依上述分類先檢查，不要自行 strip 字元。
 
 JSON 範例中的密碼位置應由使用者輸入的值取代；不得把請求印到日誌：
 
@@ -37,7 +39,7 @@ JSON 範例中的密碼位置應由使用者輸入的值取代；不得把請求
 {"ok":true,"weak_password":false}
 ```
 
-`weak_password` 只供畫面顯示警告，**不得阻止建立或登入**。符合任一條件即為 `true`：少於 12 個 Unicode scalar；小寫、大寫、數字、非英數四類中不足兩類；或不分 ASCII 大小寫，完全等於 `password`、`password123`、`12345678`、`123456789`、`qwerty123`、`letmein123`。這是簡單提示，不是密碼安全評分。
+`weak_password` 只供畫面顯示警告，**不得阻止建立或登入**。通過密碼長度與字元驗證後，只符合以下任一條件即為 `true`：少於 12 個 Unicode scalar；或小寫、大寫、數字、非英數四類中不足兩類。分類採 Rust `char::is_lowercase`、`is_uppercase`、`is_numeric`、`!is_alphanumeric` 的 Unicode 語意，分別檢查是否至少出現一次；其他字元不會自動算成非英數。沒有另外比對 blocklist，因原清單全數已被長度規則涵蓋。`abcdefghijkl` 為弱，`Abcdefghijkl` 不觸發警告。這是簡單提示，不是密碼安全評分。
 
 失敗：
 
@@ -64,3 +66,9 @@ JSON 範例中的密碼位置應由使用者輸入的值取代；不得把請求
 收到成功後，PR B 用同一組帳號與密碼經 greetd／PAM 正式登入，再啟動 Ditto session；helper 不做登入、不設定自動登入。client 用完密碼應立即清除引用並退出 greeter。
 
 送出後失去回應不代表失敗。完成標記可能已提交；應讓 wrapper 重新判斷帳號狀態並提供登入，不能把第二次請求當作登入驗證。刪除完成標記也不允許建立第二個人員帳號。已啟動 socket 的 Condition 不會因標記出現而重新求值，因此每次交易仍在鎖內重查。
+
+完成標記與 stale pending 同時存在時，復原會在鎖內刪除 pending 並 fsync 目錄，絕不 userdel。`--recover` 在看到完成標記時即保證成功；以非阻塞方式嘗試清理，無法取得安全鎖或清理失敗不阻止登入。提交後與下次復原都會重試清理。
+
+標記缺失時，復原只允許回復 root pending 指定、仍符合 useradd 初始狀態的帳號：本機 passwd 為 `x`、UID 在人員範圍、home 為 `/home/<name>`、shell 為 `/bin/bash`，且唯一 shadow 條目的密碼欄**恰為 `!`**；本機與 NSS 不得有其他人員帳號。帳號尚不存在也可嘗試清理。任何已設定密碼的帳號（包含鎖住的 hash 或非 yescrypt hash）都受保護，不因 home／sudo 成員已變更而被刪除。
+
+因此「chpasswd 已完成、標記尚未提交」的中斷狀態也會保守保留：`--recover` 回 `internal_rollback_failed`、保留 pending 與帳號；新建請求回 `already_provisioned`，不建立替代管理員。須由 root 核對後處理紀錄，不能以重送請求或刪除標記強制重新建立。只有尚未設定密碼的真實 useradd 後中斷，才自動回復並重新建立。

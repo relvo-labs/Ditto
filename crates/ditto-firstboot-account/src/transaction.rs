@@ -147,6 +147,10 @@ pub struct Engine<T> {
     pub tools: T,
 }
 struct Lock(File);
+enum Recovery {
+    Ready,
+    ProtectedHuman,
+}
 impl Drop for Lock {
     fn drop(&mut self) {
         // SAFETY: the file is live until after Drop; unlocking has no memory effects.
@@ -170,6 +174,9 @@ impl<T: AccountTools> Engine<T> {
         self.root.join("var/lib/ditto/firstboot").join(name)
     }
     fn lock(&self) -> io::Result<Lock> {
+        self.lock_with(false)
+    }
+    fn lock_with(&self, nonblocking: bool) -> io::Result<Lock> {
         let dir = self.state("");
         // Check every ancestor inside the bound root before creating state.
         // A private final directory is insufficient if its parent can be renamed.
@@ -202,7 +209,13 @@ impl<T: AccountTools> Engine<T> {
             .open(self.state("lock"))?;
         loop {
             // SAFETY: f is a live descriptor; flock is process-safe on this file.
-            if unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX) } == 0 {
+            if unsafe {
+                libc::flock(
+                    f.as_raw_fd(),
+                    libc::LOCK_EX | if nonblocking { libc::LOCK_NB } else { 0 },
+                )
+            } == 0
+            {
                 break;
             }
             let e = io::Error::last_os_error();
@@ -233,7 +246,7 @@ impl<T: AccountTools> Engine<T> {
     fn remove_state(&self, name: &str) -> io::Result<()> {
         match fs::remove_file(self.state(name)) {
             Ok(()) => self.sync_dir(),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => self.sync_dir(),
             Err(e) => Err(e),
         }
     }
@@ -254,7 +267,9 @@ impl<T: AccountTools> Engine<T> {
     }
     fn transact(&self, request: &Request, log: &mut dyn Write) -> Result<bool, Code> {
         let _lock = self.lock().map_err(internal)?;
-        self.recover_locked(log)?;
+        if matches!(self.recover_locked(log)?, Recovery::ProtectedHuman) {
+            return Err(Code::AlreadyProvisioned);
+        }
         if exists(&self.state("account-created")).map_err(internal)? {
             return Err(Code::AlreadyProvisioned);
         }
@@ -315,9 +330,7 @@ impl<T: AccountTools> Engine<T> {
         }
         // The durable marker is the commit point. Failure to unlink pending must
         // not delete a committed account; recovery gives the marker precedence.
-        if self.remove_state("pending").is_err() {
-            phase(log, "pending_cleanup", "deferred");
-        }
+        self.finish_committed_pending(log);
         Ok(weak)
     }
     fn sync_databases(&self) -> io::Result<()> {
@@ -450,16 +463,40 @@ impl<T: AccountTools> Engine<T> {
         phase(log, "rollback", code.as_str());
         code
     }
-    pub fn recover(&self, log: &mut dyn Write) -> Result<(), Code> {
-        let _lock = self.lock().map_err(|_| Code::InternalRollbackFailed)?;
-        self.recover_locked(log)
+    fn finish_committed_pending(&self, log: &mut dyn Write) {
+        // Retry under the same lock. remove_state fsyncs the directory even if
+        // an earlier unlink succeeded but its fsync failed.
+        for _ in 0..2 {
+            if self.remove_state("pending").is_ok() {
+                return;
+            }
+        }
+        phase(log, "pending_cleanup", "deferred");
     }
-    fn recover_locked(&self, log: &mut dyn Write) -> Result<(), Code> {
-        if exists(&self.state("account-created")).map_err(|_| Code::InternalRollbackFailed)? {
+    pub fn recover(&self, log: &mut dyn Write) -> Result<(), Code> {
+        // A provisioned machine must not depend on first-boot metadata, NSS,
+        // login.defs, or a busy lock. Cleanup is best effort and never waits.
+        if exists(&self.state("account-created")).unwrap_or(false) {
+            if let Ok(_lock) = self.lock_with(true) {
+                if exists(&self.state("account-created")).unwrap_or(false) {
+                    self.finish_committed_pending(log);
+                }
+            }
             return Ok(());
         }
+        let _lock = self.lock().map_err(|_| Code::InternalRollbackFailed)?;
+        match self.recover_locked(log)? {
+            Recovery::Ready => Ok(()),
+            Recovery::ProtectedHuman => Err(Code::InternalRollbackFailed),
+        }
+    }
+    fn recover_locked(&self, log: &mut dyn Write) -> Result<Recovery, Code> {
+        if exists(&self.state("account-created")).map_err(|_| Code::InternalRollbackFailed)? {
+            self.finish_committed_pending(log);
+            return Ok(Recovery::Ready);
+        }
         if !exists(&self.state("pending")).map_err(|_| Code::InternalRollbackFailed)? {
-            return Ok(());
+            return Ok(Recovery::Ready);
         }
         phase(log, "recovery", "begin");
         let f = OpenOptions::new()
@@ -479,10 +516,71 @@ impl<T: AccountTools> Engine<T> {
         if journal.version != 1 || !valid_username(&journal.username) {
             return Err(Code::InternalRollbackFailed);
         }
+        if !self
+            .pending_is_uncommitted(&journal.username)
+            .map_err(|_| Code::InternalRollbackFailed)?
+        {
+            phase(log, "recovery", "internal_rollback_failed");
+            return Ok(Recovery::ProtectedHuman);
+        }
+        // Recheck immediately before deletion; every helper writer holds this lock.
+        if exists(&self.state("account-created")).map_err(|_| Code::InternalRollbackFailed)? {
+            self.finish_committed_pending(log);
+            return Ok(Recovery::Ready);
+        }
         match self.rollback(&journal.username, log) {
-            Code::InternalRolledBack => Ok(()),
+            Code::InternalRolledBack => Ok(Recovery::Ready),
             _ => Err(Code::InternalRollbackFailed),
         }
+    }
+    fn pending_is_uncommitted(&self, name: &str) -> io::Result<bool> {
+        let (min, max) = uid_range(&self.read_optional("login.defs")?)?;
+        let passwd = self.read_optional("passwd")?;
+        let entries: Vec<_> = passwd
+            .lines()
+            .filter(|l| l.split(':').next() == Some(name))
+            .collect();
+        if entries.len() > 1 {
+            return Err(io::Error::other("ambiguous pending identity"));
+        }
+        let target = entries.first().copied();
+        let nss = self.tools.nss_passwd()?;
+        // Any other human (including a directory identity with the same name but
+        // different data) makes deletion unsafe. Missing/invalid data fails closed.
+        for database in std::iter::once(passwd.as_str()).chain(nss.as_deref()) {
+            for line in database.lines().filter(|l| !l.is_empty()) {
+                let uid = line
+                    .split(':')
+                    .nth(2)
+                    .ok_or_else(|| io::Error::other("invalid passwd entry"))?
+                    .parse::<u32>()
+                    .map_err(io::Error::other)?;
+                if (min..=max).contains(&uid) && Some(line) != target {
+                    return Ok(false);
+                }
+            }
+        }
+        let Some(target) = target else {
+            return Ok(true);
+        };
+        let p: Vec<_> = target.split(':').collect();
+        if p.len() != 7 || !(min..=max).contains(&p[2].parse::<u32>().map_err(io::Error::other)?) {
+            return Err(io::Error::other("invalid pending identity"));
+        }
+        if p[1] != "x" || p[5] != format!("/home/{name}") || p[6] != "/bin/bash" {
+            return Ok(false);
+        }
+        let shadow = Secret::from(self.read_optional("shadow")?);
+        let entries: Vec<_> = shadow
+            .as_str()
+            .map_err(io::Error::other)?
+            .lines()
+            .filter(|l| l.split(':').next() == Some(name))
+            .collect();
+        // Only useradd's exact initial password lock is recognized as unfinished.
+        // A hash (even locked, non-yescrypt, or with changed home/groups) is never
+        // deleted by recovery. A crash after chpasswd requires manual resolution.
+        Ok(entries.len() == 1 && entries[0].split(':').nth(1) == Some("!"))
     }
 }
 fn named_entry(text: &str, name: &str) -> bool {

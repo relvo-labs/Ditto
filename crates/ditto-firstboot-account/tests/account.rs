@@ -71,6 +71,15 @@ fn fail() -> io::Result<()> {
     Err(io::Error::other("injected"))
 }
 impl AccountTools for Fake {
+    fn nss_passwd(&self) -> io::Result<Option<String>> {
+        match self.0 {
+            "nss_other" => Ok(Some("carol:x:2000:2000::/home/carol:/bin/bash\n".into())),
+            "nss_changed_target" => Ok(Some("alice:x:2000:2000::/home/alice:/bin/bash\n".into())),
+            "nss_same" => Ok(Some("alice:x:1000:1000::/home/alice:/bin/bash\n".into())),
+            "nss_error" => Err(io::Error::other("injected NSS failure")),
+            _ => Ok(None),
+        }
+    }
     fn create(&self, root: &Path, name: &str, display: &str) -> io::Result<()> {
         append(
             root,
@@ -541,4 +550,344 @@ fn exact_four_kib_frame_is_accepted() {
         }
     );
     root.consistent(true);
+}
+
+fn committed_with_stale_pending() -> Root {
+    let root = Root::new();
+    assert!(matches!(
+        root.engine("").handle(&request(), &mut Vec::new()),
+        Response::Success { .. }
+    ));
+    fs::write(
+        root.0.join("home/alice/important.txt"),
+        "keep administrator data",
+    )
+    .unwrap();
+    fs::write(
+        root.state("pending"),
+        r#"{"version":1,"username":"alice","timestamp":1}"#,
+    )
+    .unwrap();
+    root
+}
+fn administrator_intact(root: &Root) {
+    assert!(fs::read_to_string(root.0.join("etc/passwd"))
+        .unwrap()
+        .lines()
+        .any(|l| l.starts_with("alice:")));
+    assert!(!fs::read_to_string(root.0.join("etc/passwd"))
+        .unwrap()
+        .lines()
+        .any(|l| l.starts_with("bob:")));
+    assert_eq!(
+        fs::read_to_string(root.0.join("home/alice/important.txt")).unwrap(),
+        "keep administrator data"
+    );
+}
+fn bob_request(root: &Root) -> Response {
+    protocol(
+        root,
+        br#"{"display_name":"","username":"bob","password":"Another-Test-Secret!42"}"#,
+        unsafe { libc::geteuid() },
+    )
+    .0
+}
+#[test]
+fn committed_recovery_finishes_pending_cleanup() {
+    let root = committed_with_stale_pending();
+    root.engine("").recover(&mut Vec::new()).unwrap();
+    assert!(!root.state("pending").exists());
+    root.consistent(true);
+    administrator_intact(&root);
+}
+#[test]
+fn review_probe_marker_removed_after_recovery_cannot_replace_admin() {
+    let root = committed_with_stale_pending();
+    root.engine("").recover(&mut Vec::new()).unwrap();
+    fs::remove_file(root.state("account-created")).unwrap();
+    assert_eq!(bob_request(&root), error(Code::AlreadyProvisioned));
+    administrator_intact(&root);
+    assert!(!root.state("pending").exists());
+}
+#[test]
+fn missing_marker_with_stale_pending_never_deletes_initialized_admin() {
+    for changed in [
+        "none",
+        "home_mode",
+        "sudo_removed",
+        "locked_hash",
+        "other_hash",
+    ] {
+        let root = committed_with_stale_pending();
+        fs::remove_file(root.state("account-created")).unwrap();
+        match changed {
+            "home_mode" => {
+                fs::set_permissions(root.0.join("home/alice"), fs::Permissions::from_mode(0o755))
+                    .unwrap()
+            }
+            "sudo_removed" => {
+                let p = root.0.join("etc/group");
+                fs::write(
+                    &p,
+                    fs::read_to_string(&p)
+                        .unwrap()
+                        .replace("sudo:x:27:alice", "sudo:x:27:"),
+                )
+                .unwrap();
+            }
+            "locked_hash" | "other_hash" => {
+                let p = root.0.join("etc/shadow");
+                fs::write(
+                    &p,
+                    fs::read_to_string(&p).unwrap().replace(
+                        "$y$test$hash",
+                        if changed == "locked_hash" {
+                            "!$y$test$hash"
+                        } else {
+                            "$6$other$hash"
+                        },
+                    ),
+                )
+                .unwrap();
+            }
+            _ => {}
+        }
+        assert_eq!(
+            root.engine("").recover(&mut Vec::new()),
+            Err(Code::InternalRollbackFailed),
+            "{changed}"
+        );
+        administrator_intact(&root);
+        assert!(root.state("pending").exists());
+        assert_eq!(bob_request(&root), error(Code::AlreadyProvisioned));
+        administrator_intact(&root);
+    }
+}
+#[test]
+fn recovery_preserves_other_humans_even_for_locked_pending_account() {
+    let root = Root::new();
+    Fake("").create(&root.0, "alice", "").unwrap();
+    append(
+        &root.0,
+        "passwd",
+        "carol:x:2000:2000::/home/carol:/bin/bash\n",
+    );
+    fs::write(
+        root.state("pending"),
+        r#"{"version":1,"username":"alice","timestamp":1}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        root.engine("").recover(&mut Vec::new()),
+        Err(Code::InternalRollbackFailed)
+    );
+    let passwd = fs::read_to_string(root.0.join("etc/passwd")).unwrap();
+    assert!(passwd.contains("alice:"));
+    assert!(passwd.contains("carol:"));
+    assert!(root.0.join("home/alice").exists());
+    assert!(root.state("pending").exists());
+    assert_eq!(bob_request(&root), error(Code::AlreadyProvisioned));
+}
+#[test]
+fn provisioned_recover_succeeds_despite_unusable_firstboot_state() {
+    for fault in [
+        "unsafe_parent",
+        "lock_directory",
+        "missing_login_defs",
+        "pending_directory",
+    ] {
+        let root = committed_with_stale_pending();
+        match fault {
+            "unsafe_parent" => fs::set_permissions(
+                root.0.join("var/lib/ditto"),
+                fs::Permissions::from_mode(0o777),
+            )
+            .unwrap(),
+            "lock_directory" => {
+                fs::remove_file(root.state("lock")).unwrap();
+                fs::create_dir(root.state("lock")).unwrap();
+            }
+            "missing_login_defs" => fs::remove_file(root.0.join("etc/login.defs")).unwrap(),
+            "pending_directory" => {
+                fs::remove_file(root.state("pending")).unwrap();
+                fs::create_dir(root.state("pending")).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        assert_eq!(root.engine("").recover(&mut Vec::new()), Ok(()), "{fault}");
+        administrator_intact(&root);
+    }
+}
+#[test]
+fn provisioned_recover_does_not_wait_for_busy_firstboot_lock() {
+    use std::os::fd::AsRawFd;
+    let root = committed_with_stale_pending();
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(root.state("lock"))
+        .unwrap();
+    assert_eq!(unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) }, 0);
+    let (send, receive) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        let engine = root.engine("");
+        let child = scope.spawn(move || {
+            send.send(engine.recover(&mut Vec::new())).unwrap();
+        });
+        let result = receive.recv_timeout(std::time::Duration::from_secs(2));
+        drop(lock); // Also release on RED so the test never leaves a blocked thread.
+        child.join().unwrap();
+        assert_eq!(result.unwrap(), Ok(()));
+    });
+    administrator_intact(&root);
+}
+#[test]
+fn display_name_rejects_format_and_line_paragraph_categories() {
+    for cp in [
+        0x00ad, 0x0600, 0x061c, 0x06dd, 0x070f, 0x0890, 0x08e2, 0x180e, 0x200b, 0x200f, 0x2028,
+        0x2029, 0x202e, 0x2060, 0x2066, 0x206f, 0xfeff, 0xfff9, 0x110bd, 0x110cd, 0x13430, 0x1343f,
+        0x1bca0, 0x1d173, 0xe0001, 0xe0020, 0xe007f,
+    ] {
+        let mut r = request();
+        r.display_name = format!("a{}nimda", char::from_u32(cp).unwrap());
+        assert_eq!(validate(&r), Err(Code::DisplayNameInvalid), "U+{cp:04X}");
+    }
+    for name in ["小愛", "Zoë", "🙂", "a b", "e\u{0301}"] {
+        let mut r = request();
+        r.display_name = name.into();
+        assert!(validate(&r).is_ok(), "{name}");
+    }
+}
+#[test]
+fn reserved_system_names_and_prefixes_are_rejected() {
+    for name in [
+        "systemd-oom",
+        "systemd-journal",
+        "systemd-future",
+        "systemd-",
+        "pipewire",
+        "avahi",
+        "kvm",
+        "lpadmin",
+        "dialout",
+        "cdrom",
+        "plugdev",
+        "lxd",
+        "sambashare",
+        "render",
+        "video",
+        "audio",
+        "input",
+        "netdev",
+        "messagebus",
+        "polkitd",
+        "_future",
+        "_greetd",
+    ] {
+        let mut r = request();
+        r.username = name.into();
+        assert_eq!(validate(&r), Err(Code::InvalidUsername), "{name}");
+    }
+    for name in ["systemd", "pipewire-user", "alice"] {
+        let mut r = request();
+        r.username = name.into();
+        assert!(validate(&r).is_ok(), "{name}");
+    }
+}
+#[test]
+fn long_password_warning_depends_on_character_classes() {
+    for (password, weak) in [("abcdefghijkl", true), ("Abcdefghijkl", false)] {
+        let mut r = request();
+        r.password = password.into();
+        assert_eq!(validate(&r), Ok(weak));
+    }
+}
+#[test]
+fn password_minimum_counts_scalars_not_utf16_units() {
+    let mut r = request();
+    r.password = "🙂🙂🙂🙂".into();
+    assert_eq!(validate(&r), Err(Code::PasswordTooShort));
+    r.password = "🙂🙂🙂🙂🙂🙂🙂🙂".into();
+    assert_eq!(validate(&r), Ok(true));
+}
+#[test]
+fn tmpfiles_preserves_mail_setgid_in_task_owned_root() {
+    let root = Root::new();
+    let uid = unsafe { libc::geteuid() };
+    let gid = unsafe { libc::getegid() };
+    fs::write(
+        root.0.join("etc/passwd"),
+        format!("root:x:{uid}:{gid}::/root:/bin/bash\n"),
+    )
+    .unwrap();
+    fs::write(
+        root.0.join("etc/group"),
+        format!("root:x:{gid}:\nmail:x:{gid}:\n"),
+    )
+    .unwrap();
+    fs::set_permissions(root.0.join("var/mail"), fs::Permissions::from_mode(0o2775)).unwrap();
+    let config = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packaging/distro/first-boot/tmpfiles.d/ditto-firstboot.conf")
+        .canonicalize()
+        .unwrap();
+    // Preserve the production mode while substituting only owner IDs: this
+    // runner cannot chown to host root/mail, and no host accounts are modified.
+    let owned_config = root.0.join("tmpfiles.conf");
+    let text = fs::read_to_string(config)
+        .unwrap()
+        .replace(" root root ", &format!(" {uid} {gid} "))
+        .replace(" root mail ", &format!(" {uid} {gid} "));
+    fs::write(&owned_config, text).unwrap();
+    let output = std::process::Command::new("systemd-tmpfiles")
+        .arg("--root")
+        .arg(&root.0)
+        .arg("--create")
+        .arg(owned_config)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::metadata(root.0.join("var/mail"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o7777,
+        0o2775
+    );
+}
+
+#[test]
+fn recovery_nss_identity_checks_fail_closed() {
+    for mode in ["nss_other", "nss_changed_target", "nss_error"] {
+        let root = Root::new();
+        Fake("").create(&root.0, "alice", "").unwrap();
+        fs::write(
+            root.state("pending"),
+            r#"{"version":1,"username":"alice","timestamp":1}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            root.engine(mode).recover(&mut Vec::new()),
+            Err(Code::InternalRollbackFailed),
+            "{mode}"
+        );
+        assert!(fs::read_to_string(root.0.join("etc/passwd"))
+            .unwrap()
+            .contains("alice:"));
+        assert!(root.0.join("home/alice").is_dir());
+        assert!(root.state("pending").is_file());
+    }
+    let root = Root::new();
+    Fake("").create(&root.0, "alice", "").unwrap();
+    fs::write(
+        root.state("pending"),
+        r#"{"version":1,"username":"alice","timestamp":1}"#,
+    )
+    .unwrap();
+    root.engine("nss_same").recover(&mut Vec::new()).unwrap();
+    root.consistent(false);
 }
