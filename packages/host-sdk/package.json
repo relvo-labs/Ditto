@@ -11,7 +11,7 @@
     "./manifest": "./src/manifest/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p ../host-runtime/tsconfig.vendor.json && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "build": "node scripts/build.mjs"
   },

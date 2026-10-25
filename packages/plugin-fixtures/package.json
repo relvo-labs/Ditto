@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p ../host-runtime/tsconfig.vendor.json && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "build": "node ../host-sdk/scripts/build-plugins.mjs cordis/* faults/* stress/*",
     "pack": "node ../host-sdk/scripts/pack-each.mjs cordis/* qml/* faults/* stress/*"
