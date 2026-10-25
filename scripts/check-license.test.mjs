@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import { activeDocAgrees, checkLicense, immutableManifestError } from './check-license.mjs';
 
 const root = new URL('../', import.meta.url);
+const decisionPath = 'notes/decisions/2026-10-25-d52-mit-license.md';
+const decisionLink = `[D-52](.agents/${decisionPath})`;
 const read = path => readFileSync(new URL(path, root));
 const baseline = checkLicense({ read });
 function changed(group, path, transform) {
@@ -36,16 +38,16 @@ test('every relicensed builtin rejects restoration of its former version', () =>
       return JSON.stringify(current);
     });
     assert.equal(errors.length, 1, previous.path);
-    assert.match(errors[0], /changed archived manifest bytes require a new version/);
+    assert.match(errors[0], /strictly greater than pre-MIT baseline/);
   }
 });
-test('metadata-only archived edits need a new identity; unchanged bytes and later versions pass', () => {
+test('metadata-only archived edits need a newer identity; baseline bytes also require advancement', () => {
   const old = JSON.stringify({ id: 'ditto.test.provider', version: '1.0.0', license: 'UNLICENSED', author: 'Ditto' });
   const previous = { id: 'ditto.test.provider', version: '1.0.0', sha256: createHash('sha256').update(old).digest('hex') };
-  assert.equal(immutableManifestError(previous, old), null);
+  assert.match(immutableManifestError(previous, old), /strictly greater than pre-MIT baseline/);
   for (const patch of [{ license: 'MIT' }, { author: 'Ditto contributors' }]) {
     const current = { ...JSON.parse(old), ...patch };
-    assert.match(immutableManifestError(previous, JSON.stringify(current)), /new version/);
+    assert.match(immutableManifestError(previous, JSON.stringify(current)), /strictly greater than pre-MIT baseline/);
     for (const version of ['1.0.1', '1.2.0', '2.0.0']) {
       assert.equal(immutableManifestError(previous, JSON.stringify({ ...current, version })), null);
     }
@@ -124,10 +126,187 @@ test('deleted or newly tracked vendor notices require review', () => {
   assert.equal(missing.find(result => result.name === 'vendor LICENSE/NOTICE hashes').errors.length, 1);
 });
 test('active docs reject the prior undecided claims', () => {
-  assert.equal(activeDocAgrees('Ditto 自有程式碼採 MIT；第三方義務仍由 owner 處理。'), true);
+  assert.equal(activeDocAgrees('Ditto 自有程式碼採 MIT；第三方義務仍由 owner 處理。' + decisionLink), true);
   for (const text of ['Ditto 自有程式碼目前未指定開源授權；Harness MIT。',
     'Ditto 自有實作目前 UNLICENSED；Harness MIT。',
     '產品授權及商業模式尚未定案；MIT。', '產品授權與商業模式未定案；MIT。']) {
     assert.equal(activeDocAgrees(text), false);
   }
+});
+
+// Stable-release contract only: no prerelease/build suffix, leading zero or
+// coercion. Exercise mutants through the same source group as the CLI.
+const manifestPath = 'shell/providers/dock_pill/manifest.json';
+for (const version of ['1.1.0', '0.99.99', '1.1.2-rc.1', '2.0.0-alpha',
+  '01.1.2', '1.01.2', '1.1.02', '1.1.2-', '1.1.2+', '1.1.2+build.1',
+  '1.1.2\n', '1.1', 'v1.1.2', '', null, 112]) {
+  test(`immutable builtin rejects version mutant ${JSON.stringify(version)}`, () => {
+    assert.equal(changed('immutable builtin manifests', manifestPath, text =>
+      JSON.stringify({ ...JSON.parse(text), version })).length, 1);
+  });
+}
+test('every builtin rejects a version older than its pre-MIT baseline', () => {
+  for (const previous of JSON.parse(read('tests/licensing/pre-mit-builtin-manifests.json')).packages) {
+    assert.equal(changed('immutable builtin manifests', previous.path, text =>
+      JSON.stringify({ ...JSON.parse(text), version: '0.0.0' })).length, 1, previous.path);
+  }
+});
+test('stable version comparison uses numeric components and preserves ID checks', () => {
+  const previous = { id: 'ditto.test', version: '1.9.9' };
+  const manifest = version => JSON.stringify({ id: previous.id, version });
+  for (const version of ['1.9.10', '1.10.0', '2.0.0', '9007199254740993.0.0']) {
+    assert.equal(immutableManifestError(previous, manifest(version)), null, version);
+  }
+  for (const version of ['1.9.8', '1.8.99', '0.99.99']) {
+    assert.match(immutableManifestError(previous, manifest(version)), /strictly greater/, version);
+  }
+  assert.match(immutableManifestError({ ...previous, version: '9007199254740993.0.0' },
+    manifest('9007199254740992.999.999')), /strictly greater/);
+  assert.match(immutableManifestError(previous, '{"id":"other","version":"2.0.0"}'), /ID/);
+});
+for (const version of ['1.0', '01.0.0', '1.0.0-rc.1', null]) {
+  test(`immutable builtin rejects malformed baseline ${JSON.stringify(version)}`, () => {
+    const fixture = 'tests/licensing/pre-mit-builtin-manifests.json';
+    assert.equal(changed('immutable builtin manifests', fixture, text => {
+      const value = JSON.parse(text);
+      value.packages[0].version = version;
+      return JSON.stringify(value);
+    }).length, 1);
+  });
+}
+
+// Explicit protection list: these are current first-party licensing documents,
+// not a recursive scan of historical notes or user-generated content. This is
+// a wording/link heuristic, not a Markdown parser or semantic/legal audit.
+const protectedDocs = [
+  'README.md', 'docs/product/Ditto-PRD-v0.4.0.md',
+  'docs/upstream/deepseek-harness.md', 'docs/upstream/g3-adoption.md',
+  '.agents/skills/ditto-release-audit/SKILL.md',
+];
+for (const path of protectedDocs) {
+  const link = `[D-52](${path === 'README.md' ? '.agents/' : path.startsWith('.agents/') ? '../../' : '../../.agents/'}${decisionPath})`;
+  for (const [name, text] of [
+    ['third-party MIT only', 'Harness 採 MIT。Ditto 授權尚待 owner 決定。'],
+    ['third-party MIT with D-52', `Harness 採 MIT。Ditto 授權尚待 owner 決定。${link}`],
+    ['missing D-52 link', 'Ditto 自有程式碼採 MIT。'],
+    ['plain D-52 mention', 'Ditto 自有程式碼採 MIT。D-52'],
+    ['wrong decision link', `Ditto 自有程式碼採 MIT。${link.replace('d52-mit-license', 'd49-g4-mvp-owner-acceptance')}`],
+    ['MIT in next sentence', `Ditto 自有程式碼授權尚待決定。Harness 採 MIT。${link}`],
+    ['negated adoption', `Ditto 自有程式碼依 ${link} 尚未採 MIT。Harness 採 MIT。`],
+  ]) {
+    test(`protected doc rejects ${name}: ${path}`, () => {
+      assert.equal(changed('active licensing docs', path, () => text).length, 1);
+    });
+  }
+  test(`protected doc accepts first-party statement and historical UNLICENSED: ${path}`, () => {
+    const text = `Ditto 自有程式碼依 ${link} 採 [MIT](LICENSE)。\n` +
+      '## 階段紀錄（歷史）\n當時 Ditto 自有程式碼未指定授權（UNLICENSED）。';
+    assert.equal(activeDocAgrees(text, path), true);
+    assert.deepEqual(changed('active licensing docs', path, () => text), []);
+  });
+}
+test('protected document scope is exactly enumerated and excludes user-generated text', () => {
+  const visited = [];
+  const unprotected = 'user-generated/README.md';
+  const results = checkLicense({ files: [unprotected], read: path => {
+    visited.push(path);
+    return read(path);
+  } });
+  assert.equal(results.find(group => group.name === 'active licensing docs').cases, protectedDocs.length);
+  assert.deepEqual(visited.filter(path => protectedDocs.includes(path)).sort(), [...protectedDocs].sort());
+  assert.ok(!visited.includes(unprotected));
+  assert.deepEqual(results.find(group => group.name === 'active licensing docs').errors, []);
+});
+test('D-11 row links D-52 while keeping remaining owner responsibility', () => {
+  const row = read('plan/06/05-decisions-and-risks.md').toString().split('\n').find(line => line.startsWith('| D-11 '));
+  assert.match(row, /\[D-52\]\(\.\.\/\.\.\/\.agents\/notes\/decisions\/2026-10-25-d52-mit-license\.md\)/);
+  assert.match(row, /D-49/);
+  assert.match(row, /owner/);
+});
+test('historical README licensing statement has an in-place D-52 supersession', () => {
+  const text = read('plan/06/docs-ai-native-os-readme.md').toString();
+  const historical = text.split('## 階段紀錄（歷史）')[1].split('## 成果與範圍')[0];
+  const sentence = historical.split('\n').find(line => line.startsWith('修正第 1 輪'));
+  assert.match(sentence, /恢復自有程式碼未指定開源授權的事實[（(][^）)]*\[D-52\]\(\.\.\/\.\.\/\.agents\/notes\/decisions\/2026-10-25-d52-mit-license\.md\)/);
+});
+
+
+// Repair F1: keep each real doc's positive statement and D-52 link, then
+// append the former undecided claims. Missing positive text cannot mask a
+// regression in the old negative checks.
+for (const path of protectedDocs) {
+  for (const claim of ['Ditto 自有程式碼目前未指定開源授權。',
+    'Ditto 自有實作目前 UNLICENSED。', '產品授權與商業模式未定案。',
+    'Ditto 自有實作目前 `UNLICENSED`。']) {
+    test(`protected doc rejects appended undecided claim ${claim}: ${path}`, () => {
+      assert.equal(changed('active licensing docs', path, text => `${text}\n${claim}`).length, 1);
+    });
+  }
+}
+for (const claim of ['Ditto 自有程式碼目前尚無授權。', '自己的專案授權尚未指定。',
+  '產品授權及商業模式尚未定案。']) {
+  test(`all former undecided patterns remain active: ${claim}`, () => {
+    assert.equal(activeDocAgrees(`Ditto 自有程式碼採 MIT。${decisionLink}\n${claim}`), false);
+  });
+}
+const currentLicense = `Ditto 自有程式碼採 MIT。${decisionLink}`;
+const historicalClaim = 'Ditto 自有程式碼目前未指定開源授權（UNLICENSED）。';
+test('explicit historical section exempts only its own subtree', () => {
+  assert.equal(activeDocAgrees(`${currentLicense}\n## 階段紀錄（歷史）\n${historicalClaim}\n### 舊驗收\n${historicalClaim}\n## 現行授權\nDitto 自有程式碼採 MIT。`), true);
+});
+for (const [name, tail] of [
+  ['ordinary section', `## 現況\n${historicalClaim}`],
+  ['history word without marker', `## 歷史說明\n${historicalClaim}`],
+  ['marker not at heading end', `## 階段紀錄（歷史）及現況\n${historicalClaim}`],
+  ['inline historical label', `這是歷史（歷史）\n${historicalClaim}`],
+  ['same-level section ends exemption', `## 階段紀錄（歷史）\n${historicalClaim}\n## 現況\n${historicalClaim}`],
+  ['higher-level section ends exemption', `### 階段紀錄（歷史）\n${historicalClaim}\n## 現況\n${historicalClaim}`],
+]) {
+  test(`historical exemption rejects ${name}`, () => {
+    assert.equal(activeDocAgrees(`${currentLicense}\n${tail}`), false);
+  });
+}
+test('historical adoption and link cannot establish the current license', () => {
+  assert.equal(activeDocAgrees(`## 階段紀錄（歷史）\n${currentLicense}`), false);
+});
+
+// Repair F2: ignored Markdown must supply neither half of the positive check.
+const hiddenWrappers = [
+  ['backtick fence', text => '```md\n' + text + '\n```'],
+  ['tilde fence', text => '~~~md\n' + text + '\n~~~'],
+  ['long fence with shorter interior fence', text => '````md\n```\n' + text + '\n````'],
+  ['unclosed fence', text => '```md\n' + text],
+  ['inline code', text => '`' + text + '`'],
+  ['double-backtick inline code', text => '`` a ` b ' + text + ' ``'],
+  ['HTML comment', text => '<!--\n' + text + '\n-->'],
+  ['unclosed HTML comment', text => '<!-- ' + text],
+  ['strikethrough', text => '~~' + text + '~~ 已撤回'],
+];
+for (const [name, wrap] of hiddenWrappers) {
+  test(`ignored ${name} cannot supply adoption`, () => {
+    assert.equal(activeDocAgrees(`${decisionLink}\n${wrap('Ditto 自有程式碼採 MIT。')}`), false);
+  });
+  test(`ignored ${name} cannot supply D-52 link`, () => {
+    assert.equal(activeDocAgrees(`Ditto 自有程式碼採 MIT。\n${wrap(decisionLink)}`), false);
+  });
+}
+for (const phrase of ['並非 Ditto 自有程式碼採 MIT。', '不是 Ditto 自有程式碼採 MIT。',
+  '若 Ditto 自有程式碼採 MIT，便會另行公告。',
+  'Ditto 自有程式碼採 MIT-0。', 'Ditto 自有程式碼採 MIT 以外的授權。',
+  'Ditto 自有程式碼採 MIT 授權以外的條款。']) {
+  test(`adoption rejects negation or license qualifier: ${phrase}`, () => {
+    assert.equal(activeDocAgrees(`${phrase}${decisionLink}`), false);
+  });
+}
+test('ignored code and comments do not hide an active undecided claim', () => {
+  const text = `${currentLicense}\n\`code\`\n<!-- comment -->\n${historicalClaim}`;
+  assert.equal(activeDocAgrees(text), false);
+});
+test('ignored fences cannot forge historical headings', () => {
+  const text = `${currentLicense}\n\`\`\`md\n## 階段紀錄（歷史）\n\`\`\`\n${historicalClaim}`;
+  assert.equal(activeDocAgrees(text), false);
+});
+test('visible adoption and D-52 survive surrounding examples and comments', () => {
+  assert.equal(activeDocAgrees('```md\n' + historicalClaim + '\n```\n' +
+    '`UNLICENSED`\n<!-- ' + historicalClaim + ' -->\n' + currentLicense), true);
 });
