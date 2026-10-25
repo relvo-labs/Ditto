@@ -162,6 +162,16 @@ def check_target_ownership(root, names):
             (not updates.is_dir() or
              any(not stat.S_ISREG(path.lstat().st_mode) for path in updates.iterdir())))):
         raise ValueError("target dpkg ownership database missing or unsafe: updates journal")
+    # Optional dpkg metadata must be real objects when present. Check the
+    # triggers parent first; never follow it while inspecting its leaf files.
+    for name in ("arch", "triggers", "triggers/File", "triggers/Unincorp"):
+        try:
+            mode = (admindir / name).lstat().st_mode
+        except FileNotFoundError:
+            continue
+        expected_type = stat.S_ISDIR if name == "triggers" else stat.S_ISREG
+        if not expected_type(mode):
+            raise ValueError(f"target dpkg ownership database missing or unsafe: {name}")
     command = ["dpkg-query", f"--admindir={admindir}"]
     env = os.environ | {"LC_ALL": "C"}
     probe = subprocess.run(command + ["-W"], text=True, capture_output=True, env=env, timeout=30)

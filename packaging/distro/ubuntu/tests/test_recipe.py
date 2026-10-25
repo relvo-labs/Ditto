@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -1519,6 +1520,101 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertEqual((target / "usr/bin/wayfire").read_bytes(),
                          (self.tree / "usr/bin/wayfire").read_bytes())
 
+    def assert_metadata_rejected_before_query(self, target):
+        # Run the actual CLI, recording and blocking any premature dpkg call.
+        # This also keeps FIFO negatives bounded on an unfixed implementation.
+        marker = self.root / f"dpkg-called-{next(self.counter)}"
+        script = """
+import runpy, subprocess, sys
+from pathlib import Path
+marker = Path(sys.argv[1])
+original_run = subprocess.run
+def query(command, **kwargs):
+    if command[0] == 'dpkg-query':
+        marker.write_text(repr(command))
+        raise AssertionError('dpkg consulted unsafe metadata')
+    return original_run(command, **kwargs)
+subprocess.run = query
+sys.argv = sys.argv[2:]
+sys.path.insert(0, str(Path(sys.argv[0]).parent))
+runpy.run_path(sys.argv[0], run_name='__main__')
+"""
+        result = call(sys.executable, "-c", script, marker, *self.runtime_args(target))
+        self.assertFalse(marker.exists(), result.stderr)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertRegex(result.stderr, "ownership database missing or unsafe|parent symlink")
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertFalse((target / "usr").exists(), "no runtime payload copied")
+
+    def test_arch_and_triggers_unsafe_metadata_rejected_before_query_and_copy(self):
+        for name in ("arch", "triggers", "triggers/File", "triggers/Unincorp"):
+            kinds = ("external-link", "dangling-link", "fifo",
+                     "file" if name == "triggers" else "directory")
+            for kind in kinds:
+                with self.subTest(metadata=name, kind=kind):
+                    case = f"metadata-{next(self.counter)}"
+                    target = self.target_database(case)
+                    path = target / "var/lib/dpkg" / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    outside = self.put(case + "-outside/sentinel", "untouched\n", self.root)
+                    if kind == "external-link":
+                        path.symlink_to(outside.parent if name == "triggers" else outside)
+                    elif kind == "dangling-link":
+                        path.symlink_to(self.root / (case + "-missing"))
+                    elif kind == "fifo":
+                        os.mkfifo(path)
+                    elif kind == "directory":
+                        path.mkdir()
+                    else:
+                        path.write_text("not a directory\n")
+                    before = path.lstat()
+                    self.assert_metadata_rejected_before_query(target)
+                    self.assertEqual(path.lstat(), before)
+                    self.assertEqual(outside.read_text(), "untouched\n")
+                    self.assertEqual(list(outside.parent.iterdir()), [outside])
+
+    def test_arch_and_triggers_symlinked_database_parents_rejected_before_query(self):
+        for name in ("var", "var/lib", "var/lib/dpkg"):
+            with self.subTest(parent=name):
+                target = self.target_database(f"metadata-parent-{next(self.counter)}")
+                self.put("var/lib/dpkg/arch", "amd64\n", target)
+                self.put("var/lib/dpkg/triggers/File", "", target)
+                self.put("var/lib/dpkg/triggers/Unincorp", "", target)
+                parent = target / name
+                outside = self.root / f"outside-parent-{next(self.counter)}"
+                parent.rename(outside)
+                parent.symlink_to(outside)
+                self.assert_metadata_rejected_before_query(target)
+
+    def test_arch_and_triggers_regular_and_absent_controls(self):
+        # Real dpkg queries determine that every optional leaf may be absent;
+        # the triggers directory itself may also be absent, with or without arch.
+        cases = [(arch, False, False, False) for arch in (False, True)]
+        cases += [(arch, True, file, unincorp)
+                  for arch, file, unincorp in itertools.product((False, True), repeat=3)]
+        for arch, directory, file, unincorp in cases:
+            with self.subTest(arch=arch, triggers=directory, file=file, unincorp=unincorp):
+                target = self.target_database(f"metadata-control-{next(self.counter)}")
+                if arch:
+                    self.put("var/lib/dpkg/arch", "amd64\n", target)
+                if directory:
+                    (target / "var/lib/dpkg/triggers").mkdir()
+                if file:
+                    self.put("var/lib/dpkg/triggers/File", "/usr/share/fixture fixture\n", target)
+                if unincorp:
+                    self.put("var/lib/dpkg/triggers/Unincorp", "", target)
+                metadata = [p for p in (target / "var/lib/dpkg").rglob("*") if p.is_file()]
+                before = {p: p.read_bytes() for p in metadata}
+                probe = call("dpkg-query", "--admindir=" + str(target / "var/lib/dpkg"), "-W")
+                self.assertEqual((probe.returncode, probe.stdout, probe.stderr), (0, "fixture\t1\n", ""))
+                result = call(sys.executable, *self.runtime_args(target))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                audit = call(sys.executable, *self.runtime_args(target, copy=False))
+                self.assertEqual(audit.returncode, 0, audit.stderr)
+                self.assertEqual({p: p.read_bytes() for p in metadata}, before)
+                for name in self.lock()["files"]:
+                    self.assertEqual((target / name).read_bytes(), (self.tree / name).read_bytes())
+
     def assert_updates_rejected(self, target, untouched):
         import importlib.util
         spec = importlib.util.spec_from_file_location("policy", RECIPE / "runtime_policy.py")
@@ -1698,6 +1794,42 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         result = call(sys.executable, *self.runtime_args(target))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(dest.read_bytes(), (self.tree / "usr/share/doc/ditto-runtime/NOTICE").read_bytes())
+
+    def test_existing_nonregular_destination_rejected_before_any_copy(self):
+        for kind in ("directory", "fifo", "socket", "live-symlink", "dangling-symlink"):
+            with self.subTest(kind=kind):
+                target = self.target_database("copy-" + kind)
+                # A late payload destination proves that preflight completes
+                # before even the first runtime file is copied.
+                name = "usr/share/doc/ditto-runtime/NOTICE"
+                dest = target / name
+                dest.parent.mkdir(parents=True)
+                outside = self.put(kind + "-outside", "untouched\n", self.root)
+                if kind == "directory":
+                    dest.mkdir()
+                    (dest / "sentinel").write_text("untouched directory\n")
+                elif kind == "fifo":
+                    os.mkfifo(dest)
+                elif kind == "socket":
+                    # A real filesystem socket inode needs no network/bind
+                    # capability, and has the same destination type as a listener.
+                    os.mknod(dest, stat.S_IFSOCK | 0o600)
+                else:
+                    dest.symlink_to(outside if kind == "live-symlink" else self.root / "missing-copy")
+                before = dest.lstat()
+                result = call(sys.executable, *self.runtime_args(target))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                for runtime_name in self.lock()["files"]:
+                    if runtime_name != name:
+                        self.assertFalse((target / runtime_name).exists(), "no earlier runtime copy")
+                self.assertIn("existing target symlink" if "symlink" in kind else
+                              "existing target non-regular file", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(dest.lstat(), before)
+                self.assertEqual(outside.read_text(), "untouched\n")
+                if kind == "directory":
+                    self.assertEqual([p.name for p in dest.iterdir()], ["sentinel"])
+                    self.assertEqual((dest / "sentinel").read_text(), "untouched directory\n")
 
     def test_drm_present_delayed_absent_and_unit_wiring(self):
         cards = self.root / "drm"
