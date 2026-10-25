@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import { activeDocAgrees, checkLicense, immutableManifestError } from './check-license.mjs';
 
 const root = new URL('../', import.meta.url);
+const decisionPath = 'notes/decisions/2026-10-25-d52-mit-license.md';
+const decisionLink = `[D-52](.agents/${decisionPath})`;
 const read = path => readFileSync(new URL(path, root));
 const baseline = checkLicense({ read });
 function changed(group, path, transform) {
@@ -173,8 +175,6 @@ for (const version of ['1.0', '01.0.0', '1.0.0-rc.1', null]) {
   });
 }
 
-const decisionPath = 'notes/decisions/2026-10-25-d52-mit-license.md';
-const decisionLink = `[D-52](.agents/${decisionPath})`;
 // Explicit protection list: these are current first-party licensing documents,
 // not a recursive scan of historical notes or user-generated content. This is
 // a wording/link heuristic, not a Markdown parser or semantic/legal audit.
@@ -228,4 +228,85 @@ test('historical README licensing statement has an in-place D-52 supersession', 
   const historical = text.split('## 階段紀錄（歷史）')[1].split('## 成果與範圍')[0];
   const sentence = historical.split('\n').find(line => line.startsWith('修正第 1 輪'));
   assert.match(sentence, /恢復自有程式碼未指定開源授權的事實[（(][^）)]*\[D-52\]\(\.\.\/\.\.\/\.agents\/notes\/decisions\/2026-10-25-d52-mit-license\.md\)/);
+});
+
+
+// Repair F1: keep each real doc's positive statement and D-52 link, then
+// append the former undecided claims. Missing positive text cannot mask a
+// regression in the old negative checks.
+for (const path of protectedDocs) {
+  for (const claim of ['Ditto 自有程式碼目前未指定開源授權。',
+    'Ditto 自有實作目前 UNLICENSED。', '產品授權與商業模式未定案。',
+    'Ditto 自有實作目前 `UNLICENSED`。']) {
+    test(`protected doc rejects appended undecided claim ${claim}: ${path}`, () => {
+      assert.equal(changed('active licensing docs', path, text => `${text}\n${claim}`).length, 1);
+    });
+  }
+}
+for (const claim of ['Ditto 自有程式碼目前尚無授權。', '自己的專案授權尚未指定。',
+  '產品授權及商業模式尚未定案。']) {
+  test(`all former undecided patterns remain active: ${claim}`, () => {
+    assert.equal(activeDocAgrees(`Ditto 自有程式碼採 MIT。${decisionLink}\n${claim}`), false);
+  });
+}
+const currentLicense = `Ditto 自有程式碼採 MIT。${decisionLink}`;
+const historicalClaim = 'Ditto 自有程式碼目前未指定開源授權（UNLICENSED）。';
+test('explicit historical section exempts only its own subtree', () => {
+  assert.equal(activeDocAgrees(`${currentLicense}\n## 階段紀錄（歷史）\n${historicalClaim}\n### 舊驗收\n${historicalClaim}\n## 現行授權\nDitto 自有程式碼採 MIT。`), true);
+});
+for (const [name, tail] of [
+  ['ordinary section', `## 現況\n${historicalClaim}`],
+  ['history word without marker', `## 歷史說明\n${historicalClaim}`],
+  ['marker not at heading end', `## 階段紀錄（歷史）及現況\n${historicalClaim}`],
+  ['inline historical label', `這是歷史（歷史）\n${historicalClaim}`],
+  ['same-level section ends exemption', `## 階段紀錄（歷史）\n${historicalClaim}\n## 現況\n${historicalClaim}`],
+  ['higher-level section ends exemption', `### 階段紀錄（歷史）\n${historicalClaim}\n## 現況\n${historicalClaim}`],
+]) {
+  test(`historical exemption rejects ${name}`, () => {
+    assert.equal(activeDocAgrees(`${currentLicense}\n${tail}`), false);
+  });
+}
+test('historical adoption and link cannot establish the current license', () => {
+  assert.equal(activeDocAgrees(`## 階段紀錄（歷史）\n${currentLicense}`), false);
+});
+
+// Repair F2: ignored Markdown must supply neither half of the positive check.
+const hiddenWrappers = [
+  ['backtick fence', text => '```md\n' + text + '\n```'],
+  ['tilde fence', text => '~~~md\n' + text + '\n~~~'],
+  ['long fence with shorter interior fence', text => '````md\n```\n' + text + '\n````'],
+  ['unclosed fence', text => '```md\n' + text],
+  ['inline code', text => '`' + text + '`'],
+  ['double-backtick inline code', text => '`` a ` b ' + text + ' ``'],
+  ['HTML comment', text => '<!--\n' + text + '\n-->'],
+  ['unclosed HTML comment', text => '<!-- ' + text],
+  ['strikethrough', text => '~~' + text + '~~ 已撤回'],
+];
+for (const [name, wrap] of hiddenWrappers) {
+  test(`ignored ${name} cannot supply adoption`, () => {
+    assert.equal(activeDocAgrees(`${decisionLink}\n${wrap('Ditto 自有程式碼採 MIT。')}`), false);
+  });
+  test(`ignored ${name} cannot supply D-52 link`, () => {
+    assert.equal(activeDocAgrees(`Ditto 自有程式碼採 MIT。\n${wrap(decisionLink)}`), false);
+  });
+}
+for (const phrase of ['並非 Ditto 自有程式碼採 MIT。', '不是 Ditto 自有程式碼採 MIT。',
+  '若 Ditto 自有程式碼採 MIT，便會另行公告。',
+  'Ditto 自有程式碼採 MIT-0。', 'Ditto 自有程式碼採 MIT 以外的授權。',
+  'Ditto 自有程式碼採 MIT 授權以外的條款。']) {
+  test(`adoption rejects negation or license qualifier: ${phrase}`, () => {
+    assert.equal(activeDocAgrees(`${phrase}${decisionLink}`), false);
+  });
+}
+test('ignored code and comments do not hide an active undecided claim', () => {
+  const text = `${currentLicense}\n\`code\`\n<!-- comment -->\n${historicalClaim}`;
+  assert.equal(activeDocAgrees(text), false);
+});
+test('ignored fences cannot forge historical headings', () => {
+  const text = `${currentLicense}\n\`\`\`md\n## 階段紀錄（歷史）\n\`\`\`\n${historicalClaim}`;
+  assert.equal(activeDocAgrees(text), false);
+});
+test('visible adoption and D-52 survive surrounding examples and comments', () => {
+  assert.equal(activeDocAgrees('```md\n' + historicalClaim + '\n```\n' +
+    '`UNLICENSED`\n<!-- ' + historicalClaim + ' -->\n' + currentLicense), true);
 });
