@@ -13,8 +13,31 @@ human_account_exists() {
         '$3 ~ /^[0-9]+$/ && $3 >= low && $3 <= high { found=1 } END { exit !found }' <<< "$accounts"
 }
 login_screen() {
+    unset DITTO_GREETER_STAGE
     exec /usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session
 }
+
+if [[ ${1:-} == --orca ]]; then
+    # Record only our own Orca child in the private attempt directory. Other
+    # D-Bus-activated accessibility daemons still require VM cleanup evidence.
+    : "${DITTO_GREETER_ORCA_PIDFILE:?}"
+    orca --replace &
+    orca_pid=$!
+    printf '%s\n' "$orca_pid" > "${DITTO_GREETER_ORCA_PIDFILE:?}"
+    cleanup_orca() {
+        kill "$orca_pid" 2>/dev/null || true
+        wait "$orca_pid" 2>/dev/null || true
+        current_pid=
+        if [[ -f $DITTO_GREETER_ORCA_PIDFILE ]]; then
+            read -r current_pid < "$DITTO_GREETER_ORCA_PIDFILE" || true
+            [[ $current_pid != "$orca_pid" ]] || rm -f -- "$DITTO_GREETER_ORCA_PIDFILE"
+        fi
+    }
+    trap cleanup_orca EXIT
+    trap 'exit 1' TERM INT HUP
+    wait "$orca_pid" || true
+    exit 0
+fi
 
 if [[ ${1:-} == --session ]]; then
     # Called only by the greeter's fixed Wayfire autostart. All children share
@@ -42,11 +65,19 @@ if [[ ${1:-} == --graphical ]]; then
     export DITTO_GREETER_RESULT="$XDG_CONFIG_HOME/result" DITTO_GREETER_SUPERVISOR_PID=$$
     install -d -m 0700 "$XDG_CONFIG_HOME/fcitx5"
     install -m 0600 /usr/lib/ditto/firstboot-fcitx5-profile "$XDG_CONFIG_HOME/fcitx5/profile"
+    export DITTO_GREETER_ORCA_PIDFILE="$XDG_CONFIG_HOME/orca.pid"
     compositor_pid=
     cleanup_graphical() {
         if [[ -n $compositor_pid ]]; then
             kill "$compositor_pid" 2>/dev/null || true
             wait "$compositor_pid" 2>/dev/null || true
+        fi
+        orca_pid=
+        if [[ -f $DITTO_GREETER_ORCA_PIDFILE ]]; then
+            read -r orca_pid < "$DITTO_GREETER_ORCA_PIDFILE" || true
+            if [[ $orca_pid =~ ^[1-9][0-9]*$ ]]; then
+                kill "$orca_pid" 2>/dev/null || true
+            fi
         fi
         rm -rf -- "$XDG_CONFIG_HOME"
     }
@@ -69,26 +100,38 @@ if human_account_exists; then
 else
     status=$?
     # A failed account lookup must never be treated as an empty machine.
-    [[ $status == 1 ]] || exit 2
+    [[ $status == 1 ]] || login_screen
 fi
 has_drm=false
 for device in /sys/class/drm/card[0-9]*/device; do
     [[ $device =~ /card[0-9]+/device$ && -e $device ]] || continue
     has_drm=true
 done
-if [[ $has_drm == true ]]; then
+# Every stage is a fresh invocation, so NSS/account state is re-read before
+# pixman or tty. A successful creation followed by a lost UI goes to login.
+stage=${DITTO_GREETER_STAGE:-gpu}
+case "$stage" in gpu|software|tty) ;; *) login_screen ;; esac
+if [[ $has_drm != true ]]; then stage=tty; fi
+if [[ $stage == gpu || $stage == software ]]; then
     status=0
-    dbus-run-session -- "$self" --graphical || status=$?
-    [[ $status != 0 ]] || exit 0
-    [[ $status != 10 ]] || exec "$self"
-    # The compositor/Qt failed: exactly one software attempt, then text.
-    status=0
-    WLR_RENDERER=pixman QT_QUICK_BACKEND=software WLR_RENDERER_ALLOW_SOFTWARE=1 \
+    if [[ $stage == gpu ]]; then
         dbus-run-session -- "$self" --graphical || status=$?
+    else
+        WLR_RENDERER=pixman QT_QUICK_BACKEND=software WLR_RENDERER_ALLOW_SOFTWARE=1 \
+            dbus-run-session -- "$self" --graphical || status=$?
+    fi
     [[ $status != 0 ]] || exit 0
-    [[ $status != 10 ]] || exec "$self"
+    if [[ $status == 10 ]]; then
+        unset DITTO_GREETER_STAGE
+    elif [[ $stage == gpu ]]; then
+        export DITTO_GREETER_STAGE=software
+    else
+        export DITTO_GREETER_STAGE=tty
+    fi
+    exec "$self"
 fi
-# The helper's --tty is also an unprivileged socket client, owned by PR A.
-# It reads secrets from the terminal, then ordinary agreety performs PAM login.
-/usr/lib/ditto/ditto-firstboot-account --tty
-login_screen
+# Error/EOF/already_provisioned must not strand tty1. Re-enter the account
+# decision after every text attempt; the helper remains authoritative.
+/usr/lib/ditto/ditto-firstboot-account --tty || true
+unset DITTO_GREETER_STAGE
+exec "$self"

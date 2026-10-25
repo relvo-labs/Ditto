@@ -3651,12 +3651,16 @@
 <context>
     <name>Messages</name>
     <message>
+        <source>登入服務目前無法使用，尚未送出建立帳號的請求。請重新啟動電腦後再試。</source>
+        <translation>The sign-in service is unavailable. No account creation request was sent. Restart the computer and try again.</translation>
+    </message>
+    <message>
         <source>名字最多 128 個字元，不能含控制字元或「: , =」，請修改後再試。</source>
         <translation>Use at most 128 characters for your name, without control characters or “: , =”. Edit it and try again.</translation>
     </message>
     <message>
-        <source>密碼不能含換行或空字元，最多 1024 個字元，請重新輸入。</source>
-        <translation>The password must not contain newlines or NUL characters and must be at most 1024 characters. Enter it again.</translation>
+        <source>密碼不能含換行或空字元，最多 511 個 UTF-8 位元組，請重新輸入。</source>
+        <translation>The password must not contain newlines or NUL characters and must be at most 511 UTF-8 bytes. Enter it again.</translation>
     </message>
     <message>
         <source>密碼至少需要 8 個字元，請重新輸入。</source>

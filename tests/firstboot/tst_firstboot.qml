@@ -49,7 +49,11 @@ TestCase {
     function test_password_data() {
         return [{tag:"7", value:"1234567", ok:false}, {tag:"8", value:"12345678", ok:true},
             {tag:"nul", value:"abcd\x00efgh", ok:false}, {tag:"newline", value:"abcd\nefgh", ok:false},
-            {tag:"return", value:"abcd\refgh", ok:false}, {tag:"long", value:"a".repeat(1025), ok:false},
+            {tag:"return", value:"abcd\refgh", ok:false}, {tag:"long", value:"a".repeat(512), ok:false},
+            {tag:"511-bytes", value:"a".repeat(511), ok:true},
+            {tag:"multibyte-fit", value:"😀".repeat(127) + "abc", ok:true},
+            {tag:"multibyte-over", value:"😀".repeat(128), ok:false},
+            {tag:"scalars-not-utf16", value:"😀".repeat(4), ok:false},
             {tag:"unicode", value:"😀".repeat(8), ok:true}, {tag:"surrogate", value:"abcdefgh\ud800", ok:false}];
     }
     function test_password(data) { compare(Validation.password(data.value), data.ok); }
@@ -57,11 +61,15 @@ TestCase {
         return [{tag:"chinese", value:"\u6797\u5c0f\u6674", ok:true}, {tag:"empty", value:"", ok:true},
             {tag:"comma", value:"a,b", ok:false}, {tag:"colon", value:"a:b", ok:false},
             {tag:"equals", value:"a=b", ok:false}, {tag:"control", value:"a\tb", ok:false},
+            {tag:"format", value:"a\u202eb", ok:false},
+            {tag:"zero-width", value:"a\u200bb", ok:false},
+            {tag:"line-separator", value:"a\u2028b", ok:false},
+            {tag:"bom", value:"a\ufeffb", ok:false},
             {tag:"long", value:"\u6797".repeat(129), ok:false}];
     }
     function test_display(data) { compare(Validation.displayName(data.value), data.ok); }
     function test_payload_cap() {
-        verify(Validation.request("\u6797".repeat(128), "alice", "x".repeat(1024)).length > 0);
+        verify(Validation.request("\u6797".repeat(128), "alice", "x".repeat(511)).length > 0);
         compare(Validation.request("\u6797".repeat(128), "alice", "😀".repeat(1024)), "");
     }
     function test_weak_is_advisory() {
@@ -71,12 +79,104 @@ TestCase {
         verify(screen.createButton.enabled);
         screen.confirmField.text = "1234567";
         verify(!screen.createButton.enabled);
-        fill(screen, "bubble42!");
+        fill(screen, "Longer-Phrase42!");
         verify(!screen.weakWarning);
         verify(screen.createButton.enabled);
         screen.phase = "creating";
         verify(!screen.createButton.enabled);
         verify(!screen.passwordField.enabled);
+    }
+    function test_weak_protocol_data() {
+        return [{tag:"8-digits", value:"12345678", weak:true},
+            {tag:"9-digits", value:"123456789", weak:true},
+            {tag:"password", value:"password", weak:true},
+            {tag:"password123", value:"PASSWORD123", weak:true},
+            {tag:"qwerty", value:"qwerty123", weak:true},
+            {tag:"letmein", value:"letmein123", weak:true},
+            {tag:"bubble42", value:"bubble42!", weak:true},
+            {tag:"helper-repeat", value:"aaaaaaaa", weak:true},
+            {tag:"helper-chinese", value:"一二三四五六七八", weak:true},
+            {tag:"helper-strong", value:"Unique-Test-Secret!42", weak:false},
+            {tag:"11-mixed", value:"abcdefgh12!", weak:true},
+            {tag:"12-one-class", value:"abcdefghijkl", weak:true},
+            {tag:"12-two-classes", value:"abcdefghijk1", weak:false},
+            {tag:"unicode-one-class", value:"\u6797".repeat(12), weak:true},
+            {tag:"unicode-and-digit", value:"\u6797".repeat(11)+"1", weak:true},
+            {tag:"emoji-scalars", value:"😀".repeat(6)+"12", weak:true},
+            {tag:"upper-and-lower", value:"Abcdefghijkl", weak:false},
+            {tag:"unicode-lower", value:"é".repeat(11)+"1", weak:false},
+            {tag:"unicode-number", value:"a".repeat(11)+"²", weak:false},
+            {tag:"long-phrase", value:"Longer-Phrase42!", weak:false}];
+    }
+    function test_weak_protocol(data) { compare(Validation.weak(data.value), data.weak); }
+    function test_reserved_service_names() {
+        for (const name of ["sudo", "wheel", "greetd", "ditto", "firstboot"]) verify(!Validation.username(name), name);
+    }
+    function test_ime_closed_on_latin_field_focus() {
+        const screen = makeScreen();
+        const closer = findChild(screen, "firstbootImeCloser");
+        verify(closer !== null);
+        compare(closer.command, ["fcitx5-remote", "-c"]);
+        for (const field of [screen.usernameField, screen.passwordField, screen.confirmField]) {
+            screen.displayField.focusInput();
+            closer.running = false;
+            const before = closer.starts;
+            field.focusInput();
+            compare(closer.starts, before + 1);
+        }
+        const input = screen.usernameField.inputItem;
+        screen.usernameField.text = "";
+        input.forceActiveFocus();
+        keyClick("a");
+        compare(input.text, "a");
+        input.insert(1, "\u6797");
+        compare(input.text, "a");
+        keyClick("$");
+        compare(input.text, "a");
+    }
+    function test_stopped_action_is_visible() {
+        const screen = makeScreen();
+        fill(screen);
+        screen.phase = "stopped";
+        screen.errorCode = "pam_failed";
+        screen.clearSecrets();
+        tryVerify(() => screen.returnButton.activeFocus);
+        tryVerify(() => {
+            const point = screen.returnButton.mapToItem(screen, 0, 0);
+            return point.y >= 76 && point.y + screen.returnButton.height <= screen.height - 68;
+        });
+    }
+    function test_editable_error_focuses_alert() {
+        const screen = makeScreen();
+        fill(screen);
+        screen.createButton.forceActiveFocus();
+        screen.errorCode = "username_taken";
+        const alert = findChild(screen, "errorMessage");
+        tryVerify(() => alert.activeFocus);
+        compare(alert.Accessible.role, Accessible.AlertMessage);
+    }
+    function test_pam_info_is_announced_and_launch_stops_deadline() {
+        const job = makeSession();
+        job.session.consume('{"ok":true,"weak_password":true}');
+        job.greeter.authMessage("Account notice", false, false, false);
+        compare(job.session.infoMessage, "Account notice");
+        const screen = makeScreen();
+        screen.phase = "authenticating";
+        screen.pamInfo = job.session.infoMessage;
+        const live = findChild(screen, "pamInfo");
+        verify(live.visible);
+        compare(live.text, "Account notice");
+        compare(live.Accessible.role, Accessible.AlertMessage);
+        job.greeter.readyToLaunch();
+        verify(!findChild(job.session, "firstbootDeadline").running);
+    }
+    function test_greetd_unavailable_sends_nothing() {
+        const greeter = createTemporaryObject(greetdFactory, testCase, {available: false});
+        const session = createTemporaryObject(sessionFactory, testCase, {greeter: greeter});
+        session.submit("Alice", "alice", "bubble42!", "bubble42!");
+        compare(findChild(session, "firstbootHelper").sent, "");
+        const messages = createTemporaryObject(messageFactory, testCase);
+        verify(messages.errorText("unavailable") !== messages.errorText("unknown"));
     }
     function test_errors_data() {
         return ["invalid_username", "username_taken", "password_too_short", "password_invalid", "display_name_invalid",

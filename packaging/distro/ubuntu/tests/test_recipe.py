@@ -133,17 +133,9 @@ class RecipeTests(unittest.TestCase):
         cls.shared = tempfile.TemporaryDirectory(prefix="ditto-regression-source-")
         cls.archive = Path(cls.shared.name) / "source.tar"
         cls.commit = call("git", "-C", REPO, "rev-parse", "HEAD").stdout.strip()
-        # A working-tree source fixture exercises uncommitted source changes
-        # too. This is synthetic test input, not a trusted release git archive.
-        paths = call("git", "-C", REPO, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
-        if paths.returncode:
-            raise RuntimeError(paths.stderr)
-        with tarfile.open(cls.archive, "w", format=tarfile.PAX_FORMAT,
-                          pax_headers={"comment": cls.commit}) as archive:
-            for name in sorted(set(paths.stdout.split("\0")) - {""}):
-                path = REPO / name
-                if path.is_file() or path.is_symlink():
-                    archive.add(path, arcname=name, recursive=False)
+        result = call("git", "-C", REPO, "archive", "--format=tar", "--output", cls.archive, cls.commit)
+        if result.returncode:
+            raise RuntimeError(result.stderr)
 
     @classmethod
     def tearDownClass(cls):
@@ -2083,7 +2075,7 @@ source "$1"
         ini.read(output / "extra/usr/lib/ditto/wayfire-greeter.ini")
         self.assertIn("input-method-v1", ini["core"]["plugins"].split())
         self.assertEqual(ini["command"]["binding_orca"], "<super> <alt> KEY_S")
-        self.assertEqual(ini["command"]["command_orca"], "orca --replace")
+        self.assertEqual(ini["command"]["command_orca"], "/usr/lib/ditto/ditto-greeter --orca")
         profile = configparser.ConfigParser()
         profile.read(output / "extra/usr/lib/ditto/firstboot-fcitx5-profile")
         self.assertEqual(profile["Groups/0"]["DefaultIM"], "chewing")

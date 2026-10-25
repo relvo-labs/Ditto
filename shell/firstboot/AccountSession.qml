@@ -15,7 +15,7 @@ Item {
     property string pendingRequest: ""
     property string response: ""
     property bool responded: false
-    property bool weakPassword: false
+    property string infoMessage: ""
     readonly property bool busy: phase === "creating" || phase === "authenticating" || phase === "launching"
     readonly property bool canEdit: phase === "editing"
     signal clearSecrets()
@@ -28,6 +28,7 @@ Item {
     function fail(code, editable) {
         phase = editable ? "editing" : "stopped";
         errorCode = code;
+        infoMessage = "";
         deadline.stop();
         helper.connected = false;
         forgetSecrets();
@@ -41,6 +42,7 @@ Item {
         response = "";
         responded = false;
         errorCode = "";
+        infoMessage = "";
         phase = "creating";
         clearSecrets();
         deadline.start();
@@ -54,7 +56,9 @@ Item {
         try { reply = JSON.parse(response); } catch (e) { return; }
         response = "";
         if (reply.ok === true && typeof reply.weak_password === "boolean") {
-            weakPassword = reply.weak_password;
+            // The exact same rule is warned before submission. Once the
+            // account is committed we proceed directly to PAM; do not retain
+            // an unused flag or delay login to ask for password confirmation.
             phase = "authenticating";
             helper.connected = false;
             deadline.restart();
@@ -69,6 +73,7 @@ Item {
         // Never echo the password or send it to an unexpected second challenge.
         if (phase !== "authenticating") return;
         if (error || (responseRequired && (echoResponse || responded))) { authFailed(); return; }
+        if (!responseRequired) infoMessage = message;
         if (responseRequired) {
             responded = true;
             greeter.respond(password);
@@ -83,6 +88,7 @@ Item {
     function launch() {
         if (phase !== "authenticating") return;
         phase = "launching";
+        deadline.stop();
         forgetSecrets();
         greeter.launch(["/usr/local/libexec/ditto-image-session"]);
     }

@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Window
+import Quickshell.Io
 import "jelly"
 import "ui" as Ui
 import "Validation.js" as Validation
@@ -10,6 +11,7 @@ Item {
     required property var translator
     property string phase: "editing"
     property string errorCode: ""
+    property string pamInfo: ""
     readonly property bool busy: phase === "creating" || phase === "authenticating" || phase === "launching"
     property alias displayField: display
     property alias usernameField: username
@@ -24,7 +26,32 @@ Item {
 
     function t(source) { return translator.t(source); }
     function clearSecrets() { password.text = ""; confirm.text = ""; }
-    onPhaseChanged: if (phase === "stopped") back.forceActiveFocus()
+    onPhaseChanged: if (phase === "stopped") Qt.callLater(() => back.forceActiveFocus())
+    onErrorCodeChanged: {
+        if (phase === "editing" && errorCode.length > 0)
+            Qt.callLater(focusError);
+    }
+    function focusError() { errorText.forceActiveFocus(Qt.OtherFocusReason); }
+    function revealFocused() {
+        const window = screen.Window.window;
+        const item = window ? window.activeFocusItem : null;
+        if (!item) return;
+        let ancestor = item;
+        while (ancestor && ancestor !== scroll.contentItem) ancestor = ancestor.parent;
+        if (!ancestor) return;
+        const point = item.mapToItem(scroll.contentItem, 0, 0);
+        if (point.y < scroll.contentY) scroll.contentY = Math.max(0, point.y - 12);
+        else if (point.y + item.height > scroll.contentY + scroll.height)
+            scroll.contentY = Math.min(scroll.contentHeight - scroll.height, point.y + item.height - scroll.height + 12);
+    }
+    function disableIme() {
+        if (!imeCloser.running) imeCloser.running = true;
+    }
+    Process {
+        id: imeCloser
+        objectName: "firstbootImeCloser"
+        command: ["fcitx5-remote", "-c"]
+    }
 
     function submit() {
         if (valid && phase === "editing") submitted(display.text, username.text, password.text, confirm.text);
@@ -68,6 +95,7 @@ Item {
         height: Math.max(0, screen.height - y - 68)
         contentWidth: width
         contentHeight: Math.max(height, card.height + 16)
+        onContentHeightChanged: Qt.callLater(screen.revealFocused)
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -106,6 +134,8 @@ Item {
                     visible: screen.errorCode.length > 0
                     radius: style.uiRadiusControl
                     color: style.uiDangerFill
+                    border.color: style.uiFocus
+                    border.width: errorText.activeFocus ? 2 : 0
                     Copy {
                         id: errorText
                         objectName: "errorMessage"
@@ -114,6 +144,9 @@ Item {
                         color: style.uiDanger
                         Accessible.role: Accessible.AlertMessage
                         Accessible.description: text
+                        Accessible.focusable: true
+                        activeFocusOnTab: visible
+                        onTextChanged: () => { if (visible && text.length > 0) Accessible.announce(text, Accessible.Assertive); }
                     }
                 }
                 Column {
@@ -147,7 +180,10 @@ Item {
                         accessibleDescription: screen.t(qsTr("以英文小寫字母開頭，只能用小寫字母、數字與「-」，最多 31 個字元。"))
                         maximumLength: 31
                         inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhLatinOnly
-                        // Hints are advisory; disable the IM feature on these fields.
+                        // Hints describe content. The focus action actually
+                        // deactivates fcitx5; the validator rejects IM commits.
+                        validator: RegularExpressionValidator { regularExpression: /^[a-z][a-z0-9-]{0,30}$/ }
+                        onInputFocused: screen.disableIme()
                         enabled: screen.phase === "editing"
                         nextTabItem: password.inputItem; previousTabItem: display.inputItem
                         onAccepted: password.focusInput()
@@ -169,12 +205,14 @@ Item {
                             Copy { id: passwordLabel; text: password.accessibleName; font.bold: true }
                             Ui.TextField {
                                 id: password
-                        accessibleLabel: passwordLabel
+                                accessibleLabel: passwordLabel
                                 objectName: "password"
                                 width: parent.width; tokens: style; secret: true
+                                accessiblePassword: true
+                                onInputFocused: screen.disableIme()
                                 accessibleName: screen.t(qsTr("密碼"))
                                 accessibleDescription: screen.t(qsTr("密碼至少 8 個字元"))
-                                maximumLength: 2048
+                                maximumLength: 511
                                 inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhLatinOnly | Qt.ImhSensitiveData | Qt.ImhHiddenText
                                 enabled: screen.phase === "editing"
                                 nextTabItem: confirm.inputItem; previousTabItem: username.inputItem
@@ -186,12 +224,14 @@ Item {
                             Copy { id: confirmLabel; text: confirm.accessibleName; font.bold: true }
                             Ui.TextField {
                                 id: confirm
-                        accessibleLabel: confirmLabel
+                                accessibleLabel: confirmLabel
                                 objectName: "confirmPassword"
                                 width: parent.width; tokens: style; secret: true
+                                accessiblePassword: true
+                                onInputFocused: screen.disableIme()
                                 accessibleName: screen.t(qsTr("再輸入一次"))
                                 accessibleDescription: password.accessibleDescription
-                                maximumLength: 2048
+                                maximumLength: 511
                                 inputMethodHints: password.inputMethodHints
                                 enabled: screen.phase === "editing"
                                 nextTabItem: create.enabled ? create : display.inputItem
@@ -230,7 +270,17 @@ Item {
                     visible: screen.busy
                     text: screen.phase === "creating" ? screen.t(qsTr("正在建立帳號與家目錄…"))
                         : screen.phase === "authenticating" ? screen.t(qsTr("帳號已建立，正在驗證登入…")) : screen.t(qsTr("正在啟動 Ditto 桌面…"))
-                    Accessible.role: Accessible.StaticText
+                    Accessible.role: Accessible.AlertMessage
+                    onTextChanged: () => { if (visible && text.length > 0) Accessible.announce(text, Accessible.Polite); }
+                }
+                Copy {
+                    objectName: "pamInfo"
+                    width: parent.width
+                    visible: screen.busy && screen.pamInfo.length > 0
+                    text: screen.pamInfo
+                    textFormat: Text.PlainText
+                    Accessible.role: Accessible.AlertMessage
+                    onTextChanged: () => { if (visible && text.length > 0) Accessible.announce(text, Accessible.Polite); }
                 }
                 Ui.Button {
                     id: create
@@ -265,13 +315,6 @@ Item {
     // Keep the keyboard's single focused control visible even on smaller outputs.
     Connections {
         target: screen.Window.window
-        function onActiveFocusItemChanged() {
-            const item = screen.Window.window.activeFocusItem;
-            if (!item) return;
-            const point = item.mapToItem(scroll.contentItem, 0, 0);
-            if (point.y < scroll.contentY) scroll.contentY = Math.max(0, point.y - 12);
-            else if (point.y + item.height > scroll.contentY + scroll.height)
-                scroll.contentY = Math.min(scroll.contentHeight - scroll.height, point.y + item.height - scroll.height + 12);
-        }
+        function onActiveFocusItemChanged() { Qt.callLater(screen.revealFocused); }
     }
 }

@@ -28,6 +28,7 @@ ShellRoot {
             translator: tr
             phase: account.phase
             errorCode: account.errorCode
+            pamInfo: account.infoMessage
             onSubmitted: (displayName, username, password, confirm) => account.submit(displayName, username, password, confirm)
             onReturnToLogin: Qt.exit(10)
         }

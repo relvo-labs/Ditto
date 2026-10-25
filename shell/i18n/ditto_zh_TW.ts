@@ -3651,12 +3651,16 @@
 <context>
     <name>Messages</name>
     <message>
+        <source>登入服務目前無法使用，尚未送出建立帳號的請求。請重新啟動電腦後再試。</source>
+        <translation>登入服務目前無法使用，尚未送出建立帳號的請求。請重新啟動電腦後再試。</translation>
+    </message>
+    <message>
         <source>名字最多 128 個字元，不能含控制字元或「: , =」，請修改後再試。</source>
         <translation>名字最多 128 個字元，不能含控制字元或「: , =」，請修改後再試。</translation>
     </message>
     <message>
-        <source>密碼不能含換行或空字元，最多 1024 個字元，請重新輸入。</source>
-        <translation>密碼不能含換行或空字元，最多 1024 個字元，請重新輸入。</translation>
+        <source>密碼不能含換行或空字元，最多 511 個 UTF-8 位元組，請重新輸入。</source>
+        <translation>密碼不能含換行或空字元，最多 511 個 UTF-8 位元組，請重新輸入。</translation>
     </message>
     <message>
         <source>密碼至少需要 8 個字元，請重新輸入。</source>

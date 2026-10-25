@@ -130,3 +130,7 @@ greetd command 只精確接受既有 agreety 或新 wrapper，不接受附加參
 Qt offscreen 單元測試只能證明驗證、可存取標記、鍵盤順序與使用 doubles 的狀態機；
 Socket／greetd／PAM 真實協定、GPU／pixman／無 DRM、fcitx5 中文提交、Orca 與音訊、
 登入後的程序清理及重開機，均須兩個 PR 整合後另做 VM 驗收。
+
+整合 #213／#214 後，須從同一來源重建 helper 並更新 runtime lock，使其列入
+`usr/lib/ditto/target/release/ditto-firstboot-account`；舊 lock 缺件會失敗。
+登入後須在 VM 確認沒有殘留 `_greetd` 程序，包含 Orca、AT-SPI 與 speech-dispatcher。
