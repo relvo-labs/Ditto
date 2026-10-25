@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 from runtime_policy import check_target_ownership, confined_path, validate
 
@@ -24,7 +25,13 @@ def main():
                 dest = confined_path(args.root, name)
                 if dest.is_symlink():
                     raise ValueError(f"existing target symlink: {name}")
-                if dest.exists() and dest.stat().st_nlink > 1:
+                try:
+                    existing = dest.lstat()
+                except FileNotFoundError:
+                    continue
+                if not stat.S_ISREG(existing.st_mode):
+                    raise ValueError(f"existing target non-regular file: {name}")
+                if existing.st_nlink > 1:
                     raise ValueError(f"existing target hardlink: {name}")
             for name in lock.get("symlinks", {}):
                 dest = confined_path(args.root, name)
