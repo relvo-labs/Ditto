@@ -1,5 +1,6 @@
 """Policy/sequence controls in scratch roots; not real root/systemd/VT acceptance."""
 import contextlib
+import errno
 import importlib.machinery
 import importlib.util
 import io
@@ -228,6 +229,34 @@ class TTYLauncherTests(unittest.TestCase):
                 m.main(['--prepare'])
             vt.assert_not_called()
             run.assert_not_called()
+
+    def test_retire_greeter_vanished_status_reads_continue_scanning(self):
+        m = self.launcher
+        # Unlike OSError(errno.ESRCH, ...), this subclass is not automatically
+        # converted by Python into ProcessLookupError.
+        class StatusError(OSError):
+            pass
+        for error in (FileNotFoundError(), ProcessLookupError(),
+                      StatusError(errno.ESRCH, 'fixture process reaped')):
+            with self.subTest(error=type(error).__name__), mock.patch.object(m, 'greeter_uid', return_value=999), mock.patch.object(m.subprocess, 'run'), mock.patch.object(Path, 'iterdir', return_value=[Path('/proc/41'), Path('/proc/42')]), mock.patch.object(Path, 'read_text', side_effect=[error, 'Uid: 1000 1000 1000 1000\nState: S\n']) as read:
+                m.retire_greeter()
+                self.assertEqual(read.call_count, 2)
+
+    def test_retire_live_greeter_keeps_five_second_deadline(self):
+        m = self.launcher
+        with mock.patch.object(m, 'greeter_uid', return_value=999), mock.patch.object(m.subprocess, 'run'), mock.patch.object(Path, 'iterdir', return_value=[Path('/proc/42')]), mock.patch.object(Path, 'read_text', return_value='Uid: 999 999 999 999\nState: S\n'), mock.patch.object(m.time, 'monotonic', side_effect=[10, 14.99, 15]), mock.patch.object(m.time, 'sleep') as wait:
+            with self.assertRaisesRegex(ValueError, 'greeter still running'):
+                m.retire_greeter()
+            wait.assert_called_once_with(0.05)
+
+    def test_retire_greeter_unrelated_failures_propagate(self):
+        m = self.launcher
+        for error in (PermissionError(errno.EACCES, 'fixture denied'),
+                      OSError(errno.EIO, 'fixture IO failure')):
+            with self.subTest(error=error), mock.patch.object(m, 'greeter_uid', return_value=999), mock.patch.object(m.subprocess, 'run'), mock.patch.object(Path, 'iterdir', return_value=[Path('/proc/42')]), mock.patch.object(Path, 'read_text', side_effect=error), self.assertRaises(type(error)):
+                m.retire_greeter()
+        with mock.patch.object(m, 'greeter_uid', return_value=999), mock.patch.object(m.subprocess, 'run'), mock.patch.object(Path, 'iterdir', side_effect=ProcessLookupError()), self.assertRaises(ProcessLookupError):
+            m.retire_greeter()  # Only a vanished status entry is safe to skip.
 
     def test_prepare_retires_session_before_vt(self):
         m = self.launcher

@@ -4,13 +4,17 @@ The child gets real PTY stdin/stdout, as provided by tty-force. Only /dev/tty
 opens are redirected to that slave; this does not qualify systemd/VT or PAM.
 """
 import contextlib
+import fcntl
 import json
 import os
+from pathlib import Path
 import pty
 import select
 import signal
 import subprocess
+import sys
 import termios
+import tempfile
 import time
 import traceback
 import unittest
@@ -215,6 +219,195 @@ class TTYRealPTYTests(unittest.TestCase):
     def test_existing_account_skips_helper(self):
         with self.session('existing') as terminal:
             terminal.finish(0)
+
+
+class SignalTerminalSession(TerminalSession):
+    """Production run/wait and /dev/tty, with an exec'ed account helper double.
+
+    This owns a new session and controlling foreground PTY. No account tool,
+    root privilege or systemd service is used; markers represent fake state.
+    """
+    def __init__(self, case, phase):
+        self.scratch = tempfile.TemporaryDirectory(prefix='ditto-tty-signals-')
+        self.root = Path(self.scratch.name)
+        helper = self.root / 'helper'
+        helper.write_text(f'''#!{sys.executable} -I
+import os
+from pathlib import Path
+import signal
+import sys
+import time
+root = Path({str(self.root)!r})
+assert sys.argv[1:] == ['--tty']
+assert os.tcgetpgrp(0) == os.getpgrp()
+# A callable parent handler must reset on exec, never inherit SIG_IGN.
+assert signal.getsignal(signal.SIGINT) != signal.SIG_IGN
+for sig in (signal.SIGQUIT, signal.SIGTERM, signal.SIGHUP):
+    assert signal.getsignal(sig) == signal.SIG_DFL
+with (root / 'calls').open('a') as stream:
+    stream.write('call\\n')
+received = []
+def interrupted(sig, frame):
+    received.append(sig)
+for sig in (signal.SIGINT, signal.SIGQUIT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(sig, interrupted)
+# QUIT is handled only by this double. Rust SignalGuard handles INT/TERM/HUP;
+# these tests assert launcher waiting, not new Rust QUIT transaction semantics.
+if {phase!r} == 'after':
+    (root / 'created').write_text('committed fixture\\n')
+os.write(1, b'Fixture signal helper ready\\n')
+deadline = time.monotonic() + 4
+while not received:
+    assert time.monotonic() < deadline, 'test signal never reached helper'
+    time.sleep(0.01)
+(root / 'received').write_text(str(received[0]))
+# Exceed subprocess.run's KeyboardInterrupt grace period deterministically.
+time.sleep(0.6)
+if {phase!r} == 'mid':
+    (root / 'created').write_text('committed fixture\\n')
+(root / 'completed').write_text('finished after signal\\n')
+sys.exit(0 if (root / 'created').exists() else 1)
+''')
+        helper.chmod(0o700)
+        try:
+            super().__init__(case, phase)
+        except BaseException:
+            self.scratch.cleanup()
+            raise
+
+    def child(self, phase, slave_path, report_writer):
+        state = {'reads': []}
+        try:
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+            assert os.tcgetpgrp(0) == os.getpgrp() == os.getpid()
+            attrs = termios.tcgetattr(0)
+            assert attrs[3] & termios.ISIG
+            assert attrs[6][termios.VINTR] == b'\x03'
+            assert attrs[6][termios.VQUIT] == b'\x1c'
+            with open('/dev/tty', 'rb', buffering=0) as tty:
+                # /dev/tty is the 5:0 alias, not the slave's device number.
+                assert os.tcgetpgrp(tty.fileno()) == os.tcgetpgrp(0)
+                assert os.ttyname(0) == slave_path
+            launcher = load_launcher()
+            original = {sig: signal.getsignal(sig) for sig in
+                        (signal.SIGINT, signal.SIGQUIT, signal.SIGTERM, signal.SIGHUP)}
+
+            def account_exists():
+                exists = (self.root / 'created').exists()
+                state['reads'].append({'human': exists, 'completed': (self.root / 'completed').exists()})
+                return exists
+
+            # The real subprocess.run executes the double, preserving fixed
+            # argv/env and inherited terminal descriptors. No run/wait mock.
+            with mock.patch.object(launcher, 'HELPER', str(self.root / 'helper')), mock.patch.object(launcher, 'human_account_exists', side_effect=account_exists):
+                state['result'] = launcher.tty_session()
+            state['restored'] = all(signal.getsignal(sig) == old for sig, old in original.items())
+        except BaseException:
+            state['error'] = traceback.format_exc()
+        state['calls'] = len((self.root / 'calls').read_text().splitlines()) if (self.root / 'calls').exists() else 0
+        os.write(report_writer, json.dumps(state).encode('utf-8'))
+        os.close(report_writer)
+        os._exit(0)
+
+    def wait_marker(self, name):
+        deadline = time.monotonic() + 3
+        while not (self.root / name).exists():
+            self.case.assertLess(time.monotonic(), deadline, f'helper did not write {name}')
+            time.sleep(0.01)
+
+    def wait_terminated(self, sig):
+        deadline = time.monotonic() + 3
+        while True:
+            pid, status = os.waitpid(self.pid, os.WNOHANG)
+            if pid:
+                self.pid = None
+                self.case.assertEqual(os.waitstatus_to_exitcode(status), -sig)
+                return
+            self.case.assertLess(time.monotonic(), deadline, 'launcher resisted stop signal')
+            time.sleep(0.01)
+
+    def close(self):
+        # Group contains only task-owned launcher/helper, even if launcher
+        # already died. Always clean children on a failing assertion as well.
+        try:
+            os.killpg(self.group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        super().close()
+        self.scratch.cleanup()
+
+
+class TTYSignalPTYTests(unittest.TestCase):
+    @contextlib.contextmanager
+    def session(self, phase):
+        terminal = SignalTerminalSession(self, phase)
+        terminal.group = terminal.pid
+        try:
+            terminal.expect(b'Fixture signal helper ready')
+            yield terminal
+        finally:
+            terminal.close()
+
+    def terminal_signal(self, phase, value, sig):
+        with self.session(phase) as terminal:
+            terminal.send(value)  # Kernel ISIG delivers to the foreground group.
+            if phase in ('before', 'rollback'):
+                terminal.expect(RETRY)
+                terminal.send(b'\x04')
+                terminal.expect(STOP)
+                terminal.send(b'\n')
+            else:
+                terminal.expect(b'An account was found. Returning to sign-in;')
+            report, diagnostic = terminal.finish(1)
+            self.assertEqual((terminal.root / 'received').read_text(), str(sig))
+            self.assertTrue((terminal.root / 'completed').exists(), 'helper was killed before completion')
+            self.assertTrue(report['restored'], report)
+            self.assertEqual(len(report['reads']), 3, report)
+            self.assertEqual(report['reads'][-1], {'human': phase in ('mid', 'after'), 'completed': True})
+            self.assertEqual(diagnostic, b'')
+
+    def test_vintr_before_transaction(self):
+        self.terminal_signal('before', b'\x03', signal.SIGINT)
+
+    def test_vintr_mid_transaction_completes_before_account_readback(self):
+        self.terminal_signal('mid', b'\x03', signal.SIGINT)
+
+    def test_vintr_mid_transaction_rollback_returns_to_bounded_flow(self):
+        self.terminal_signal('rollback', b'\x03', signal.SIGINT)
+
+    def test_vintr_after_commit_waits_for_helper(self):
+        self.terminal_signal('after', b'\x03', signal.SIGINT)
+
+    def test_vquit_before_transaction(self):
+        self.terminal_signal('before', b'\x1c', signal.SIGQUIT)
+
+    def test_vquit_mid_transaction_waits_for_helper(self):
+        self.terminal_signal('mid', b'\x1c', signal.SIGQUIT)
+
+    def test_vquit_after_commit_waits_for_helper(self):
+        self.terminal_signal('after', b'\x1c', signal.SIGQUIT)
+
+    def test_vintr_at_retry_still_stops(self):
+        with self.session('before') as terminal:
+            # First VINTR lets the helper finish without creating an account;
+            # the second tests the restored launcher handler at retry.
+            terminal.send(b'\x03')
+            terminal.expect(RETRY)
+            terminal.send(b'\x03')
+            report, diagnostic = terminal.finish(1, result=1)
+            self.assertTrue(report['restored'], report)
+            self.assertIn(b'account state could not be confirmed', diagnostic)
+
+    def test_systemd_group_stop_signals_leave_launcher_killable(self):
+        for sig in (signal.SIGTERM, signal.SIGHUP):
+            for phase in ('before', 'mid', 'after'):
+                with self.subTest(signal=sig, phase=phase), self.session(phase) as terminal:
+                    os.killpg(terminal.group, sig)  # control-group analogue, no systemd claim.
+                    terminal.wait_terminated(sig)
+                    terminal.wait_marker('completed')
+                    self.assertEqual((terminal.root / 'received').read_text(), str(sig))
+                    self.assertEqual((terminal.root / 'created').exists(), phase != 'before')
 
 
 if __name__ == '__main__':
