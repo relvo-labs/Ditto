@@ -273,6 +273,7 @@
   "已登入": "Signed in",
   "已登入：%1": "Signed in: %1",
   "已移除套件": "Package removed",
+  "已經在寫入分割表，來不及取消。請等待安裝結果。": "The partition table is already being written; it is too late to cancel. Wait for the result.",
   "已自動停用：一再失敗（%1）": "Disabled automatically: kept failing (%1)",
   "已複製到剪貼簿": "Copied to the clipboard",
   "已複製為「%1」": "Duplicated as “%1”",

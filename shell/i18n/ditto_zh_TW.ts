@@ -3869,6 +3869,10 @@
         <source>正在取消…</source>
         <translation>正在取消…</translation>
     </message>
+    <message>
+        <source>已經在寫入分割表，來不及取消。請等待安裝結果。</source>
+        <translation>已經在寫入分割表，來不及取消。請等待安裝結果。</translation>
+    </message>
 </context>
 <context>
     <name>InstallerScreen</name>

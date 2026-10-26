@@ -14,6 +14,7 @@ VIRTUAL = re.compile(r"(?:loop|ram|zram|dm-|md|sr|nbd|fd|mtdblock|zd)[0-9]*|mmcb
 NAME = re.compile(r"[a-z][a-z0-9]{0,31}")
 DEVNUM = re.compile(r"[0-9]{1,10}:[0-9]{1,10}")
 DISPLAY_LIMIT = 64
+IDENTITY_LIMIT = 256   # compared, never shown; long enough that truncation cannot merge two WWIDs
 
 # Reason codes, in the order they are reported.
 REASONS = ("install_medium", "in_use", "read_only", "removable", "unsupported_sector_size",
@@ -31,11 +32,16 @@ class Disk:
     serial: str
     removable: bool
     read_only: bool
+    diskseq: int = 0     # kernel disk sequence number: new for every attached medium, never reused
+    wwid: str = ""       # world-wide identifier when the device reports one
 
     def identity(self):
-        """Everything shown to the user plus what binds the node; compared before writing."""
-        return (self.name, self.devnum, self.size_bytes, self.logical_block_size, self.model,
-                self.vendor, self.serial, self.removable, self.read_only)
+        """Everything shown to the user plus what binds the kernel disk; compared before writing.
+
+        A swapped disk on the same name, major:minor and size still differs in diskseq.
+        """
+        return (self.name, self.devnum, self.diskseq, self.size_bytes, self.logical_block_size, self.model,
+                self.vendor, self.serial, self.wwid, self.removable, self.read_only)
 
 
 @dataclass(frozen=True)
@@ -61,12 +67,12 @@ def _text(path):
     return None if data is None else data.decode("utf-8", "replace").strip()
 
 
-def display(value):
+def display(value, limit=DISPLAY_LIMIT):
     """Printable, single-line, bounded display text from device-provided bytes."""
     if not value:
         return ""
     text = "".join(ch if ch.isprintable() else " " for ch in value)
-    return " ".join(text.split())[:DISPLAY_LIMIT]
+    return " ".join(text.split())[:limit]
 
 
 def _vpd_serial(data):
@@ -83,6 +89,14 @@ def _serial(block):
         if value:
             return value
     return _vpd_serial(_attr(block / "device/vpd_pg80"))
+
+
+def _wwid(block):
+    for rel in ("wwid", "device/wwid"):
+        value = _text(block / rel)
+        if value:
+            return value
+    return ""
 
 
 def _int(text):
@@ -105,6 +119,7 @@ def _scan_block(block):
     lbs = _int(_text(block / "queue/logical_block_size"))
     removable = _text(block / "removable")
     read_only = _text(block / "ro")
+    diskseq = _int(_text(block / "diskseq"))
     partitions, busy = [], any((block / "holders").glob("*"))
     for child in sorted(block.iterdir()):
         if (child / "partition").is_file():
@@ -112,12 +127,13 @@ def _scan_block(block):
             if part_dev and DEVNUM.fullmatch(part_dev):
                 partitions.append(part_dev)
             busy = busy or any((child / "holders").glob("*"))
+    # Without a diskseq the confirmation cannot be bound to one kernel disk: never offered.
     if (devnum is None or not DEVNUM.fullmatch(devnum) or sectors is None or lbs is None or
-            removable not in ("0", "1") or read_only not in ("0", "1")):
+            removable not in ("0", "1") or read_only not in ("0", "1") or not diskseq):
         return _Scan(None, name, tuple(partitions), busy, True)
     disk = Disk(name, devnum, sectors * 512, lbs, display(_text(block / "device/model")),
                 display(_text(block / "device/vendor")), display(_serial(block)),
-                removable == "1", read_only == "1")
+                removable == "1", read_only == "1", diskseq, display(_wwid(block), IDENTITY_LIMIT))
     return _Scan(disk, name, tuple(partitions), busy, False)
 
 

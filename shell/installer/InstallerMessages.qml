@@ -68,6 +68,7 @@ QtObject {
         case "erase_warning": return qsTr("將清除整顆磁碟的全部資料");
         case "remove_media": return qsTr("請拔除安裝媒體，再重新開機。");
         case "cancelling": return qsTr("正在取消…");
+        case "cancel_too_late": return qsTr("已經在寫入分割表，來不及取消。請等待安裝結果。");
         default: return "";
         }
     }

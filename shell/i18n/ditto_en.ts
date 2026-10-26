@@ -3869,6 +3869,10 @@
         <source>正在取消…</source>
         <translation>Cancelling...</translation>
     </message>
+    <message>
+        <source>已經在寫入分割表，來不及取消。請等待安裝結果。</source>
+        <translation>The partition table is already being written; it is too late to cancel. Wait for the result.</translation>
+    </message>
 </context>
 <context>
     <name>InstallerScreen</name>

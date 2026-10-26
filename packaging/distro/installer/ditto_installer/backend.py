@@ -26,7 +26,9 @@ def disk_view(disk):
 
 class Backend:
     def __init__(self, prepare_fn, reboot_fn, *, token_factory=None):
-        """prepare_fn() -> (enumerate_fn, install_fn); install_fn(disk, cancel_check, progress).
+        """prepare_fn() -> (enumerate_fn, install_fn); install_fn(disk, gate, progress).
+
+        gate is the attempt's writer.CancelGate (cancel_check and commit boundary).
 
         prepare_fn may raise any error with a .code (medium/manifest); that code is
         then reported as the medium state and only 'state'/'reboot' are served.
@@ -52,8 +54,8 @@ class Backend:
             return
         kwargs = {"token_factory": self._token_factory} if self._token_factory else {}
 
-        def install(disk, cancel_check):
-            return install_fn(disk, cancel_check, self._set_progress)
+        def install(disk, gate):
+            return install_fn(disk, gate, self._set_progress)
         with self._lock:
             self.session = Session(enumerate_fn, install, **kwargs)
             self.medium = READY
@@ -104,6 +106,7 @@ class Backend:
                 if session.state == CONFIRMING:
                     session.back()
                     return {"ok": True, "state": session.state}
+                # Refused with "committing" once the partition table is being written.
                 session.request_cancel()
                 return {"ok": True, "state": INSTALLING}
         except SessionError as error:

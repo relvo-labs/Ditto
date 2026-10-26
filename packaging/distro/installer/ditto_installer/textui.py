@@ -169,10 +169,16 @@ class TextUI:
             self.term.write(f"\r{stage}{percent}        ")
             line = self.term.poll_line(self.interval)
             if line is not None and line.strip().lower() == "c" and not cancelling:
-                if self.client.request("cancel").get("ok"):
+                reply = self.client.request("cancel")
+                if reply.get("ok"):
                     cancelling = True
                     self.say()
                     self.say(msg(messages.STATUS, "cancelling"))
+                elif reply.get("error") == "committing":
+                    # Too late: the result is whatever the partition table commit gives.
+                    cancelling = True
+                    self.say()
+                    self.say(msg(messages.STATUS, "cancel_too_late"))
 
 
 def main():

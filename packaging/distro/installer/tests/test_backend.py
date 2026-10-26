@@ -53,7 +53,7 @@ class BackendFixture(base.Fixture):
         shutil.copyfile(self.target(), self.target_path)
         self.before = base.file_sha(self.target_path)
         base.make_block(self.sysfs, "sdz", dev="8:240", size_bytes=os.path.getsize(self.target_path),
-                        model="Task Disk", serial="TASK-0001", serial_at="serial")
+                        model="Task Disk", serial="TASK-0001", serial_at="serial", wwid="eui.task0001")
         base.make_block(self.sysfs, "sdy", dev="8:224", removable=1)
         base.make_block(self.sysfs, "sdb", dev="8:16", model="USB Stick", partitions=("8:17",))
         self.config = {"schema": 1, "manifest_sha256": digest, "medium_label": LABEL,
@@ -68,10 +68,12 @@ class BackendFixture(base.Fixture):
         install = functools.partial(writer.install, allow_regular_file=True)
         if install_wrapper:
             install = install_wrapper(install)
+        self.mountinfo = self.path("mountinfo")
+        self.mountinfo.write_text("")
         empty = self.path("empty")
         empty.write_text("")
         prepare = service.make_prepare(self.config, find=fake_find, sysfs=self.sysfs, dev_root=self.devroot,
-                                       mountinfo_path=empty, swaps_path=empty, install=install)
+                                       mountinfo_path=self.mountinfo, swaps_path=empty, install=install)
         self.backend = backend.Backend(prepare, lambda: self.reboots.append("reboot"))
         self.backend.prepare()
         self.sock = self.root / "backend.sock"
@@ -114,6 +116,31 @@ class BackendFixture(base.Fixture):
         wait_for(lambda: self.client.request("state")["state"] != "installing")
         self.backend.wait(30)
         return self.client.request("state")
+
+    def gated(self, stage):
+        """Install wrapper that pauses once at `stage` until the test sends cancel."""
+        self.reached, self.release = threading.Event(), threading.Event()
+
+        def wrap(install):
+            def run(man, payload_dir, target, disk, *, progress, **kwargs):
+                def gate_progress(name, done, total):
+                    progress(name, done, total)
+                    if name == stage and not self.reached.is_set():
+                        self.reached.set()
+                        self.release.wait(20)
+                if stage != "readback":
+                    return install(man, payload_dir, target, disk, progress=gate_progress, **kwargs)
+                real = writer._read_region
+
+                def gate_read(*args):
+                    if not self.reached.is_set():
+                        self.reached.set()
+                        self.release.wait(20)
+                    return real(*args)
+                with mock.patch.object(writer, "_read_region", gate_read):
+                    return install(man, payload_dir, target, disk, progress=progress, **kwargs)
+            return run
+        return wrap
 
 
 class ProtocolTests(BackendFixture):
@@ -213,32 +240,6 @@ class ProtocolTests(BackendFixture):
 
 
 class CancelTests(BackendFixture):
-    def gated(self, stage):
-        """Install wrapper that pauses once at `stage` until the test sends cancel."""
-        self.reached, self.release = threading.Event(), threading.Event()
-
-        def wrap(install):
-            def run(man, payload_dir, target, disk, *, cancel_check, progress):
-                def gate_progress(name, done, total):
-                    progress(name, done, total)
-                    if name == stage and not self.reached.is_set():
-                        self.reached.set()
-                        self.release.wait(20)
-                if stage != "readback":
-                    return install(man, payload_dir, target, disk, cancel_check=cancel_check,
-                                   progress=gate_progress)
-                real = writer._read_region
-
-                def gate_read(*args):
-                    if not self.reached.is_set():
-                        self.reached.set()
-                        self.release.wait(20)
-                    return real(*args)
-                with mock.patch.object(writer, "_read_region", gate_read):
-                    return install(man, payload_dir, target, disk, cancel_check=cancel_check, progress=progress)
-            return run
-        return wrap
-
     def test_cancel_in_each_phase(self):
         expected = {"verify": "untouched", "write": "partially_written", "readback": "partially_written"}
         for stage, disk_state in expected.items():
@@ -265,6 +266,87 @@ class CancelTests(BackendFixture):
                 self.assertEqual(self.reboots, [])
                 self.doCleanups()
 
+    def test_cancel_at_every_write_point_is_cancelled_or_refused(self):
+        """Class B end to end: inject a real backend 'cancel' before each disk write.
+
+        Before the GPT commit the reply is ok and the result is cancelled with no
+        partition table; from the first GPT write on the reply is 'committing' and
+        the result is the commit's. An accepted cancel never ends 'succeeded'."""
+        def run_with(inject_at):
+            counter = {"writes": 0, "before_gpt": None}
+            replies = []
+            real_write, real_build = writer._pwrite_all, writer.gpt.build
+
+            def write(*args):
+                counter["writes"] += 1
+                if counter["writes"] == inject_at:
+                    replies.append(self.backend.handle({"action": "cancel"}))
+                return real_write(*args)
+
+            def build(*args):
+                if counter["before_gpt"] is None:
+                    counter["before_gpt"] = counter["writes"]
+                return real_build(*args)
+            cli = self.start()
+            chosen = self.select_target()
+            with mock.patch.object(writer, "_pwrite_all", write), mock.patch.object(writer.gpt, "build", build):
+                self.assertEqual(cli.request("confirm", token=chosen["confirm_token"]), {"ok": True, "state": "installing"})
+                state = self.finish()
+            return counter, replies, state
+
+        counter, replies, state = run_with(None)
+        self.doCleanups()
+        self.assertEqual((replies, state["result"]["outcome"]), ([], "succeeded"))
+        total, before_gpt = counter["writes"], counter["before_gpt"]
+        self.assertGreater(total, before_gpt)
+        for n in range(1, total + 1):
+            with self.subTest(write=n, before_gpt=before_gpt):
+                _, replies, state = run_with(n)
+                result = state["result"]
+                if n <= before_gpt:
+                    self.assertEqual(replies, [{"ok": True, "state": "installing"}])
+                    self.assertEqual((state["state"], result["outcome"], result["disk_state"]),
+                                     ("cancelled", "cancelled", "partially_written"))
+                    self.assert_no_table(self.target_path)
+                else:
+                    self.assertEqual(replies, [{"ok": False, "error": "committing"}])
+                    self.assertEqual((state["state"], result["outcome"]), ("succeeded", "succeeded"))
+                    fd = os.open(self.target_path, os.O_RDONLY)
+                    try:
+                        base.gpt.read(base.gpt.file_reader(fd), os.path.getsize(self.target_path))
+                    finally:
+                        os.close(fd)
+                self.doCleanups()
+
+    def test_cancel_racing_into_the_boundary_wins_or_loses_whole(self):
+        """Class B: a cancel that takes the gate just before enter_commit stops the write
+        (no GPT); one that arrives just after it is refused and the commit decides."""
+        for name, first in (("cancel-first", True), ("commit-first", False)):
+            with self.subTest(order=name):
+                replies = []
+                real_enter = writer.CancelGate.enter_commit
+
+                def enter(gate):
+                    if first:
+                        replies.append(self.backend.handle({"action": "cancel"}))
+                        return real_enter(gate)
+                    entered = real_enter(gate)
+                    replies.append(self.backend.handle({"action": "cancel"}))
+                    return entered
+                cli = self.start()
+                chosen = self.select_target()
+                with mock.patch.object(writer.CancelGate, "enter_commit", enter):
+                    cli.request("confirm", token=chosen["confirm_token"])
+                    state = self.finish()
+                if first:
+                    self.assertEqual(replies, [{"ok": True, "state": "installing"}])
+                    self.assertEqual((state["state"], state["result"]["stage"]), ("cancelled", "readback"))
+                    self.assert_no_table(self.target_path)
+                else:
+                    self.assertEqual(replies, [{"ok": False, "error": "committing"}])
+                    self.assertEqual(state["state"], "succeeded")
+                self.doCleanups()
+
     def test_cancel_after_success_is_refused(self):
         cli = self.start()
         chosen = self.select_target()
@@ -273,6 +355,41 @@ class CancelTests(BackendFixture):
         self.assertEqual(state["state"], "succeeded")
         self.assertEqual(cli.request("cancel"), {"ok": False, "error": "not_installing"})
         self.assertEqual(cli.request("state")["result"]["outcome"], "succeeded")
+
+
+class HotplugTests(BackendFixture):
+    def test_swap_after_confirmation_is_never_written(self):
+        """Class A end to end: the confirmed disk is replaced (or changes) while the payload
+        is being verified; the writer must refuse before its first write."""
+        def write(rel, text):
+            return lambda: (self.sysfs / "block/sdz" / rel).write_text(text)
+
+        def holder():
+            (self.sysfs / "block/sdz/holders/dm-0").mkdir()
+        rows = {
+            "serial-a-to-serial-b": write("serial", "SERIAL-B\n"),
+            "new-diskseq-same-serial": write("diskseq", "424242\n"),
+            "wwid-changed": write("wwid", "eui.other\n"),
+            "now-read-only": write("ro", "1\n"),
+            "now-mounted": lambda: self.mountinfo.write_text("1 0 8:240 / /mnt rw - ext4 /dev/sdz rw\n"),
+            "now-held": holder,
+            "gone": lambda: shutil.rmtree(self.sysfs / "block/sdz"),
+        }
+        for name, change in rows.items():
+            with self.subTest(change=name):
+                cli = self.start(install_wrapper=self.gated("verify"))
+                chosen = self.select_target()
+                self.assertEqual(cli.request("confirm", token=chosen["confirm_token"]),
+                                 {"ok": True, "state": "installing"})
+                self.assertTrue(self.reached.wait(20))
+                change()
+                self.release.set()
+                state = self.finish()
+                self.assertEqual((state["state"], state["result"]["outcome"], state["result"]["stage"],
+                                  state["result"]["code"], state["result"]["disk_state"]),
+                                 ("failed", "failed", "preflight", "target_changed", "untouched"))
+                self.assertEqual(base.file_sha(self.target_path), self.before)
+                self.doCleanups()
 
 
 class ScriptedTerminal:
@@ -326,6 +443,77 @@ class TextFrontendTests(BackendFixture):
         self.assertIn(messages.RESULTS["payload_hash_mismatch"][1], term.text)
         self.assertIn(messages.DISK_STATE["untouched"][1], term.text)
         self.assertNotIn(messages.RESULTS["ok"][1], term.text)
+
+    def test_cancel_refused_while_committing_is_said(self):
+        """Class B, text frontend: 'c' during the partition table write is answered with the
+        too-late message, never 'Cancelling...', and the real (successful) result follows."""
+        reached, release = threading.Event(), threading.Event()
+        real_build = writer.gpt.build
+
+        def build(*args):
+            reached.set()
+            release.wait(20)
+            return real_build(*args)
+
+        class Term(ScriptedTerminal):
+            typed = False
+
+            def poll_line(self, timeout):
+                time.sleep(0.01)
+                if reached.is_set() and not self.typed:
+                    self.typed = True
+                    return "c"
+                if self.typed:
+                    release.set()
+                return None
+        cli = self.start()
+        term = Term(["1", "ERASE", ""])
+        with mock.patch.object(writer.gpt, "build", build):
+            self.assertEqual(textui.TextUI(cli, term, interval=0.01).run(), 0)
+        self.assertIn(messages.STATUS["cancel_too_late"][1], term.text)
+        self.assertNotIn(messages.STATUS["cancelling"][1], term.text)
+        self.assertIn(messages.RESULTS["ok"][1], term.text)
+        self.assertEqual(self.backend.session.state, session.SUCCEEDED)
+
+    def test_backend_death_after_confirm_is_unknown_and_not_retried(self):
+        """Class C, text frontend: the backend dies after 'confirm' is sent and before it
+        answers (it may already be writing). The screen says the result is unknown and
+        never reconnects to guess."""
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        path = self.root / "dying.sock"
+        listener.bind(str(path))
+        listener.listen(4)
+        disk = {"name": "sdz", "model": "Task Disk", "vendor": "", "serial": "TASK-0001",
+                "size_bytes": 64 << 30, "removable": False, "read_only": False}
+        replies = {"state": {"ok": True, "medium": "ready", "state": "listing", "notice": None,
+                             "progress": {"stage": None, "done": 0, "total": 0}, "result": None,
+                             "rebooting": False},
+                   "list": {"ok": True, "disks": [dict(disk, token="t1", reasons=[])]},
+                   "select": {"ok": True, "confirm_token": "c1", "disk": disk}}
+        seen = {"connections": 0, "actions": []}
+
+        def serve_until_confirm():
+            while True:
+                try:
+                    conn, _ = listener.accept()
+                except OSError:
+                    return
+                seen["connections"] += 1
+                with conn, conn.makefile("rb") as reader:
+                    for line in reader:
+                        action = json.loads(line)["action"]
+                        seen["actions"].append(action)
+                        if action == "confirm":
+                            break             # dies without answering
+                        conn.sendall(protocol.encode(replies[action]))
+        threading.Thread(target=serve_until_confirm, daemon=True).start()
+        term = ScriptedTerminal(["1", "ERASE", ""])
+        self.assertEqual(textui.TextUI(client.Client(path, connect_timeout=2), term).run(), 1)
+        listener.close()
+        self.assertIn(messages.RESULTS["service_lost"][1], term.text)
+        self.assertNotIn(messages.RESULTS["ok"][1], term.text)
+        self.assertEqual(seen["actions"], ["state", "list", "select", "confirm"])
+        self.assertEqual(seen["connections"], 1)
 
     def test_lost_backend_reports_unknown_result(self):
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

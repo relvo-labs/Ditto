@@ -122,13 +122,16 @@ class Fixture(unittest.TestCase):
 
     def disk_for(self, target, **changes):
         values = dict(name="sdz", devnum="8:240", size_bytes=os.path.getsize(target), logical_block_size=512,
-                      model="Task Disk", vendor="ATA", serial="TASK-0001", removable=False, read_only=False)
+                      model="Task Disk", vendor="ATA", serial="TASK-0001", removable=False, read_only=False,
+                      diskseq=240, wwid="eui.task0001")
         values.update(changes)
         return disks.Disk(**values)
 
     def install(self, man, out, target, **kwargs):
         kwargs.setdefault("allow_regular_file", True)
         disk = kwargs.pop("disk", None) or self.disk_for(target)
+        # Default: the system still shows exactly the confirmed disk, eligible.
+        kwargs.setdefault("recheck", lambda devnum: disks.Candidate(disk, ()) if devnum == disk.devnum else None)
         return writer.install(man, out, target, disk, **kwargs)
 
     def assert_untouched(self, result, target, before):
@@ -300,10 +303,14 @@ class LayoutTests(Fixture):
 
 def make_block(sysfs, name, *, size_bytes=64 << 30, dev="8:0", removable=0, ro=0, lbs=512,
                model="Disk", vendor="ATA", serial=None, serial_at="device/serial", device=True,
-               partitions=(), holders=(), part_holders=(), write_size=True):
+               partitions=(), holders=(), part_holders=(), write_size=True, diskseq=None, wwid=None,
+               wwid_at="wwid"):
     block = sysfs / "block" / name
     block.mkdir(parents=True)
     (block / "dev").write_text(dev + "\n")
+    if diskseq is not False:
+        major, minor = map(int, dev.split(":"))
+        (block / "diskseq").write_text(f"{diskseq or major * 1000 + minor + 1}\n")
     if write_size:
         (block / "size").write_text(f"{size_bytes // 512}\n")
     (block / "removable").write_text(f"{removable}\n")
@@ -317,6 +324,10 @@ def make_block(sysfs, name, *, size_bytes=64 << 30, dev="8:0", removable=0, ro=0
         (block / "device").mkdir()
         (block / "device/model").write_text(model + "\n")
         (block / "device/vendor").write_text(vendor + "\n")
+    if wwid is not None:
+        path = block / wwid_at
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(wwid + "\n")
     if serial is not None:
         path = block / serial_at
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -375,6 +386,26 @@ class DiskTests(Fixture):
         model = result["nvme0n1"].disk.model
         self.assertTrue(model.startswith("WD SN770 [31m") and len(model) == disks.DISPLAY_LIMIT, model)
         self.assertTrue(model.isprintable())
+
+    def test_identity_carries_diskseq_and_wwid(self):
+        """A disk without a kernel diskseq cannot be bound to one confirmation: never offered."""
+        sysfs = self.path("sys")
+        make_block(sysfs, "nvme0n1", dev="259:0", diskseq=9, wwid="eui.0026b72839dc4235", serial="N-1")
+        make_block(sysfs, "sda", dev="8:0", diskseq=11, wwid="naa.5000c500a1b2c3d4", wwid_at="device/wwid")
+        make_block(sysfs, "sdb", dev="8:16", diskseq=False)
+        make_block(sysfs, "sdc", dev="8:32", diskseq=12)
+        (sysfs / "block/sdc/diskseq").write_text("not-a-number\n")
+        result = {c.disk.name: c for c in disks.enumerate_disks(sysfs)}
+        rows = {"nvme0n1": ((), 9, "eui.0026b72839dc4235"), "sda": ((), 11, "naa.5000c500a1b2c3d4"),
+                "sdb": (("unreadable",), 0, ""), "sdc": (("unreadable",), 0, "")}
+        for name, (reasons, diskseq, wwid) in rows.items():
+            with self.subTest(disk=name):
+                c = result[name]
+                self.assertEqual((c.reasons, c.disk.diskseq, c.disk.wwid), (reasons, diskseq, wwid))
+        same = result["nvme0n1"].disk
+        for field, value in (("diskseq", 10), ("wwid", "eui.other"), ("serial", "N-2")):
+            with self.subTest(changed=field):
+                self.assertNotEqual(same.identity(), disks.Disk(**{**same.__dict__, field: value}).identity())
 
     def test_medium_devnum_from_partition(self):
         sysfs = self.fake_sysfs()
@@ -529,6 +560,81 @@ class WriterTests(Fixture):
         self.assertEqual(file_sha(small), small_before)
         self.assertFalse((self.root / "absent.img").exists())
 
+    def test_open_descriptor_is_bound_to_the_confirmed_disk(self):
+        """Class A: after O_EXCL open and before the first write, the fd and the freshly
+        enumerated identity/eligibility of its devnum must equal the confirmation."""
+        _, out, digest = self.build_payload()
+        man = self.load(out, digest)
+        real_fd_identity = writer._fd_identity
+
+        def candidate(disk, **changes):
+            reasons = changes.pop("reasons", ())
+            return lambda devnum: disks.Candidate(disks.Disk(**{**disk.__dict__, **changes}), reasons)
+
+        def fd_says(**changes):
+            def fake(fd, info, disk):
+                devnum, diskseq, size = real_fd_identity(fd, info, disk)
+                values = {"devnum": devnum, "diskseq": disk.diskseq, "size": size, **changes}
+                if values.pop("error", False):
+                    raise OSError(errno.ENOTTY, "injected")
+                return values["devnum"], values["diskseq"], values["size"]
+            return fake
+
+        def raising(devnum):
+            raise OSError(errno.EIO, "sysfs unreadable")
+        rows = {
+            # name: (recheck factory(disk) | None, fd identity patch | None, expected code)
+            "same-disk": (None, None, "ok"),
+            "hotplug-serial-swap": (lambda d: candidate(d, serial="SERIAL-B"), None, "target_changed"),
+            "new-diskseq-same-serial": (lambda d: candidate(d, diskseq=d.diskseq + 1), None, "target_changed"),
+            "wwid-changed": (lambda d: candidate(d, wwid="eui.other"), None, "target_changed"),
+            "model-changed": (lambda d: candidate(d, model="Other"), None, "target_changed"),
+            "gone": (lambda d: (lambda devnum: None), None, "target_changed"),
+            "sysfs-unreadable": (lambda d: raising, None, "target_changed"),
+            "now-mounted": (lambda d: candidate(d, reasons=("in_use",)), None, "target_changed"),
+            "now-install-medium": (lambda d: candidate(d, reasons=("install_medium",)), None, "target_changed"),
+            "now-read-only": (lambda d: candidate(d, read_only=True, reasons=("read_only",)), None,
+                              "target_changed"),
+            "now-too-small": (lambda d: candidate(d, reasons=("too_small",)), None, "target_changed"),
+            "fd-diskseq-differs": (None, fd_says(diskseq=1), "target_changed"),
+            "fd-devnum-differs": (None, fd_says(devnum="8:0"), "target_changed"),
+            "fd-size-differs": (None, fd_says(size=MIB), "target_changed"),
+            "fd-identity-unreadable": (None, fd_says(error=True), "target_changed"),
+        }
+        for name, (recheck_for, fd_patch, code) in rows.items():
+            with self.subTest(case=name):
+                target = self.target()
+                before = file_sha(target)
+                disk = self.disk_for(target)
+                events = []
+                real_open, real_write = writer.open_target, writer._pwrite_all
+                base_recheck = recheck_for(disk) if recheck_for else (lambda devnum: disks.Candidate(disk, ()))
+
+                def recheck(devnum, base_recheck=base_recheck):
+                    events.append(("recheck", devnum))
+                    return base_recheck(devnum)
+
+                def opened(*args, **kwargs):
+                    events.append(("open",))
+                    return real_open(*args, **kwargs)
+
+                def write(*args):
+                    events.append(("write",))
+                    return real_write(*args)
+                with mock.patch.object(writer, "open_target", opened), \
+                        mock.patch.object(writer, "_pwrite_all", write), \
+                        mock.patch.object(writer, "_fd_identity", fd_patch or real_fd_identity):
+                    result = self.install(man, out, target, disk=disk, recheck=recheck)
+                if code == "ok":
+                    self.assertEqual(result.outcome, "succeeded", result)
+                    first_write = events.index(("write",))
+                    self.assertEqual(events[:first_write], [("open",), ("recheck", "8:240")])
+                    continue
+                self.assertEqual((result.outcome, result.stage, result.code), ("failed", "preflight", code), result)
+                self.assert_untouched(result, target, before)
+                self.assertNotIn(("write",), events)
+                self.assertEqual(events[0], ("open",))
+
     def test_cancel_before_any_write(self):
         _, out, digest = self.build_payload()
         man = self.load(out, digest)
@@ -559,6 +665,48 @@ class WriterTests(Fixture):
         self.assertEqual((result.outcome, result.stage, result.disk_state),
                          ("cancelled", "write", "partially_written"))
         self.assert_no_table(target)
+
+    def test_commit_boundary_decides_cancel_once(self):
+        """Class B at the writer: a cancel accepted before enter_commit ends cancelled with
+        no GPT; after enter_commit the gate refuses every cancel and the outcome is the commit's."""
+        _, out, digest = self.build_payload()
+        man = self.load(out, digest)
+        rows = {
+            # name: (when the cancel is requested, accepted?, outcome)
+            "racing-into-boundary": ("enter_commit", True, "cancelled"),
+            "during-gpt-write": ("gpt_build", False, "succeeded"),
+            "after-gpt-readback": ("gpt_read", False, "succeeded"),
+        }
+        for name, (point, accepted, outcome) in rows.items():
+            with self.subTest(case=name):
+                gate = writer.CancelGate()
+                answers = []
+                real_enter, real_build, real_read = gate.enter_commit, writer.gpt.build, writer.gpt.read
+
+                def enter():
+                    if point == "enter_commit":
+                        answers.append(gate.request_cancel())   # the other thread wins the lock first
+                    return real_enter()
+
+                def build(*args):
+                    if point == "gpt_build":
+                        answers.append(gate.request_cancel())
+                    return real_build(*args)
+
+                def read(*args):
+                    table = real_read(*args)
+                    if point == "gpt_read":
+                        answers.append(gate.request_cancel())
+                    return table
+                target = self.target()
+                with mock.patch.object(writer.gpt, "build", build), mock.patch.object(writer.gpt, "read", read):
+                    result = self.install(man, out, target, cancel_check=gate, enter_commit=enter)
+                self.assertEqual(answers, [accepted])
+                self.assertEqual(result.outcome, outcome, result)
+                self.assertFalse(gate() and result.outcome == "succeeded")
+                if outcome == "cancelled":
+                    self.assertEqual((result.stage, result.disk_state), ("readback", "partially_written"))
+                    self.assert_no_table(target)
 
     def test_write_readback_and_commit_faults(self):
         _, out, digest = self.build_payload()
@@ -685,14 +833,16 @@ class SessionTests(Fixture):
         target = devroot / "sdz"
         shutil.copyfile(self.target(), target)
         make_block(sysfs, "sdz", dev="8:240", size_bytes=os.path.getsize(target), model="Task Disk",
-                   serial="TASK-0001", serial_at="serial")
+                   serial="TASK-0001", serial_at="serial", wwid="eui.task0001")
         make_block(sysfs, "sdy", dev="8:224", removable=1)
         calls = []
 
-        def default_install(disk, cancel_check):
+        def default_install(disk, gate):
             calls.append(disk)
             return writer.install(man, out, devroot / disk.name, disk, allow_regular_file=True,
-                                  cancel_check=cancel_check)
+                                  recheck=lambda devnum: next((c for c in enumerate_fn() if c.disk.devnum == devnum),
+                                                              None),
+                                  cancel_check=gate, enter_commit=gate.enter_commit)
         state = {"mountinfo": ""}
 
         def enumerate_fn():
@@ -739,6 +889,9 @@ class SessionTests(Fixture):
             "size": lambda sysfs, state: (sysfs / "block/sdz/size").write_text("99999999\n"),
             "mounted": lambda sysfs, state: state.update(mountinfo="1 0 8:240 / /mnt rw - ext4 /dev/sdz rw\n"),
             "gone": lambda sysfs, state: shutil.rmtree(sysfs / "block/sdz"),
+            # Same name, devnum, size, model and serial: only the kernel disk sequence differs.
+            "diskseq": lambda sysfs, state: (sysfs / "block/sdz/diskseq").write_text("999999\n"),
+            "wwid": lambda sysfs, state: (sysfs / "block/sdz/wwid").write_text("eui.other\n"),
         }
         for name, mutate in mutations.items():
             with self.subTest(change=name):
@@ -775,6 +928,43 @@ class SessionTests(Fixture):
         # After a cancelled attempt the user may choose a disk again.
         self.assertTrue(any(o.token for o in sess.list_disks()))
         self.assertEqual((sess.state, sess.result), (session.LISTING, None))
+
+    def test_cancel_gate_table(self):
+        """Class B: whichever of cancel/commit takes the gate first wins; never both."""
+        rows = {
+            "cancel-then-commit": (("cancel", "commit"), [True, False], True),
+            "commit-then-cancel": (("commit", "cancel"), [True, False], False),
+            "cancel-twice-then-commit": (("cancel", "cancel", "commit"), [True, True, False], True),
+            "commit-then-cancel-twice": (("commit", "cancel", "cancel"), [True, False, False], False),
+        }
+        for name, (steps, answers, cancelled) in rows.items():
+            with self.subTest(case=name):
+                gate = writer.CancelGate()
+                got = [gate.request_cancel() if step == "cancel" else gate.enter_commit() for step in steps]
+                self.assertEqual((got, gate(), gate.committing), (answers, cancelled, not cancelled))
+
+    def test_session_cancel_is_refused_once_committing(self):
+        """Class B at the session: request_cancel after the boundary raises 'committing';
+        a writer that ignores the boundary can never turn an accepted cancel into success."""
+        seen = {}
+
+        def committing_install(disk, gate):
+            self.assertTrue(gate.enter_commit())
+            with self.assertRaises(session.SessionError) as caught:
+                sess.request_cancel()
+            seen["code"] = caught.exception.code
+            return writer.Result("succeeded", "done", "ok", "installed")
+        sess, *_ = self.setup_session(install=committing_install)
+        result = sess.confirm(sess.select(next(o.token for o in sess.list_disks() if o.token)).token)
+        self.assertEqual((seen["code"], result.outcome, sess.state), ("committing", "succeeded", session.SUCCEEDED))
+
+        def ignoring_install(disk, gate):
+            sess.request_cancel()                                    # accepted
+            return writer.Result("succeeded", "done", "ok", "installed")   # buggy writer ignores it
+        sess, *_ = self.setup_session(install=ignoring_install)
+        result = sess.confirm(sess.select(next(o.token for o in sess.list_disks() if o.token)).token)
+        self.assertEqual((result.outcome, result.code, result.disk_state, sess.state),
+                         ("failed", "internal_error", "unknown", session.FAILED))
 
     def test_no_return_to_list_after_success_and_writer_crash_is_failure(self):
         sess, *_ = self.setup_session()

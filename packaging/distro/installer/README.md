@@ -49,7 +49,9 @@
 
 只列 `/sys/block` 下有 `device` 的整碟，略過 loop、ram、zram、dm、md、sr、nbd、fd、mtdblock 與 eMMC boot／rpmb。以下磁碟列出但不能選，並帶原因：安裝媒體所在磁碟、使用中（掛載、swap、holders）、唯讀、可移除、4K 原生磁區、容量不足、資訊讀不到。型號、廠商與序號是裝置提供的資料，只做顯示：移除不可列印字元、最多 64 字元。
 
-確認時重新列舉並比對名稱、major:minor、容量、邏輯磁區大小、型號、廠商、序號、removable、ro；不同就回到列表。寫入時以 `O_EXCL|O_NOFOLLOW` 開啟目標，核心會拒絕已掛載或被占用的區塊裝置；再比對 `st_rdev` 與 `BLKGETSIZE64`。正式路徑只接受區塊裝置。
+確認綁定核心的磁碟身分：名稱、major:minor、`diskseq`（每次接上新磁碟都會換新、不重複使用）、容量、邏輯磁區大小、型號、廠商、序號、WWID（裝置有提供時）、removable、ro。讀不到 `diskseq` 的磁碟列為「資訊讀不到」，不提供安裝。按下確認時重新列舉並比對；不同就回到列表。
+
+寫入前還有第二道核對，綁在**已開啟的描述元**上：以 `O_EXCL|O_NOFOLLOW` 開啟目標（核心會拒絕已掛載或被占用的區塊裝置）後，用該 fd 自己的 `st_rdev`、`BLKGETDISKSEQ`、`BLKGETSIZE64` 比對確認時的值；再以這個 major:minor 重新列舉 sysfs，身分必須完全相同，且仍符合所有選碟規則（不是安裝媒體、未掛載、無 holders／swap、非唯讀、容量足夠）。任何一項不符，或資訊讀不到，就在第一次寫入前以 `target_changed` 停止，磁碟維持 `untouched`。fd 自己的 `diskseq` 綁住了 fd 指向的磁碟；sysfs 以 major:minor 查到的項目也必須是同一個 `diskseq`，所以即使 major:minor 被另一顆磁碟重用也無法通過。正式路徑只接受區塊裝置。
 
 ## 寫入順序與失敗語意
 
@@ -61,6 +63,10 @@
 6. 寫入新 GPT，並讀回、核對主表與備份表。
 
 六步都成立才回報成功。第 3 步之後的失敗或取消是 `partially_written`：因為 GPT 最後才寫，這種磁碟不會開機。第 3 步之前一律是 `untouched`。清除不是安全抹除。
+
+取消與第 6 步的提交點由同一把鎖（`writer.CancelGate`）決定，兩者只會有一個成立：提交點之前受理的取消，結果一定是 `cancelled` 且不寫 GPT；進入提交點之後，後端以 `committing` 拒絕取消，畫面說明「來不及取消」，結果由提交本身決定（成功或 `commit_failed`）。不會出現「取消已受理」卻回報成功。
+
+前端送出 `confirm` 後，後端在回覆前就開始寫入。因此前端只要還有未回覆的 `confirm`，或已在安裝中，連線中斷就顯示「無法確認結果」並停止重連；圖形畫面與文字畫面相同。
 
 ## builder 組裝（計畫，尚未執行）
 
@@ -81,7 +87,7 @@ python3 packaging/distro/installer/tests/test_ui_wrapper.py
 python3 packaging/distro/installer/tests/test_qml.py   # 需要 Qt 6.10.2（QT_PREFIX）才跑 qmltestrunner
 ```
 
-只使用 task 自有的稀疏一般檔案、假 sysfs、暫存目錄中的 Unix socket、記錄型的工具替身與 #212 的 Quickshell stubs；不開啟任何區塊裝置、loop 或掛載，不需要 root。`sfdisk --json／--verify` 作為獨立讀者核對寫出的 GPT。這些測試**不能**證明真實區塊裝置的 `O_EXCL`、`O_DIRECT`、`BLKFLSBUF`、`BLKRRPART`，也不能證明 mkosi `Format=uki`、PAM／logind 座位、Wayfire 在實體 GPU 的行為、growfs 或開機。
+只使用 task 自有的稀疏一般檔案、假 sysfs、暫存目錄中的 Unix socket、記錄型的工具替身與 #212 的 Quickshell stubs；不開啟任何區塊裝置、loop 或掛載，不需要 root。`sfdisk --json／--verify` 作為獨立讀者核對寫出的 GPT。這些測試**不能**證明真實區塊裝置的 `O_EXCL`、`O_DIRECT`、`BLKFLSBUF`、`BLKRRPART`、`BLKGETDISKSEQ` 與 sysfs `diskseq`／`wwid`（一般檔案沒有裝置身分，測試以注入取代 fd 身分），也不能證明 mkosi `Format=uki`、PAM／logind 座位、Wayfire 在實體 GPU 的行為、growfs 或開機。
 
 ## 已知限制與待驗證
 
@@ -90,4 +96,4 @@ python3 packaging/distro/installer/tests/test_qml.py   # 需要 Qt 6.10.2（QT_P
 - 清單 SHA256 綁定安裝器與同一媒體上的 payload，是完整性檢查，不是簽章；真實性依 GitHub pre-release 的 `SHA256SUMS`。
 - 清除不是安全抹除；檔案系統 UUID 來自固定 mkosi Seed，所有安裝相同，只有 GPT GUID 隨機。
 - 安裝環境不含 Orca；畫面有 AT-SPI 名稱與文字狀態，但螢幕閱讀器流程未驗證。文字畫面只有英文。
-- VM 須驗：ISO 以 USB 與光碟開機、安裝、離線回讀（machine-id 為空、無 host key、無 ESP／rootfs seed、無人員帳號、對安裝結果重跑 pristine scan）、首次開機 growfs、#212 建帳號、PAM 登入；負例含 payload 一個 byte 損毀、目標太小、確認畫面取消、寫入中取消、無 DRM。
+- VM 須驗：ISO 以 USB 與光碟開機、安裝、離線回讀（machine-id 為空、無 host key、無 ESP／rootfs seed、無人員帳號、對安裝結果重跑 pristine scan）、首次開機 growfs、#212 建帳號、PAM 登入；負例含 payload 一個 byte 損毀、目標太小、確認畫面取消、寫入中取消、寫入分割表時取消（應顯示來不及取消）、確認後熱插拔換成另一顆同容量磁碟（應停止且不寫入）、按下確認後立即終止後端（應顯示無法確認結果）、無 DRM。

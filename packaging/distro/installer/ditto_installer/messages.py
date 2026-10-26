@@ -68,6 +68,8 @@ STATUS = {
     "erase_warning": ("將清除整顆磁碟的全部資料", "ALL DATA ON THIS WHOLE DISK WILL BE ERASED"),
     "remove_media": ("請拔除安裝媒體，再重新開機。", "Remove the installation medium, then restart."),
     "cancelling": ("正在取消…", "Cancelling..."),
+    "cancel_too_late": ("已經在寫入分割表，來不及取消。請等待安裝結果。",
+                        "The partition table is already being written; it is too late to cancel. Wait for the result."),
 }
 
 STAGES = {

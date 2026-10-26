@@ -60,9 +60,13 @@ def make_prepare(config, *, find=find_medium, sysfs="/sys", dev_root=Path("/dev"
             return disks.enumerate_disks(sysfs, mountinfo=_read(mountinfo_path), swaps=_read(swaps_path),
                                          medium_devnums=medium.devnums, min_bytes=minimum)
 
-        def install_fn(disk, cancel_check, progress):
-            return install(man, medium.payload_dir, Path(dev_root) / disk.name, disk,
-                           cancel_check=cancel_check, progress=progress)
+        def recheck(devnum):
+            # Fresh enumeration: identity (diskseq, serial, WWID, ...) and every exclusion rule.
+            return next((c for c in enumerate_fn() if c.disk.devnum == devnum), None)
+
+        def install_fn(disk, gate, progress):
+            return install(man, medium.payload_dir, Path(dev_root) / disk.name, disk, recheck=recheck,
+                           cancel_check=gate, enter_commit=gate.enter_commit, progress=progress)
         return enumerate_fn, install_fn
     return prepare
 

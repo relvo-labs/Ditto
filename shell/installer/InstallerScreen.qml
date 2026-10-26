@@ -21,7 +21,6 @@ Item {
     readonly property var eligible: (client.disks || []).filter(d => typeof d.token === "string" && d.token.length > 0)
     readonly property var excluded: (client.disks || []).filter(d => !d.token)
     readonly property var chosen: client.confirmation ? client.confirmation.disk : null
-    property bool cancelRequested: false
     property alias cancelConfirmButton: cancelConfirm
     property alias eraseButton: erase
     property alias cancelInstallButton: cancelInstall
@@ -47,10 +46,7 @@ Item {
             if (first) first.forceActiveFocus(); else refresh.forceActiveFocus();
         } else if (view === "medium") rebootMedium.forceActiveFocus();
     }
-    onViewChanged: {
-        if (view !== "installing") cancelRequested = false;
-        Qt.callLater(focusDefault);
-    }
+    onViewChanged: Qt.callLater(focusDefault)
     onEligibleChanged: if (view === "list") Qt.callLater(focusDefault)
 
     InstallerMessages { id: messages }
@@ -251,7 +247,8 @@ Item {
                     Status {
                         objectName: "stageText"
                         width: parent.width
-                        text: screen.cancelRequested ? screen.t(messages.status("cancelling"))
+                        text: screen.client.cancelStatus === "refused" ? screen.t(messages.status("cancel_too_late"))
+                            : screen.client.cancelStatus !== "" ? screen.t(messages.status("cancelling"))
                             : screen.t(messages.stage(screen.client.progress.stage || "verify"))
                               + (screen.client.progress.total > 0 ? "  " + screen.client.percent + "%" : "")
                     }
@@ -270,11 +267,11 @@ Item {
                     Ui.Button {
                         id: cancelInstall
                         objectName: "cancelInstall"
-                        enabled: !screen.cancelRequested
+                        enabled: screen.client.cancelStatus === ""
                         tokens: style
                         text: screen.t(qsTr("取消安裝"))
                         Accessible.description: screen.t(qsTr("停止安裝。已開始寫入的磁碟會無法開機，需要重新安裝。"))
-                        onClicked: { screen.cancelRequested = true; screen.client.cancel(); }
+                        onClicked: screen.client.cancel()
                     }
                 }
 

@@ -3,14 +3,18 @@
 Frontends only send: list, select(disk token), confirm(confirm token),
 cancel, and read state. Tokens are random, per listing / per confirmation
 screen, single use. The disk is re-enumerated and compared with the snapshot
-shown on the confirmation screen before anything is written.
+shown on the confirmation screen (including the kernel diskseq) here, and the
+writer compares it again against the opened descriptor before the first write.
+
+Cancel while installing goes through the attempt's CancelGate: accepted before
+the GPT commit boundary, refused with "committing" once the commit has started.
 """
 
 from dataclasses import dataclass
 import secrets
 import threading
 
-from .writer import Result
+from .writer import CancelGate, Result
 
 LISTING, CONFIRMING, INSTALLING, SUCCEEDED, FAILED, CANCELLED = (
     "listing", "confirming", "installing", "succeeded", "failed", "cancelled")
@@ -36,12 +40,16 @@ class Confirmation:
 
 class Session:
     def __init__(self, enumerate_fn, install_fn, token_factory=lambda: secrets.token_hex(16)):
-        """enumerate_fn() -> [Candidate]; install_fn(disk, cancel_check) -> writer.Result."""
+        """enumerate_fn() -> [Candidate]; install_fn(disk, gate) -> writer.Result.
+
+        gate is a writer.CancelGate: callable as cancel_check, and gate.enter_commit
+        must be handed to the writer as its commit boundary.
+        """
         self._enumerate = enumerate_fn
         self._install = install_fn
         self._token = token_factory
         self._lock = threading.Lock()
-        self._cancel = threading.Event()
+        self._gate = None
         self.state = LISTING
         self._offers = {}
         self._confirmation = None
@@ -100,7 +108,7 @@ class Session:
                 self.state, self.notice = LISTING, "disk_changed"
                 return None
             self.state = INSTALLING
-            self._cancel.clear()
+            self._gate = CancelGate()   # one per attempt; cancel is possible from here on
             return pending.disk
 
     def confirm(self, token):
@@ -111,20 +119,29 @@ class Session:
         with self._lock:
             if self.state != INSTALLING:
                 raise SessionError("not_installing")
+            gate = self._gate
         try:
-            result = self._install(disk, self._cancel.is_set)
+            result = self._install(disk, gate)
         except Exception:  # noqa: BLE001 - an escaping writer bug must not look like success
             result = None
         with self._lock:
             if not isinstance(result, Result):
                 result = Result("failed", "done", "internal_error", "unknown")
+            if result.outcome == "succeeded" and gate():
+                # Unreachable with a writer that honours enter_commit; never report both.
+                result = Result("failed", result.stage, "internal_error", "unknown")
             self.result = result
             self.state = {"succeeded": SUCCEEDED, "cancelled": CANCELLED}.get(result.outcome, FAILED)
             return result
 
     def request_cancel(self):
-        """Callable from another thread while installing; the writer stops at its next check."""
+        """Callable from another thread while installing.
+
+        Accepted: the writer stops at its next check and never writes the GPT.
+        Raises SessionError("committing") once the commit boundary was entered.
+        """
         with self._lock:
             if self.state != INSTALLING:
                 raise SessionError("not_installing")
-            self._cancel.set()
+            if not self._gate.request_cancel():
+                raise SessionError("committing")
