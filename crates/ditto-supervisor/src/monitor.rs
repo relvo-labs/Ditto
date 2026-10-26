@@ -1236,9 +1236,9 @@ mod tests {
             let seen = seen[pongs % seen.len()];
             let outcome = if n >= at && n < resumed_ping {
                 &disruption[(n - at) as usize]
-            } else if n == 0 || n == resumed_ping || (n > at && stall == Some(since_pong)) {
-                &Outcome::Pong
-            } else if n < at && stall == Some(since_pong) {
+            } else if n == 0 || n == resumed_ping || stall == Some(since_pong) {
+                // The disruption's pings are handled above, so the pattern
+                // applies before and after it alike.
                 &Outcome::Pong
             } else {
                 &missed
