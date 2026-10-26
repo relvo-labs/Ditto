@@ -8,7 +8,7 @@
 
 ## 結論
 
-`ditto-supervisor` 對每一代剛武裝的 Shell 給 60 秒啟動寬限：寬限內要連續 10 次無回應（約 19～21 秒）才判定無回應；寬限結束後維持 [plan/03/05 §3](../../../plan/03/05-platform-supervision-and-rescue.md) 的連續 3 次（約 6～7 秒）。門檻依每次無回應被觀察到的時間決定，連續次數跨過寬限結束不歸零。
+`ditto-supervisor` 對每一代剛武裝的 Shell 給 60 秒啟動寬限：寬限內要連續 10 次無回應（約 19～21 秒）才判定無回應；寬限結束後維持 [plan/03/05 §3](../../../plan/03/05-platform-supervision-and-rescue.md) 的連續 3 次（約 6～7 秒）。門檻依每次無回應被觀察到的時間決定，連續次數跨過寬限結束不歸零。「一代」以回 `pong` 的連線對端程序（`SO_PEERCRED` 的 PID 加上程序啟動時間）判斷，不以是否觀察到 Shell 退出推斷。
 
 ## 依據
 
@@ -21,12 +21,15 @@
 
 - 全面把 `--misses` 調高：會放寬常態期，違反 NFR-08 的 10 秒，也違反「量測不得自我放寬」。
 - 等 Shell 回報 `shell.report` 或開機 commit 完成才武裝：supervisor 要依賴 Core 或 Shell 的狀態，違反 supervisor 獨立於被監督者；且第二次停頓就在開機 commit 之後。
-- 寬限內完全不觸發：啟動中真的卡死就永遠不進救援。
+- 寬限內完全不觸發：寬限結束後仍會以 3 次規則觸發，所以不是「永遠不進救援」；但剛武裝就卡死的 Shell 要等寬限結束才處理，從武裝起超過 60 秒；10 次門檻則約 21 秒。卡死上限也會跟著寬限長度走，要拉長寬限就得一起拉長卡死時間。
 - 跨過寬限結束的連續無回應沿用啟動門檻：寬限邊界附近卡死的 Shell 會得到比常態寬鬆的處理，常態規則被變相放寬。
+- 以觀察到「不存在」來判斷新的一代：Core 重啟 Shell 的最短退避是 1 秒，比 2 秒的 ping 間隔短，新 Shell 可能在 supervisor 看到「不存在」之前就接上。舊連線斷掉、重連到新 Shell 只會得到一次無回應，新 Shell 會沿用舊的常態期，在慢機器上啟動停頓仍會被殺（PR #227 審查 P1）。
+- 讀 Core 寫的 `shell.pid` 判斷新的一代：要依賴 Core 寫檔的時機，而且檔案指向的不一定是回 `pong` 的那個程序；從連線本身讀對端較直接。
 - 降低 Shell 主執行緒停頓（供應者非同步載入等）：是根本改善，但改動 Shell，另開 follow-up；supervisor 仍需要對慢機器有容忍。
 
 ## 影響
 
-- `crates/ditto-supervisor`：新增 `--startup-grace-ms`（預設 60000，0 為關閉）與 `--startup-misses`（預設 10，不得小於 `--misses`）；日誌以 `phase` 區分 `startup` 與 `steady`，並記 `grace_ended`。既有旗標與預設不變。
+- `crates/ditto-supervisor`：新增 `--startup-grace-ms`（預設 60000，0 為關閉）與 `--startup-misses`（預設 10，不得小於 `--misses`）；日誌以 `phase` 區分 `startup` 與 `steady`，以 `peer` 記錄對端，並記 `grace_ended`。既有旗標與預設不變。
 - plan/03/05 §3「Shell 無回應」一列加上例外。常態期與 NFR-08 不變；啟動寬限內卡死到觸發的上限約 21 秒，救援介面啟動時間另計。這段時間只有單元測試證據，VM 驗收由 #226 追蹤。
-- 已知限制：新 Shell 若在一個 ping 間隔內取代舊 Shell、supervisor 沒觀察到「不存在」，不會重新寬限。
+- 同一個 Shell 不能延長自己的寬限：重連後對端 PID 不變，仍是同一代。
+- 已知限制：讀不到對端時（`getsockopt` 失敗，或 PID 為 0），每條連線各算一代。這樣不會把剛啟動的 Shell 套上舊的常態期，從不回覆的 Shell 也仍會觸發；但反覆停頓、每約 20 秒內回覆一次的 Shell 不會被觸發。日誌記 `peer="unknown"`。

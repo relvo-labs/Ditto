@@ -11,16 +11,19 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::monitor::{Outcome, Pinger};
+use crate::monitor::{Outcome, Peer, Pinger};
 
 /// One connection kept across pings: a new connection every two seconds makes
 /// Quickshell log a `PeerClosedError` warning for each. After any miss the
 /// connection is dropped and the next ping reconnects, so a Shell restart or
-/// a half-read reply cannot carry over.
+/// a half-read reply cannot carry over. Each connection's peer is identified
+/// when it is made, so a replaced Shell is a new generation (#226).
 pub struct SocketPinger {
     pub path: PathBuf,
     stream: Option<UnixStream>,
     received: Vec<u8>,
+    peer: Peer,
+    connections: u64,
 }
 
 impl SocketPinger {
@@ -29,7 +32,45 @@ impl SocketPinger {
             path,
             stream: None,
             received: Vec::new(),
+            peer: Peer::Unknown { connection: 0 },
+            connections: 0,
         }
+    }
+}
+
+/// The PID of the process that listens on the other end: `SO_PEERCRED` on a
+/// connecting socket reports the listener's credentials from `listen(2)`, and
+/// is available before the Shell accepts (a stopped Shell still has one).
+fn peer_pid(stream: &UnixStream) -> Option<u32> {
+    use std::os::fd::AsRawFd;
+    let mut credentials = libc::ucred {
+        pid: 0,
+        uid: 0,
+        gid: 0,
+    };
+    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: credentials is a valid writable ucred and length is its size.
+    let result = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            (&mut credentials as *mut libc::ucred).cast(),
+            &mut length,
+        )
+    };
+    let complete = length as usize == std::mem::size_of::<libc::ucred>();
+    // PID 0: the peer is in a PID namespace this process cannot see.
+    (result == 0 && complete && credentials.pid > 0).then_some(credentials.pid as u32)
+}
+
+fn identify(stream: &UnixStream, connection: u64) -> Peer {
+    match peer_pid(stream) {
+        Some(pid) => Peer::Process {
+            pid,
+            start: start_time(pid).and_then(|start| start.parse().ok()),
+        },
+        None => Peer::Unknown { connection },
     }
 }
 
@@ -84,6 +125,10 @@ impl Pinger for SocketPinger {
         }
         outcome
     }
+
+    fn peer(&self) -> Peer {
+        self.peer
+    }
 }
 
 impl SocketPinger {
@@ -91,7 +136,11 @@ impl SocketPinger {
         let deadline = Instant::now() + timeout;
         if self.stream.is_none() {
             match connect(&self.path) {
-                Ok(stream) => self.stream = Some(stream),
+                Ok(stream) => {
+                    self.connections += 1;
+                    self.peer = identify(&stream, self.connections);
+                    self.stream = Some(stream);
+                }
                 Err(error) => {
                     return match error.raw_os_error() {
                         Some(libc::ENOENT | libc::ECONNREFUSED | libc::ENOTDIR) => Outcome::Absent,
@@ -417,6 +466,44 @@ mod tests {
         let stale = dir.join("stale.sock");
         drop(UnixListener::bind(&stale).unwrap());
         assert_eq!(SocketPinger::new(stale).ping(1, timeout), Outcome::Absent);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The peer is the listening process, read from the connection, also
+    /// when nobody accepts (a stopped Shell). Listener and test share a
+    /// process here, so the expected peer is this test's own PID.
+    #[test]
+    fn the_peer_is_the_listening_process() {
+        let dir = temp("peer");
+        let me = Peer::Process {
+            pid: std::process::id(),
+            start: start_time(std::process::id()).and_then(|s| s.parse().ok()),
+        };
+        assert!(matches!(me, Peer::Process { start: Some(_), .. }));
+
+        let mut absent = SocketPinger::new(dir.join("missing.sock"));
+        absent.ping(1, Duration::from_millis(100));
+        assert_eq!(absent.peer(), Peer::Unknown { connection: 0 });
+
+        let good = dir.join("good.sock");
+        serve(&good, |line| {
+            Some(format!("{}\n", line.replace("ping", "pong")))
+        });
+        let mut pinger = SocketPinger::new(good);
+        assert_eq!(pinger.ping(1, Duration::from_millis(200)), Outcome::Pong);
+        assert_eq!(pinger.peer(), me);
+
+        let stopped = dir.join("stopped.sock");
+        let _listener = UnixListener::bind(&stopped).unwrap();
+        let mut pinger = SocketPinger::new(stopped);
+        assert!(matches!(
+            pinger.ping(1, Duration::from_millis(20)),
+            Outcome::NoReply(_)
+        ));
+        assert_eq!(pinger.peer(), me);
+        assert_eq!(pinger.connections, 1);
+        pinger.ping(2, Duration::from_millis(20));
+        assert_eq!(pinger.connections, 2, "every miss reconnects");
         let _ = fs::remove_dir_all(&dir);
     }
 

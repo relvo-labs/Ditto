@@ -10,7 +10,7 @@ mod shell;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use monitor::{Clock, Effects, Outcome, Phase, State, Timing};
+use monitor::{Clock, Effects, Outcome, Peer, Phase, State, Timing};
 use shell::{Locator, SocketPinger};
 
 const USAGE: &str =
@@ -183,13 +183,18 @@ impl Effects for RealEffects<'_> {
         }
     }
 
-    fn transition(&mut self, from: State, to: State, outcome: &Outcome, phase: Phase) {
+    fn transition(&mut self, from: State, to: State, outcome: &Outcome, phase: Phase, peer: Peer) {
         let detail = match outcome {
             Outcome::NoReply(reason) => reason.clone(),
+            // Armed to Armed is a Shell replaced without an observed exit.
+            _ if matches!(from, State::Armed { .. }) && matches!(to, State::Armed { .. }) => {
+                "new_shell".into()
+            }
             _ => String::new(),
         };
         let from = format!("{from:?}");
         let to_text = format!("{to:?}");
+        let peer = peer.describe();
         let mut fields = vec![
             ("from", from.as_str()),
             ("to", to_text.as_str()),
@@ -199,6 +204,7 @@ impl Effects for RealEffects<'_> {
         // tripped it. Tells a startup stall from a steady hang in the journal.
         if matches!(to, State::Armed { .. } | State::Tripped) {
             fields.push(("phase", phase.as_str()));
+            fields.push(("peer", peer.as_str()));
         }
         log("state", &fields);
     }

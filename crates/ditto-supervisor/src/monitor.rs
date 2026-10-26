@@ -57,6 +57,30 @@ impl Phase {
     }
 }
 
+/// Which Shell answered: the generation a `pong` belongs to. Read from the
+/// connection itself, not inferred from an observed exit, because Core can
+/// relaunch a crashed Shell faster than one ping interval and the supervisor
+/// then never sees the socket absent (review of #227).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Peer {
+    /// The process listening on the socket (`SO_PEERCRED`), with its start
+    /// time (field 22 of `/proc/<pid>/stat`) so a reused PID is another Shell.
+    Process { pid: u32, start: Option<u64> },
+    /// The peer could not be read. Each connection then counts as its own
+    /// Shell: a reconnect never inherits an old Shell's steady phase, and a
+    /// Shell that does not answer cannot start a new generation.
+    Unknown { connection: u64 },
+}
+
+impl Peer {
+    pub fn describe(self) -> String {
+        match self {
+            Peer::Process { pid, .. } => format!("pid:{pid}"),
+            Peer::Unknown { .. } => "unknown".into(),
+        }
+    }
+}
+
 pub struct Monitor {
     pub state: State,
     threshold: u32,
@@ -64,6 +88,10 @@ pub struct Monitor {
     grace_ms: u64,
     /// When the current Shell generation was armed, on the monitor's clock.
     armed_at_ms: u64,
+    /// The Shell generation that was armed last.
+    pub peer: Option<Peer>,
+    /// Counts Shell generations; changes whenever a new one is armed.
+    pub generation: u64,
     /// The phase the last observation of an armed Shell was judged in.
     pub phase: Phase,
 }
@@ -78,6 +106,8 @@ impl Monitor {
             startup_threshold: threshold,
             grace_ms: 0,
             armed_at_ms: 0,
+            peer: None,
+            generation: 0,
             phase: Phase::Steady,
         }
     }
@@ -102,20 +132,30 @@ impl Monitor {
         }
     }
 
-    /// `now_ms` is when `outcome` was observed, on the monitor's clock. The
-    /// threshold for a miss is the one of the phase at that moment, and the
-    /// count is not reset when the grace ends: once it has ended, a streak
-    /// that began inside it trips as soon as it reaches the steady count.
-    pub fn observe(&mut self, outcome: &Outcome, now_ms: u64) -> Action {
+    /// `now_ms` is when `outcome` was observed, on the monitor's clock, and
+    /// `peer` is who was on the other end of the connection. The threshold
+    /// for a miss is the one of the phase at that moment, and the count is not
+    /// reset when the grace ends: once it has ended, a streak that began
+    /// inside it trips as soon as it reaches the steady count.
+    pub fn observe(&mut self, outcome: &Outcome, peer: Peer, now_ms: u64) -> Action {
         if matches!(self.state, State::Armed { .. }) {
             self.phase = self.phase_at(now_ms);
         }
         let (next, action) = match (self.state, outcome) {
-            (State::Armed { .. }, Outcome::Pong) => (State::Armed { misses: 0 }, Action::None),
-            // A new Shell generation (first answer, or a new Shell after an
-            // exit or a trip): its startup grace begins now.
-            (_, Outcome::Pong) => {
+            // A `pong` from a Shell other than the armed one (the first, or a
+            // replacement, whether or not its predecessor was seen to exit):
+            // a new generation, whose startup grace begins now.
+            (_, Outcome::Pong) if self.peer != Some(peer) => {
+                self.peer = Some(peer);
+                self.generation += 1;
                 self.armed_at_ms = now_ms;
+                self.phase = self.phase_at(now_ms);
+                (State::Armed { misses: 0 }, Action::None)
+            }
+            // The same Shell answering again, also after a reconnect, a trip
+            // whose kill failed, or a gap: it keeps its generation's grace,
+            // so a Shell cannot extend its own grace by stalling.
+            (_, Outcome::Pong) => {
                 self.phase = self.phase_at(now_ms);
                 (State::Armed { misses: 0 }, Action::None)
             }
@@ -148,14 +188,18 @@ pub trait Clock {
 
 pub trait Pinger {
     fn ping(&mut self, sequence: u64, timeout: Duration) -> Outcome;
+    /// Who the last `ping` talked to, identified when its connection was made.
+    fn peer(&self) -> Peer;
 }
 
 pub trait Effects {
     /// SIGKILL the Shell and start the rescue UI. `phase` is the rule that
     /// tripped, so a startup hang can be told from a steady one in the log.
     fn trip(&mut self, misses: u32, last: &Outcome, phase: Phase);
-    /// `phase` is meaningful when `to` is `Armed` or `Tripped`.
-    fn transition(&mut self, from: State, to: State, outcome: &Outcome, phase: Phase);
+    /// A state change, or a new Shell generation while armed (`from` and `to`
+    /// both `Armed`). `phase` and `peer` are meaningful when `to` is `Armed`
+    /// or `Tripped`.
+    fn transition(&mut self, from: State, to: State, outcome: &Outcome, phase: Phase, peer: Peer);
     /// The armed Shell's startup grace is over; `misses` is its current streak.
     fn grace_ended(&mut self, misses: u32);
 }
@@ -203,10 +247,15 @@ pub fn run(
         sequence += 1;
         let started = clock.now_ms();
         let outcome = pinger.ping(sequence, timing.timeout);
-        let (before, before_phase) = (monitor.state, monitor.phase);
-        let action = monitor.observe(&outcome, clock.now_ms());
-        if std::mem::discriminant(&before) != std::mem::discriminant(&monitor.state) {
-            effects.transition(before, monitor.state, &outcome, monitor.phase);
+        let peer = pinger.peer();
+        let (before, before_phase, before_generation) =
+            (monitor.state, monitor.phase, monitor.generation);
+        let action = monitor.observe(&outcome, peer, clock.now_ms());
+        if std::mem::discriminant(&before) != std::mem::discriminant(&monitor.state)
+            || before_generation != monitor.generation
+        {
+            let armed = monitor.peer.unwrap_or(peer);
+            effects.transition(before, monitor.state, &outcome, monitor.phase, armed);
         } else if let State::Armed { misses } = monitor.state {
             if before_phase == Phase::Startup && monitor.phase == Phase::Steady {
                 effects.grace_ended(misses);
@@ -242,23 +291,51 @@ mod tests {
         }
     }
 
-    /// Scripted replies; a miss costs the whole timeout, like a stopped Shell.
+    /// Scripted replies, each from a scripted peer; a miss costs the whole
+    /// timeout, like a stopped Shell.
     struct FakeSocket {
         clock: FakeClock,
-        script: VecDeque<Outcome>,
+        script: VecDeque<(Outcome, Peer)>,
+        peer: Peer,
         sequences: Vec<u64>,
     }
 
     impl Pinger for FakeSocket {
         fn ping(&mut self, sequence: u64, timeout: Duration) -> Outcome {
             self.sequences.push(sequence);
-            let outcome = self.script.pop_front().unwrap_or(Outcome::Absent);
+            let (outcome, peer) = self
+                .script
+                .pop_front()
+                .unwrap_or((Outcome::Absent, SHELL_A));
+            self.peer = peer;
             match outcome {
                 Outcome::NoReply(_) => self.clock.sleep(timeout),
                 _ => self.clock.sleep(Duration::from_millis(3)),
             }
             outcome
         }
+        fn peer(&self) -> Peer {
+            self.peer
+        }
+    }
+
+    const SHELL_A: Peer = Peer::Process {
+        pid: 4100,
+        start: Some(900),
+    };
+    const SHELL_B: Peer = Peer::Process {
+        pid: 4200,
+        start: Some(1_300),
+    };
+    /// SHELL_A's PID reused by another process later.
+    const SHELL_A_REUSED: Peer = Peer::Process {
+        pid: 4100,
+        start: Some(5_000),
+    };
+
+    /// `outcomes`, all from `peer`.
+    fn from(peer: Peer, outcomes: Vec<Outcome>) -> Vec<(Outcome, Peer)> {
+        outcomes.into_iter().map(|o| (o, peer)).collect()
     }
 
     #[derive(Default)]
@@ -269,6 +346,8 @@ mod tests {
         states: Vec<State>,
         /// The phase reported with each transition into `Armed`.
         armed_phases: Vec<Phase>,
+        /// The peer reported with each transition into `Armed`.
+        armed_peers: Vec<Peer>,
         grace_ended: Vec<(u64, u32)>,
     }
 
@@ -277,10 +356,11 @@ mod tests {
             self.trips.push((self.clock.now_ms(), misses));
             self.trip_phases.push(phase);
         }
-        fn transition(&mut self, _: State, to: State, _: &Outcome, phase: Phase) {
+        fn transition(&mut self, _: State, to: State, _: &Outcome, phase: Phase, peer: Peer) {
             self.states.push(to);
             if matches!(to, State::Armed { .. }) {
                 self.armed_phases.push(phase);
+                self.armed_peers.push(peer);
             }
         }
         fn grace_ended(&mut self, misses: u32) {
@@ -309,12 +389,18 @@ mod tests {
         drive_with(&Timing::default(), script)
     }
 
+    /// One Shell (one peer) throughout.
     fn drive_with(timing: &Timing, script: Vec<Outcome>) -> (Recorder, Vec<u64>) {
+        drive_peers(timing, from(SHELL_A, script))
+    }
+
+    fn drive_peers(timing: &Timing, script: Vec<(Outcome, Peer)>) -> (Recorder, Vec<u64>) {
         let clock = FakeClock::default();
         let rounds = script.len() as u64;
         let mut socket = FakeSocket {
             clock: clock.clone(),
             script: script.into(),
+            peer: Peer::Unknown { connection: 0 },
             sequences: vec![],
         };
         let mut recorder = Recorder {
@@ -488,18 +574,24 @@ mod tests {
     /// the startup grace again, with or without an observed exit between.
     #[test]
     fn a_new_shell_after_a_trip_gets_the_grace_again() {
-        let mut script = vec![Outcome::Pong];
-        script.extend(std::iter::repeat_n(miss(), 10));
+        let shell_c = Peer::Process {
+            pid: 4300,
+            start: Some(2_000),
+        };
+        let mut a = vec![Outcome::Pong];
+        a.extend(std::iter::repeat_n(miss(), 10));
         // Straight from Tripped to a new Shell's pong.
-        script.push(Outcome::Pong);
-        script.extend([miss(), miss(), miss(), miss(), miss()]);
-        script.extend(pongs(2));
+        let mut b = vec![Outcome::Pong];
+        b.extend([miss(), miss(), miss(), miss(), miss()]);
+        b.extend(pongs(2));
         // Through Absent to another new Shell.
-        script.push(Outcome::Absent);
-        script.push(Outcome::Pong);
-        script.extend([miss(), miss(), miss(), miss()]);
-        script.extend(pongs(2));
-        let (recorder, _) = drive_default(script);
+        let mut c = vec![Outcome::Absent, Outcome::Pong];
+        c.extend([miss(), miss(), miss(), miss()]);
+        c.extend(pongs(2));
+        let mut script = from(SHELL_A, a);
+        script.extend(from(SHELL_B, b));
+        script.extend(from(shell_c, c));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
         assert_eq!(recorder.trips, [(21_000, 10)]);
         assert_eq!(
             recorder.states,
@@ -512,19 +604,20 @@ mod tests {
             ]
         );
         assert_eq!(recorder.armed_phases, [Phase::Startup; 3]);
+        assert_eq!(recorder.armed_peers, [SHELL_A, SHELL_B, shell_c]);
     }
 
     /// A Shell long past its grace exits; the next one starts its own grace.
     #[test]
     fn a_new_shell_after_an_exit_gets_the_grace_again() {
-        let mut script = pongs(40);
-        script.push(Outcome::Absent);
-        script.push(miss()); // listening, not answering yet
-        script.push(Outcome::Pong);
-        script.extend([miss(), miss(), miss(), miss(), miss()]);
-        script.extend(pongs(35));
-        script.extend([miss(), miss(), miss()]);
-        let (recorder, _) = drive_default(script);
+        let mut script = from(SHELL_A, pongs(40));
+        script.push((Outcome::Absent, SHELL_A));
+        let mut b = vec![miss(), Outcome::Pong]; // listening, then answering
+        b.extend([miss(), miss(), miss(), miss(), miss()]);
+        b.extend(pongs(35));
+        b.extend([miss(), miss(), miss()]);
+        script.extend(from(SHELL_B, b));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
         assert_eq!(recorder.grace_ended.len(), 2);
         assert_eq!(recorder.trips.len(), 1, "{:?}", recorder.trips);
         assert_eq!(recorder.trip_phases, [Phase::Steady]);
@@ -540,18 +633,122 @@ mod tests {
         );
     }
 
+    fn reset() -> Outcome {
+        Outcome::NoReply("connection reset".into())
+    }
+
+    /// Review P1: the old Shell is past its grace and crashes; Core relaunches
+    /// it within one ping interval, so no Absent is ever observed. The write
+    /// on the old connection fails, the reconnect reaches the new Shell, which
+    /// answers and then stalls 6 s. The new peer is a new generation.
+    #[test]
+    fn a_fast_replacement_gets_the_grace() {
+        for new_shell in [SHELL_B, SHELL_A_REUSED] {
+            let mut script = from(SHELL_A, pongs(31));
+            let mut b = vec![reset(), Outcome::Pong];
+            b.extend([miss(), miss(), miss()]);
+            b.extend(pongs(5));
+            script.extend(from(new_shell, b));
+            let (recorder, _) = drive_peers(&Timing::default(), script);
+            assert!(recorder.trips.is_empty(), "{:?}", recorder.trips);
+            assert_eq!(
+                recorder.states,
+                [State::Armed { misses: 0 }, State::Armed { misses: 0 }]
+            );
+            assert_eq!(recorder.armed_peers, [SHELL_A, new_shell]);
+            assert_eq!(recorder.armed_phases, [Phase::Startup, Phase::Startup]);
+        }
+    }
+
+    /// A new Shell that hangs right after replacing the old one still trips,
+    /// at the startup threshold.
+    #[test]
+    fn a_fast_replacement_that_hangs_trips_at_the_startup_threshold() {
+        let mut script = from(SHELL_A, pongs(31));
+        let mut b = vec![reset(), Outcome::Pong];
+        b.extend(std::iter::repeat_n(miss(), 12));
+        script.extend(from(SHELL_B, b));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        // The new Shell answers at 64 003 ms; misses at 67, 69, …, 85 s.
+        assert_eq!(recorder.trips, [(85_000, 10)]);
+        assert_eq!(recorder.trip_phases, [Phase::Startup]);
+    }
+
+    /// The same Shell reconnecting (every miss drops the connection) is not
+    /// a new generation: past its grace, three misses trip it as before.
+    #[test]
+    fn the_same_shell_reconnecting_keeps_its_phase() {
+        let mut script = pongs(31);
+        script.extend([reset(), Outcome::Pong, miss(), miss(), miss()]);
+        let (recorder, _) = drive_default(script);
+        assert_eq!(recorder.trips, [(71_000, 3)]);
+        assert_eq!(recorder.trip_phases, [Phase::Steady]);
+        assert_eq!(recorder.armed_peers, [SHELL_A]);
+    }
+
+    /// A Shell that keeps stalling and answering in between cannot extend
+    /// its own grace: it keeps its PID, so once its grace is over the steady
+    /// rule trips it. Nine misses then a pong, over and over: tolerated
+    /// during the grace, tripped at the third miss after it.
+    #[test]
+    fn a_stalling_shell_cannot_extend_its_grace() {
+        let mut script = vec![Outcome::Pong];
+        for _ in 0..4 {
+            script.extend(std::iter::repeat_n(miss(), 9));
+            script.push(Outcome::Pong);
+        }
+        let (recorder, _) = drive_default(script);
+        assert_eq!(recorder.grace_ended, [(60_003, 0)]);
+        assert_eq!(recorder.trips, [(67_000, 3)]);
+        assert_eq!(recorder.trip_phases, [Phase::Steady]);
+    }
+
+    /// Without peer credentials every connection is its own Shell: a
+    /// reconnect does not inherit the old steady phase, and a Shell that does
+    /// not answer cannot start a new generation, so it still trips.
+    #[test]
+    fn an_unidentified_peer_neither_inherits_nor_escapes() {
+        let unknown = |connection| Peer::Unknown { connection };
+        let mut script: Vec<_> = pongs(31).into_iter().map(|o| (o, unknown(1))).collect();
+        script.push((reset(), unknown(2)));
+        script.push((Outcome::Pong, unknown(3)));
+        script.extend((4..7).map(|c| (miss(), unknown(c))));
+        // Pongs keep their connection, so they share one connection number.
+        script.extend(std::iter::repeat_n((Outcome::Pong, unknown(7)), 5));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        assert!(recorder.trips.is_empty(), "{:?}", recorder.trips);
+        assert_eq!(recorder.armed_peers, [unknown(1), unknown(3), unknown(7)]);
+        assert_eq!(recorder.armed_phases, [Phase::Startup; 3]);
+
+        // Hung from its first answer, reconnecting on every miss.
+        let mut script = vec![(Outcome::Pong, unknown(1))];
+        script.extend((2..16).map(|c| (miss(), unknown(c))));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        assert_eq!(recorder.trips, [(21_000, 10)]);
+
+        // Hung after its grace: the steady rule, reconnects notwithstanding.
+        let mut script: Vec<_> = pongs(31).into_iter().map(|o| (o, unknown(1))).collect();
+        script.extend((2..8).map(|c| (miss(), unknown(c))));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        assert_eq!(recorder.trips, [(67_000, 3)]);
+        assert_eq!(recorder.trip_phases, [Phase::Steady]);
+    }
+
     #[test]
     fn the_monitor_on_its_own() {
         let mut monitor = Monitor::new(3);
-        assert_eq!(monitor.observe(&miss(), 0), Action::None);
+        assert_eq!(monitor.observe(&miss(), SHELL_A, 0), Action::None);
         assert_eq!(monitor.state, State::Unarmed);
-        monitor.observe(&Outcome::Pong, 0);
-        monitor.observe(&miss(), 0);
-        monitor.observe(&miss(), 0);
+        monitor.observe(&Outcome::Pong, SHELL_A, 0);
+        monitor.observe(&miss(), SHELL_A, 0);
+        monitor.observe(&miss(), SHELL_A, 0);
         assert_eq!(monitor.state, State::Armed { misses: 2 });
-        assert_eq!(monitor.observe(&miss(), 0), Action::Trip { misses: 3 });
         assert_eq!(
-            monitor.observe(&miss(), 0),
+            monitor.observe(&miss(), SHELL_A, 0),
+            Action::Trip { misses: 3 }
+        );
+        assert_eq!(
+            monitor.observe(&miss(), SHELL_A, 0),
             Action::None,
             "a tripped Shell is not killed twice"
         );
@@ -559,40 +756,76 @@ mod tests {
     }
 
     #[test]
+    fn generations_follow_the_peer() {
+        let mut monitor = Monitor::new(3).with_startup_grace(Duration::from_secs(60), 10);
+        monitor.observe(&Outcome::Pong, SHELL_A, 0);
+        assert_eq!((monitor.generation, monitor.peer), (1, Some(SHELL_A)));
+        monitor.observe(&Outcome::Pong, SHELL_A, 70_000);
+        assert_eq!(monitor.phase, Phase::Steady);
+        // A trip whose kill failed: the same Shell answering again keeps its
+        // generation and its steady phase.
+        for _ in 0..3 {
+            monitor.observe(&miss(), SHELL_A, 71_000);
+        }
+        assert_eq!(monitor.state, State::Tripped);
+        monitor.observe(&Outcome::Pong, SHELL_A, 72_000);
+        assert_eq!((monitor.generation, monitor.phase), (1, Phase::Steady));
+        // A different Shell, while armed: new generation, new grace.
+        monitor.observe(&miss(), SHELL_B, 73_000);
+        monitor.observe(&Outcome::Pong, SHELL_B, 74_000);
+        assert_eq!(monitor.state, State::Armed { misses: 0 });
+        assert_eq!((monitor.generation, monitor.phase), (2, Phase::Startup));
+        monitor.observe(&Outcome::Pong, SHELL_A_REUSED, 75_000);
+        assert_eq!(monitor.generation, 3, "a reused PID is another Shell");
+    }
+
+    #[test]
     fn the_grace_boundary_on_the_monitor_clock() {
         let mut monitor = Monitor::new(3).with_startup_grace(Duration::from_millis(1_000), 10);
-        monitor.observe(&Outcome::Pong, 5_000);
+        monitor.observe(&Outcome::Pong, SHELL_A, 5_000);
         assert_eq!(monitor.phase, Phase::Startup);
         for _ in 0..9 {
-            assert_eq!(monitor.observe(&miss(), 5_999), Action::None);
+            assert_eq!(monitor.observe(&miss(), SHELL_A, 5_999), Action::None);
         }
         assert_eq!(monitor.phase, Phase::Startup);
-        assert_eq!(monitor.observe(&Outcome::Pong, 5_999), Action::None);
-        monitor.observe(&miss(), 6_000);
+        assert_eq!(
+            monitor.observe(&Outcome::Pong, SHELL_A, 5_999),
+            Action::None
+        );
+        monitor.observe(&miss(), SHELL_A, 6_000);
         assert_eq!(
             monitor.phase,
             Phase::Steady,
             "the grace is [armed, armed + grace)"
         );
-        monitor.observe(&miss(), 6_000);
-        assert_eq!(monitor.observe(&miss(), 6_000), Action::Trip { misses: 3 });
+        monitor.observe(&miss(), SHELL_A, 6_000);
+        assert_eq!(
+            monitor.observe(&miss(), SHELL_A, 6_000),
+            Action::Trip { misses: 3 }
+        );
 
         // Ten misses inside the grace trip at ten, not never.
         let mut monitor = Monitor::new(3).with_startup_grace(Duration::from_secs(60), 10);
-        monitor.observe(&Outcome::Pong, 0);
+        monitor.observe(&Outcome::Pong, SHELL_A, 0);
         for at in 1..10 {
-            assert_eq!(monitor.observe(&miss(), at), Action::None);
+            assert_eq!(monitor.observe(&miss(), SHELL_A, at), Action::None);
         }
-        assert_eq!(monitor.observe(&miss(), 10), Action::Trip { misses: 10 });
+        assert_eq!(
+            monitor.observe(&miss(), SHELL_A, 10),
+            Action::Trip { misses: 10 }
+        );
 
         // A grace is never stricter than the steady rule; zero means none.
         let mut monitor = Monitor::new(3).with_startup_grace(Duration::from_secs(60), 1);
-        monitor.observe(&Outcome::Pong, 0);
-        assert_eq!(monitor.observe(&miss(), 1), Action::None);
-        assert_eq!(monitor.observe(&miss(), 2), Action::None);
-        assert_eq!(monitor.observe(&miss(), 3), Action::Trip { misses: 3 });
+        monitor.observe(&Outcome::Pong, SHELL_A, 0);
+        assert_eq!(monitor.observe(&miss(), SHELL_A, 1), Action::None);
+        assert_eq!(monitor.observe(&miss(), SHELL_A, 2), Action::None);
+        assert_eq!(
+            monitor.observe(&miss(), SHELL_A, 3),
+            Action::Trip { misses: 3 }
+        );
         let mut monitor = Monitor::new(3).with_startup_grace(Duration::ZERO, 10);
-        monitor.observe(&Outcome::Pong, 0);
+        monitor.observe(&Outcome::Pong, SHELL_A, 0);
         assert_eq!(monitor.phase, Phase::Steady);
     }
 }

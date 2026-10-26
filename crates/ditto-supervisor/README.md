@@ -46,11 +46,11 @@ handler: Socket {
 | --- | --- | --- |
 | 沒有 socket、或沒有程序在聽（`ENOENT`／`ECONNREFUSED`） | 不存在 | 無。Shell 退出由 Core 的受控啟動器處理 |
 | 在聽，但**從未**回過 `pong` | 尚未武裝 | 無 |
-| 從不存在、尚未武裝或已觸發，收到 `pong` | 已武裝，進入**啟動寬限**（60 秒） | 無。日誌 `state` 帶 `phase="startup"` |
-| 已武裝後收到 `pong` | 已武裝，未回應次數歸零 | 無。不延長寬限 |
+| 收到**另一個 Shell** 的 `pong`（第一次回覆，或對端程序與上次武裝的不同；不論先前是什麼狀態，包括已武裝） | 已武裝，新的一代，進入**啟動寬限**（60 秒） | 無。日誌 `state` 帶 `phase="startup"` 與 `peer`；已武裝時被取代記 `detail="new_shell"` |
+| 收到**同一個 Shell** 的 `pong`（含斷線重連後、或觸發後沒殺掉又回覆） | 已武裝，未回應次數歸零 | 無。沿用這一代的寬限，不重新開始 |
 | 啟動寬限內連續 10 次未回應（約 19～21 秒） | 已觸發 | 同下一列；日誌帶 `phase="startup"` |
 | 寬限結束後連續 3 次未回應（約 6～7 秒） | 已觸發 | `SIGKILL` Shell → 寫 `rescue-request.json` → `systemctl --user start --no-block ditto-rescue.service`；日誌帶 `phase="steady"` |
-| 已觸發後 | 等新的 Shell 回 `pong` 才重新武裝 | 同一個卡住的 Shell 不會被處理兩次 |
+| 已觸發後 | 等 Shell 回 `pong` 才重新武裝 | 同一個卡住的 Shell 不會被處理兩次 |
 
 「尚未武裝」是刻意的限制：在第一次回 `pong` 之前就卡住的 Shell，supervisor 不會處理。啟動期的卡住要由 Core 的啟動就緒檢查負責。
 
@@ -58,8 +58,9 @@ handler: Socket {
 
 - 門檻依**每次未回應被觀察到的時間**（supervisor 自己的單調時鐘）落在寬限內或外決定。連續次數不因寬限結束而歸零：寬限一結束，跨過邊界的連續未回應累計達 3 次就觸發。
 - 上限：啟動中真的卡死，從卡住起約 21 秒內觸發，不會變成永遠不處理；寬限結束後就是原本的 3 次規則，常態期（NFR-08 的 10 秒）沒有放寬。
-- 每次重新武裝（第一次回覆、Shell 退出後的新 Shell、觸發後的新 Shell，例如從救援回到一般桌面）都重新開始寬限。寬限結束時記一行 `grace_ended`。
-- 已知限制：新的 Shell 若在一個 ping 間隔內取代舊的、supervisor 沒觀察到「不存在」，它沿用舊 Shell 的狀態，不會重新寬限。
+- 「哪一代」由連線本身判斷，不靠有沒有觀察到 Shell 退出：每次新連線都以 `SO_PEERCRED` 讀出在聽的程序 PID，並讀 `/proc/<pid>/stat` 的啟動時間，PID 被重用也分得出來。Core 重啟 Shell 的最短退避是 1 秒，比 ping 間隔短，所以新 Shell 可能在 supervisor 看到「不存在」之前就接上；舊連線斷掉、重連到新 Shell 並收到 `pong` 時，對端不同，就是新的一代。寬限結束時記一行 `grace_ended`。
+- 同一個 Shell 不能自己延長寬限：每次未回應後都會重連，但對端 PID 不變，所以仍是同一代。反覆停頓又偶爾回覆的 Shell，寬限一過就照 3 次規則處理。
+- 讀不到對端（`getsockopt` 失敗，或對端在看不到的 PID namespace，PID 為 0）時，日誌記 `peer="unknown"`，每條連線各算一代：重連後的 `pong` 會重新寬限，不會沿用舊 Shell 的常態期而把剛啟動的 Shell 殺掉；從不回覆的 Shell 不會產生新的一代，仍在上限內觸發。代價是這種情況下，反覆停頓但每約 20 秒內回覆一次的 Shell 不會被觸發。Linux 的 Unix socket 一般都讀得到對端，這是退路。
 - 依據與取捨見 [D-53](../../.agents/notes/decisions/2026-10-27-d53-supervisor-startup-grace.md)。
 
 非阻塞 connect：`SIGSTOP` 的 Shell 不再 accept，listen backlog 滿了以後阻塞式 connect 會把 supervisor 一起卡住。backlog 滿（`EAGAIN`）也算一次未回應。
@@ -96,7 +97,7 @@ ditto-supervisor --once
 
 `--startup-grace-ms 0` 關閉啟動寬限。`--startup-misses` 不得小於 `--misses`，否則拒絕啟動；未指定時取 10 與 `--misses` 的較大值，所以原有的呼叫方式（例如 `--misses 100000`）照常可用。
 
-日誌是 stderr 上的 `ditto-supervisor event=<名稱> key="value"` 行，由 journal 依 unit 保存。`started` 記錄生效的門檻（含 `startup_grace_ms`、`startup_misses`）；`state` 在進入已武裝或已觸發時帶 `phase`，`shell_unresponsive` 也帶 `phase`，用來分辨啟動期與常態期的觸發。
+日誌是 stderr 上的 `ditto-supervisor event=<名稱> key="value"` 行，由 journal 依 unit 保存。`started` 記錄生效的門檻（含 `startup_grace_ms`、`startup_misses`）；`state` 在進入已武裝或已觸發時帶 `phase` 與 `peer`（`pid:<n>` 或 `unknown`），`shell_unresponsive` 也帶 `phase`，用來分辨啟動期與常態期的觸發。
 
 ## 已知限制
 
