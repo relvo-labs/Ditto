@@ -212,7 +212,11 @@ helper 日誌只有 `phase=<階段> result=<結果>`，不包含帳號、顯示�
 
 ## 文字保底
 
-`--tty` 在 controlling `/dev/tty` 顯示英文提示，英文是研究允許的無 DRM 保底限制；不宣稱 Linux console 能顯示中文或提供 fcitx5／Orca。密碼與確認欄停用 ECHO／ECHONL，完成、讀取錯誤與可處理的 INT／TERM／HUP 會恢復終端狀態；SIGKILL／斷電只能依 unit 的 TTYReset 與重啟復原。
+`--tty` 在 controlling `/dev/tty` 顯示英文提示，英文是研究允許的無 DRM 保底限制；不宣稱 Linux console 能顯示中文或提供 fcitx5／Orca。密碼與確認欄停用 ECHO／ECHONL，完成、讀取錯誤與可處理的 INT／QUIT／TERM／HUP 會恢復終端狀態；SIGKILL／斷電只能依 unit 的 TTYReset 與重啟復原。
+
+帳號工具（含 getent）各自離開 tty 前景程序群組，標準 IO 只用 null／pipe，helper 等待並收回工具。pending 寫入後收到終端中斷，交易觀察旗標並延後至一致結束：工具成功則回讀提交、清 pending；工具失敗走既有回復。中斷本身不觸發刪除有密碼帳號；細節見協定的「文字模式的終端中斷」。這不改變 systemd cgroup 停止或強制終止後的保守復原。
+
+已知限制：helper 等待 flock 時，Ctrl-C／Ctrl-\ 不會強制跳出；持鎖的 account／recovery service 仍受既有 120 秒期限約束，systemctl stop 維持可用。本項只記錄，沒有更改鎖或期限。
 
 弱密碼先顯示警告但繼續交易。文字模式目前每次啟動處理一組輸入；驗證失敗後可重啟這個 unit 重試。成功後提示使用新帳密登入。PR B 現以固定 dispatcher／TTY root session 接上無 DRM、失敗重試及後續正式登入入口，靜態／隔離測試不等同 VM 接受；helper 不自行呼叫 login 或啟動工作階段。
 
