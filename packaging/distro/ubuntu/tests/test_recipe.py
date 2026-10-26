@@ -385,7 +385,10 @@ source "$1"
         # #221 builder scan: py3compile-generated psutil test bytecode is not
         # package bytes (#205 fixtures cannot cover it). finalize removes only
         # that generated directory, keeps package files, and fails if any
-        # test bytecode remains.
+        # test bytecode remains. Repair 2: it runs on the builder, so a symlink
+        # at any component (final or ancestor) or a non-directory fails the
+        # build without touching anything outside the root, and a failing
+        # leftover search fails closed.
         output, _ = self.generate()
         tests_rel = "usr/lib/python3/dist-packages/psutil/tests"
         package_files = {tests_rel + "/test_linux.py": b"return_value='/home/foo (deleted)'\n",
@@ -393,43 +396,64 @@ source "$1"
                          "usr/lib/python3/dist-packages/psutil/__pycache__/__init__.cpython-314.pyc": b"\x00runtime"}
         stub = ('python3() { if [[ "$1" == -c ]]; then echo synthetic-source-commit; fi; return 0; }\n'
                 'chroot() { return 0; }\n')
+        cache_rel = str(Path(PSUTIL_TEST_BYTECODE).parent)
         rows = {
-            # name: (layout, extra shell before sourcing, expect success)
-            "generated-bytecode": ("dir", "", True),
-            "bytecode-dir-is-symlink": ("symlink", "", True),
-            "psutil-absent": ("absent", "", True),
-            "removal-silently-fails": ("dir", "rm() { return 0; }\n", False),
-            "stray-bytecode-elsewhere-in-tests": ("stray", "", False),
+            # name: (layout, symlinked component, extra shell before sourcing, expected stderr or None)
+            "generated-bytecode": ("dir", None, "", None),
+            "tests-without-bytecode": ("no-cache", None, "", None),
+            "psutil-absent": ("absent", None, "", None),
+            "removal-silently-fails": ("dir", None, "rm() { return 0; }\n", "after removal"),
+            "stray-bytecode-elsewhere-in-tests": ("stray", None, "", "still in the image"),
+            "find-fails-silently": ("no-cache", None, "find() { return 1; }\n", "find failed"),
+            "find-fails-after-removal": ("dir", None, "find() { return 2; }\n", "find failed"),
+            "tests-is-a-file": ("tests-file", None, "", "not a directory"),
         }
-        for name, (layout, extra, ok) in rows.items():
+        for component in ("usr/lib/python3", "usr/lib/python3/dist-packages",
+                          "usr/lib/python3/dist-packages/psutil", tests_rel, cache_rel):
+            rows["symlink-at-" + component] = ("symlink", component, "", "refusing to follow a symlink")
+
+        def snapshot(directory):
+            return {str(p.relative_to(directory)): p.read_bytes() for p in sorted(directory.rglob("*"))
+                    if p.is_file()}
+        for name, (layout, component, extra, error) in rows.items():
             with self.subTest(case=name):
-                image = self.root / f"psutil-{name}"
+                image = self.root / f"psutil-{name.replace('/', '_')}"
                 for rel in ("etc/ssh", "var/lib/dbus", "etc/systemd/system", "etc/pam.d", "usr/lib"):
                     (image / rel).mkdir(parents=True, exist_ok=True)
                 self.put("etc/pam.d/greetd", "# synthetic PAM\n", image)
-                outside = self.root / f"psutil-{name}-outside"
                 cache = image / PSUTIL_TEST_BYTECODE
+                outside = None
                 if layout != "absent":
                     for rel, data in package_files.items():
                         (image / rel).parent.mkdir(parents=True, exist_ok=True)
                         (image / rel).write_bytes(data)
-                    if layout == "symlink":
-                        outside.mkdir()
-                        (outside / "keep.pyc").write_bytes(b"outside the image")
-                        cache.parent.symlink_to(outside)
-                    else:
+                    if layout not in ("no-cache", "tests-file"):
                         cache.parent.mkdir(parents=True)
                         cache.write_bytes(b"\x00/home/giampaolo/svn/psutil/tests/test_linux.py\x00")
                     if layout == "stray":
                         (image / tests_rel / "sub").mkdir()
                         (image / tests_rel / "sub/x.cpython-314.pyc").write_bytes(b"\x00")
+                    if layout == "tests-file":
+                        shutil.rmtree(image / tests_rel)
+                        (image / tests_rel).write_bytes(b"not a directory\n")
+                    if layout == "symlink":
+                        # Move the subtree to a host path and leave a link in its place.
+                        outside = self.root / f"outside-{name.replace('/', '_')}"
+                        shutil.move(str(image / component), str(outside))
+                        (image / component).symlink_to(outside)
+                        before = snapshot(outside)
+                        self.assertTrue(any(key.endswith("test_linux.cpython-314.pyc") for key in before))
                 result = subprocess.run(["bash", "-c", stub + extra + 'source "$1"\n', "finalize-test",
                                          str(output / "finalize.sh")],
                                         env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
                                         text=True, capture_output=True, timeout=30)
-                if not ok:
-                    self.assertNotEqual(result.returncode, 0)
+                if outside is not None:
+                    self.assertEqual(snapshot(outside), before, "a file outside the image root changed")
+                    self.assertTrue((image / component).is_symlink())
+                if error is not None:
+                    self.assertNotEqual(result.returncode, 0, result.stderr)
                     self.assertIn("psutil test bytecode", result.stderr)
+                    self.assertIn(error, result.stderr)
                     continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertFalse(cache.parent.exists() or cache.parent.is_symlink())
@@ -438,8 +462,6 @@ source "$1"
                     continue
                 for rel, data in package_files.items():
                     self.assertEqual((image / rel).read_bytes(), data, rel)
-                if layout == "symlink":
-                    self.assertEqual((outside / "keep.pyc").read_bytes(), b"outside the image")
 
     def test_finish_esp_mount_and_version_contract(self):
         text = (RECIPE / "finish-image.sh").read_text()
