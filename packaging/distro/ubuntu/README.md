@@ -65,7 +65,7 @@ tree 以映像 root 為起點，只接受 `generate.py` 列舉的路徑與 lock 
 
 `repart.d/` 維持 ESP＋writable state＋versioned read-only `/usr`＋empty slot。`finalize.sh` 預先整合 tty1 getty conflict 與 greetd PAM Wayland type；generator 保留 udev settle，另以 `wait-drm` 最多等待 30 秒，確認任一 `card[0-9]+` 有 backing device；不固定 PCI／vendor／card 編號，逾時由非致命的 ExecStartPre 放行，讓 greeter wrapper 可走無 DRM 文字保底。這是可攜化的實際 readiness wait，尚未證明與原 UAT boot 行為等價。`finish-image.sh` 驗 partition labels，唯讀掛載 `/usr`，用 `bootctl --no-variables` 安裝 `EFI/BOOT/BOOTX64.EFI`，不寫 builder EFI NVRAM。不再執行舊 run 的事後 boot patch。
 
-沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清空 machine-id，移除 rootfs 的 `var/lib/systemd/random-seed` 與 ESP 的 `boot/loader/random-seed`；finish 以 `bootctl install --random-seed=no` 避免產生 seed，另刪除 mkosi 已寫入的 ESP seed，確認不存在（含懸空 symlink），失敗即中止。開機時由既有 `systemd-random-seed.service`／`systemd-boot-random-seed.service` 分別管理 rootfs／ESP seed，不新增服務。fstab 與 finish 階段均以 `umask=0077` 掛載 ESP，只限 root 存取。這些是 source 契約，修正後映像尚未重建；首次開機 seed 服務實際成功執行、生成非空且各機不同的 ESP seed，以及 root-only 權限仍待 #207 開機回讀。首次帳號畫面與 wrapper 已有來源接線；PR A helper 尚未存在時由具名 TODO 維持 agreety，沒有可用帳號，不能當作可用的首次設定。這不是安裝器。
+沒有內建人員帳號、密碼、client SSH key、自動登入或遠端控制配置。root 鎖定；SSH 與 sysupdate 自動 timers 預設停用；`ditto-ssh-keygen.service` 是 ssh.service 必要依賴，以 `ssh-keygen -A` 在每機首次啟動 SSH 前產生 host keys。映像清空 machine-id，移除 rootfs 的 `var/lib/systemd/random-seed` 與 ESP 的 `boot/loader/random-seed`；finish 以 `bootctl install --random-seed=no` 避免產生 seed，另刪除 mkosi 已寫入的 ESP seed，確認不存在（含懸空 symlink），失敗即中止。開機時由既有 `systemd-random-seed.service`／`systemd-boot-random-seed.service` 分別管理 rootfs／ESP seed，不新增服務。fstab 與 finish 階段均以 `umask=0077` 掛載 ESP，只限 root 存取；fstab 另有 `ditto-state` 的 `/` 項目，用途見下方 #221 一節。這些是 source 契約，修正後映像尚未重建；首次開機 seed 服務實際成功執行、生成非空且各機不同的 ESP seed，以及 root-only 權限仍待 #207 開機回讀。首次帳號畫面與 wrapper 已有來源接線；PR A helper 尚未存在時由具名 TODO 維持 agreety，沒有可用帳號，不能當作可用的首次設定。這不是安裝器。
 
 scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作者／checkout 路徑，全檔比對；預設檢查具名 home 與 build producer 路徑，允許 AppArmor 等 distro 使用的泛用 `/home/` tunable，不按檔名全面排除。報告只輸出路徑／hash，不輸出檔案內容。帳號檢查採 passwd／shadow 聯合驗證：`etc/passwd` 與 `etc/shadow` 均須包含 root、帳號集合必須一致，任一缺檔、不可讀、非 regular file、檔案或 parent symlink、重複帳號、密碼欄位空值／active credential／格式錯誤均失敗；passwd 可用 `x` 指向 shadow，shadow 則只接受真正鎖定的密碼欄位。host keys、authorized keys、known-hosts、非空 machine-id、rootfs／ESP random seed（含空檔）、greetd／getty／GDM 等 active autologin、sudoers（包含 include）免密規則、未核准完整 PEM key blocks 或讀取錯誤也均失敗。ESP seed 的懸空 symlink、指向檔案或目錄的 symlink 與實體目錄也列入 identity 拒絕，不讀取 link 的外部目標。未結構化或其他格式秘密仍需 D11／D12 供應鏈掃描，不將此掃描當完整保證。
 
@@ -103,10 +103,18 @@ scan 唯讀檢查 mounted pristine rootfs；傳入 `--forbid` 可加精確的作
 - 完整 reboot 才是已觀察到的換槽方法；Ubuntu PoC soft-reboot 未切 `/usr`。新 image 未重驗更新／手動或自動回退、hang／斷電矩陣與 shared state schema 相容。
 - greetd／bounded DRM wait 接線仍屬 PoC；UAT 使用 autologin，抽取版的 agreety 密碼登入未實測；產品 GDM／GNOME 共存、帳號建立／OEM、keyring 登入與冷開機解鎖由 D06／D07 處理；原 Ubuntu UAT keyring 冷開機後 locked。
 - pristine scanner 只在 #205 第一輪失敗映像執行過，本次修正尚未在新的真實映像執行；合成 positive controls 不能替代完整 Ubuntu default files／package closure 的實際掃描。固定 mkosi seed 的 UUID 與空 machine-id／ConditionFirstBoot 語意由 #152 決定，GDM／relogin 接線由 #153 決定，runtime closure 精簡交 #151；本輪不變更這些政策。
-- 無 installer、Secure Boot／NVIDIA／硬體、音效、NFR／效能接受；無模型憑證或 pinned backend。模板 runner 存在不代表任意程式可安全啟用。
+- 安裝器只有 [`packaging/distro/installer/`](../installer/README.md) 的後端核心與 payload 抽取，尚無 ISO、安裝畫面或開機驗證；Secure Boot／NVIDIA／硬體、音效、NFR／效能均未接受；無模型憑證或 pinned backend。模板 runner 存在不代表任意程式可安全啟用。
 - source／NOTICE／SBOM、名稱／角色素材權利與營運 EOL／修補 SLA 尚須各責任 issue 交付。B 加裝版只共用封裝契約，本目錄不實作 #174。
 
 抽取對照：原 `work/build-image.py` → generator／repart／finalize；`finish-image.sh`、`patch-image-boot.sh` → 完成步驟與前置 boot 設定；`scan-pristine-rootfs.py` → 掃描器。`prepare-builder.sh` 與 provisioning 不納入；`build-native.sh`／`build-ui.sh`／`build-desktop.sh`／`build-wayfire*.sh`／`fetch-wayfire-deps.py` 的成功結果轉成明確 runtime 輸入契約，未冒充已移植成乾淨建置管線。
+
+## #221 ISO 預覽版的映像調整（source 契約，尚未重建）
+
+依 owner 2026-10-26 決定（[#152 留言](https://github.com/relvo-labs/Ditto/issues/152#issuecomment-6414217695)）：
+
+- `packages.txt` 加入 `linux-firmware` 與 `mesa-libgallium`。amdgpu、i915、xe、nouveau、radeon 等 kernel 驅動已在 `linux-modules-7.0.0-38-generic`（snapshot 沒有 `linux-modules-extra` 這個套件），缺的是 firmware；`linux-firmware` 在 snapshot 是拉入全部 `linux-firmware-*` 分包的 meta，依 index 估計安裝後約 662 MiB。`mesa-libgallium` 原本就由 `libegl-mesa0` 帶入，明列是為了閉包精簡時不被移除。不含 NVIDIA 專有驅動。套件名稱與版本只查過 `resolute`、`-updates`、`-security` 的 Packages index（InRelease 以本機 Ubuntu archive keyring 經 gpgv 驗證），沒有下載或安裝 `.deb`。
+- `/etc/fstab` 新增 `/dev/disk/by-partlabel/ditto-state / ext4 rw,x-systemd.growfs 0 0`。安裝器會把 `ditto-state` 分割區設成填滿磁碟，首次開機由 `systemd-growfs-root.service` 線上擴展 ext4。依 systemd v259.9 `src/fstab-generator/fstab-generator.c`，initrd 的 `rootflags=` 只採用 `x-systemd.makefs`／`validatefs`，growfs 必須來自 host 端 `/etc/fstab` 的 `/` 項目。`systemd-repart` 無法做這件事：它只會把分割區長進緊接其後的空間，而 `ditto-state` 後面是兩個 `/usr` 槽。直接複製的映像分割區大小不變，growfs 不做事。
+- 以上只有 source 測試。新映像仍須在 builder 回讀：`packages.tsv` 含 `linux-firmware*`、`/usr` 8 GiB 槽的使用量、UKI 大小與 ESP 剩餘空間（firmware 是否被帶進 initrd），以及 finish／pristine scan；VM 須回讀 `systemd-growfs-root.service` 結果與擴展後的 `df`。實體 GPU 仍未驗證。
 
 本機回歸入口為 `python3 packaging/distro/ubuntu/tests/test_recipe.py -v`，需要 Git 與真實 `dpkg-query`。測試只使用 task-owned filesystem／dpkg fixtures、source archive 與有界 DRM 假目錄，不啟動 runtime binary、guest 或掛載映像；通過不代表映像已取得資格。
 

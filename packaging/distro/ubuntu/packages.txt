@@ -50,6 +50,13 @@ libgbm1
 libegl1
 libegl-mesa0
 libgl1-mesa-dri
+# #221 hardware enablement (owner 2026-10-26): amdgpu/i915/xe/nouveau already ship
+# in linux-modules-7.0.0-38-generic but need firmware; the snapshot meta pulls every
+# split linux-firmware-* package (about 662 MiB installed). mesa-libgallium holds
+# radeonsi/iris/crocus/nouveau/llvmpipe and is listed so minimisation keeps it.
+# No proprietary NVIDIA driver. Names checked in the gpgv-verified snapshot index.
+linux-firmware
+mesa-libgallium
 libpipewire-0.3-0t64
 libpolkit-agent-1-0
 libqt6waylandclient6

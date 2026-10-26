@@ -37,6 +37,9 @@ QUICKSHELL_TARGET_PACKAGES = {
     "libpolkit-agent-1-0", "libqt6waylandclient6", "libqt6widgets6", "libqt6core6t64",
     "libqt6gui6", "libqt6qml6", "libqt6quick6"}
 TIMERS = ("fstrim", "dpkg-db-backup", "motd-news")
+# #221: firmware for amdgpu/i915/xe/nouveau (kernel modules already ship in
+# linux-modules-7.0.0-38-generic) and Mesa's gallium drivers. Source contract only.
+HARDWARE_ENABLEMENT_PACKAGES = {"linux-firmware", "mesa-libgallium"}
 PUBLIC_PRODUCER_MANIFEST = "public-producer-path-fixtures.json"
 # The eight package/vendor hits of the first #205 real-image scan; the four
 # owned Rust artifacts of that scan are deliberately absent (remap instead).
@@ -315,8 +318,42 @@ source "$1"
                                 env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
                                 text=True, capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((image / "etc/fstab").read_text().split(),
-                         ["/dev/disk/by-partlabel/ditto-esp", "/boot", "vfat", "umask=0077", "0", "2"])
+        rows = [line.split() for line in (image / "etc/fstab").read_text().splitlines()
+                if line.strip() and not line.lstrip().startswith("#")]
+        self.assertIn(["/dev/disk/by-partlabel/ditto-esp", "/boot", "vfat", "umask=0077", "0", "2"], rows)
+        self.assertEqual(len(rows), 2, rows)
+
+    def test_generated_fstab_grows_state_root_on_boot(self):
+        # #221: the installer enlarges the ditto-state partition; the host-side
+        # /etc/fstab "/" entry is what hooks systemd-growfs-root.service in
+        # systemd 259 (rootflags=x-systemd.growfs is ignored in the initrd).
+        output, _ = self.generate()
+        image = self.root / "image"
+        for rel in ("etc/ssh", "var/lib/dbus", "etc/systemd/system", "etc/pam.d"):
+            (image / rel).mkdir(parents=True, exist_ok=True)
+        self.put("etc/pam.d/greetd", "# synthetic PAM\n", image)
+        script = '''
+python3() { if [[ "$1" == -c ]]; then echo synthetic-source-commit; fi; return 0; }
+chroot() { return 0; }
+source "$1"
+'''
+        result = subprocess.run(["bash", "-c", script, "finalize-test", str(output / "finalize.sh")],
+                                env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
+                                text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = [line.split() for line in (image / "etc/fstab").read_text().splitlines()
+                if line.strip() and not line.lstrip().startswith("#")]
+        roots = [row for row in rows if row[1] == "/"]
+        self.assertEqual(roots, [["/dev/disk/by-partlabel/ditto-state", "/", "ext4",
+                                  "rw,x-systemd.growfs", "0", "0"]])
+        # The state label is the one the UKI command line and the installer use.
+        conf = (output / "mkosi.conf").read_text()
+        self.assertIn("root=PARTLABEL=ditto-state", conf)
+        self.assertNotIn("rootflags=", conf)
+        repart = configparser.ConfigParser()
+        repart.read(output / "mkosi.repart/10-root.conf")
+        self.assertEqual(repart["Partition"]["Label"], "ditto-state")
+        self.assertEqual(repart["Partition"]["Format"], "ext4")
 
     def test_finish_esp_mount_and_version_contract(self):
         text = (RECIPE / "finish-image.sh").read_text()
@@ -1908,6 +1945,23 @@ runpy.run_path(sys.argv[0], run_name='__main__')
                     if line and not line.startswith("#")]
         for mode, packages in closures.items():
             self.assertEqual(packages, declared, mode)
+
+    def test_hardware_enablement_packages_in_every_mode(self):
+        # #221 owner decision: linux-firmware plus the open-source GPU stack,
+        # never the proprietary NVIDIA driver. Names were checked against the
+        # gpgv-verified snapshot index; the image closure itself is a builder row.
+        for flags, mode in self.MODES:
+            with self.subTest(mode=mode):
+                output, _ = self.generate(flags=flags)
+                conf = configparser.ConfigParser(interpolation=None, strict=True)
+                conf.optionxform = str
+                conf.read(output / "mkosi.conf")
+                packages = conf["Content"]["Packages"].split(",")
+                self.assertLessEqual(HARDWARE_ENABLEMENT_PACKAGES, set(packages))
+                self.assertFalse([name for name in packages if name.startswith("nvidia-")], packages)
+        listed = [line for line in (RECIPE / "packages.txt").read_text().splitlines()
+                  if line and not line.startswith("#")]
+        self.assertLessEqual(HARDWARE_ENABLEMENT_PACKAGES, set(listed))
 
     def test_closure_contract_detects_missing_or_single_mode_fix(self):
         # Controls for the contract itself on task-owned recipe copies.

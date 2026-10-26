@@ -11,7 +11,12 @@ commit="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourc
 printf '\nDITTO_SOURCE_COMMIT=%s\n' "$commit" >> "$root/usr/lib/os-release"
 printf 'ditto\n' > "$root/etc/hostname"
 printf 'LANG=C.UTF-8\n' > "$root/etc/locale.conf"
-printf '/dev/disk/by-partlabel/ditto-esp /boot vfat umask=0077 0 2\n' > "$root/etc/fstab"
+# The #221 installer sizes ditto-state to fill the disk; growfs then extends
+# ext4 online. systemd 259 only hooks systemd-growfs-root.service from a host
+# fstab "/" entry (the initrd ignores rootflags=x-systemd.growfs). No-op when
+# the partition already matches the file system, e.g. a directly copied image.
+printf '/dev/disk/by-partlabel/ditto-state / ext4 rw,x-systemd.growfs 0 0\n' > "$root/etc/fstab"
+printf '/dev/disk/by-partlabel/ditto-esp /boot vfat umask=0077 0 2\n' >> "$root/etc/fstab"
 ln -sfn /run/systemd/resolve/stub-resolv.conf "$root/etc/resolv.conf"
 # Package postinst may generate these. Ship no machine-specific host keys/seed.
 rm -f "$root"/etc/ssh/ssh_host_*key* "$root/var/lib/systemd/random-seed"
