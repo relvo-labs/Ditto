@@ -44,13 +44,15 @@ handler: Socket {
 
 | 觀察 | 狀態 | 動作 |
 | --- | --- | --- |
-| 沒有 socket、或沒有程序在聽（`ENOENT`／`ECONNREFUSED`） | 不存在 | 無。Shell 退出由 Core 的受控啟動器處理 |
+| 沒有程序在聽：沒有 socket 檔（`ENOENT`）、沒有程序綁著它（`ECONNREFUSED`）、路徑不是目錄（`ENOTDIR`） | 不存在 | 無。Shell 退出由 Core 的受控啟動器處理 |
 | 在聽，但**從未**回過 `pong` | 尚未武裝 | 無 |
-| 從不存在、尚未武裝或已觸發，收到 `pong` | 已武裝，進入**啟動寬限**（60 秒） | 無。日誌 `state` 帶 `phase="startup"` |
-| 已武裝後收到 `pong` | 已武裝，未回應次數歸零 | 無。不延長寬限 |
+| 第一次收到 `pong`，或收到**可證明是另一個程序**的 `pong`（不論先前是什麼狀態，見下方身分規則） | 已武裝，新的一代，進入**啟動寬限**（60 秒） | 無。日誌 `state` 帶 `phase="startup"` 與 `peer`；已武裝時被取代記 `detail="new_shell"` |
+| 收到**可能是同一個程序**的 `pong`（不論先前是什麼狀態：斷線重連後、不存在或尚未武裝之後、觸發後沒殺掉；含讀不到對端、讀不到啟動時間） | 已武裝，這一代繼續，未回應次數歸零 | 無。寬限仍從這一代第一次武裝起算，不重新開始；寬限已過就照 3 次規則 |
 | 啟動寬限內連續 10 次未回應（約 19～21 秒） | 已觸發 | 同下一列；日誌帶 `phase="startup"` |
 | 寬限結束後連續 3 次未回應（約 6～7 秒） | 已觸發 | `SIGKILL` Shell → 寫 `rescue-request.json` → `systemctl --user start --no-block ditto-rescue.service`；日誌帶 `phase="steady"` |
-| 已觸發後 | 等新的 Shell 回 `pong` 才重新武裝 | 同一個卡住的 Shell 不會被處理兩次 |
+| 已觸發後 | 等 Shell 回 `pong` 才重新武裝 | 同一個卡住的 Shell 不會被處理兩次 |
+
+「不存在」只表示沒有程序在聽，沒有別的意思。connect 失敗只有一個地方判斷（`classify_connect_error`），第一次連線和寫入遇到斷線（`BrokenPipe`）後的重連都用它：上面三種錯誤是不存在；backlog 滿（`EAGAIN`）和其他錯誤都是一次未回應。主執行緒停住、不再 accept 的 Shell 仍握著 listening socket，supervisor 每次未回應後都會重連，很快就把 backlog 填滿，所以這種 Shell 只會被看成未回應，不會被看成不存在。
 
 「尚未武裝」是刻意的限制：在第一次回 `pong` 之前就卡住的 Shell，supervisor 不會處理。啟動期的卡住要由 Core 的啟動就緒檢查負責。
 
@@ -58,8 +60,12 @@ handler: Socket {
 
 - 門檻依**每次未回應被觀察到的時間**（supervisor 自己的單調時鐘）落在寬限內或外決定。連續次數不因寬限結束而歸零：寬限一結束，跨過邊界的連續未回應累計達 3 次就觸發。
 - 上限：啟動中真的卡死，從卡住起約 21 秒內觸發，不會變成永遠不處理；寬限結束後就是原本的 3 次規則，常態期（NFR-08 的 10 秒）沒有放寬。
-- 每次重新武裝（第一次回覆、Shell 退出後的新 Shell、觸發後的新 Shell，例如從救援回到一般桌面）都重新開始寬限。寬限結束時記一行 `grace_ended`。
-- 已知限制：新的 Shell 若在一個 ping 間隔內取代舊的、supervisor 沒觀察到「不存在」，它沿用舊 Shell 的狀態，不會重新寬限。
+- 「哪一代」跟著程序走，不跟著狀態走：每次新連線都以 `SO_PEERCRED` 讀出在聽的程序 PID，並讀 `/proc/<pid>/stat` 的啟動時間，PID 被重用也分得出來。Core 重啟 Shell 的最短退避是 1 秒，比 ping 間隔短，所以新 Shell 可能在 supervisor 看到「不存在」之前就接上；舊連線斷掉、重連到新 Shell 並收到 `pong` 時，若可證明是另一個程序，就是新的一代。反過來，看到「不存在」或觸發之後，回 `pong` 的若可能是同一個程序，也只是這一代繼續，不重新寬限。寬限結束時記一行 `grace_ended`。
+- **身分規則**（`Peer::provably_differs_from`，唯一的判斷處）：兩次觀察**除非可證明不同，否則視為可能是同一個程序**。可證明不同只有兩種：兩次都讀到 PID 且 PID 不同；或 PID 相同、兩次都讀到啟動時間且不同。讀不到對端（`getsockopt` 失敗，或對端在看不到的 PID namespace，PID 為 0，日誌記 `peer="unknown"`）、或讀不到啟動時間，都不能證明什麼，視為同一代。這一代先前沒讀到的身分資訊（PID 或啟動時間），之後讀到會記下來（不開新的一代），之後 PID 被重用才分得出來。
+- 失敗方向：不確定就當成同一代，寬限不會被重新開始，所以寧可進入救援，不放過卡住的 Shell。代價是無法分辨的替換（讀不到對端，或 PID 相同、其中一次讀不到啟動時間）可能拿不到寬限，在慢機器上可能被誤判而進入救援。Linux 的 Unix socket 一般都讀得到對端，這是退路。
+- 同一個 Shell 不能自己延長寬限：不論它被觀察成什麼樣子、斷線重連幾次、中間是否被看成不存在，都仍是同一代。反覆停頓又偶爾回覆的 Shell，寬限一過就照 3 次規則處理。
+- 測試證據：單元測試對同一個真實 Shell 窮舉所有觀察方式（每次 `pong` 是有啟動時間、沒有啟動時間、讀不到對端但同一連線、讀不到對端且換了連線，長度 8 的所有序列），乘上停頓模式（k 次未回應後回覆一次，k＝1～9，以及卡死），結果都和每次正確辨識時完全相同；k≥3 與卡死最遲在「第一次武裝＋寬限＋常態上限」內觸發（k＝1、2 等於最多每 6 秒回覆一次，3 次規則本來就不觸發）。另一組測試在其中硬插入「不存在」與「不存在後未回應」（固定後的 pinger 對活著的 Shell 產生不出這些），同一個 Shell 回覆後仍不會重新寬限：k≥3 與卡死最遲在「第一次武裝＋寬限＋常態上限」與「恢復回覆＋常態上限」兩者較晚者內觸發。
+- 仍然不會觸發的情況：supervisor 只處理已武裝的 Shell。真的看到「不存在」之後，接著一直未回應（尚未武裝）就不會觸發。對同一個活著、握著 listening socket 的 Shell，固定後的 pinger 不會產生「不存在」（有 socket 測試）。真的不存在，表示 Shell 已經不在，由 Core 的退出與重啟處理；新起來的 Shell 從未回應，則屬於上面「尚未武裝」的既有設計。剩下的只有一種：活著的程序自己關掉或刪除 listening socket，之後重新 listen 卻一直不回應。目前的 Shell 不會這樣做（`SocketServer` 在整個程序期間都開著），supervisor 也無從 ping 到它。
 - 依據與取捨見 [D-53](../../.agents/notes/decisions/2026-10-27-d53-supervisor-startup-grace.md)。
 
 非阻塞 connect：`SIGSTOP` 的 Shell 不再 accept，listen backlog 滿了以後阻塞式 connect 會把 supervisor 一起卡住。backlog 滿（`EAGAIN`）也算一次未回應。
@@ -96,7 +102,7 @@ ditto-supervisor --once
 
 `--startup-grace-ms 0` 關閉啟動寬限。`--startup-misses` 不得小於 `--misses`，否則拒絕啟動；未指定時取 10 與 `--misses` 的較大值，所以原有的呼叫方式（例如 `--misses 100000`）照常可用。
 
-日誌是 stderr 上的 `ditto-supervisor event=<名稱> key="value"` 行，由 journal 依 unit 保存。`started` 記錄生效的門檻（含 `startup_grace_ms`、`startup_misses`）；`state` 在進入已武裝或已觸發時帶 `phase`，`shell_unresponsive` 也帶 `phase`，用來分辨啟動期與常態期的觸發。
+日誌是 stderr 上的 `ditto-supervisor event=<名稱> key="value"` 行，由 journal 依 unit 保存。`started` 記錄生效的門檻（含 `startup_grace_ms`、`startup_misses`）；`state` 在進入已武裝或已觸發時帶 `phase` 與 `peer`（`pid:<n>` 或 `unknown`），`shell_unresponsive` 也帶 `phase`，用來分辨啟動期與常態期的觸發。
 
 ## 已知限制
 
