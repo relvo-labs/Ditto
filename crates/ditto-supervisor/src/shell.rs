@@ -38,6 +38,21 @@ impl SocketPinger {
     }
 }
 
+/// The one place a failed connect becomes an outcome, for the first connect
+/// and for the reconnect after a broken pipe alike. `Absent` means nothing is
+/// listening (no socket file, nobody bound to it, a path that is not a
+/// directory) and nothing else: a live process holding the listening socket
+/// is never absent. A full backlog (`EAGAIN`) is what a Shell whose UI thread
+/// stopped accepting produces once the pinger has reconnected a few times,
+/// so it is a miss, as is every other error.
+fn classify_connect_error(error: &io::Error) -> Outcome {
+    match error.raw_os_error() {
+        Some(libc::ENOENT | libc::ECONNREFUSED | libc::ENOTDIR) => Outcome::Absent,
+        Some(libc::EAGAIN) => Outcome::NoReply("listen backlog full".into()),
+        _ => Outcome::NoReply(format!("connect: {error}")),
+    }
+}
+
 /// The PID of the process that listens on the other end: `SO_PEERCRED` on a
 /// connecting socket reports the listener's credentials from `listen(2)`, and
 /// is available before the Shell accepts (a stopped Shell still has one).
@@ -141,13 +156,7 @@ impl SocketPinger {
                     self.peer = identify(&stream, self.connections);
                     self.stream = Some(stream);
                 }
-                Err(error) => {
-                    return match error.raw_os_error() {
-                        Some(libc::ENOENT | libc::ECONNREFUSED | libc::ENOTDIR) => Outcome::Absent,
-                        Some(libc::EAGAIN) => Outcome::NoReply("listen backlog full".into()),
-                        _ => Outcome::NoReply(format!("connect: {error}")),
-                    };
-                }
+                Err(error) => return classify_connect_error(&error),
             }
         }
         let stream = self.stream.as_mut().expect("connected above");
@@ -158,10 +167,11 @@ impl SocketPinger {
         };
         let _ = stream.set_write_timeout(Some(remaining()));
         if let Err(error) = stream.write_all(format!("ping {sequence}\n").as_bytes()) {
-            // The Shell exited since the last ping: its end is gone.
+            // This connection's other end is gone. Whether a Shell is still
+            // listening is up to the reconnect, judged like any connect.
             if error.kind() == io::ErrorKind::BrokenPipe {
                 return match connect(&self.path) {
-                    Err(_) => Outcome::Absent,
+                    Err(error) => classify_connect_error(&error),
                     Ok(_) => Outcome::NoReply("connection reset".into()),
                 };
             }
@@ -504,6 +514,132 @@ mod tests {
         assert_eq!(pinger.connections, 1);
         pinger.ping(2, Duration::from_millis(20));
         assert_eq!(pinger.connections, 2, "every miss reconnects");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn only_nobody_listening_is_absent() {
+        let outcome = |errno| classify_connect_error(&io::Error::from_raw_os_error(errno));
+        for errno in [libc::ENOENT, libc::ECONNREFUSED, libc::ENOTDIR] {
+            assert_eq!(outcome(errno), Outcome::Absent, "errno {errno}");
+        }
+        assert_eq!(
+            outcome(libc::EAGAIN),
+            Outcome::NoReply("listen backlog full".into())
+        );
+        for errno in [
+            libc::EACCES,
+            libc::EINTR,
+            libc::ETIMEDOUT,
+            libc::EMFILE,
+            libc::EINPROGRESS,
+        ] {
+            assert!(
+                matches!(outcome(errno), Outcome::NoReply(_)),
+                "errno {errno}"
+            );
+        }
+    }
+
+    /// A listening socket whose backlog is one, so it fills at once, as a
+    /// stopped Shell's does once the pinger has reconnected a few times.
+    fn small_backlog_listener(path: &Path) -> UnixListener {
+        use std::os::fd::AsRawFd;
+        let listener = UnixListener::bind(path).unwrap();
+        // SAFETY: listen(2) on a socket this test owns; on Linux a second
+        // listen only changes the backlog.
+        assert_eq!(unsafe { libc::listen(listener.as_raw_fd(), 1) }, 0);
+        listener
+    }
+
+    /// Connections nobody accepts, until connect says the backlog is full.
+    fn fill_backlog(path: &Path) -> Vec<UnixStream> {
+        let mut held = Vec::new();
+        loop {
+            match connect(path) {
+                Ok(stream) => held.push(stream),
+                Err(error) if error.raw_os_error() == Some(libc::EAGAIN) => return held,
+                Err(error) => panic!("{error}"),
+            }
+            assert!(held.len() < 64, "the backlog never filled");
+        }
+    }
+
+    /// Review round 4 P1: a live Shell whose UI thread stopped accepting
+    /// must never look absent. Here the kept connection breaks (the write
+    /// gets BrokenPipe) and the reconnect finds the backlog full. Returns
+    /// the outcome of that ping and of five more.
+    fn broken_pipe_then_full_backlog(attempt: usize) -> Vec<Outcome> {
+        let dir = temp(&format!("broken-{attempt}"));
+        let path = dir.join("shell.sock");
+        let listener = small_backlog_listener(&path);
+        let accepting = listener.try_clone().unwrap();
+        // Answer one ping, then close that connection and stop accepting.
+        let server = std::thread::spawn(move || {
+            let (stream, _) = accepting.accept().unwrap();
+            let mut writer = stream.try_clone().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream).read_line(&mut line).unwrap();
+            writer
+                .write_all(line.replace("ping", "pong").as_bytes())
+                .unwrap();
+        });
+        let mut pinger = SocketPinger::new(path.clone());
+        assert_eq!(pinger.ping(1, Duration::from_millis(500)), Outcome::Pong);
+        server.join().unwrap();
+        let _held = fill_backlog(&path);
+        let outcomes = (2..8)
+            .map(|sequence| pinger.ping(sequence, Duration::from_millis(20)))
+            .collect();
+        drop(listener);
+        let _ = fs::remove_dir_all(&dir);
+        outcomes
+    }
+
+    /// Never Absent, whatever path the broken connection takes. Writing to
+    /// the closed connection normally fails with BrokenPipe and the
+    /// reconnect meets the full backlog ("listen backlog full", which only
+    /// that path can give while a connection is held); rarely the kernel
+    /// lets the write through and the read reports the reset instead. The
+    /// scenario is repeated until the BrokenPipe path has been seen.
+    #[test]
+    fn a_live_listener_is_never_absent_after_a_broken_pipe() {
+        let mut reconnect_path_seen = false;
+        for attempt in 0..10 {
+            let outcomes = broken_pipe_then_full_backlog(attempt);
+            for outcome in &outcomes {
+                assert!(
+                    matches!(outcome, Outcome::NoReply(_)),
+                    "a live listener reported {outcome:?}"
+                );
+            }
+            if outcomes[0] == Outcome::NoReply("listen backlog full".into()) {
+                reconnect_path_seen = true;
+                break;
+            }
+        }
+        assert!(
+            reconnect_path_seen,
+            "the BrokenPipe reconnect was never exercised"
+        );
+    }
+
+    /// One pinger, reconnecting after every miss as it does in service,
+    /// against a listener that never accepts: only misses, never Absent.
+    #[test]
+    fn a_never_accepting_listener_with_reconnects_is_only_missed() {
+        let dir = temp("never");
+        let path = dir.join("shell.sock");
+        let _listener = small_backlog_listener(&path);
+        let mut pinger = SocketPinger::new(path);
+        let mut full = 0;
+        for sequence in 1..=20 {
+            match pinger.ping(sequence, Duration::from_millis(20)) {
+                Outcome::NoReply(reason) => full += usize::from(reason == "listen backlog full"),
+                other => panic!("ping {sequence}: {other:?}"),
+            }
+        }
+        assert!(full > 0, "the backlog filled and was still a miss");
         let _ = fs::remove_dir_all(&dir);
     }
 

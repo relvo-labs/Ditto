@@ -68,8 +68,9 @@ pub enum Peer {
     /// reused PID can be told apart. Compare with `provably_differs_from`.
     Process { pid: u32, start: Option<u64> },
     /// The peer could not be read. It never starts a generation by itself:
-    /// while armed it is taken to be the same Shell, so the supervisor errs
-    /// toward rescue (a replacement may miss its grace), never away from it.
+    /// in any state it is taken to be possibly the same Shell, so the
+    /// supervisor errs toward rescue (a replacement may miss its grace),
+    /// never away from it.
     Unknown { connection: u64 },
 }
 
@@ -189,28 +190,30 @@ impl Monitor {
             self.phase = self.phase_at(now_ms);
         }
         let identified = matches!(peer, Peer::Process { .. }).then_some(peer);
+        // The generation follows the process, not the state (review round 4):
+        // in any state, only the first answer ever or a process provably
+        // different from the last armed one starts a new generation.
         let (next, action) = match (self.state, outcome) {
-            // Armed, and a process provably different from this generation's
-            // answers: a replacement the supervisor did not see exit (Core
-            // relaunches faster than one ping interval). New generation.
-            (State::Armed { .. }, Outcome::Pong)
-                if self
-                    .peer
-                    .is_some_and(|armed| armed.provably_differs_from(peer)) =>
+            (_, Outcome::Pong)
+                if self.generation == 0
+                    || self
+                        .peer
+                        .is_some_and(|armed| armed.provably_differs_from(peer)) =>
             {
                 self.new_generation(identified, now_ms)
             }
-            // Armed, and possibly the same process (see the identity rule):
-            // the same generation and its grace, learning what can be learnt
-            // about its identity. No observation pattern of one Shell, and no
-            // reconnect, can earn it a new grace.
-            (State::Armed { .. }, Outcome::Pong) => {
+            // Possibly the same process (see the identity rule): its own
+            // generation goes on, with the grace counted from its first
+            // arming, learning what can be learnt about its identity. Armed,
+            // after a reconnect; or after Absent, Unarmed or a trip whose kill
+            // did not take: a Shell past its grace resumes the steady rule, its
+            // misses start again from zero. No observation of one Shell, no
+            // reconnect and no Absent can earn it a new grace.
+            (_, Outcome::Pong) => {
                 self.peer = Peer::learn(self.peer, peer);
+                self.phase = self.phase_at(now_ms);
                 (State::Armed { misses: 0 }, Action::None)
             }
-            // After an observed exit, a Shell that never answered, or a trip:
-            // a new generation, whoever answers.
-            (_, Outcome::Pong) => self.new_generation(identified, now_ms),
             (_, Outcome::Absent) => (State::Absent, Action::None),
             (State::Absent | State::Unarmed, Outcome::NoReply(_)) => (State::Unarmed, Action::None),
             (State::Tripped, Outcome::NoReply(_)) => (State::Tripped, Action::None),
@@ -795,8 +798,12 @@ mod tests {
         }
         let (recorder, _) = drive_peers(&Timing::default(), script);
         assert_eq!(recorder.grace_ended, [(60_003, 0)]);
-        assert_eq!(recorder.trips, [(67_000, 3)]);
-        assert_eq!(recorder.trip_phases, [Phase::Steady]);
+        assert_eq!(recorder.trips[0], (67_000, 3));
+        // The fake Shell survives each kill and answers again as the same
+        // process: it resumes its generation (round 4), so every later stall
+        // trips by the steady rule too.
+        assert!(recorder.trip_phases.iter().all(|p| *p == Phase::Steady));
+        assert!(recorder.trips.iter().all(|(_, misses)| *misses == 3));
     }
 
     /// Unidentified, a reconnect that reaches a new Shell cannot be told
@@ -818,9 +825,11 @@ mod tests {
         );
     }
 
-    /// An observed exit still starts a new generation, identified or not.
+    /// After an observed exit, an unidentified Shell cannot be told from the
+    /// one before, so it resumes that generation (round 4; in round 2 it got
+    /// a new grace): toward rescue.
     #[test]
-    fn an_unidentified_shell_after_an_exit_gets_the_grace() {
+    fn an_unidentified_shell_after_an_exit_resumes_the_generation() {
         let unknown = |connection| Peer::Unknown { connection };
         let mut script: Vec<_> = pongs(40).into_iter().map(|o| (o, unknown(1))).collect();
         script.push((Outcome::Absent, unknown(1)));
@@ -828,8 +837,12 @@ mod tests {
         script.extend((3..8).map(|c| (miss(), unknown(c))));
         script.extend(std::iter::repeat_n((Outcome::Pong, unknown(8)), 5));
         let (recorder, _) = drive_peers(&Timing::default(), script);
-        assert!(recorder.trips.is_empty(), "{:?}", recorder.trips);
-        assert_eq!(recorder.armed_phases, [Phase::Startup, Phase::Startup]);
+        assert_eq!(recorder.trips, [(89_000, 3)]);
+        // Armed, resumed after the exit, resumed again after the trip.
+        assert_eq!(
+            recorder.armed_phases,
+            [Phase::Startup, Phase::Steady, Phase::Steady]
+        );
     }
 
     #[test]
@@ -864,26 +877,27 @@ mod tests {
         monitor.observe(&miss(), SHELL_A, 70_500);
         monitor.observe(&Outcome::Pong, SHELL_A, 70_600);
         assert_eq!((monitor.generation, monitor.phase), (1, Phase::Steady));
-        // After a trip, whoever answers is a new generation (the 6efa9b5
-        // rule; a Shell whose kill failed and that hangs again trips again).
+        // After a trip whose kill did not take, the same process answering
+        // resumes its generation, steady (round 4; a Shell that hangs again
+        // trips again after three misses).
         for _ in 0..3 {
             monitor.observe(&miss(), SHELL_A, 71_000);
         }
         assert_eq!(monitor.state, State::Tripped);
         monitor.observe(&Outcome::Pong, SHELL_A, 72_000);
-        assert_eq!((monitor.generation, monitor.phase), (2, Phase::Startup));
+        assert_eq!((monitor.generation, monitor.phase), (1, Phase::Steady));
         // A different identified Shell, while armed: new generation, new grace.
         monitor.observe(&Outcome::Pong, SHELL_B, 130_000);
         assert_eq!(monitor.phase, Phase::Startup);
-        assert_eq!(monitor.generation, 3);
+        assert_eq!(monitor.generation, 2);
         monitor.observe(&Outcome::Pong, SHELL_A_REUSED, 131_000);
-        assert_eq!(monitor.generation, 4, "a reused PID is another Shell");
+        assert_eq!(monitor.generation, 3, "a reused PID is another Shell");
         // An unknown peer while armed is not a new generation and does not
         // replace the known one.
         monitor.observe(&Outcome::Pong, Peer::Unknown { connection: 9 }, 200_000);
         assert_eq!(
             (monitor.generation, monitor.peer, monitor.phase),
-            (4, Some(SHELL_A_REUSED), Phase::Steady)
+            (3, Some(SHELL_A_REUSED), Phase::Steady)
         );
         // A generation armed while unidentified records its process when it
         // becomes known, without a new grace; a different process after that
@@ -1189,5 +1203,188 @@ mod tests {
             }
         }
         assert_eq!(checked, 405);
+    }
+
+    // Review round 4 (P1, P2): `Absent` injected into the life of one Shell.
+    // With the fixed pinger a live Shell holding its listening socket cannot
+    // be observed as Absent (see the socket tests in `shell.rs`); these tests
+    // inject it anyway, and Absent→NoReply (Unarmed), and show that the same
+    // process still cannot gain a new grace.
+
+    /// Like `first_trip`, but at ping `at` the outcomes `disruption` replace
+    /// the stall pattern, then one pong (the resumed pong) follows and the
+    /// pattern goes on from there. Returns the first trip and when the
+    /// resumed pong was observed.
+    fn first_trip_disrupted(
+        seen: &[Seen],
+        stall: Option<u32>,
+        at: u64,
+        disruption: &[Outcome],
+        until: u64,
+    ) -> (Option<u64>, u64) {
+        let mut monitor = Monitor::from_timing(&Timing::default());
+        let mut observer = Observer { connection: 1 };
+        let missed = miss();
+        let resumed_ping = at + disruption.len() as u64;
+        let resumed = resumed_ping * 2_000 + 3;
+        let (mut pongs, mut since_pong) = (0usize, 0u32);
+        for n in 0.. {
+            let start: u64 = n * 2_000;
+            if start > until {
+                return (None, resumed);
+            }
+            let seen = seen[pongs % seen.len()];
+            let outcome = if n >= at && n < resumed_ping {
+                &disruption[(n - at) as usize]
+            } else if n == 0 || n == resumed_ping || (n > at && stall == Some(since_pong)) {
+                &Outcome::Pong
+            } else if n < at && stall == Some(since_pong) {
+                &Outcome::Pong
+            } else {
+                &missed
+            };
+            match outcome {
+                Outcome::Pong => {
+                    let peer = observer.peer(seen);
+                    pongs += 1;
+                    since_pong = 0;
+                    monitor.observe(outcome, peer, start + 3);
+                }
+                Outcome::NoReply(_) => {
+                    observer.connection += 1;
+                    if n < at || n > resumed_ping {
+                        since_pong += 1;
+                    }
+                    let peer = observer.peer(seen);
+                    if let Action::Trip { .. } = monitor.observe(outcome, peer, start + 1_000) {
+                        return (Some(start + 1_000), resumed);
+                    }
+                }
+                Outcome::Absent => {
+                    observer.connection += 1;
+                    let peer = observer.peer(seen);
+                    monitor.observe(outcome, peer, start + 3);
+                }
+            }
+        }
+        unreachable!()
+    }
+
+    #[test]
+    fn an_injected_absent_earns_one_shell_no_new_grace() {
+        let kinds = [Seen::WithStart, Seen::WithoutStart, Seen::UnknownNew];
+        let disruptions = [
+            vec![Outcome::Absent],
+            vec![Outcome::Absent, miss()],
+            vec![Outcome::Absent, miss(), miss(), miss()],
+            vec![miss(), Outcome::Absent, miss()],
+            vec![Outcome::Absent, Outcome::Absent],
+        ];
+        // Inside the grace, across its end, and well after it.
+        let positions = [5, 29, 40];
+        let stalls: Vec<Option<u32>> = (1..=9).map(Some).chain([None]).collect();
+        let until = 100_000;
+        let mut runs = 0;
+        for disruption in &disruptions {
+            for at in positions {
+                for &stall in &stalls {
+                    let (truth, resumed) =
+                        first_trip_disrupted(&[Seen::WithStart], stall, at, disruption, until);
+                    // No new grace at the resumed pong: a stall of three or
+                    // more trips by the first grace's bound or by the steady
+                    // bound after the resumed pong, whichever is later.
+                    if !matches!(stall, Some(k) if k < 3) {
+                        let bound = NO_ESCAPE_BOUND.max(resumed + 3 * 2_000 + 1_000);
+                        assert!(
+                            truth.is_some_and(|trip| trip <= bound),
+                            "{disruption:?} at {at}, stall {stall:?}: {truth:?} > {bound}"
+                        );
+                    }
+                    let mut seen = [Seen::WithStart; 8];
+                    for code in 0..3usize.pow(8) {
+                        for (i, slot) in seen.iter_mut().enumerate() {
+                            *slot = kinds[code / 3usize.pow(i as u32) % 3];
+                        }
+                        assert_eq!(
+                            first_trip_disrupted(&seen, stall, at, disruption, until).0,
+                            truth,
+                            "seen {seen:?}, {disruption:?} at {at}, stall {stall:?}"
+                        );
+                        runs += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(runs, 6_561 * 5 * 3 * 10);
+    }
+
+    /// The inverse after an exit: an armed Shell past its grace, then Absent
+    /// (or Absent, then a listener that does not answer yet), then a pong.
+    /// Exactly the provably different Shells get a new grace; the rest
+    /// resume the old generation and trip by the steady rule.
+    #[test]
+    fn after_an_absent_only_a_provably_different_shell_gets_a_grace() {
+        let kinds = [Seen::WithStart, Seen::WithoutStart, Seen::UnknownNew];
+        let other_pid = |start| Peer::Process { pid: 4200, start };
+        let replacements = [
+            other_pid(Some(1_300)),
+            other_pid(None),
+            Peer::Process {
+                pid: P,
+                start: Some(5_000),
+            },
+            Peer::Process {
+                pid: P,
+                start: None,
+            },
+            Peer::Unknown { connection: 999 },
+        ];
+        let gaps = [vec![Outcome::Absent], vec![Outcome::Absent, miss()]];
+        let mut checked = 0;
+        for code in 0..3usize.pow(4) {
+            let armed: Vec<Seen> = (0..4).map(|i| kinds[code / 3usize.pow(i) % 3]).collect();
+            let pid_known = armed.iter().any(|s| !matches!(s, Seen::UnknownNew));
+            let start_known = armed.iter().any(|s| matches!(s, Seen::WithStart));
+            for replacement in replacements {
+                let provable = match replacement {
+                    Peer::Process { pid, .. } if pid != P => pid_known,
+                    Peer::Process { start: Some(_), .. } => start_known,
+                    _ => false,
+                };
+                for gap in &gaps {
+                    let mut monitor = Monitor::from_timing(&Timing::default());
+                    let mut observer = Observer { connection: 1 };
+                    for n in 0..31u64 {
+                        let peer = observer.peer(armed[n as usize % 4]);
+                        monitor.observe(&Outcome::Pong, peer, n * 2_000 + 3);
+                    }
+                    let mut n = 31u64;
+                    for outcome in gap {
+                        monitor.observe(outcome, replacement, n * 2_000 + 1_000);
+                        n += 1;
+                    }
+                    monitor.observe(&Outcome::Pong, replacement, n * 2_000 + 3);
+                    let generation = monitor.generation;
+                    let mut trips = vec![];
+                    for outcome in [miss(), miss(), miss()] {
+                        n += 1;
+                        let at = n * 2_000 + 1_000;
+                        if monitor.observe(&outcome, replacement, at) != Action::None {
+                            trips.push(at);
+                        }
+                    }
+                    let context = format!("armed {armed:?}, {replacement:?}, gap {gap:?}");
+                    if provable {
+                        assert_eq!(generation, 2, "{context}");
+                        assert!(trips.is_empty(), "{context}: {trips:?}");
+                    } else {
+                        assert_eq!(generation, 1, "{context}");
+                        assert_eq!(trips, [n * 2_000 + 1_000], "{context}");
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        assert_eq!(checked, 81 * 5 * 2);
     }
 }
