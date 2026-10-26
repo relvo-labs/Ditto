@@ -66,9 +66,9 @@ pub enum Peer {
     /// The process listening on the socket (`SO_PEERCRED`), with its start
     /// time (field 22 of `/proc/<pid>/stat`) so a reused PID is another Shell.
     Process { pid: u32, start: Option<u64> },
-    /// The peer could not be read. Each connection then counts as its own
-    /// Shell: a reconnect never inherits an old Shell's steady phase, and a
-    /// Shell that does not answer cannot start a new generation.
+    /// The peer could not be read. It never starts a generation by itself:
+    /// while armed it is taken to be the same Shell, so the supervisor errs
+    /// toward rescue (a replacement may miss its grace), never away from it.
     Unknown { connection: u64 },
 }
 
@@ -88,7 +88,8 @@ pub struct Monitor {
     grace_ms: u64,
     /// When the current Shell generation was armed, on the monitor's clock.
     armed_at_ms: u64,
-    /// The Shell generation that was armed last.
+    /// The identified process of the current generation, if one has
+    /// answered; never `Peer::Unknown`.
     pub peer: Option<Peer>,
     /// Counts Shell generations; changes whenever a new one is armed.
     pub generation: u64,
@@ -132,6 +133,14 @@ impl Monitor {
         }
     }
 
+    fn new_generation(&mut self, identified: Option<Peer>, now_ms: u64) -> (State, Action) {
+        self.peer = identified;
+        self.generation += 1;
+        self.armed_at_ms = now_ms;
+        self.phase = self.phase_at(now_ms);
+        (State::Armed { misses: 0 }, Action::None)
+    }
+
     /// `now_ms` is when `outcome` was observed, on the monitor's clock, and
     /// `peer` is who was on the other end of the connection. The threshold
     /// for a miss is the one of the phase at that moment, and the count is not
@@ -141,24 +150,27 @@ impl Monitor {
         if matches!(self.state, State::Armed { .. }) {
             self.phase = self.phase_at(now_ms);
         }
+        let identified = matches!(peer, Peer::Process { .. }).then_some(peer);
         let (next, action) = match (self.state, outcome) {
-            // A `pong` from a Shell other than the armed one (the first, or a
-            // replacement, whether or not its predecessor was seen to exit):
-            // a new generation, whose startup grace begins now.
-            (_, Outcome::Pong) if self.peer != Some(peer) => {
-                self.peer = Some(peer);
-                self.generation += 1;
-                self.armed_at_ms = now_ms;
-                self.phase = self.phase_at(now_ms);
+            // Armed, and an identified process other than this generation's
+            // answers: a replacement the supervisor did not see exit (Core
+            // relaunches faster than one ping interval). New generation.
+            (State::Armed { .. }, Outcome::Pong)
+                if self.peer.is_some() && identified.is_some() && identified != self.peer =>
+            {
+                self.new_generation(identified, now_ms)
+            }
+            // Armed, and the same process answers, or the peer is unknown, or
+            // this generation's process was not known yet (then it is
+            // recorded): the same generation and its grace. Neither a stalling
+            // Shell nor an unreadable peer can earn a new grace by reconnecting.
+            (State::Armed { .. }, Outcome::Pong) => {
+                self.peer = self.peer.or(identified);
                 (State::Armed { misses: 0 }, Action::None)
             }
-            // The same Shell answering again, also after a reconnect, a trip
-            // whose kill failed, or a gap: it keeps its generation's grace,
-            // so a Shell cannot extend its own grace by stalling.
-            (_, Outcome::Pong) => {
-                self.phase = self.phase_at(now_ms);
-                (State::Armed { misses: 0 }, Action::None)
-            }
+            // After an observed exit, a Shell that never answered, or a trip:
+            // a new generation, whoever answers.
+            (_, Outcome::Pong) => self.new_generation(identified, now_ms),
             (_, Outcome::Absent) => (State::Absent, Action::None),
             (State::Absent | State::Unarmed, Outcome::NoReply(_)) => (State::Unarmed, Action::None),
             (State::Tripped, Outcome::NoReply(_)) => (State::Tripped, Action::None),
@@ -703,22 +715,12 @@ mod tests {
         assert_eq!(recorder.trip_phases, [Phase::Steady]);
     }
 
-    /// Without peer credentials every connection is its own Shell: a
-    /// reconnect does not inherit the old steady phase, and a Shell that does
-    /// not answer cannot start a new generation, so it still trips.
+    /// Without peer credentials a Shell that does not answer still trips,
+    /// reconnects notwithstanding. (A reconnect that answers keeps the
+    /// generation: `an_unidentified_reconnect_keeps_the_generation`.)
     #[test]
     fn an_unidentified_peer_neither_inherits_nor_escapes() {
         let unknown = |connection| Peer::Unknown { connection };
-        let mut script: Vec<_> = pongs(31).into_iter().map(|o| (o, unknown(1))).collect();
-        script.push((reset(), unknown(2)));
-        script.push((Outcome::Pong, unknown(3)));
-        script.extend((4..7).map(|c| (miss(), unknown(c))));
-        // Pongs keep their connection, so they share one connection number.
-        script.extend(std::iter::repeat_n((Outcome::Pong, unknown(7)), 5));
-        let (recorder, _) = drive_peers(&Timing::default(), script);
-        assert!(recorder.trips.is_empty(), "{:?}", recorder.trips);
-        assert_eq!(recorder.armed_peers, [unknown(1), unknown(3), unknown(7)]);
-        assert_eq!(recorder.armed_phases, [Phase::Startup; 3]);
 
         // Hung from its first answer, reconnecting on every miss.
         let mut script = vec![(Outcome::Pong, unknown(1))];
@@ -732,6 +734,62 @@ mod tests {
         let (recorder, _) = drive_peers(&Timing::default(), script);
         assert_eq!(recorder.trips, [(67_000, 3)]);
         assert_eq!(recorder.trip_phases, [Phase::Steady]);
+    }
+
+    /// Review round 2 P1: without peer credentials, the same Shell stalling
+    /// nine pings and answering once, over and over, reconnects after every
+    /// miss. A reconnect must not give it a new grace: the steady rule trips
+    /// it once the grace from its first arming is over.
+    #[test]
+    fn an_unidentified_stalling_shell_trips_after_its_first_grace() {
+        let unknown = |connection| Peer::Unknown { connection };
+        let mut connection = 1;
+        let mut script = vec![(Outcome::Pong, unknown(connection))];
+        for _ in 0..6 {
+            for _ in 0..9 {
+                connection += 1;
+                script.push((miss(), unknown(connection)));
+            }
+            connection += 1;
+            script.push((Outcome::Pong, unknown(connection)));
+        }
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        assert_eq!(recorder.grace_ended, [(60_003, 0)]);
+        assert_eq!(recorder.trips, [(67_000, 3)]);
+        assert_eq!(recorder.trip_phases, [Phase::Steady]);
+    }
+
+    /// Unidentified, a reconnect that reaches a new Shell cannot be told
+    /// from the same Shell, so it keeps the generation: the rule of 6efa9b5,
+    /// which errs toward rescue.
+    #[test]
+    fn an_unidentified_reconnect_keeps_the_generation() {
+        let unknown = |connection| Peer::Unknown { connection };
+        let mut script: Vec<_> = pongs(31).into_iter().map(|o| (o, unknown(1))).collect();
+        script.push((reset(), unknown(2)));
+        script.push((Outcome::Pong, unknown(3)));
+        script.extend((4..7).map(|c| (miss(), unknown(c))));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        assert_eq!(recorder.trips, [(71_000, 3)]);
+        assert_eq!(recorder.trip_phases, [Phase::Steady]);
+        assert_eq!(
+            recorder.states,
+            [State::Armed { misses: 0 }, State::Tripped]
+        );
+    }
+
+    /// An observed exit still starts a new generation, identified or not.
+    #[test]
+    fn an_unidentified_shell_after_an_exit_gets_the_grace() {
+        let unknown = |connection| Peer::Unknown { connection };
+        let mut script: Vec<_> = pongs(40).into_iter().map(|o| (o, unknown(1))).collect();
+        script.push((Outcome::Absent, unknown(1)));
+        script.push((Outcome::Pong, unknown(2)));
+        script.extend((3..8).map(|c| (miss(), unknown(c))));
+        script.extend(std::iter::repeat_n((Outcome::Pong, unknown(8)), 5));
+        let (recorder, _) = drive_peers(&Timing::default(), script);
+        assert!(recorder.trips.is_empty(), "{:?}", recorder.trips);
+        assert_eq!(recorder.armed_phases, [Phase::Startup, Phase::Startup]);
     }
 
     #[test]
@@ -762,21 +820,44 @@ mod tests {
         assert_eq!((monitor.generation, monitor.peer), (1, Some(SHELL_A)));
         monitor.observe(&Outcome::Pong, SHELL_A, 70_000);
         assert_eq!(monitor.phase, Phase::Steady);
-        // A trip whose kill failed: the same Shell answering again keeps its
-        // generation and its steady phase.
+        // Armed, the same process answering again keeps its generation.
+        monitor.observe(&miss(), SHELL_A, 70_500);
+        monitor.observe(&Outcome::Pong, SHELL_A, 70_600);
+        assert_eq!((monitor.generation, monitor.phase), (1, Phase::Steady));
+        // After a trip, whoever answers is a new generation (the 6efa9b5
+        // rule; a Shell whose kill failed and that hangs again trips again).
         for _ in 0..3 {
             monitor.observe(&miss(), SHELL_A, 71_000);
         }
         assert_eq!(monitor.state, State::Tripped);
         monitor.observe(&Outcome::Pong, SHELL_A, 72_000);
-        assert_eq!((monitor.generation, monitor.phase), (1, Phase::Steady));
-        // A different Shell, while armed: new generation, new grace.
-        monitor.observe(&miss(), SHELL_B, 73_000);
-        monitor.observe(&Outcome::Pong, SHELL_B, 74_000);
-        assert_eq!(monitor.state, State::Armed { misses: 0 });
         assert_eq!((monitor.generation, monitor.phase), (2, Phase::Startup));
-        monitor.observe(&Outcome::Pong, SHELL_A_REUSED, 75_000);
-        assert_eq!(monitor.generation, 3, "a reused PID is another Shell");
+        // A different identified Shell, while armed: new generation, new grace.
+        monitor.observe(&Outcome::Pong, SHELL_B, 130_000);
+        assert_eq!(monitor.phase, Phase::Startup);
+        assert_eq!(monitor.generation, 3);
+        monitor.observe(&Outcome::Pong, SHELL_A_REUSED, 131_000);
+        assert_eq!(monitor.generation, 4, "a reused PID is another Shell");
+        // An unknown peer while armed is not a new generation and does not
+        // replace the known one.
+        monitor.observe(&Outcome::Pong, Peer::Unknown { connection: 9 }, 200_000);
+        assert_eq!(
+            (monitor.generation, monitor.peer, monitor.phase),
+            (4, Some(SHELL_A_REUSED), Phase::Steady)
+        );
+        // A generation armed while unidentified records its process when it
+        // becomes known, without a new grace; a different process after that
+        // is a replacement.
+        let mut monitor = Monitor::new(3).with_startup_grace(Duration::from_secs(60), 10);
+        monitor.observe(&Outcome::Pong, Peer::Unknown { connection: 1 }, 0);
+        assert_eq!((monitor.generation, monitor.peer), (1, None));
+        monitor.observe(&Outcome::Pong, SHELL_A, 70_000);
+        assert_eq!(
+            (monitor.generation, monitor.peer, monitor.phase),
+            (1, Some(SHELL_A), Phase::Steady)
+        );
+        monitor.observe(&Outcome::Pong, SHELL_B, 71_000);
+        assert_eq!((monitor.generation, monitor.phase), (2, Phase::Startup));
     }
 
     #[test]
