@@ -1,0 +1,68 @@
+#!/bin/bash
+# Installer screen on tty1 as the unprivileged ditto-installer user.
+# Order: GPU Wayfire+Quickshell (zh-TW) -> pixman/Qt software -> English text.
+# The root backend keeps all state, so a fallback never repeats or loses work.
+set -euo pipefail
+self=/usr/lib/ditto-installer/ditto-installer-ui
+text=/usr/lib/ditto-installer/ditto-installer-text
+
+if [[ ${1:-} == --session ]]; then
+    # Started only by the fixed Wayfire autostart below.
+    status=0
+    quickshell -p /usr/lib/ditto-installer/shell/installer/shell.qml || status=$?
+    printf '%s\n' "$status" > "${DITTO_INSTALLER_RESULT:?}"
+    kill -USR1 "${DITTO_INSTALLER_SUPERVISOR_PID:?}"
+    exit "$status"
+fi
+
+if [[ ${1:-} == --graphical ]]; then
+    export QT_QPA_PLATFORM=wayland QT_QUICK_CONTROLS_STYLE=Basic QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1
+    export XDG_CURRENT_DESKTOP=Wayfire XDG_SESSION_TYPE=wayland
+    export XDG_CONFIG_HOME
+    XDG_CONFIG_HOME=$(mktemp -d "${XDG_RUNTIME_DIR:?}/ditto-installer.XXXXXX")
+    export DITTO_INSTALLER_RESULT="$XDG_CONFIG_HOME/result" DITTO_INSTALLER_SUPERVISOR_PID=$$
+    compositor_pid=
+    cleanup_graphical() {
+        if [[ -n $compositor_pid ]]; then
+            kill "$compositor_pid" 2>/dev/null || true
+            wait "$compositor_pid" 2>/dev/null || true
+        fi
+        rm -rf -- "$XDG_CONFIG_HOME"
+    }
+    trap cleanup_graphical EXIT
+    trap '[[ -z $compositor_pid ]] || kill "$compositor_pid" 2>/dev/null || true' USR1
+    trap 'exit 1' TERM INT HUP
+    wayfire --config /usr/lib/ditto-installer/wayfire-installer.ini &
+    compositor_pid=$!
+    wait "$compositor_pid" || true
+    # A compositor exit alone is not proof that the screen ran.
+    [[ -f $DITTO_INSTALLER_RESULT ]] || exit 1
+    read -r status < "$DITTO_INSTALLER_RESULT"
+    [[ $status =~ ^[0-9]+$ ]] || exit 1
+    exit "$status"
+fi
+
+[[ $# == 0 ]] || exit 2
+has_drm=false
+for device in /sys/class/drm/card[0-9]*/device; do
+    [[ $device =~ /card[0-9]+/device$ && -e $device ]] || continue
+    has_drm=true
+done
+stage=${DITTO_INSTALLER_STAGE:-gpu}
+case "$stage" in gpu|software|text) ;; *) stage=text ;; esac
+if [[ $has_drm != true ]]; then stage=text; fi
+if [[ $stage == gpu || $stage == software ]]; then
+    status=0
+    if [[ $stage == gpu ]]; then
+        dbus-run-session -- "$self" --graphical || status=$?
+    else
+        WLR_RENDERER=pixman QT_QUICK_BACKEND=software WLR_RENDERER_ALLOW_SOFTWARE=1 \
+            dbus-run-session -- "$self" --graphical || status=$?
+    fi
+    # The screen exits 0 only after the backend accepted a restart request.
+    [[ $status != 0 ]] || exit 0
+    if [[ $stage == gpu ]]; then export DITTO_INSTALLER_STAGE=software; else export DITTO_INSTALLER_STAGE=text; fi
+    exec "$self"
+fi
+printf '%s\n' 'No usable display for the graphical installer; using the English text screen.'
+exec "$text"

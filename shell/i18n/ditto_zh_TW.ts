@@ -3699,4 +3699,298 @@
         <translation>這台電腦已經有帳號，請回到登入畫面登入。</translation>
     </message>
 </context>
+<context>
+    <name>InstallerMessages</name>
+    <message>
+        <source>安裝完成，內容已逐一讀回核對。請拔除安裝媒體，再重新開機。</source>
+        <translation>安裝完成，內容已逐一讀回核對。請拔除安裝媒體，再重新開機。</translation>
+    </message>
+    <message>
+        <source>已取消安裝。</source>
+        <translation>已取消安裝。</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的內容與安裝程式不符，沒有寫入任何磁碟。請重新下載 ISO、核對 SHA256 後再製作安裝媒體。</source>
+        <translation>安裝媒體上的內容與安裝程式不符，沒有寫入任何磁碟。請重新下載 ISO、核對 SHA256 後再製作安裝媒體。</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的清單無法辨識，沒有寫入任何磁碟。請重新製作安裝媒體。</source>
+        <translation>安裝媒體上的清單無法辨識，沒有寫入任何磁碟。請重新製作安裝媒體。</translation>
+    </message>
+    <message>
+        <source>安裝媒體缺少必要檔案，沒有寫入任何磁碟。請重新製作安裝媒體。</source>
+        <translation>安裝媒體缺少必要檔案，沒有寫入任何磁碟。請重新製作安裝媒體。</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的檔案型態不正確，沒有寫入任何磁碟。請重新製作安裝媒體。</source>
+        <translation>安裝媒體上的檔案型態不正確，沒有寫入任何磁碟。請重新製作安裝媒體。</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的檔案已損毀，沒有寫入任何磁碟。請重新下載並核對 SHA256。</source>
+        <translation>安裝媒體上的檔案已損毀，沒有寫入任何磁碟。請重新下載並核對 SHA256。</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的資料核對不符，安裝已停止。請重新下載並核對 SHA256。</source>
+        <translation>安裝媒體上的資料核對不符，安裝已停止。請重新下載並核對 SHA256。</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的資料長度不符，安裝已停止。請重新下載並核對 SHA256。</source>
+        <translation>安裝媒體上的資料長度不符，安裝已停止。請重新下載並核對 SHA256。</translation>
+    </message>
+    <message>
+        <source>解開安裝資料時失敗，安裝已停止。請重新製作安裝媒體。</source>
+        <translation>解開安裝資料時失敗，安裝已停止。請重新製作安裝媒體。</translation>
+    </message>
+    <message>
+        <source>這顆磁碟容量不足，沒有寫入任何資料。請選擇更大的磁碟。</source>
+        <translation>這顆磁碟容量不足，沒有寫入任何資料。請選擇更大的磁碟。</translation>
+    </message>
+    <message>
+        <source>無法以獨占方式開啟這顆磁碟（可能正被使用），沒有寫入任何資料。</source>
+        <translation>無法以獨占方式開啟這顆磁碟（可能正被使用），沒有寫入任何資料。</translation>
+    </message>
+    <message>
+        <source>磁碟狀態和確認時不同，沒有寫入任何資料。請重新選擇磁碟。</source>
+        <translation>磁碟狀態和確認時不同，沒有寫入任何資料。請重新選擇磁碟。</translation>
+    </message>
+    <message>
+        <source>寫入磁碟時發生錯誤，安裝已停止。</source>
+        <translation>寫入磁碟時發生錯誤，安裝已停止。</translation>
+    </message>
+    <message>
+        <source>讀回核對時發生錯誤，安裝已停止。</source>
+        <translation>讀回核對時發生錯誤，安裝已停止。</translation>
+    </message>
+    <message>
+        <source>寫入後讀回的內容不符，安裝已停止。這顆磁碟可能有問題。</source>
+        <translation>寫入後讀回的內容不符，安裝已停止。這顆磁碟可能有問題。</translation>
+    </message>
+    <message>
+        <source>寫入分割表時失敗，安裝已停止。</source>
+        <translation>寫入分割表時失敗，安裝已停止。</translation>
+    </message>
+    <message>
+        <source>目前無法確認安裝結果。請不要使用這顆磁碟開機，重新執行安裝。</source>
+        <translation>目前無法確認安裝結果。請不要使用這顆磁碟開機，重新執行安裝。</translation>
+    </message>
+    <message>
+        <source>找不到安裝媒體，或媒體上的安裝資料不完整，沒有寫入任何磁碟。請確認隨身碟已插好；問題持續時請重新製作安裝媒體。</source>
+        <translation>找不到安裝媒體，或媒體上的安裝資料不完整，沒有寫入任何磁碟。請確認隨身碟已插好；問題持續時請重新製作安裝媒體。</translation>
+    </message>
+    <message>
+        <source>安裝服務已停止，目前無法確認結果。請不要從目標磁碟開機；重新開機後再安裝一次。</source>
+        <translation>安裝服務已停止，目前無法確認結果。請不要從目標磁碟開機；重新開機後再安裝一次。</translation>
+    </message>
+    <message>
+        <source>這個畫面已過期，已重新整理磁碟清單。</source>
+        <translation>這個畫面已過期，已重新整理磁碟清單。</translation>
+    </message>
+    <message>
+        <source>這是安裝用的隨身碟或光碟，不能安裝到這裡。</source>
+        <translation>這是安裝用的隨身碟或光碟，不能安裝到這裡。</translation>
+    </message>
+    <message>
+        <source>這顆磁碟正在使用中（已掛載或被其他系統占用）。</source>
+        <translation>這顆磁碟正在使用中（已掛載或被其他系統占用）。</translation>
+    </message>
+    <message>
+        <source>這顆磁碟是唯讀的，無法寫入。</source>
+        <translation>這顆磁碟是唯讀的，無法寫入。</translation>
+    </message>
+    <message>
+        <source>可移除式裝置不列為安裝目標。</source>
+        <translation>可移除式裝置不列為安裝目標。</translation>
+    </message>
+    <message>
+        <source>這顆磁碟使用 4K 原生磁區，預覽版尚未支援。</source>
+        <translation>這顆磁碟使用 4K 原生磁區，預覽版尚未支援。</translation>
+    </message>
+    <message>
+        <source>容量不足，無法安裝 Ditto。</source>
+        <translation>容量不足，無法安裝 Ditto。</translation>
+    </message>
+    <message>
+        <source>讀不到這顆磁碟的資訊，不提供安裝。</source>
+        <translation>讀不到這顆磁碟的資訊，不提供安裝。</translation>
+    </message>
+    <message>
+        <source>正在核對安裝資料</source>
+        <translation>正在核對安裝資料</translation>
+    </message>
+    <message>
+        <source>正在準備磁碟</source>
+        <translation>正在準備磁碟</translation>
+    </message>
+    <message>
+        <source>正在清除舊的分割表</source>
+        <translation>正在清除舊的分割表</translation>
+    </message>
+    <message>
+        <source>正在寫入</source>
+        <translation>正在寫入</translation>
+    </message>
+    <message>
+        <source>正在讀回核對</source>
+        <translation>正在讀回核對</translation>
+    </message>
+    <message>
+        <source>正在寫入分割表</source>
+        <translation>正在寫入分割表</translation>
+    </message>
+    <message>
+        <source>完成</source>
+        <translation>完成</translation>
+    </message>
+    <message>
+        <source>這顆磁碟的資料沒有被更動。</source>
+        <translation>這顆磁碟的資料沒有被更動。</translation>
+    </message>
+    <message>
+        <source>這顆磁碟的原有資料已被部分清除，目前無法開機。可以重新安裝，或改用其他磁碟。</source>
+        <translation>這顆磁碟的原有資料已被部分清除，目前無法開機。可以重新安裝，或改用其他磁碟。</translation>
+    </message>
+    <message>
+        <source>正在尋找安裝媒體…</source>
+        <translation>正在尋找安裝媒體…</translation>
+    </message>
+    <message>
+        <source>沒有可以安裝的磁碟。</source>
+        <translation>沒有可以安裝的磁碟。</translation>
+    </message>
+    <message>
+        <source>將清除整顆磁碟的全部資料</source>
+        <translation>將清除整顆磁碟的全部資料</translation>
+    </message>
+    <message>
+        <source>請拔除安裝媒體，再重新開機。</source>
+        <translation>請拔除安裝媒體，再重新開機。</translation>
+    </message>
+    <message>
+        <source>正在取消…</source>
+        <translation>正在取消…</translation>
+    </message>
+    <message>
+        <source>已經在寫入分割表，來不及取消。請等待安裝結果。</source>
+        <translation>已經在寫入分割表，來不及取消。請等待安裝結果。</translation>
+    </message>
+</context>
+<context>
+    <name>InstallerScreen</name>
+    <message>
+        <source>（無法讀取）</source>
+        <translation>（無法讀取）</translation>
+    </message>
+    <message>
+        <source>Ditto · 安裝</source>
+        <translation>Ditto · 安裝</translation>
+    </message>
+    <message>
+        <source>無法開始安裝</source>
+        <translation>無法開始安裝</translation>
+    </message>
+    <message>
+        <source>重新開機</source>
+        <translation>重新開機</translation>
+    </message>
+    <message>
+        <source>選擇要安裝 Ditto 的磁碟</source>
+        <translation>選擇要安裝 Ditto 的磁碟</translation>
+    </message>
+    <message>
+        <source>Ditto 會使用整顆磁碟，選好之後還會再確認一次。隨身碟等可移除裝置不能當作安裝目標。</source>
+        <translation>Ditto 會使用整顆磁碟，選好之後還會再確認一次。隨身碟等可移除裝置不能當作安裝目標。</translation>
+    </message>
+    <message>
+        <source>序號</source>
+        <translation>序號</translation>
+    </message>
+    <message>
+        <source>選擇這顆磁碟。下一步會再確認，不會立刻清除。</source>
+        <translation>選擇這顆磁碟。下一步會再確認，不會立刻清除。</translation>
+    </message>
+    <message>
+        <source>不能安裝的磁碟：</source>
+        <translation>不能安裝的磁碟：</translation>
+    </message>
+    <message>
+        <source>重新整理</source>
+        <translation>重新整理</translation>
+    </message>
+    <message>
+        <source>確認要清除這顆磁碟嗎？</source>
+        <translation>確認要清除這顆磁碟嗎？</translation>
+    </message>
+    <message>
+        <source>型號</source>
+        <translation>型號</translation>
+    </message>
+    <message>
+        <source>容量</source>
+        <translation>容量</translation>
+    </message>
+    <message>
+        <source>。這個動作無法復原。</source>
+        <translation>。這個動作無法復原。</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <source>回到磁碟清單，不寫入任何資料。</source>
+        <translation>回到磁碟清單，不寫入任何資料。</translation>
+    </message>
+    <message>
+        <source>清除並安裝</source>
+        <translation>清除並安裝</translation>
+    </message>
+    <message>
+        <source>清除整顆磁碟的全部資料並安裝 Ditto。</source>
+        <translation>清除整顆磁碟的全部資料並安裝 Ditto。</translation>
+    </message>
+    <message>
+        <source>正在安裝</source>
+        <translation>正在安裝</translation>
+    </message>
+    <message>
+        <source>安裝進度</source>
+        <translation>安裝進度</translation>
+    </message>
+    <message>
+        <source>安裝期間請不要拔除安裝媒體或關機。</source>
+        <translation>安裝期間請不要拔除安裝媒體或關機。</translation>
+    </message>
+    <message>
+        <source>取消安裝</source>
+        <translation>取消安裝</translation>
+    </message>
+    <message>
+        <source>停止安裝。已開始寫入的磁碟會無法開機，需要重新安裝。</source>
+        <translation>停止安裝。已開始寫入的磁碟會無法開機，需要重新安裝。</translation>
+    </message>
+    <message>
+        <source>安裝完成</source>
+        <translation>安裝完成</translation>
+    </message>
+    <message>
+        <source>已拔除，重新開機</source>
+        <translation>已拔除，重新開機</translation>
+    </message>
+    <message>
+        <source>已取消安裝</source>
+        <translation>已取消安裝</translation>
+    </message>
+    <message>
+        <source>安裝沒有完成</source>
+        <translation>安裝沒有完成</translation>
+    </message>
+    <message>
+        <source>重新選擇磁碟</source>
+        <translation>重新選擇磁碟</translation>
+    </message>
+    <message>
+        <source>Tab 移動　Enter 確認　·　只支援 UEFI x86_64，Secure Boot 須關閉</source>
+        <translation>Tab 移動　Enter 確認　·　只支援 UEFI x86_64，Secure Boot 須關閉</translation>
+    </message>
+</context>
 </TS>

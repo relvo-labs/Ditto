@@ -1,0 +1,33 @@
+[Unit]
+Description=Ditto installer screen (zh-TW graphical, English text fallback)
+Requires=ditto-installer-backend.service
+After=ditto-installer-backend.service systemd-user-sessions.service systemd-logind.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+User=ditto-installer
+Group=ditto-installer
+PAMName=ditto-installer
+# Bounded wait for a DRM card; a timeout only selects the text fallback.
+ExecStartPre=-/usr/lib/ditto-installer/wait-drm
+ExecStart=/usr/lib/ditto-installer/ditto-installer-ui
+StandardInput=tty-fail
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty1
+UtmpMode=user
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+# No PrivateNetwork: libinput needs udev uevents, which only the initial netns receives.
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

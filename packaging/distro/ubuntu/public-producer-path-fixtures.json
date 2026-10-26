@@ -136,6 +136,158 @@
       "classification": "GTK 3 上游 library 內嵌的 SVG 圖示資源；命中為 Inkscape export-filename 中繼資料，不是 Ditto 建置者或 checkout 路徑。"
     },
     {
+      "path": "usr/share/doc/python3-psutil/examples/procinfo.py",
+      "sha256": "f2609e0ea5155d65f8581a0606a63dbf4e632bd2c3eb5e38ffa479ad4805d7fd",
+      "bytes": 11982,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "python3-psutil",
+        "version": "7.1.0-1ubuntu1",
+        "deb": "pool/main/p/python-psutil/python3-psutil_7.1.0-1ubuntu1_amd64.deb",
+        "deb_sha256": "e32074ff3ab5dd5ba76fad23867ff73fbe11953a28614a11adea96e9721e1d16",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute/main/binary-amd64/Packages.xz",
+        "index_sha256": "ed9ac41cb263efaecc5a06a0742dc56570e2fb5ff94c4f2e4b2fbdcddd73cf24"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "psutil 上游範例腳本；命中為說明註解裡的示範輸出（上游作者的工作目錄），不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
+      "path": "usr/share/doc/python3-psutil/examples/procsmem.py",
+      "sha256": "e1096a15fc60c515cc18cfaaf0de03dfcc8b0b5127719f5aa42fe4f983d72895",
+      "bytes": 3737,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "python3-psutil",
+        "version": "7.1.0-1ubuntu1",
+        "deb": "pool/main/p/python-psutil/python3-psutil_7.1.0-1ubuntu1_amd64.deb",
+        "deb_sha256": "e32074ff3ab5dd5ba76fad23867ff73fbe11953a28614a11adea96e9721e1d16",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute/main/binary-amd64/Packages.xz",
+        "index_sha256": "ed9ac41cb263efaecc5a06a0742dc56570e2fb5ff94c4f2e4b2fbdcddd73cf24"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "psutil 上游範例腳本；命中為說明註解裡被截斷的示範命令列，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
+      "path": "usr/lib/python3/dist-packages/psutil-7.1.0.dist-info/METADATA",
+      "sha256": "61e7b71d3e11a6b3c0ae9308d560610f9f98203d1cbf1083dccb506059115a75",
+      "bytes": 23309,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "python3-psutil",
+        "version": "7.1.0-1ubuntu1",
+        "deb": "pool/main/p/python-psutil/python3-psutil_7.1.0-1ubuntu1_amd64.deb",
+        "deb_sha256": "e32074ff3ab5dd5ba76fad23867ff73fbe11953a28614a11adea96e9721e1d16",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute/main/binary-amd64/Packages.xz",
+        "index_sha256": "ed9ac41cb263efaecc5a06a0742dc56570e2fb5ff94c4f2e4b2fbdcddd73cf24"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "psutil 上游套件說明（PyPI long description）；命中為使用範例中的示範工作目錄與檔案路徑，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
+      "path": "usr/lib/python3/dist-packages/psutil/tests/test_linux.py",
+      "sha256": "72a5c2e2b4f95bec8372fa1049a24c4a13cf3f6a472cb3dd3bdff46c1c241284",
+      "bytes": 88535,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "python3-psutil",
+        "version": "7.1.0-1ubuntu1",
+        "deb": "pool/main/p/python-psutil/python3-psutil_7.1.0-1ubuntu1_amd64.deb",
+        "deb_sha256": "e32074ff3ab5dd5ba76fad23867ff73fbe11953a28614a11adea96e9721e1d16",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute/main/binary-amd64/Packages.xz",
+        "index_sha256": "ed9ac41cb263efaecc5a06a0742dc56570e2fb5ff94c4f2e4b2fbdcddd73cf24"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "psutil 上游測試模組；命中為 mock 用的假路徑字串，不是 Ditto 建置者或 checkout 路徑。由 py3compile 產生的 __pycache__ 不是套件檔案，不在此登錄，改由 finalize 移除。"
+    },
+    {
+      "path": "usr/lib/firmware/rtw89/rtw8922a_fw-3.bin.zst",
+      "sha256": "58e44b2ab36fc698c65b975b38e5564604ef8fe732875afdc7943415d7d24d54",
+      "bytes": 381256,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "linux-firmware-realtek",
+        "version": "20260319.git217ca6e4-0ubuntu1.2",
+        "deb": "pool/main/l/linux-firmware-realtek/linux-firmware-realtek_20260319.git217ca6e4-0ubuntu1.2_all.deb",
+        "deb_sha256": "7d79e70a5fa859c4d7581c12a7c2ab0de98c05c67a0ccffb4f223a986cb3f78d",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute-updates/main/binary-amd64/Packages.xz",
+        "index_sha256": "7807f03727e9eece950ee6e96cb2392a69b5b67c0d3adc417f7794cc504dae51"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "Realtek 上游 Wi-Fi 韌體（壓縮檔）；命中為韌體內嵌的廠商建置環境路徑，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
+      "path": "usr/lib/firmware/qcom/sdm845/cdsp.mbn.zst",
+      "sha256": "b76ba802085efe079f907ead4106b2fd6c6e26c173884c25160a3c4f9aac86ce",
+      "bytes": 971210,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "linux-firmware-qualcomm-misc",
+        "version": "20260319.git217ca6e4-0ubuntu2.1",
+        "deb": "pool/main/l/linux-firmware-qualcomm-misc/linux-firmware-qualcomm-misc_20260319.git217ca6e4-0ubuntu2.1_all.deb",
+        "deb_sha256": "2b760aa0bbadf8d2ce1b2136a297549833743bdc1d16f2e98dcb0887c1ece0a4",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute-updates/main/binary-amd64/Packages.xz",
+        "index_sha256": "7807f03727e9eece950ee6e96cb2392a69b5b67c0d3adc417f7794cc504dae51"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "Qualcomm 上游 SDM845 DSP 韌體（壓縮檔）；命中為韌體內嵌的廠商建置環境路徑，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
+      "path": "usr/lib/firmware/qcom/sdm845/adsp.mbn.zst",
+      "sha256": "0e524ad94e68455e2d610871d3fb0b029f2a2b2ec5f552443c0c2bb2f479734c",
+      "bytes": 4623673,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "linux-firmware-qualcomm-misc",
+        "version": "20260319.git217ca6e4-0ubuntu2.1",
+        "deb": "pool/main/l/linux-firmware-qualcomm-misc/linux-firmware-qualcomm-misc_20260319.git217ca6e4-0ubuntu2.1_all.deb",
+        "deb_sha256": "2b760aa0bbadf8d2ce1b2136a297549833743bdc1d16f2e98dcb0887c1ece0a4",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute-updates/main/binary-amd64/Packages.xz",
+        "index_sha256": "7807f03727e9eece950ee6e96cb2392a69b5b67c0d3adc417f7794cc504dae51"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256 與映像相同；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。"
+      },
+      "classification": "Qualcomm 上游 SDM845 DSP 韌體（壓縮檔）；命中為韌體內嵌的廠商建置環境路徑，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
+      "path": "usr/share/doc/sudo/examples/sudoers",
+      "sha256": "dcf943c4b04ceed69a41a990b28adf9f9679ade670934d6196267949a4ff70c4",
+      "bytes": 4178,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "sudo",
+        "version": "1.9.17p2-1ubuntu3.2",
+        "deb": "pool/main/s/sudo/sudo_1.9.17p2-1ubuntu3.2_amd64.deb",
+        "deb_sha256": "6c05f7816ba1a74acaf08e124321caa47efff271265d4d4342e033cf8bdb6560",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute-updates/main/binary-amd64/Packages.xz",
+        "index_sha256": "7807f03727e9eece950ee6e96cb2392a69b5b67c0d3adc417f7794cc504dae51"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256（writer 與 coordinator 各自核對）；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。尚未在含 sudo 的映像中實掃。"
+      },
+      "classification": "sudo 上游範例 sudoers（文件範例，非啟用中的設定）；命中為範例 operator 使用者的家目錄指令路徑，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
       "path": "usr/lib/ditto-node/bin/node",
       "sha256": "3517c2df0b2f8cd7f422b4b8450ef81c6889f08eb03e281d6de9079b15e6a327",
       "bytes": 124836408,

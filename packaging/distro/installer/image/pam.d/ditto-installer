@@ -1,0 +1,6 @@
+# PAMName= of ditto-installer-ui.service: systemd runs only the account and
+# session stacks (no authentication) to give the frontend a logind seat session
+# on tty1 for Wayfire. The frontend user has no password and no login shell.
+account  required  pam_permit.so
+session  required  pam_loginuid.so
+session  required  pam_systemd.so type=wayland class=greeter desktop=Wayfire

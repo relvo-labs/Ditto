@@ -9,7 +9,7 @@ import re
 import shutil
 import tarfile
 import tempfile
-from runtime_policy import validate
+from runtime_policy import WAYFIRE_LIBRARY, validate
 
 FIRSTBOOT_UNITS = ("ditto-firstboot-account.socket", "ditto-firstboot-account.service",
                    "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
@@ -20,6 +20,115 @@ FIRSTBOOT_UNITS = ("ditto-firstboot-account.socket", "ditto-firstboot-account.se
 def digest(path):
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+INSTALLER_UNITS = ("ditto-installer-backend.service", "ditto-installer-ui.service")
+INSTALLER_LAUNCHERS = ("ditto-installer-backend", "ditto-installer-text", "ditto-installer-ui")
+
+
+def installer_runtime(lock):
+    """Only Quickshell, Wayfire (+ its libraries/plugins/data) and the runtime
+    licence material go into the installer; Core, Node and the agent stay out."""
+    def wanted(name):
+        return (name in ("usr/bin/quickshell", "usr/bin/wayfire") or WAYFIRE_LIBRARY.fullmatch(name) is not None
+                or re.fullmatch(r"usr/lib/wayfire/[A-Za-z0-9_.-]+\.so", name) is not None
+                or name.startswith(("usr/share/wayfire/", "usr/share/doc/ditto-runtime/")))
+    subset = {key: value for key, value in lock.items() if key not in ("files", "symlinks")}
+    subset["files"] = {name: sha for name, sha in lock.get("files", {}).items() if wanted(name)}
+    subset["symlinks"] = {name: target for name, target in lock.get("symlinks", {}).items() if wanted(name)}
+    return subset
+
+
+def read_packages(path):
+    return [line for line in path.read_text().splitlines() if line and not line.startswith("#")]
+
+
+def generate_installer(args, parser, source, here, expected, lock):
+    """#221 installer: a full OS packed as the initrd of one UKI, run from RAM.
+
+    It carries the installer backend/frontends from the same source archive and
+    the payload manifest SHA256; it never stages the Ditto runtime, greetd or the
+    first-account flow. Same snapshot, kernel pin and runtime-lock provenance.
+    """
+    installer = source / "packaging/distro/installer"
+    modules = sorted((installer / "ditto_installer").glob("*.py"))
+    files = [*modules, *(installer / "image" / name for name in INSTALLER_LAUNCHERS),
+             *(installer / "image/units" / unit for unit in INSTALLER_UNITS),
+             installer / "image/sysusers.d/ditto-installer.conf", installer / "image/wayfire-installer.ini",
+             installer / "image/pam.d/ditto-installer", source / "shell/installer/shell.qml"]
+    if not modules or not all(path.is_file() and not path.is_symlink() for path in files):
+        parser.error("installer sources missing from the source archive")
+    runtime = installer_runtime(lock)
+    try:
+        validate(runtime, args.runtime_tree)
+    except (ValueError, OSError) as error:
+        parser.error(f"installer runtime subset: {error}")
+    output = args.output
+    output.mkdir(parents=True)
+
+    def put(name, value, mode=0o644):
+        path = output / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(value)
+        path.chmod(mode)
+
+    for module in modules:
+        put("extra/usr/lib/ditto-installer/ditto_installer/" + module.name, module.read_bytes())
+    for name in INSTALLER_LAUNCHERS:
+        put("extra/usr/lib/ditto-installer/" + name, (installer / "image" / name).read_bytes(), 0o755)
+    for unit in INSTALLER_UNITS:
+        put("extra/usr/lib/systemd/system/" + unit, (installer / "image/units" / unit).read_bytes())
+    put("extra/usr/lib/sysusers.d/ditto-installer.conf",
+        (installer / "image/sysusers.d/ditto-installer.conf").read_bytes())
+    put("extra/usr/lib/ditto-installer/wayfire-installer.ini", (installer / "image/wayfire-installer.ini").read_bytes())
+    put("extra/etc/pam.d/ditto-installer", (installer / "image/pam.d/ditto-installer").read_bytes())
+    put("extra/usr/lib/ditto-installer/wait-drm", (here / "wait-drm.py").read_bytes(), 0o755)
+    # The zh-TW screen uses the shared Shell components (Jelly, ui, i18n).
+    shutil.copytree(source / "shell", output / "extra/usr/lib/ditto-installer/shell", symlinks=True)
+    for name in runtime["files"]:
+        dest = output / "runtime" / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(args.runtime_tree / name, dest)
+    for name, target in runtime["symlinks"].items():
+        dest = output / "runtime" / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.symlink_to(target)
+    for helper in ("apply-runtime.py", "runtime_policy.py"):
+        shutil.copy2(here / helper, output / helper)
+    put("extra/usr/share/ditto/runtime-lock.json", (json.dumps(runtime, indent=2) + "\n").encode())
+    put("extra/usr/lib/ditto-installer/installer.json", (json.dumps({
+        "schema": 1, "manifest_sha256": args.payload_manifest_sha256, "medium_label": args.medium_label,
+        "payload_dir": "ditto/payload", "frontend_user": "ditto-installer"}, indent=2) + "\n").encode())
+    put("extra/usr/share/ditto/image-inputs.json", (json.dumps(expected | {
+        "version": args.version, "runtime_lock_sha256": digest(args.runtime_lock), "mode": "installer",
+        "runtime_subset_files": len(runtime["files"]), "runtime_subset_symlinks": len(runtime["symlinks"]),
+        "payload_manifest_sha256": args.payload_manifest_sha256, "medium_label": args.medium_label},
+        indent=2) + "\n").encode())
+    shutil.copy2(here / "finalize-installer.sh", output / "finalize.sh")
+    packages = read_packages(here / "packages-installer.txt")
+    put("mkosi.conf", f"""[Distribution]
+Distribution=ubuntu
+Release=resolute
+Architecture=x86-64
+Snapshot={args.snapshot}
+Repositories=universe
+[Output]
+Format=uki
+Output=ditto-installer
+OutputDirectory=out
+ManifestFormat=json
+ImageId=ditto-installer
+ImageVersion={args.version}
+[Content]
+Packages={','.join(packages)}
+ExtraTrees=extra
+FinalizeScripts=finalize.sh
+KernelCommandLine=console=tty0 rd.systemd.gpt_auto=no systemd.gpt_auto=no
+[Build]
+BuildSources=.
+[Validation]
+SecureBoot=no
+""".encode())
 
 
 def main():
@@ -34,7 +143,23 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dev-software-render", action="store_true",
                         help="TEST ONLY: allow software rendering in the generated session")
+    parser.add_argument("--profile", choices=("image", "installer"), default="image",
+                        help="image: the Ditto disk; installer: the #221 RAM-only installer UKI")
+    parser.add_argument("--payload-manifest-sha256",
+                        help="installer only: SHA256 printed by make-payload.py for the payload it will carry")
+    parser.add_argument("--medium-label", help="installer only: ISO volume label, e.g. DITTO_INSTALL_7")
     args = parser.parse_args()
+    installer_args = (args.payload_manifest_sha256, args.medium_label)
+    if args.profile == "installer":
+        if (not isinstance(args.payload_manifest_sha256, str) or
+                not re.fullmatch(r"[0-9a-f]{64}", args.payload_manifest_sha256) or
+                not isinstance(args.medium_label, str) or
+                not re.fullmatch(r"DITTO_[A-Z0-9_]{1,26}", args.medium_label)):
+            parser.error("installer profile needs --payload-manifest-sha256 and a DITTO_ --medium-label")
+        if args.dev_software_render:
+            parser.error("--dev-software-render applies to the image profile only")
+    elif any(value is not None for value in installer_args):
+        parser.error("--payload-manifest-sha256/--medium-label apply to the installer profile only")
     for value, pattern in ((args.version, r"[0-9][A-Za-z0-9.\-]{0,31}"),
                            (args.snapshot, r"[0-9]{8}T[0-9]{6}Z"),
                            (args.source_commit, r"[0-9a-f]{40}"),
@@ -108,6 +233,10 @@ def main():
                                  or not (firstboot / "ditto-firstboot-tty").is_file()
                                  or (firstboot / "ditto-firstboot-tty").is_symlink()):
             parser.error("PR A firstboot artifacts incomplete: need helper binary, crate, units and tmpfiles")
+        if args.profile == "installer":
+            generate_installer(args, parser, source, here, expected, lock)
+            print(args.output)
+            return
         output = args.output
         output.mkdir(parents=True)
         extra = output / "extra"

@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""BUILDER ONLY: assemble the #221 UEFI x86_64 hybrid installer ISO and SHA256SUMS.
+
+Run inside the disposable builder after (1) the Ditto image was built, finished
+and pristine-scanned, (2) make-payload.py cut its payload, and (3) the installer
+profile was built with that payload's manifest SHA256. Needs xorriso, mtools and
+dosfstools; no root, no loop device. Never run on a development host.
+
+Layout: ISO 9660 (Rock Ridge) volume <medium label> holding ditto/payload/;
+the El Torito EFI image is also appended as GPT partition 2 (ESP), so the
+same file boots from optical media and after `dd` to a USB drive. The ESP only
+contains EFI/BOOT/BOOTX64.EFI = the installer UKI (whole installer in its
+initrd); there is no BIOS boot path and no Secure Boot signature.
+"""
+
+import argparse
+import datetime
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from ditto_installer import MIB, manifest  # noqa: E402
+from ditto_installer.payload import MANIFEST  # noqa: E402
+from ditto_installer.service import ConfigError, parse_config  # noqa: E402
+
+ESP_TYPE_XORRISO = "28732ac11ff8d211ba4b00a0c93ec93b"     # C12A7328-F81F-11D2-BA4B-00A0C93EC93B, GPT byte order
+ISO_PART_TYPE_XORRISO = "a2a0d0ebe5b9334487c068b6b72699c7"  # EBD0A0A2-B9E5-4433-87C0-68B6B72699C7 basic data
+VERSION = re.compile(r"[0-9][A-Za-z0-9.\-]{0,31}")
+
+
+class AssemblyError(ValueError):
+    pass
+
+
+def sha256_file(path):
+    with open(path, "rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def esp_image_bytes(uki_bytes):
+    """FAT32 image for one UKI: 5 % + 16 MiB slack for FAT/cluster overhead, at least 64 MiB."""
+    wanted = uki_bytes + uki_bytes // 20 + 16 * MIB
+    return max(64 * MIB, -(-wanted // MIB) * MIB)
+
+
+def iso_name(version):
+    return f"ditto-{version}-installer-x86_64.iso"
+
+
+def modification_date(epoch):
+    stamp = datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc)
+    return stamp.strftime("%Y%m%d%H%M%S") + "00"
+
+
+def check_inputs(uki, installer_build, payload_dir):
+    """Cross-check UKI, installer build and payload; returns (config, manifest)."""
+    uki, installer_build, payload_dir = Path(uki), Path(installer_build), Path(payload_dir)
+    if uki.is_symlink() or not uki.is_file() or uki.stat().st_size < 4096:
+        raise AssemblyError("installer UKI missing or too small")
+    with open(uki, "rb") as stream:
+        if stream.read(2) != b"MZ":
+            raise AssemblyError("installer UKI is not a PE image")
+    root = installer_build / "extra"
+    try:
+        config = parse_config((root / "usr/lib/ditto-installer/installer.json").read_text())
+        inputs = json.loads((root / "usr/share/ditto/image-inputs.json").read_text())
+    except (OSError, ValueError, ConfigError) as error:
+        raise AssemblyError(f"installer build is not an installer profile output: {error}") from error
+    if (inputs.get("mode"), inputs.get("payload_manifest_sha256"), inputs.get("medium_label")) != (
+            "installer", config["manifest_sha256"], config["medium_label"]):
+        raise AssemblyError("installer build inputs disagree with its embedded config")
+    try:
+        parsed = manifest.load(payload_dir / MANIFEST, config["manifest_sha256"])
+        manifest.verify_payloads(parsed, payload_dir)
+    except manifest.ManifestError as error:
+        raise AssemblyError(f"payload does not match the installer: {error.code}") from error
+    return config, parsed
+
+
+def plan(*, uki, payload_dir, output, label, version, epoch):
+    """Return the ordered steps: ("run", argv, env) or ("copy", src, dst) / ("write", path, text)."""
+    output = Path(output)
+    work, tree = output / "work", output / "work/tree"
+    esp = work / "esp.img"
+    iso = output / iso_name(version)
+    env = {"SOURCE_DATE_EPOCH": str(epoch), "MTOOLS_SKIP_CHECK": "1", "LC_ALL": "C"}
+    size_kib = esp_image_bytes(Path(uki).stat().st_size) // 1024
+    volume_id = f"{epoch & 0xFFFFFFFF:08X}"
+    steps = [
+        ("run", ["mkfs.vfat", "-C", "-F", "32", "-n", "DITTO_EFI", "-i", volume_id, str(esp), str(size_kib)], env),
+        ("run", ["mmd", "-i", str(esp), "::/EFI", "::/EFI/BOOT"], env),
+        ("run", ["mcopy", "-i", str(esp), str(uki), "::/EFI/BOOT/BOOTX64.EFI"], env),
+    ]
+    payload_files = sorted(p.name for p in Path(payload_dir).iterdir())
+    for name in payload_files:
+        steps.append(("copy", Path(payload_dir) / name, tree / "ditto/payload" / name))
+    steps.append(("write", tree / "README.txt",
+                  f"Ditto {version} installer (preview). UEFI x86_64 only; Secure Boot must be off.\n"
+                  "Write this ISO to a USB drive or boot it as a CD/DVD. See the project install guide.\n"))
+    steps.append(("run", [
+        "xorriso", "-as", "mkisofs", "-o", str(iso), "-V", label, "-iso-level", "3", "-rational-rock",
+        f"--modification-date={modification_date(epoch)}",
+        "-partition_offset", "16",
+        "-append_partition", "2", ESP_TYPE_XORRISO, str(esp), "-appended_part_as_gpt",
+        "-iso_mbr_part_type", ISO_PART_TYPE_XORRISO,
+        "-c", "/boot.catalog",
+        "-e", "--interval:appended_partition_2:all::", "-no-emul-boot",
+        str(tree)], env))
+    steps.append(("run", ["xorriso", "-indev", str(iso), "-report_el_torito", "plain",
+                          "-report_system_area", "plain"], env))
+    return steps, iso
+
+
+def sha256sums(paths):
+    return "".join(f"{sha256_file(path)}  {Path(path).name}\n" for path in paths)
+
+
+def execute(steps, runner, record):
+    for step in steps:
+        kind = step[0]
+        if kind == "run":
+            _, argv, env = step
+            result = runner(argv, env={**os.environ, **env}, capture_output=True, text=True, timeout=3600,
+                            check=False)
+            record.append({"argv": argv, "exit": result.returncode, "stdout": result.stdout[-20000:],
+                           "stderr": result.stderr[-20000:]})
+            if result.returncode != 0:
+                raise AssemblyError(f"{argv[0]} failed with exit {result.returncode}")
+        elif kind == "copy":
+            _, source, dest = step
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, dest)
+        else:
+            _, path, text = step
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+
+
+def assemble(*, uki, installer_build, payload_dir, output, version, epoch, runner=subprocess.run):
+    output = Path(output)
+    if output.exists() or output.is_symlink():
+        raise AssemblyError("output must not exist (use a fresh directory)")
+    if not isinstance(version, str) or not VERSION.fullmatch(version):
+        raise AssemblyError("invalid version")
+    if type(epoch) is not int or not 0 < epoch < 2**32:
+        raise AssemblyError("invalid SOURCE_DATE_EPOCH")
+    config, parsed = check_inputs(uki, installer_build, payload_dir)
+    steps, iso = plan(uki=uki, payload_dir=payload_dir, output=output, label=config["medium_label"],
+                      version=version, epoch=epoch)
+    (output / "work").mkdir(parents=True)
+    record = []
+    execute(steps, runner, record)
+    if not iso.is_file() or iso.stat().st_size == 0:
+        raise AssemblyError("xorriso produced no ISO")
+    (output / "SHA256SUMS").write_text(sha256sums([iso]))
+    (output / "assembly.json").write_text(json.dumps({
+        "iso": iso.name, "iso_sha256": sha256_file(iso), "medium_label": config["medium_label"],
+        "payload_manifest_sha256": config["manifest_sha256"], "payload_image_version": parsed.image_version,
+        "payload_source_commit": parsed.source_commit, "installer_uki_sha256": sha256_file(uki),
+        "source_date_epoch": epoch, "commands": record}, indent=1) + "\n")
+    shutil.rmtree(output / "work/tree")
+    return iso
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--installer-uki", type=Path, required=True, help="mkosi out/ditto-installer*.efi")
+    parser.add_argument("--installer-build", type=Path, required=True, help="generate.py --profile installer output")
+    parser.add_argument("--payload", type=Path, required=True, help="make-payload.py output directory")
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--source-date-epoch", type=int, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        iso = assemble(uki=args.installer_uki, installer_build=args.installer_build, payload_dir=args.payload,
+                       output=args.output, version=args.version, epoch=args.source_date_epoch)
+    except (AssemblyError, OSError) as error:
+        parser.error(str(error))
+    print(iso)
+
+
+if __name__ == "__main__":
+    main()

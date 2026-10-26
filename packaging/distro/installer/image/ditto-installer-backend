@@ -1,0 +1,6 @@
+#!/usr/bin/python3 -I
+"""Root installer backend (ditto-installer-backend.service)."""
+import sys
+sys.path.insert(0, "/usr/lib/ditto-installer")
+from ditto_installer.service import main  # noqa: E402
+main()

@@ -3699,4 +3699,298 @@
         <translation>This computer already has an account. Return to the login screen to sign in.</translation>
     </message>
 </context>
+<context>
+    <name>InstallerMessages</name>
+    <message>
+        <source>安裝完成，內容已逐一讀回核對。請拔除安裝媒體，再重新開機。</source>
+        <translation>Installation finished and was verified by reading it back. Remove the installation medium and restart.</translation>
+    </message>
+    <message>
+        <source>已取消安裝。</source>
+        <translation>Installation cancelled.</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的內容與安裝程式不符，沒有寫入任何磁碟。請重新下載 ISO、核對 SHA256 後再製作安裝媒體。</source>
+        <translation>The medium's contents do not match this installer. Nothing was written. Download the ISO again and check its SHA256.</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的清單無法辨識，沒有寫入任何磁碟。請重新製作安裝媒體。</source>
+        <translation>The medium's payload list is invalid. Nothing was written. Recreate the installation medium.</translation>
+    </message>
+    <message>
+        <source>安裝媒體缺少必要檔案，沒有寫入任何磁碟。請重新製作安裝媒體。</source>
+        <translation>A required file is missing from the medium. Nothing was written.</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的檔案型態不正確，沒有寫入任何磁碟。請重新製作安裝媒體。</source>
+        <translation>A file on the medium has an unexpected type. Nothing was written.</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的檔案已損毀，沒有寫入任何磁碟。請重新下載並核對 SHA256。</source>
+        <translation>A file on the medium is damaged. Nothing was written. Download again and check the SHA256.</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的資料核對不符，安裝已停止。請重新下載並核對 SHA256。</source>
+        <translation>Data on the medium failed verification and installation stopped. Download again and check the SHA256.</translation>
+    </message>
+    <message>
+        <source>安裝媒體上的資料長度不符，安裝已停止。請重新下載並核對 SHA256。</source>
+        <translation>Data on the medium has the wrong length and installation stopped.</translation>
+    </message>
+    <message>
+        <source>解開安裝資料時失敗，安裝已停止。請重新製作安裝媒體。</source>
+        <translation>Unpacking the installation data failed and installation stopped.</translation>
+    </message>
+    <message>
+        <source>這顆磁碟容量不足，沒有寫入任何資料。請選擇更大的磁碟。</source>
+        <translation>The disk is too small. Nothing was written. Choose a larger disk.</translation>
+    </message>
+    <message>
+        <source>無法以獨占方式開啟這顆磁碟（可能正被使用），沒有寫入任何資料。</source>
+        <translation>The disk could not be opened exclusively (it may be in use). Nothing was written.</translation>
+    </message>
+    <message>
+        <source>磁碟狀態和確認時不同，沒有寫入任何資料。請重新選擇磁碟。</source>
+        <translation>The disk changed since you confirmed it. Nothing was written. Choose the disk again.</translation>
+    </message>
+    <message>
+        <source>寫入磁碟時發生錯誤，安裝已停止。</source>
+        <translation>Writing to the disk failed and installation stopped.</translation>
+    </message>
+    <message>
+        <source>讀回核對時發生錯誤，安裝已停止。</source>
+        <translation>Reading the disk back failed and installation stopped.</translation>
+    </message>
+    <message>
+        <source>寫入後讀回的內容不符，安裝已停止。這顆磁碟可能有問題。</source>
+        <translation>The data read back did not match and installation stopped. The disk may be faulty.</translation>
+    </message>
+    <message>
+        <source>寫入分割表時失敗，安裝已停止。</source>
+        <translation>Writing the partition table failed and installation stopped.</translation>
+    </message>
+    <message>
+        <source>目前無法確認安裝結果。請不要使用這顆磁碟開機，重新執行安裝。</source>
+        <translation>The result could not be determined. Do not boot from this disk; run the installation again.</translation>
+    </message>
+    <message>
+        <source>找不到安裝媒體，或媒體上的安裝資料不完整，沒有寫入任何磁碟。請確認隨身碟已插好；問題持續時請重新製作安裝媒體。</source>
+        <translation>The installation medium was not found or its data is incomplete. Nothing was written. Check the USB drive; if this persists, recreate the medium.</translation>
+    </message>
+    <message>
+        <source>安裝服務已停止，目前無法確認結果。請不要從目標磁碟開機；重新開機後再安裝一次。</source>
+        <translation>The installer service stopped and the result is unknown. Do not start from the target disk; restart and install again.</translation>
+    </message>
+    <message>
+        <source>這個畫面已過期，已重新整理磁碟清單。</source>
+        <translation>That screen was out of date; the disk list was refreshed.</translation>
+    </message>
+    <message>
+        <source>這是安裝用的隨身碟或光碟，不能安裝到這裡。</source>
+        <translation>This is the installation medium.</translation>
+    </message>
+    <message>
+        <source>這顆磁碟正在使用中（已掛載或被其他系統占用）。</source>
+        <translation>This disk is in use (mounted or held by another device).</translation>
+    </message>
+    <message>
+        <source>這顆磁碟是唯讀的，無法寫入。</source>
+        <translation>This disk is read-only.</translation>
+    </message>
+    <message>
+        <source>可移除式裝置不列為安裝目標。</source>
+        <translation>Removable devices are not offered as targets.</translation>
+    </message>
+    <message>
+        <source>這顆磁碟使用 4K 原生磁區，預覽版尚未支援。</source>
+        <translation>Disks with 4K native sectors are not supported in this preview.</translation>
+    </message>
+    <message>
+        <source>容量不足，無法安裝 Ditto。</source>
+        <translation>This disk is too small for Ditto.</translation>
+    </message>
+    <message>
+        <source>讀不到這顆磁碟的資訊，不提供安裝。</source>
+        <translation>This disk's details could not be read.</translation>
+    </message>
+    <message>
+        <source>正在核對安裝資料</source>
+        <translation>Checking the installation data</translation>
+    </message>
+    <message>
+        <source>正在準備磁碟</source>
+        <translation>Preparing the disk</translation>
+    </message>
+    <message>
+        <source>正在清除舊的分割表</source>
+        <translation>Erasing the old partition table</translation>
+    </message>
+    <message>
+        <source>正在寫入</source>
+        <translation>Writing</translation>
+    </message>
+    <message>
+        <source>正在讀回核對</source>
+        <translation>Reading back to verify</translation>
+    </message>
+    <message>
+        <source>正在寫入分割表</source>
+        <translation>Writing the partition table</translation>
+    </message>
+    <message>
+        <source>完成</source>
+        <translation>Done</translation>
+    </message>
+    <message>
+        <source>這顆磁碟的資料沒有被更動。</source>
+        <translation>The disk was not changed.</translation>
+    </message>
+    <message>
+        <source>這顆磁碟的原有資料已被部分清除，目前無法開機。可以重新安裝，或改用其他磁碟。</source>
+        <translation>The disk's previous data was partly erased and it will not boot. Install again or use another disk.</translation>
+    </message>
+    <message>
+        <source>正在尋找安裝媒體…</source>
+        <translation>Looking for the installation medium...</translation>
+    </message>
+    <message>
+        <source>沒有可以安裝的磁碟。</source>
+        <translation>No disk can be used for installation.</translation>
+    </message>
+    <message>
+        <source>將清除整顆磁碟的全部資料</source>
+        <translation>ALL DATA ON THIS WHOLE DISK WILL BE ERASED</translation>
+    </message>
+    <message>
+        <source>請拔除安裝媒體，再重新開機。</source>
+        <translation>Remove the installation medium, then restart.</translation>
+    </message>
+    <message>
+        <source>正在取消…</source>
+        <translation>Cancelling...</translation>
+    </message>
+    <message>
+        <source>已經在寫入分割表，來不及取消。請等待安裝結果。</source>
+        <translation>The partition table is already being written; it is too late to cancel. Wait for the result.</translation>
+    </message>
+</context>
+<context>
+    <name>InstallerScreen</name>
+    <message>
+        <source>（無法讀取）</source>
+        <translation>(unreadable)</translation>
+    </message>
+    <message>
+        <source>Ditto · 安裝</source>
+        <translation>Ditto · Install</translation>
+    </message>
+    <message>
+        <source>無法開始安裝</source>
+        <translation>Installation cannot start</translation>
+    </message>
+    <message>
+        <source>重新開機</source>
+        <translation>Restart</translation>
+    </message>
+    <message>
+        <source>選擇要安裝 Ditto 的磁碟</source>
+        <translation>Choose the disk to install Ditto on</translation>
+    </message>
+    <message>
+        <source>Ditto 會使用整顆磁碟，選好之後還會再確認一次。隨身碟等可移除裝置不能當作安裝目標。</source>
+        <translation>Ditto uses the whole disk. You will be asked to confirm once more. Removable devices such as USB thumb drives cannot be targets.</translation>
+    </message>
+    <message>
+        <source>序號</source>
+        <translation>Serial</translation>
+    </message>
+    <message>
+        <source>選擇這顆磁碟。下一步會再確認，不會立刻清除。</source>
+        <translation>Choose this disk. The next step asks again; nothing is erased yet.</translation>
+    </message>
+    <message>
+        <source>不能安裝的磁碟：</source>
+        <translation>Disks that cannot be used:</translation>
+    </message>
+    <message>
+        <source>重新整理</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <source>確認要清除這顆磁碟嗎？</source>
+        <translation>Erase this disk?</translation>
+    </message>
+    <message>
+        <source>型號</source>
+        <translation>Model</translation>
+    </message>
+    <message>
+        <source>容量</source>
+        <translation>Size</translation>
+    </message>
+    <message>
+        <source>。這個動作無法復原。</source>
+        <translation>. This cannot be undone.</translation>
+    </message>
+    <message>
+        <source>取消</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>回到磁碟清單，不寫入任何資料。</source>
+        <translation>Return to the disk list without writing anything.</translation>
+    </message>
+    <message>
+        <source>清除並安裝</source>
+        <translation>Erase and install</translation>
+    </message>
+    <message>
+        <source>清除整顆磁碟的全部資料並安裝 Ditto。</source>
+        <translation>Erase all data on the whole disk and install Ditto.</translation>
+    </message>
+    <message>
+        <source>正在安裝</source>
+        <translation>Installing</translation>
+    </message>
+    <message>
+        <source>安裝進度</source>
+        <translation>Installation progress</translation>
+    </message>
+    <message>
+        <source>安裝期間請不要拔除安裝媒體或關機。</source>
+        <translation>Do not remove the installation medium or switch off the computer while installing.</translation>
+    </message>
+    <message>
+        <source>取消安裝</source>
+        <translation>Cancel installation</translation>
+    </message>
+    <message>
+        <source>停止安裝。已開始寫入的磁碟會無法開機，需要重新安裝。</source>
+        <translation>Stop installing. A disk that has started being written will not boot and needs a new installation.</translation>
+    </message>
+    <message>
+        <source>安裝完成</source>
+        <translation>Installation finished</translation>
+    </message>
+    <message>
+        <source>已拔除，重新開機</source>
+        <translation>Removed, restart now</translation>
+    </message>
+    <message>
+        <source>已取消安裝</source>
+        <translation>Installation cancelled</translation>
+    </message>
+    <message>
+        <source>安裝沒有完成</source>
+        <translation>Installation did not finish</translation>
+    </message>
+    <message>
+        <source>重新選擇磁碟</source>
+        <translation>Choose a disk again</translation>
+    </message>
+    <message>
+        <source>Tab 移動　Enter 確認　·　只支援 UEFI x86_64，Secure Boot 須關閉</source>
+        <translation>Tab moves  Enter confirms  ·  UEFI x86_64 only; Secure Boot must be off</translation>
+    </message>
+</context>
 </TS>
