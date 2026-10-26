@@ -41,6 +41,14 @@ TIMERS = ("fstrim", "dpkg-db-backup", "motd-news")
 # #221: firmware for amdgpu/i915/xe/nouveau (kernel modules already ship in
 # linux-modules-7.0.0-38-generic) and Mesa's gallium drivers. Source contract only.
 HARDWARE_ENABLEMENT_PACKAGES = {"linux-firmware", "mesa-libgallium"}
+# Supplementary group the first-boot helper gives the first (administrator)
+# account -> (the command that group exists for, normal-image package providing
+# it). /usr/bin/sudo is not a dpkg file: sudo 1.9.17p2-1ubuntu3.2's postinst
+# registers it with update-alternatives (-> /usr/bin/sudo.ws, priority 40), and
+# its Pre-Depends sudo-common ships "%sudo ALL=(ALL:ALL) ALL". VM221-B-001: the
+# image had the group membership but no tool, and root is locked.
+ADMIN_GROUP_TOOLS = {"sudo": ("/usr/bin/sudo", "sudo")}
+HELPER_TRANSACTION = REPO / "crates/ditto-firstboot-account/src/transaction.rs"
 PUBLIC_PRODUCER_MANIFEST = "public-producer-path-fixtures.json"
 # The eight package/vendor hits of the first #205 real-image scan; the four
 # owned Rust artifacts of that scan are deliberately absent (remap instead).
@@ -677,6 +685,44 @@ bootctl() { [[ "$*" == --version ]]; printf '%s\\n' "$version"; }
         self.put("etc/sudoers.d/README", '# No active NOPASSWD: rules\n', self.root / "image")
         self.put("etc/gdm3/custom.conf", '[daemon]\n# AutomaticLoginEnable=true\nAutomaticLoginEnable=false\n', self.root / "image")
         self.scan()
+
+    def test_ubuntu_default_sudo_policy_passes_and_nopasswd_still_fails(self):
+        # Shape of the files the normal image gains with sudo (#221
+        # VM221-B-001): the active lines of sudo-common 1.2ubuntu /etc/sudoers,
+        # the README's commented "@includedir" line, sudo's /dev/null unit mask
+        # and the update-alternatives links. The byte-exact upstream control
+        # ran outside the repo (evidence HANDOFF-repair3). Control rows, not a
+        # rule change: the scanner must accept it and still reject NOPASSWD.
+        image = self.pristine_image("ubuntu-sudo")
+        policy = ("#\n# This file MUST be edited with the 'visudo' command as root.\n"
+                  "Defaults\tenv_reset\nDefaults\tmail_badpass\n"
+                  'Defaults\tsecure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"\n'
+                  "Defaults\tuse_pty\n"
+                  '#Defaults:%sudo env_keep += "http_proxy https_proxy ftp_proxy all_proxy no_proxy"\n'
+                  "root\tALL=(ALL:ALL) ALL\n%admin ALL=(ALL) ALL\n%sudo\tALL=(ALL:ALL) ALL\n"
+                  '# See sudoers(5) for more information on "@include" directives:\n\n'
+                  "@includedir /etc/sudoers.d\n")
+        self.put("etc/sudoers", policy, image)
+        self.put("etc/sudoers.d/README", "#\n# sudo  package now includes the directive:\n# \n"
+                 "# \t@includedir /etc/sudoers.d\n# \n", image)
+        self.link(image, "usr/lib/systemd/system/sudo.service", "/dev/null")
+        self.put("usr/bin/sudo.ws", "synthetic setuid binary\n", image)
+        self.link(image, "etc/alternatives/sudo", "/usr/bin/sudo.ws")
+        self.link(image, "usr/bin/sudo", "/etc/alternatives/sudo")
+        self.assertEqual(self.scan(image=image)["authentication_config"], [])
+        rows = {"sudoers.d": ("etc/sudoers.d/90-ditto", "%sudo ALL=(ALL:ALL) NOPASSWD: ALL\n"),
+                "sudoers": ("etc/sudoers", policy.replace("%sudo\tALL=(ALL:ALL) ALL",
+                                                          "%sudo\tALL=(ALL:ALL) NOPASSWD: ALL"))}
+        for row, (name, text) in rows.items():
+            with self.subTest(row=row):
+                path = image / name
+                original = path.read_text() if path.exists() else None
+                self.put(name, text, image)
+                self.assertIn(name, self.scan(1, image=image)["authentication_config"])
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_text(original)
 
     def test_unit_masks_aliases_and_auth_directory_links(self):
         target = self.put("usr/lib/systemd/system/fixture.service", "[Service]\nExecStart=/bin/true\n", self.root / "image")
@@ -2084,6 +2130,39 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         listed = [line for line in (RECIPE / "packages.txt").read_text().splitlines()
                   if line and not line.startswith("#")]
         self.assertLessEqual(HARDWARE_ENABLEMENT_PACKAGES, set(listed))
+
+    def test_first_account_admin_groups_ship_their_tool(self):
+        # #221 VM221-B-001: the helper put the first account in group sudo, the
+        # image had no sudo, and root is locked: the administrator had no
+        # privilege path. Read the groups from the helper's real useradd call
+        # so a new group cannot be added without registering its tool here.
+        source = HELPER_TRANSACTION.read_text()
+        call_args = re.findall(r'command\("/usr/sbin/useradd"\)\s*\.args\(\[(.*?)\]\)', source, re.S)
+        self.assertEqual(len(call_args), 1, "helper useradd call not found")
+        words = re.findall(r'"([^"]*)"', call_args[0])
+        self.assertEqual(words.count("-G"), 1, words)
+        groups = words[words.index("-G") + 1].split(",")
+        self.assertIn("sudo", groups)  # #212 owner decision: first account is the administrator
+        listed = [line for line in (RECIPE / "packages.txt").read_text().splitlines()
+                  if line and not line.startswith("#")]
+        for group in groups:
+            with self.subTest(group=group):
+                self.assertIn(group, ADMIN_GROUP_TOOLS, "admin group without a registered tool")
+                tool, provider = ADMIN_GROUP_TOOLS[group]
+                self.assertIn(provider, listed, f"{tool} provider missing from packages.txt")
+                for flags, mode in self.MODES:
+                    output, _ = self.generate(flags=flags)
+                    conf = configparser.ConfigParser(interpolation=None, strict=True)
+                    conf.optionxform = str
+                    conf.read(output / "mkosi.conf")
+                    self.assertIn(provider, conf["Content"]["Packages"].split(","), mode)
+        # The installer runs as root from RAM and creates no account: no sudo there.
+        output, _ = self.generate(flags=self.INSTALLER_FLAGS)
+        conf = configparser.ConfigParser(interpolation=None, strict=True)
+        conf.optionxform = str
+        conf.read(output / "mkosi.conf")
+        installer = conf["Content"]["Packages"].split(",")
+        self.assertFalse({provider for _, provider in ADMIN_GROUP_TOOLS.values()} & set(installer))
 
     def test_closure_contract_detects_missing_or_single_mode_fix(self):
         # Controls for the contract itself on task-owned recipe copies.

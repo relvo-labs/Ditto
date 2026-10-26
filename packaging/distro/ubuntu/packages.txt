@@ -2,6 +2,14 @@
 # D04 must qualify/minimize this list; the kernel pin is intentionally explicit.
 zstd
 login
+# #221 VM221-B-001: the first-boot helper makes the first account the
+# administrator (#212 owner decision: useradd -G sudo) while root stays locked,
+# so the image must carry the tool that group exists for. sudo's postinst
+# registers /usr/bin/sudo as the alternative for sudo.ws; its Pre-Depends
+# sudo-common ships Ubuntu's default /etc/sudoers ("%sudo ALL=(ALL:ALL) ALL",
+# password required). No NOPASSWD rule, no polkit/pkexec. Name and version
+# (1.9.17p2-1ubuntu3.2 in -updates/-security) checked in the gpgv-verified index.
+sudo
 systemd
 systemd-container
 systemd-sysv

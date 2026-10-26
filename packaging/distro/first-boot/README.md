@@ -121,7 +121,7 @@ AlertMessage，PAM 資訊與真實階段透過 Accessible.announce 宣告；Orca
 此 PR 沒有下載套件、重建映像或做 host／VM 設定。
 
 VM 仍須驗：GPU／pixman／無 DRM、PAM 成功與失敗、中文名字、Orca／音訊、重開登入、
-PR A pending 復原、getent／shadow yescrypt／sudo／家目錄與標記，以及 journal 密碼掃描、登入後沒有殘留 `_greetd` 程序（含 Orca／AT-SPI／speech-dispatcher）。
+PR A pending 復原、getent／shadow yescrypt／sudo（新帳號以自己的密碼 `sudo -v` 成功提權）／家目錄與標記，以及 journal 密碼掃描、登入後沒有殘留 `_greetd` 程序（含 Orca／AT-SPI／speech-dispatcher）。
 
 
 ## 原生 helper（PR A）
@@ -163,6 +163,8 @@ socket 為 `root:_greetd 0660`，再以 `SO_PEERCRED` 核對 runtime `_greetd` U
 /usr/bin/getent passwd
 /usr/bin/getent passwd|group <name>
 ```
+
+`-G sudo` 只有在映像真的有 sudo 時才代表管理權限。#221 VM 驗收（`VM221-B-001`）發現：帳號已加入 `sudo` 群組，映像卻沒有 sudo，root 又是鎖定的。Ubuntu 配方因此在 normal 映像加入 `sudo` 套件，使用 Ubuntu 預設的 `%sudo ALL=(ALL:ALL) ALL`（需要密碼，沒有 NOPASSWD）；recipe 測試會從這裡的 useradd 參數讀出群組，要求每個群組都有對應的工具套件。helper 本身沒有修改。映像尚未重建，sudo 的實際提權仍待 VM 驗證。
 
 `--no-log-init` 避免寫入 `/var/log/lastlog`／faillog；HOME_MODE 固定為 0750。指定 YESCRYPT 讓 chpasswd 走 libcrypt 而非 PAM 密碼品質拒絕，符合 owner「弱密碼警告但允許」的政策；登入仍走 greetd／PAM。帳號工具採清空後的固定環境，stdout／stderr 不輸出。密碼只透過 chpasswd stdin 傳遞，不放 argv、環境、journal、pending 或完成標記。
 
