@@ -39,7 +39,7 @@ NFR-08：Shell 退出或無回應後 **10 秒內**提供可操作介面。
 | 情境 | 偵測 | 救援介面 |
 | --- | --- | --- |
 | Shell 退出 | Core 的受控啟動器看到子程序退出 | Core 重啟 Shell（退避）；10 分鐘內 3 次失敗 → 啟動救援介面 |
-| Shell 無回應 | supervisor 每 2 秒 ping `shell.sock`，連續 3 次無回應（6 秒） | `SIGKILL` Shell → 啟動救援介面，不先嘗試重啟（無回應的原因可能是某個供應者，重啟會再卡住） |
+| Shell 無回應 | supervisor 每 2 秒 ping `shell.sock`，連續 3 次無回應（6 秒）。例外：每一代 Shell 第一次回應後 60 秒內是啟動寬限，要連續 10 次無回應（約 20 秒）才判定，所以啟動中卡死仍在約 21 秒內處理；寬限結束後回到 3 次規則（[D-53](../../.agents/notes/decisions/2026-10-27-d53-supervisor-startup-grace.md)） | `SIGKILL` Shell → 啟動救援介面，不先嘗試重啟（無回應的原因可能是某個供應者，重啟會再卡住） |
 | Core 重啟風暴 | systemd `OnFailure=` | 啟動救援介面；此時 Core 不可用，救援介面進入離線模式（§4.3） |
 
 救援介面是 `shell/rescue/` 的**獨立 Quickshell 設定**：

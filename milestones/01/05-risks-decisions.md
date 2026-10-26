@@ -85,6 +85,7 @@
 | D-50 | **#159 Shell 擴充契約（UI-P01）** | **2026-10-22 已決定（安全預設，待 owner 檢視）**：設定頁用多條目 area `ui.settings_page`；跨信任設定先採宣告式表單（前提是 Core 端 `config_schema` 驗證）；UI 暫態只在 Shell 記憶體；UI SDK 為 `root:/sdk/Ditto/Ui` qmldir 模組；舊 Profile 不遷移、走內建 fallback。D-49 由 PR #147 保留（[紀錄](../../.agents/notes/decisions/2026-10-22-d50-shell-extension-contracts.md)） | UI-P02 開工 | coordinator（owner 事先授權安全預設） |
 | D-51 | **發行版底座與雙形式** | **2026-10-24 owner 已決定**：Ubuntu 26.04＋mkosi＋sysupdate `/usr` A/B；#174 B 並行共用包；Fedora bootc 暫停留證、不做 Fedora 加裝；非更新／硬體接受（[紀錄](../../.agents/notes/decisions/2026-10-24-d51-ubuntu-mkosi-base.md)、[ADR](../../docs/platform/distro-architecture.md)） | 發行版 D01 | owner |
 | D-52 | **Ditto 自有程式碼授權** | **2026-10-25 owner 已決定**：MIT，`2026 Ditto contributors`；不重新授權第三方、素材或 owner／使用者生成物，不代表完整法律審查（[紀錄](../../.agents/notes/decisions/2026-10-25-d52-mit-license.md)） | #200 來源 metadata | owner |
+| D-53 | **supervisor 的 Shell 啟動寬限** | **2026-10-27 已決定（依 owner 指示修 #226，待 owner 檢視）**：每一代 Shell 武裝後 60 秒內要連續 10 次無回應才判定（啟動中卡死約 21 秒內處理），之後維持 3 次；常態期與 NFR-08 不變（[紀錄](../../.agents/notes/decisions/2026-10-27-d53-supervisor-startup-grace.md)） | #226 修正 | coordinator（owner 指示） |
 
 ## 2.1 G4 開工時的既有決策盤點
 
