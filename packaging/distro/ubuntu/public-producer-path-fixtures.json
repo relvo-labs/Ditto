@@ -269,6 +269,25 @@
       "classification": "Qualcomm 上游 SDM845 DSP 韌體（壓縮檔）；命中為韌體內嵌的廠商建置環境路徑，不是 Ditto 建置者或 checkout 路徑。"
     },
     {
+      "path": "usr/share/doc/sudo/examples/sudoers",
+      "sha256": "dcf943c4b04ceed69a41a990b28adf9f9679ade670934d6196267949a4ff70c4",
+      "bytes": 4178,
+      "source": {
+        "kind": "ubuntu-deb",
+        "package": "sudo",
+        "version": "1.9.17p2-1ubuntu3.2",
+        "deb": "pool/main/s/sudo/sudo_1.9.17p2-1ubuntu3.2_amd64.deb",
+        "deb_sha256": "6c05f7816ba1a74acaf08e124321caa47efff271265d4d4342e033cf8bdb6560",
+        "packages_index": "https://snapshot.ubuntu.com/ubuntu/20261020T000000Z/dists/resolute-updates/main/binary-amd64/Packages.xz",
+        "index_sha256": "7807f03727e9eece950ee6e96cb2392a69b5b67c0d3adc417f7794cc504dae51"
+      },
+      "verification": {
+        "level": "signed-snapshot-index",
+        "detail": "由 .deb 解出的檔案完整 SHA256（writer 與 coordinator 各自核對）；.deb 的 SHA256 列於 snapshot Packages.xz，該 Packages.xz 的雜湊列於 gpgv 驗證通過（exit 0）的 InRelease。尚未在含 sudo 的映像中實掃。"
+      },
+      "classification": "sudo 上游範例 sudoers（文件範例，非啟用中的設定）；命中為範例 operator 使用者的家目錄指令路徑，不是 Ditto 建置者或 checkout 路徑。"
+    },
+    {
       "path": "usr/lib/ditto-node/bin/node",
       "sha256": "3517c2df0b2f8cd7f422b4b8450ef81c6889f08eb03e281d6de9079b15e6a327",
       "bytes": 124836408,
