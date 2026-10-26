@@ -10,6 +10,10 @@ util-linux
 kmod
 kbd
 linux-image-7.0.0-38-generic
+# Format=uki: mkosi 26 takes sd-stub from the image itself
+# (usr/lib/systemd/boot/efi/linuxx64.efi.stub) and fails without it; ukify runs
+# from the builder/tools tree, not the image. Universe, 259.9-0ubuntu0.1 in -updates.
+systemd-boot-efi
 # Display firmware only (the installed system carries the full linux-firmware).
 linux-firmware-amd-graphics
 linux-firmware-intel-graphics

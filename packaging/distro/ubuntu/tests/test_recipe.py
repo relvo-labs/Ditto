@@ -2392,6 +2392,25 @@ source "$1"
         config = parse_config((extra / "usr/lib/ditto-installer/installer.json").read_text())
         self.assertEqual((config["manifest_sha256"], config["medium_label"]), ("a" * 64, "DITTO_INSTALL_7"))
 
+    def test_installer_uki_carries_its_sd_stub_provider(self):
+        # Builder attempt 2 (845da6c): mkosi 26 stopped the installer build with
+        # "sd-stub not found at /usr/lib/systemd/boot/efi/linuxx64.efi.stub in
+        # the image". For Format=uki mkosi reads the stub and the kernel from the
+        # image root (ukify comes from the builder/tools tree), so both providers
+        # must be in the installer package set, as they are in the normal image.
+        output, _ = self.generate(flags=self.INSTALLER_FLAGS)
+        conf = configparser.ConfigParser(interpolation=None, strict=True)
+        conf.optionxform = str
+        conf.read(output / "mkosi.conf")
+        self.assertEqual(conf["Output"]["Format"], "uki")
+        packages = conf["Content"]["Packages"].split(",")
+        for provider in ("systemd-boot-efi", "linux-image-7.0.0-38-generic"):
+            self.assertEqual(packages.count(provider), 1, provider)
+        self.assertIn("Repositories=universe", (output / "mkosi.conf").read_text())  # systemd-boot-efi is in universe
+        normal = [line for line in (RECIPE / "packages.txt").read_text().splitlines()
+                  if line and not line.startswith("#")]
+        self.assertIn("systemd-boot-efi", normal)
+
     def test_installer_profile_argument_contract(self):
         rows = [("--profile", "installer"),
                 ("--profile", "installer", "--payload-manifest-sha256", "A" * 64, "--medium-label", "DITTO_X"),
