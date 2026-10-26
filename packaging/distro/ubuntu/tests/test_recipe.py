@@ -157,7 +157,7 @@ class RecipeTests(unittest.TestCase):
                  "usr/share/doc/ditto-runtime/NOTICE"]
         names += ["usr/lib/ditto/target/release/" + n for n in (
             "ditto-core", "ditto-worker", "ditto-confine", "ditto-supervisor", "dittoctl",
-            "ditto-test-host", "ditto-dbus-proxy", "ditto-generation-runner")]
+            "ditto-test-host", "ditto-dbus-proxy", "ditto-generation-runner", "ditto-firstboot-account")]
         for name in names:
             self.put(name, "synthetic non-executable runtime fixture\n", self.tree)
 
@@ -1855,8 +1855,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         unit = configparser.ConfigParser()
         unit.read(output / "extra/etc/systemd/system/greetd.service.d/seat.conf")
         helper = unit["Service"]["ExecStartPre"]
-        self.assertEqual(helper, "/usr/lib/ditto/wait-drm")
-        self.assertTrue(os.access(output / "extra" / helper.lstrip("/"), os.X_OK))
+        self.assertEqual(helper, "-/usr/lib/ditto/wait-drm")
+        self.assertTrue(os.access(output / "extra" / helper.lstrip("-/"), os.X_OK))
 
     def test_dev_renderer_mode_is_explicit_and_recorded(self):
         for flags, mode in (((), "normal"), (("--dev-software-render",), "dev-software-render")):
@@ -1950,6 +1950,196 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         (lib.parent / "libunwind.so.8").symlink_to(lib.name)
         _, result = self.generate(2)
         self.assertIn("not admitted", result.stderr)
+
+    def firstboot_archive(self, omit=()):
+        # Derive absence/partial cases from the committed source archive. Never
+        # overlay fake units onto merged PR A or admit uncommitted source files.
+        archive = self.root / f"firstboot-{next(self.counter)}.tar"
+        with tarfile.open(self.archive) as old, tarfile.open(
+                archive, "w", format=tarfile.PAX_FORMAT, pax_headers={"comment": self.commit}) as new:
+            for member in old:
+                if any(member.name == name or member.name.startswith(name.rstrip("/") + "/")
+                       for name in omit):
+                    continue
+                new.addfile(member, old.extractfile(member) if member.isfile() else None)
+        return archive
+
+    def test_firstboot_install_and_pending_pr_a_contract(self):
+        # Only an explicitly all-absent archive may retain the legacy login.
+        archive = self.firstboot_archive(("crates/ditto-firstboot-account",
+                                          "packaging/distro/first-boot/units",
+                                          "packaging/distro/first-boot/tmpfiles.d"))
+        (self.tree / "usr/lib/ditto/target/release/ditto-firstboot-account").unlink()
+        output, _ = self.generate(archive=archive)
+        extra = output / "extra"
+        for name in ("ditto-greeter", "wayfire-greeter.ini", "firstboot-fcitx5-profile"):
+            self.assertTrue((extra / "usr/lib/ditto" / name).is_file())
+        self.assertTrue(os.access(extra / "usr/lib/ditto/ditto-greeter", os.X_OK))
+        shell = extra / "usr/lib/ditto/shell/firstboot"
+        self.assertTrue((shell / "shell.qml").is_file())
+        for name in ("core", "jelly", "ui", "i18n", "wallpapers"):
+            self.assertEqual((shell / name).readlink().as_posix(), "../" + name)
+            self.assertTrue((shell / name).is_dir())
+        state = json.loads((extra / "usr/share/ditto/firstboot-integration.json").read_text())
+        self.assertEqual(state, {"enabled": False, "pending": "TODO_FIRSTBOOT_ACCOUNT_PR_A"})
+        conf = (extra / "etc/greetd/config.toml").read_bytes()
+        scanner = load_module("firstboot_scan", RECIPE / "scan-pristine-rootfs.py")
+        self.assertFalse(scanner.unsafe_authentication("etc/greetd/config.toml", conf))
+        self.assertIn(b"/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session", conf)
+
+    def test_firstboot_complete_pr_a_wires_greetd_and_socket(self):
+        helper = self.tree / "usr/lib/ditto/target/release/ditto-firstboot-account"
+        helper.chmod(0o755)  # Still synthetic; never execute it.
+        output, _ = self.generate()
+        extra = output / "extra"
+        self.assertEqual(json.loads((extra / "usr/share/ditto/firstboot-integration.json").read_text()),
+                         {"enabled": True, "pending": None})
+        import tomllib
+        config = tomllib.loads((extra / "etc/greetd/config.toml").read_text())
+        self.assertEqual(config["default_session"], {"command": "/usr/lib/ditto/ditto-greeter", "user": "_greetd"})
+        link = extra / "usr/lib/ditto/ditto-firstboot-account"
+        self.assertEqual(str(link.readlink()), "target/release/ditto-firstboot-account")
+        # Compare installed bytes and enablement against real committed PR A,
+        # rather than synthetic two-unit fixtures that miss recovery ordering.
+        units = ("ditto-firstboot-account.socket", "ditto-firstboot-account.service",
+                 "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
+                 "ditto-firstboot-tty-dispatch.socket", "ditto-firstboot-tty-dispatch.service",
+                 "ditto-firstboot-tty-prepare.service")
+        with tarfile.open(self.archive) as source:
+            for name in units:
+                original = source.extractfile("packaging/distro/first-boot/units/" + name).read()
+                self.assertEqual((extra / "usr/lib/systemd/system" / name).read_bytes(), original)
+                unit = configparser.ConfigParser()
+                unit.read_string(original.decode())
+                self.assertNotIn("RequiredBy", unit["Install"] if unit.has_section("Install") else {})
+                for target in unit.get("Install", "WantedBy", fallback="").split():
+                    enabled = extra / "etc/systemd/system" / (target + ".wants") / name
+                    self.assertEqual(enabled.readlink().as_posix(), "/usr/lib/systemd/system/" + name)
+            for src, dest in (("packaging/distro/first-boot/tmpfiles.d/ditto-firstboot.conf",
+                               "usr/lib/tmpfiles.d/ditto-firstboot.conf"),
+                              ("crates/ditto-firstboot-account/UNICODE-NOTICE.txt",
+                               "usr/share/doc/ditto-firstboot-account/UNICODE-NOTICE.txt")):
+                self.assertEqual((extra / dest).read_bytes(), source.extractfile(src).read())
+        recovery = configparser.ConfigParser()
+        recovery.read(extra / "usr/lib/systemd/system/ditto-firstboot-account-recover.service")
+        self.assertEqual(set(recovery["Install"]["WantedBy"].split()), {"sysinit.target", "greetd.service"})
+        self.assertIn("greetd.service", recovery["Unit"]["Before"].split())
+        self.assertFalse((extra / "etc/systemd/system/greetd.service.requires").exists())
+        self.assertFalse(any(extra.glob("etc/systemd/system/*.wants/ditto-firstboot-account-tty.service")))
+        launcher = extra / "usr/lib/ditto/ditto-firstboot-tty"
+        self.assertTrue(os.access(launcher, os.X_OK))
+        with tarfile.open(self.archive) as source:
+            self.assertEqual(launcher.read_bytes(),
+                             source.extractfile("packaging/distro/first-boot/ditto-firstboot-tty").read())
+        self.assertIn("ditto-firstboot-tty-dispatch.socket",
+                      (output / "finalize.sh").read_text())
+        # Run the generated finalizer in a temporary image, recording chroot
+        # actions and stubbing runtime apply, never executing the helper.
+        image = self.pristine_image("firstboot-finalizer")
+        for rel in ("etc/ssh", "var/lib/dbus", "etc/systemd/system", "etc/pam.d"):
+            (image / rel).mkdir(parents=True, exist_ok=True)
+        self.put("etc/pam.d/greetd", "# fixture\n", image)
+        shutil.copytree(extra, image, dirs_exist_ok=True, symlinks=True)
+        shutil.copytree(output / "runtime", image, dirs_exist_ok=True, symlinks=True)
+        obsolete = self.link(image,
+                             "etc/systemd/system/greetd.service.requires/ditto-firstboot-account-recover.service",
+                             "/usr/lib/systemd/system/ditto-firstboot-account-recover.service")
+        script = '''
+python3() { if [[ "$1" == -c ]]; then echo synthetic-source-commit; fi; return 0; }
+chroot() { printf '%s\\n' "$*" >> "$BUILDROOT/chroot-actions"; }
+source "$1"
+'''
+        result = subprocess.run(["bash", "-c", script, "finalize-test", str(output / "finalize.sh")],
+                                env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
+                                text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("systemctl enable ditto-firstboot-account.socket ditto-firstboot-account-recover.service ditto-firstboot-tty-dispatch.socket",
+                      (image / "chroot-actions").read_text())
+        self.assertFalse(obsolete.is_symlink())
+        for target in ("sysinit.target", "greetd.service"):
+            self.assertEqual((image / f"etc/systemd/system/{target}.wants/ditto-firstboot-account-recover.service")
+                             .readlink().as_posix(), "/usr/lib/systemd/system/ditto-firstboot-account-recover.service")
+
+    def test_firstboot_partial_pr_a_fails_before_output(self):
+        required_sources = ("crates/ditto-firstboot-account/Cargo.toml",
+                            "crates/ditto-firstboot-account/UNICODE-NOTICE.txt",
+                            "packaging/distro/first-boot/tmpfiles.d/ditto-firstboot.conf",
+                            *("packaging/distro/first-boot/units/" + name for name in (
+                                "ditto-firstboot-account.socket", "ditto-firstboot-account.service",
+                                "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
+                                "ditto-firstboot-tty-dispatch.socket", "ditto-firstboot-tty-dispatch.service",
+                 "ditto-firstboot-tty-prepare.service")),
+                            "packaging/distro/first-boot/ditto-firstboot-tty")
+        for missing in required_sources:
+            with self.subTest(missing=missing):
+                _, result = self.generate(2, archive=self.firstboot_archive((missing,)))
+                self.assertIn("PR A firstboot artifacts incomplete", result.stderr)
+        # A valid old lock without the new helper still fails before output.
+        (self.tree / "usr/lib/ditto/target/release/ditto-firstboot-account").unlink()
+        _, result = self.generate(2)
+        self.assertIn("PR A firstboot artifacts incomplete", result.stderr)
+
+    def test_firstboot_binary_without_source_fails_before_output(self):
+        archive = self.firstboot_archive(("crates/ditto-firstboot-account",
+                                          "packaging/distro/first-boot/units",
+                                          "packaging/distro/first-boot/tmpfiles.d"))
+        _, result = self.generate(2, archive=archive)
+        self.assertIn("PR A firstboot artifacts incomplete", result.stderr)
+        # A helper alias is also a partial delivery, even with source absent.
+        helper = self.tree / "usr/lib/ditto/target/release/ditto-firstboot-account"
+        helper.unlink()
+        helper.symlink_to("ditto-core")
+        _, result = self.generate(2, archive=archive)
+        self.assertIn("PR A firstboot artifacts incomplete", result.stderr)
+
+    def test_firstboot_pristine_markers_rejected(self):
+        for name in ("account-created", "pending"):
+            for kind in ("empty", "regular", "dangling", "directory", "parent-link", "fifo"):
+                with self.subTest(marker=name, kind=kind):
+                    image = self.pristine_image(f"marker-{name}-{kind}")
+                    marker = image / "var/lib/ditto/firstboot" / name
+                    marker.parent.mkdir(parents=True)
+                    if kind == "parent-link":
+                        marker.parent.rmdir()
+                        marker.parent.symlink_to("/outside-not-read")
+                    elif kind == "directory":
+                        marker.mkdir()
+                    elif kind == "dangling":
+                        marker.symlink_to("/outside-not-read")
+                    elif kind == "fifo":
+                        os.mkfifo(marker)
+                    else:
+                        marker.write_text("" if kind == "empty" else "fixture\n")
+                    report = self.scan(1, image=image)
+                    self.assertIn("var/lib/ditto/firstboot/" + name, report["identity_files"])
+                    self.assertEqual(report["errors"], [])
+
+    def test_firstboot_greetd_allowlist_is_exact(self):
+        path = "etc/greetd/config.toml"
+        for command, expected in (("/usr/lib/ditto/ditto-greeter", 0),
+                                  ("/usr/lib/ditto/ditto-greeter --autologin", 1),
+                                  ("/usr/lib/ditto/ditto-greeter; /bin/sh", 1),
+                                  ("/usr/lib/ditto/ditto-greeter-other", 1)):
+            self.put(path, '[default_session]\ncommand="' + command + '"\nuser="_greetd"\n', self.root / "image")
+            self.scan(expected)
+        self.put(path, '[default_session]\ncommand="/usr/lib/ditto/ditto-greeter"\nuser="root"\n', self.root / "image")
+        self.scan(1)
+        self.put(path, '[initial_session]\ncommand="/usr/lib/ditto/ditto-greeter"\nuser="_greetd"\n', self.root / "image")
+        self.scan(1)
+
+    def test_firstboot_input_and_accessibility_recipe(self):
+        output, _ = self.generate()
+        text = (output / "mkosi.conf").read_text()
+        for name in ("fcitx5", "fcitx5-chinese-addons", "fcitx5-chewing", "at-spi2-core", "orca", "speech-dispatcher"):
+            self.assertIn(name, text)
+        ini = configparser.ConfigParser()
+        ini.read(output / "extra/usr/lib/ditto/wayfire-greeter.ini")
+        self.assertIn("input-method-v1", ini["core"]["plugins"].split())
+        self.assertEqual(ini["command"]["binding_orca"], "<super> <alt> KEY_S")
+        self.assertEqual(ini["command"]["command_orca"], "/usr/lib/ditto/ditto-greeter --orca")
+        profile = configparser.ConfigParser()
+        profile.read(output / "extra/usr/lib/ditto/firstboot-fcitx5-profile")
+        self.assertEqual(profile["Groups/0"]["DefaultIM"], "chewing")
 
 
 class DecisionTableTests(unittest.TestCase):

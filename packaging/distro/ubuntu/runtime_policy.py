@@ -8,7 +8,7 @@ import stat
 import subprocess
 
 NATIVE = {"ditto-core", "ditto-worker", "ditto-confine", "ditto-supervisor", "dittoctl",
-          "ditto-test-host", "ditto-dbus-proxy", "ditto-generation-runner"}
+          "ditto-test-host", "ditto-dbus-proxy", "ditto-generation-runner", "ditto-firstboot-account"}
 FIXED = {"usr/bin/quickshell", "usr/bin/wayfire", "usr/local/libexec/xdg-desktop-portal-wlr",
          "usr/lib/ditto-node/bin/node"} | {f"usr/lib/ditto/target/release/{n}" for n in NATIVE}
 WAYFIRE_LIBRARY = re.compile(

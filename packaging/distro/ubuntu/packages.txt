@@ -32,6 +32,12 @@ wl-clipboard
 wayland-utils
 fcitx5
 fcitx5-chinese-addons
+# Taiwan: Chewing (Zhuyin); Chinese addons alone provides Pinyin, not Chewing.
+fcitx5-chewing
+# First-boot AT-SPI and speech; end-to-end Orca/audio require VM evidence.
+at-spi2-core
+orca
+speech-dispatcher
 fonts-noto-cjk
 libqt6core6t64
 libqt6gui6

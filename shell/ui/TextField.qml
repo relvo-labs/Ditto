@@ -9,13 +9,25 @@ Rectangle {
 
     required property var tokens
     property alias text: input.text
+    property alias inputItem: input
+    property alias inputMethodHints: input.inputMethodHints
+    property alias maximumLength: input.maximumLength
+    property alias validator: input.validator
+    property string accessibleDescription: ""
+    property Item accessibleLabel: null
+    property Item nextTabItem: null
+    property Item previousTabItem: null
     property string placeholder: ""
     property string accessibleName: placeholder
     property bool readOnly: false
     /// A secret (an API key): shown as dots, never kept by the field after
     /// its form is done (the form clears `text`).
     property bool secret: false
+    // Opt in only for labelled password fields: Qt hides their direct name.
+    // Existing secret/API-key inputs retain their accessible name by default.
+    property bool accessiblePassword: false
     signal accepted()
+    signal inputFocused()
     readonly property bool jelly: tokens.uiCandidate === true
 
     implicitWidth: 240
@@ -48,7 +60,17 @@ Rectangle {
         activeFocusOnTab: true
         Accessible.role: Accessible.EditableText
         Accessible.name: field.accessibleName
+        Accessible.description: field.accessibleDescription
+        Accessible.passwordEdit: field.accessiblePassword
+        KeyNavigation.tab: field.nextTabItem
+        KeyNavigation.backtab: field.previousTabItem
         onAccepted: field.accepted()
+        onActiveFocusChanged: if (activeFocus) field.inputFocused()
+        // Qt 6.10.2 crashes when labelledBy is bound to null. These labels are
+        // static associations; never call the setter for a missing label.
+        Component.onCompleted: {
+            if (field.accessibleLabel) Accessible.labelledBy = field.accessibleLabel;
+        }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter

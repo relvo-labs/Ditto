@@ -1,15 +1,17 @@
 [Unit]
 Description=Ditto first-boot account text fallback on tty1
-ConditionPathExists=!/var/lib/ditto/firstboot/account-created
-Requires=ditto-firstboot-account-recover.service
-After=ditto-firstboot-account-recover.service
+Requires=ditto-firstboot-tty-prepare.service
+Wants=ditto-firstboot-account-recover.service
+After=ditto-firstboot-tty-prepare.service ditto-firstboot-account-recover.service greetd.service getty@tty1.service
+OnSuccess=greetd.service
+OnFailure=greetd.service
 Conflicts=greetd.service getty@tty1.service
 
 [Service]
 Type=oneshot
 User=root
 Group=root
-ExecStart=/usr/lib/ditto/ditto-firstboot-account --tty
+ExecStart=/usr/lib/ditto/ditto-firstboot-tty --tty-session
 # Human input has no deadline. Account transaction recovery still uses pending.
 TimeoutStartSec=infinity
 UMask=0077
@@ -40,3 +42,5 @@ TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
 SendSIGHUP=yes
+KillMode=control-group
+Restart=no

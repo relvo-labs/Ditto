@@ -1,6 +1,132 @@
-# 首次開機建立帳號：原生 helper
+# 首次開機帳號整合（#212）
 
-這是 #212 的 PR A：建立第一個管理員帳號的 Rust helper、socket、開機復原與文字保底 units。協定在 [PROTOCOL.md](../../../crates/ditto-firstboot-account/PROTOCOL.md)；PR B 負責畫面、greeter、無 DRM 的啟動選擇及映像接線。本目錄尚未接入映像配方。
+PR A 提供 root 帳號 helper、socket、復原與文字 units；PR B 提供原生 1A 畫面、
+greeter、輸入法與 Ubuntu 映像接線。以下保留兩者的責任與驗證範圍。
+
+## Greeter 與畫面（PR B）
+
+本目錄提供 `_greetd` 的 wrapper、Wayfire 設定與 Chewing profile。
+帳號與完成／pending 標記由 PR A 的 root helper 唯一寫入；QML 只保留輸入暫態，
+不寫 `/etc`、Profile 或標記，也不負責回復交易。
+
+## 接線與失敗路徑
+
+wrapper 以 `/etc/login.defs` 的 UID_MIN／UID_MAX 查 `getent passwd`；查詢異常轉登入畫面，
+已有一般帳號則 exec `/usr/sbin/agreety --cmd /usr/local/libexec/ditto-image-session`。
+沒有帳號才啟動暫態 D-Bus session、Wayfire、fcitx5 與獨立 Quickshell config。
+Quickshell 結束時 wrapper 嘗試終止並等待合成器及輸入法；Orca 經 `--orca` 啟動並記錄該次子程序 PID，清理時嘗試終止。AT-SPI／speech-dispatcher 等 D-Bus 啟動程序仍未逐一監督，不能保證沒有殘留。
+圖形失敗只重試一次 `WLR_RENDERER=pixman QT_QUICK_BACKEND=software`；再失敗或沒有
+DRM 時，wrapper 只以固定 `ditto-firstboot-tty --request` 送出 `tty\n`；不再以 `_greetd` 呼叫 root-only helper。
+新 socket `/run/ditto/firstboot-tty.sock` 為 `root:_greetd 0660`，由 systemd `Accept=no` 啟動一次性 root dispatcher。
+dispatcher 在讀內容前以 `SO_PEERCRED` 確認 `_greetd` UID，並將 peer 的實際 PPid ancestry 與 systemd 回讀的
+`greetd.service MainPID` 比對；單有相同 UID、群組或自述欄位不夠。只接受 4 bytes 的固定請求及 EOF，
+沒有帳密、參數、路徑或命令欄位；畸形、超長、逾時、非 greeter 或重播不會停止 greetd。
+
+root 重新檢查本機 passwd、NSS 與 UID_MIN..UID_MAX；已有帳號或查詢不明時只回登入，不啟動 TTY。
+無帳號時以 O_EXCL／O_NOFOLLOW 在 root 擁有、不可由 greeter 寫入的 `/run/ditto` 建立
+`firstboot-tty-used`，然後只 queue `ditto-firstboot-account-tty.service`。這個本次開機 latch
+不是 helper 的完成標記，保留到重開機，連 unit 啟動失敗也不自動再嘗試。
+
+TTY unit 與 greetd／getty@tty1 Conflicts 並 After，等停止完成才取得 controlling `/dev/tty1`。
+root prepare unit 固定 `loginctl terminate-user _greetd`，最多等待 5 秒確認 `_greetd` 程序退場，涵蓋 PAM
+移出 greetd cgroup 的 session；仍有程序就拒絕 VT 接管。接著驗證 foreground controlling tty1，
+以固定 VT_ACTIVATE／VT_WAITACTIVE(1)（5 秒 deadline）切換可見 VT。prepare unit 只持有
+`CAP_SYS_TTY_CONFIG` 供此固定切換；帳號 TTY unit Requires／After prepare，但只 Wants recovery，維持原本三項 account capabilities，不讓 helper 繼承 VT capability。沒有授予 greeter capability／sudo／setuid／polkit 或一般 systemctl 權限。
+帳號寫入與交易鎖仍只由未修改的 helper 負責。
+
+helper `--tty` 每次結束後重查帳號；有帳號就結束 TTY，透過 unit 的 OnSuccess 回 greetd／agreety，使用者輸入
+帳密走正式 PAM 登入，沒有 autologin。無法確認建立時保留說明，不宣稱 rollback 成功；最多三次嘗試，每次重試
+都要按 Enter。EOF／中斷／次數用盡會停止，說明重開機重試或管理員復原，並回一般登入。TTYReset、TTYVHangup、
+SendSIGHUP、KillMode=control-group 釋放終端；OnFailure 亦回 greetd。本次開機 latch 使後續 wrapper
+只到一般登入，避免無帳號／無 DRM 時快速重生。若交易已留下有密碼帳號但 pending 不明，仍保留帳號與紀錄供 root 核對。
+文字模式不承諾繁中輸入、中文 VT 顯示或 Orca。
+
+`greetd.service` 的 `ExecStartPre=-/usr/lib/ditto/wait-drm` 保留最多 30 秒等待，
+但失敗不再殺掉 greetd，故即使 tty1 getty 被 mask，wrapper 可送出上述固定 handoff；是否在真實 systemd／VT／shadow-utils／PAM 下成立，仍待可丟棄 VM 驗證。
+不另開 root console，也不開第二個 getty。GPU、logind 座位、TTY 交接仍待 VM。
+
+Quickshell 0.3.1 的本機 `quickshell-io.qmltypes` 已核對 `Socket.path/connected/write/flush`、
+`SplitParser`；使用 `Quickshell.Io.Socket` 直接連 `/run/ditto/firstboot-account.sock`，
+一個 UTF-8 JSON 請求（本體最多 4096 bytes，結尾 LF 不計）；回覆接受完整 JSON（可帶換行）。
+無 CLI bridge，密碼不進 argv、環境變數或日誌。Socket 回覆／失聯／逾時沒有自動重送。
+失聯後顯示結果未知，要求重啟供 helper 檢查，不能宣稱已回復。
+
+helper 回覆 `ok` 後依序 `Greetd.createSession(username)`、只對一次非回顯的 challenge
+`respond(password)`、`launch(["/usr/local/libexec/ditto-image-session"])`。第二次提示、
+PAM 失敗或逾時停止並清除密碼，提供回登入畫面的按鈕，不重跑建立帳號。
+QML／JS 字串及 Qt socket 緩衝區無法保證原地清零；程式只縮短持有時間，成功交接後退出。
+
+## 介面、輸入法與無障礙
+
+使用現有 JellySurface、TextField、Button、Tokens、Backdrop；單卡採 owner 的 1A 參考。
+提示字採深色、密碼最短長度放在密碼欄旁，管理員說明與相符提示分開。
+只有真正的輸入焦點框；沒有靜態假焦點。未實作的放大文字／閱讀器開關／語言與鍵盤
+膠囊全部移除；頁尾顯示實際綁定的 Super+Alt+S（wrapper `--orca` 執行固定 `orca --replace` 並記錄 PID）。
+
+新增套件 `fcitx5-chewing`，預設 keyboard-us＋Chewing 注音；既有 chinese-addons 留下，
+不把拼音當注音。Wayfire 啟用 input-method-v1，Qt 使用 Wayland text-input-v3，
+`QT_IM_MODULE`／`QT_IM_MODULES` 留空。「你的名字」可使用 IM；帳號與密碼設定
+`ImhNoPredictiveText | ImhLatinOnly`，密碼另帶 `ImhSensitiveData | ImhHiddenText`。
+Hints 只是內容提示；帳號、密碼與確認欄每次取得焦點時，另以固定參數
+`fcitx5-remote -c` 嘗試關閉輸入法，不帶使用者資料。帳號內層 TextInput 加上
+RegularExpressionValidator，拒絕非格式文字的實際編輯／IM 提交。fcitx5 的實際停用狀態仍須 VM 回讀。
+
+所有輸入與按鈕有 Accessible role／name／description，密碼為 passwordEdit，錯誤為
+AlertMessage；密碼欄另有明確 `Accessible.labelledBy`（Qt 6.10 會遮蔽 Password 的直接 name getter）。Tab 順序是名字→帳號→密碼→確認→建立，Shift+Tab 反向，不能建立時跳過
+停用按鈕。超出小螢幕高度可捲動，焦點自動捲入可視區。
+新增 `at-spi2-core`、`orca`、`speech-dispatcher`，設定 `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`。
+**Orca 讀取／發聲、greeter 的音訊服務、純鍵盤實機流程、中文實際提交均未在 VM 驗證。**
+
+## 合併後映像接線與先決條件
+
+PR A 已合併；正常 archive 必須走完整耦合路徑。`TODO_FIRSTBOOT_ACCOUNT_PR_A` 僅保留為舊 archive 全缺席時的明確狀態，recipe 測試會刻意移除整組來源與 runtime binary 才覆蓋此分支。
+PR A 不在來源 archive 時仍可建置，greetd 維持舊 agreety 命令；映像內
+`/usr/share/ditto/firstboot-integration.json` 記錄 `enabled:false` 與 TODO，不能當作首次設定可用。
+只要 PR A 的 crate／任一 unit／tmpfiles 出現，就要求以下整套 artifacts，缺少即在建立
+output 之前失敗；全部齊備才切到 `/usr/lib/ditto/ditto-greeter` 並啟用 socket：
+
+- 同 source runtime lock 的 `usr/lib/ditto/target/release/ditto-firstboot-account`；依既有 native
+  工具鏈、path remap、來源與 NOTICE 規則建置。generator 以相對 symlink 提供契約路徑
+  `/usr/lib/ditto/ditto-firstboot-account`，不從任意外部位置複製 executable。
+- 來源 `packaging/distro/first-boot/units/` 的 account socket／service、recovery、TTY，以及新的 dispatch socket／service、prepare service，共七個 unit。TTY unit 由 PR B 接上 root session；helper src/* 與其餘 PR A units 保留。
+- 來源 `crates/ditto-firstboot-account/UNICODE-NOTICE.txt` 原文安裝到 `/usr/share/doc/ditto-firstboot-account/UNICODE-NOTICE.txt`。
+- 來源 `packaging/distro/first-boot/tmpfiles.d/ditto-firstboot.conf`。
+
+generator 為 account 與 dispatch socket 建立 `sockets.target.wants`，並建立 recovery 的 `sysinit.target.wants`、`greetd.service.wants`；finalizer 啟用兩個 socket／recovery 並移除舊 `greetd.service.requires` recovery link。recovery 維持 `Before=greetd.service`，其失敗不以 Requires 阻止既有登入。TTY unit 安裝但不預設啟用。
+
+必須從整合來源重建 helper，重新產生 runtime lock，確認 lock 包含
+`usr/lib/ditto/target/release/ditto-firstboot-account`；沿用沒有該檔案的舊 lock 會被拒絕。`runtime_policy.py`／`lock-runtime.py` 已接受該路徑，但 repo 沒有端到端 runtime producer；本次沒有重建 helper／runtime、產生真實 lock 或映像。D04 producer 的同來源建置、path remap、NOTICE 與新 lock 是實映像接受的先決條件。
+
+本 PR 不修改 PR A 的 crate／units。QML 的格式／長度只是 UX 鏡像；helper 的限制、
+保留字、既有群組與帳號碰撞才是權威。已依 PR A 修復後的 PROTOCOL.md 對齊：密碼至少
+8 個 Unicode scalar、最多 511 UTF-8 bytes；少於 12 scalar 或 Unicode 四類中不足兩類只警告。
+`bubble42!` 會警告。Qt 6.10.2 的 Array.from(QString)／Unicode property regexp 不符這項需要，
+所以手動計數 surrogate pair，並從本機 ICU 的 Unicode 17.0.0 屬性產生唯讀範圍表；
+Lowercase／Uppercase／Number／Alphabetic 與 Rust char 分類定義相同，沒有額外 blocklist。
+產生器在 tests/firstboot/generate_unicode.py，資料授權／來源在 shell/firstboot/UNICODE-NOTICE.txt；
+沒有新增 greeter 常駐程序或 runtime 相依。helper 的 weak_password 回覆仍驗證型別，但不再存入
+未使用欄位：建立前已顯示相同規則的警告，成功後立即走 PAM，不新增確認步驟。
+標記已對照 PR A transaction.rs：`/var/lib/ditto/firstboot/{account-created,pending}`。
+
+共用 TextField 不對 null 設 labelledBy，只在完成建立且 label 非 null 時關聯；passwordEdit 為
+首開密碼欄明確 opt-in，既有 API-key／secret 欄保留可存取名稱。可重試錯誤把焦點移到可聚焦的
+AlertMessage，PAM 資訊與真實階段透過 Accessible.announce 宣告；Orca 的實際讀取仍待 VM。
+
+## 來源與尚未驗證項目
+
+新程式為 Ditto 自有 MIT。桌布重用既有 `shell/wallpapers/SOURCES.md`，權利仍未釐清。
+新增 Ubuntu 套件應從同 snapshot 取用並保留 `/usr/share/doc/*/copyright`；精確版本、
+授權全文、傳遞依賴與 SBOM 留待實際新映像 dpkg manifest 回讀，尚無發行授權盤點完成聲明。
+來源位置：Ubuntu archive 的 fcitx5-chewing、at-spi2-core、orca、speech-dispatcher source packages。
+此 PR 沒有下載套件、重建映像或做 host／VM 設定。
+
+VM 仍須驗：GPU／pixman／無 DRM、PAM 成功與失敗、中文名字、Orca／音訊、重開登入、
+PR A pending 復原、getent／shadow yescrypt／sudo／家目錄與標記，以及 journal 密碼掃描、登入後沒有殘留 `_greetd` 程序（含 Orca／AT-SPI／speech-dispatcher）。
+
+
+## 原生 helper（PR A）
+
+這是 #212 的 PR A：建立第一個管理員帳號的 Rust helper、socket、開機復原與文字保底 units。協定在 [PROTOCOL.md](../../../crates/ditto-firstboot-account/PROTOCOL.md)；PR B 負責畫面、greeter、無 DRM 的啟動選擇及映像接線。本次已接入 Ubuntu generator／finalizer 的靜態安裝路徑；runtime 產物與真實 root TTY／VT 交接驗證仍是上述先決條件，沒有宣稱已重建或接受實映像。
 
 ## 流程與安裝位置
 
@@ -88,7 +214,7 @@ helper 日誌只有 `phase=<階段> result=<結果>`，不包含帳號、顯示�
 
 `--tty` 在 controlling `/dev/tty` 顯示英文提示，英文是研究允許的無 DRM 保底限制；不宣稱 Linux console 能顯示中文或提供 fcitx5／Orca。密碼與確認欄停用 ECHO／ECHONL，完成、讀取錯誤與可處理的 INT／TERM／HUP 會恢復終端狀態；SIGKILL／斷電只能依 unit 的 TTYReset 與重啟復原。
 
-弱密碼先顯示警告但繼續交易。文字模式目前每次啟動處理一組輸入；驗證失敗後可重啟這個 unit 重試。成功後提示使用新帳密登入。PR B 仍須接上無 DRM 偵測、失敗重試及後續正式登入入口；helper 不自行呼叫 login 或啟動工作階段。
+弱密碼先顯示警告但繼續交易。文字模式目前每次啟動處理一組輸入；驗證失敗後可重啟這個 unit 重試。成功後提示使用新帳密登入。PR B 現以固定 dispatcher／TTY root session 接上無 DRM、失敗重試及後續正式登入入口，靜態／隔離測試不等同 VM 接受；helper 不自行呼叫 login 或啟動工作階段。
 
 ## 驗證與已知限制
 

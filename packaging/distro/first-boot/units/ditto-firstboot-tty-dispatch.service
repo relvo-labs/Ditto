@@ -1,0 +1,28 @@
+[Unit]
+Description=Authorize a fixed Ditto first-boot tty1 handoff
+# No Conflicts with greetd: untrusted activation must not stop login.
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/lib/ditto/ditto-firstboot-tty --dispatch
+TimeoutStartSec=20s
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/run/ditto
+PrivateNetwork=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+LimitCORE=0
+StandardInput=null
+StandardOutput=null
+StandardError=journal

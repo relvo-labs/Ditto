@@ -1,0 +1,1 @@
+../../../g4/visual/stubs/Quickshell/Quickshell.qml
