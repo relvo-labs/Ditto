@@ -184,7 +184,7 @@ impl SignalGuard {
     fn install() -> io::Result<Self> {
         TTY_INTERRUPTED.store(false, std::sync::atomic::Ordering::Relaxed);
         let mut guard = Self(Vec::new());
-        for signal in [libc::SIGINT, libc::SIGTERM, libc::SIGHUP] {
+        for signal in [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP] {
             // SAFETY: zero is a valid initial sigaction; initialize the mask below.
             let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
             action.sa_sigaction = tty_signal as *const () as libc::sighandler_t;
@@ -212,7 +212,7 @@ impl Drop for SignalGuard {
         }
     }
 }
-fn check_tty_signal() -> io::Result<()> {
+pub(crate) fn check_tty_signal() -> io::Result<()> {
     if TTY_INTERRUPTED.load(std::sync::atomic::Ordering::Relaxed) {
         Err(io::Error::new(
             io::ErrorKind::Interrupted,
@@ -423,5 +423,254 @@ mod tests {
         let mut output = [0; 2];
         master.read_exact(&mut output).unwrap();
         assert_eq!(&output, b"\r\n");
+    }
+
+    // Isolate process-wide signal dispositions/flag from parallel libtest cases.
+    #[test]
+    fn tty_signal_guard_survives_and_restores_all_signals() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "unix::tests::tty_signal_guard_child",
+                "--nocapture",
+            ])
+            .env("DITTO_220_SIGNAL_CHILD", "1")
+            .status()
+            .unwrap();
+        assert!(status.success(), "signal child: {status}");
+    }
+    #[test]
+    fn tty_signal_guard_child() {
+        if std::env::var_os("DITTO_220_SIGNAL_CHILD").is_none() {
+            return;
+        }
+        protect_process().unwrap();
+        for signal in [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP] {
+            // SAFETY: initialize the complete action, retaining the prior one.
+            let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
+            action.sa_sigaction = libc::SIG_IGN;
+            let mut original = MaybeUninit::uninit();
+            unsafe {
+                libc::sigemptyset(&mut action.sa_mask);
+                assert_eq!(libc::sigaction(signal, &action, original.as_mut_ptr()), 0);
+            }
+            let guard = SignalGuard::install().unwrap();
+            // SAFETY: installed guard must catch each signal, including QUIT.
+            assert_eq!(unsafe { libc::raise(signal) }, 0);
+            assert_eq!(
+                check_tty_signal().unwrap_err().kind(),
+                io::ErrorKind::Interrupted
+            );
+            drop(guard);
+            let mut restored = MaybeUninit::<libc::sigaction>::uninit();
+            unsafe {
+                assert_eq!(
+                    libc::sigaction(signal, std::ptr::null(), restored.as_mut_ptr()),
+                    0
+                );
+                assert_eq!(restored.assume_init().sa_sigaction, libc::SIG_IGN);
+                assert_eq!(
+                    libc::sigaction(signal, &original.assume_init(), std::ptr::null_mut()),
+                    0
+                );
+            }
+        }
+    }
+    // Invoked only by the Python controlling-PTY test. This double uses the real
+    // Rust guard, but its account markers do not stand for real account tools.
+    #[test]
+    fn tty_signal_helper_child() {
+        let Some(root) = std::env::var_os("DITTO_220_PTY_ROOT") else {
+            return;
+        };
+        let root = std::path::PathBuf::from(root);
+        protect_process().unwrap();
+        let _guard = SignalGuard::install().unwrap();
+        assert_eq!(unsafe { libc::tcgetpgrp(0) }, unsafe { libc::getpgrp() });
+        File::create(root.join("calls"))
+            .unwrap()
+            .write_all(b"call\n")
+            .unwrap();
+        io::stdout()
+            .write_all(b"Fixture signal helper ready\n")
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(4);
+        while check_tty_signal().is_ok() {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        std::fs::write(root.join("received"), libc::SIGQUIT.to_string()).unwrap();
+        std::thread::sleep(Duration::from_millis(600));
+        std::fs::write(root.join("created"), "committed fixture\n").unwrap();
+        std::fs::write(root.join("completed"), "finished after signal\n").unwrap();
+    }
+    #[test]
+    fn transaction_defers_interrupts_to_a_coherent_end() {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "unix::tests::transaction_interrupt_child",
+                "--nocapture",
+            ])
+            .env("DITTO_220_TRANSACTION_CHILD", "1")
+            .status()
+            .unwrap();
+        assert!(status.success(), "transaction child: {status}");
+    }
+    #[test]
+    fn transaction_interrupt_child() {
+        if std::env::var_os("DITTO_220_TRANSACTION_CHILD").is_none() {
+            return;
+        }
+        use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+        struct Tools {
+            at: &'static str,
+            signal: i32,
+        }
+        impl Tools {
+            fn interrupt(&self, at: &str) {
+                if self.at == at {
+                    assert_eq!(unsafe { libc::raise(self.signal) }, 0);
+                }
+            }
+        }
+        impl AccountTools for Tools {
+            fn create(&self, root: &Path, _: &str, _: &str) -> io::Result<()> {
+                fs::write(
+                    root.join("etc/passwd"),
+                    "root:x:0:0::/root:/bin/bash\nalice:x:1000:1000::/home/alice:/bin/bash\n",
+                )?;
+                fs::write(root.join("etc/shadow"), "alice:!:0:0:99999:7:::\n")?;
+                fs::write(root.join("etc/group"), "sudo:x:27:alice\nalice:x:1000:\n")?;
+                fs::create_dir(root.join("home/alice"))?;
+                fs::set_permissions(root.join("home/alice"), fs::Permissions::from_mode(0o750))?;
+                self.interrupt("create");
+                Ok(())
+            }
+            fn password(&self, root: &Path, _: &str, _: &[u8]) -> io::Result<()> {
+                if self.at == "delete" {
+                    return Err(io::Error::other("injected password failure"));
+                }
+                fs::write(
+                    root.join("etc/shadow"),
+                    "alice:$y$test$hash:0:0:99999:7:::\n",
+                )?;
+                self.interrupt("password");
+                Ok(())
+            }
+            fn delete(&self, root: &Path, _: &str) -> io::Result<()> {
+                // No interrupt may cause deletion of an initialized account.
+                assert!(!fs::read_to_string(root.join("etc/shadow"))?.contains("$y$"));
+                self.interrupt("delete");
+                self.interrupt("delete"); // repeated interrupt during rollback
+                fs::write(root.join("etc/passwd"), "root:x:0:0::/root:/bin/bash\n")?;
+                fs::write(root.join("etc/shadow"), "")?;
+                fs::write(root.join("etc/group"), "sudo:x:27:\n")?;
+                fs::remove_dir(root.join("home/alice"))
+            }
+        }
+        struct Log<'a> {
+            tools: &'a Tools,
+            bytes: Vec<u8>,
+        }
+        impl Write for Log<'_> {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.bytes.extend_from_slice(bytes);
+                // phase() formats across multiple writes; inject at whole line.
+                if bytes.ends_with(b"\n") {
+                    let text = String::from_utf8_lossy(&self.bytes);
+                    if text.ends_with("phase=chpasswd result=begin\n") {
+                        self.tools.interrupt("between");
+                    }
+                    if text.ends_with("phase=commit result=ok\n") {
+                        self.tools.interrupt("committed");
+                    }
+                }
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        protect_process().unwrap();
+        for signal in [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP] {
+            for at in ["create", "between", "password", "delete", "committed"] {
+                let _guard = SignalGuard::install().unwrap();
+                let root = std::env::temp_dir()
+                    .join(format!("ditto-220-{}-{signal}-{at}", std::process::id()));
+                for dir in ["etc", "home", "var/mail", "var/lib/ditto/firstboot"] {
+                    fs::create_dir_all(root.join(dir)).unwrap();
+                }
+                for dir in ["", "var", "var/lib", "var/lib/ditto"] {
+                    fs::set_permissions(root.join(dir), fs::Permissions::from_mode(0o755)).unwrap();
+                }
+                fs::set_permissions(
+                    root.join("var/lib/ditto/firstboot"),
+                    fs::Permissions::from_mode(0o700),
+                )
+                .unwrap();
+                for (file, text) in [
+                    ("passwd", "root:x:0:0::/root:/bin/bash\n"),
+                    ("shadow", ""),
+                    ("group", "sudo:x:27:\n"),
+                    ("gshadow", ""),
+                    ("login.defs", "UID_MIN 1000\nUID_MAX 60000\n"),
+                ] {
+                    fs::write(root.join("etc").join(file), text).unwrap();
+                }
+                let engine = Engine {
+                    root: root.clone(),
+                    tools: Tools { at, signal },
+                };
+                let mut log = Log {
+                    tools: &engine.tools,
+                    bytes: Vec::new(),
+                };
+                let request = Request {
+                    display_name: "".into(),
+                    username: "alice".into(),
+                    password: "Unique-Test-Secret!42".into(),
+                };
+                let response = engine.handle(&request, &mut log);
+                let committed = at != "delete";
+                assert_eq!(
+                    matches!(response, Response::Success { .. }),
+                    committed,
+                    "{signal} {at}: {response:?}"
+                );
+                if !committed {
+                    assert_eq!(response, Response::error(Code::InternalRolledBack));
+                }
+                assert_eq!(
+                    fs::read_to_string(root.join("etc/passwd"))
+                        .unwrap()
+                        .contains("alice:"),
+                    committed
+                );
+                assert_eq!(
+                    fs::read_to_string(root.join("etc/shadow"))
+                        .unwrap()
+                        .contains("$y$"),
+                    committed
+                );
+                assert_eq!(root.join("home/alice").exists(), committed);
+                assert_eq!(
+                    root.join("var/lib/ditto/firstboot/account-created")
+                        .exists(),
+                    committed
+                );
+                assert!(!root.join("var/lib/ditto/firstboot/pending").exists());
+                assert!(check_tty_signal().is_err(), "signal injection missed {at}");
+                if matches!(at, "create" | "between" | "password") {
+                    assert!(
+                        String::from_utf8(log.bytes)
+                            .unwrap()
+                            .contains("phase=interrupt result=deferred\n"),
+                        "transaction did not observe {signal} {at}"
+                    );
+                }
+                fs::remove_dir_all(root).unwrap();
+            }
+        }
     }
 }
