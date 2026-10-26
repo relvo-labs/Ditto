@@ -2219,8 +2219,18 @@ source "$1"
             self.assertNotIn(absent, packages)
         self.assertNotIn("root=", conf["Content"]["KernelCommandLine"])
         self.assertFalse((output / "mkosi.repart").exists())
-        self.assertFalse((output / "runtime").exists())
+        # Only the Quickshell/Wayfire part of the locked runtime is staged.
+        staged = sorted(p.relative_to(output / "runtime").as_posix()
+                        for p in (output / "runtime").rglob("*") if not p.is_dir())
+        self.assertEqual(staged, ["usr/bin/quickshell", "usr/bin/wayfire", "usr/share/doc/ditto-runtime/NOTICE"])
+        for name in staged:
+            self.assertEqual((output / "runtime" / name).read_bytes(), (self.tree / name).read_bytes())
+        self.assertTrue((output / "apply-runtime.py").is_file())
         extra = output / "extra"
+        subset = json.loads((extra / "usr/share/ditto/runtime-lock.json").read_text())
+        self.assertEqual(sorted(subset["files"]), staged)
+        self.assertEqual({k: v for k, v in subset.items() if k not in ("files", "symlinks")},
+                         {k: v for k, v in self.lock().items() if k not in ("files", "symlinks")})
         self.assertFalse((extra / "etc/greetd").exists())
         self.assertFalse(list(extra.rglob("ditto-firstboot*")))
         self.assertFalse((extra / "usr/lib/ditto").exists())
@@ -2236,14 +2246,23 @@ source "$1"
             self.assertIn("packaging/distro/installer/ditto_installer/backend.py", modules)
             pairs = [(n, "usr/lib/ditto-installer/ditto_installer/" + Path(n).name) for n in modules]
             pairs += [("packaging/distro/installer/image/" + n, "usr/lib/ditto-installer/" + n)
-                      for n in ("ditto-installer-backend", "ditto-installer-text")]
+                      for n in ("ditto-installer-backend", "ditto-installer-text", "ditto-installer-ui",
+                                "wayfire-installer.ini")]
             pairs += [("packaging/distro/installer/image/units/" + n, "usr/lib/systemd/system/" + n)
-                      for n in ("ditto-installer-backend.service", "ditto-installer-text.service")]
-            pairs.append(("packaging/distro/installer/image/sysusers.d/ditto-installer.conf",
-                          "usr/lib/sysusers.d/ditto-installer.conf"))
+                      for n in ("ditto-installer-backend.service", "ditto-installer-ui.service")]
+            pairs += [("packaging/distro/installer/image/sysusers.d/ditto-installer.conf",
+                       "usr/lib/sysusers.d/ditto-installer.conf"),
+                      ("packaging/distro/installer/image/pam.d/ditto-installer", "etc/pam.d/ditto-installer"),
+                      ("shell/installer/InstallerScreen.qml",
+                       "usr/lib/ditto-installer/shell/installer/InstallerScreen.qml")]
             for src, dest in pairs:
                 self.assertEqual((extra / dest).read_bytes(), source.extractfile(src).read(), dest)
-        self.assertTrue(os.access(extra / "usr/lib/ditto-installer/ditto-installer-backend", os.X_OK))
+        for name in ("ditto-installer-backend", "ditto-installer-text", "ditto-installer-ui", "wait-drm"):
+            self.assertTrue(os.access(extra / "usr/lib/ditto-installer" / name, os.X_OK), name)
+        self.assertEqual((extra / "usr/lib/ditto-installer/wait-drm").read_bytes(), (RECIPE / "wait-drm.py").read_bytes())
+        self.assertEqual((extra / "usr/lib/ditto-installer/shell/installer/ui").readlink().as_posix(), "../ui")
+        self.assertTrue((extra / "usr/lib/ditto-installer/shell/ui/JellySurface.qml").is_file())
+        self.assertFalse((extra / "usr/lib/systemd/system/ditto-installer-text.service").exists())
         # The generated config is accepted by the backend's own strict parser.
         sys.path.insert(0, str(extra / "usr/lib/ditto-installer"))
         try:
@@ -2268,6 +2287,16 @@ source "$1"
             with self.subTest(flags=flags):
                 self.generate(2, flags=flags)
 
+    def test_installer_runtime_subset_fails_closed(self):
+        # A Wayfire library alias whose target lies outside the installer subset
+        # is admitted for the image but must not be half-copied into the installer.
+        lib = self.tree / "usr/lib/x86_64-linux-gnu/libwf-config.so"
+        lib.parent.mkdir(parents=True)
+        lib.symlink_to("../ditto-node/bin/node")
+        self.generate()
+        _, result = self.generate(2, flags=self.INSTALLER_FLAGS)
+        self.assertIn("installer runtime subset", result.stderr)
+
     def test_installer_finalizer(self):
         output, _ = self.generate(flags=self.INSTALLER_FLAGS)
         image = self.pristine_image("installer-root")
@@ -2276,6 +2305,7 @@ source "$1"
         (image / "var/lib/systemd/random-seed").write_bytes(b"seed")
         shutil.copytree(output / "extra", image, dirs_exist_ok=True, symlinks=True)
         script = '''
+python3() { printf '%s\\n' "$*" >> "$BUILDROOT/python-actions"; if [[ "$1" == -c ]]; then echo synthetic-source-commit; fi; return 0; }
 chroot() { printf '%s\\n' "$*" >> "$BUILDROOT/chroot-actions"; }
 source "$1"
 '''
@@ -2287,13 +2317,17 @@ source "$1"
         self.assertEqual(result.returncode, 0, result.stderr)
         actions = (image / "chroot-actions").read_text().splitlines()
         self.assertIn(f"{image} usermod --lock root", actions)
-        self.assertIn(f"{image} systemctl enable ditto-installer-backend.service ditto-installer-text.service",
+        self.assertIn(f"{image} systemctl enable ditto-installer-backend.service ditto-installer-ui.service",
                       actions)
+        python_actions = (image / "python-actions").read_text().splitlines()
+        self.assertEqual(python_actions[0], f"{output}/apply-runtime.py --root {image} --runtime-tree "
+                         f"{output}/runtime --runtime-lock {image}/usr/share/ditto/runtime-lock.json")
         self.assertIn(f"{image} systemctl set-default multi-user.target", actions)
         self.assertFalse(any("greetd" in line or "ssh" in line for line in actions))
         self.assertEqual((image / "etc/machine-id").read_text(), "")
         self.assertFalse((image / "var/lib/systemd/random-seed").exists())
-        self.assertIn("DITTO_IMAGE_ROLE=installer", (image / "usr/lib/os-release").read_text())
+        self.assertIn("DITTO_SOURCE_COMMIT=synthetic-source-commit\nDITTO_IMAGE_ROLE=installer",
+                      (image / "usr/lib/os-release").read_text())
         self.put("etc/initrd-release", "ID=initrd\n", image)
         result = run()
         self.assertNotEqual(result.returncode, 0)

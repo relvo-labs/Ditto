@@ -9,7 +9,7 @@ import re
 import shutil
 import tarfile
 import tempfile
-from runtime_policy import validate
+from runtime_policy import WAYFIRE_LIBRARY, validate
 
 FIRSTBOOT_UNITS = ("ditto-firstboot-account.socket", "ditto-firstboot-account.service",
                    "ditto-firstboot-account-recover.service", "ditto-firstboot-account-tty.service",
@@ -22,15 +22,28 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-INSTALLER_UNITS = ("ditto-installer-backend.service", "ditto-installer-text.service")
-INSTALLER_LAUNCHERS = ("ditto-installer-backend", "ditto-installer-text")
+INSTALLER_UNITS = ("ditto-installer-backend.service", "ditto-installer-ui.service")
+INSTALLER_LAUNCHERS = ("ditto-installer-backend", "ditto-installer-text", "ditto-installer-ui")
+
+
+def installer_runtime(lock):
+    """Only Quickshell, Wayfire (+ its libraries/plugins/data) and the runtime
+    licence material go into the installer; Core, Node and the agent stay out."""
+    def wanted(name):
+        return (name in ("usr/bin/quickshell", "usr/bin/wayfire") or WAYFIRE_LIBRARY.fullmatch(name) is not None
+                or re.fullmatch(r"usr/lib/wayfire/[A-Za-z0-9_.-]+\.so", name) is not None
+                or name.startswith(("usr/share/wayfire/", "usr/share/doc/ditto-runtime/")))
+    subset = {key: value for key, value in lock.items() if key not in ("files", "symlinks")}
+    subset["files"] = {name: sha for name, sha in lock.get("files", {}).items() if wanted(name)}
+    subset["symlinks"] = {name: target for name, target in lock.get("symlinks", {}).items() if wanted(name)}
+    return subset
 
 
 def read_packages(path):
     return [line for line in path.read_text().splitlines() if line and not line.startswith("#")]
 
 
-def generate_installer(args, parser, source, here, expected):
+def generate_installer(args, parser, source, here, expected, lock):
     """#221 installer: a full OS packed as the initrd of one UKI, run from RAM.
 
     It carries the installer backend/frontends from the same source archive and
@@ -41,9 +54,15 @@ def generate_installer(args, parser, source, here, expected):
     modules = sorted((installer / "ditto_installer").glob("*.py"))
     files = [*modules, *(installer / "image" / name for name in INSTALLER_LAUNCHERS),
              *(installer / "image/units" / unit for unit in INSTALLER_UNITS),
-             installer / "image/sysusers.d/ditto-installer.conf"]
+             installer / "image/sysusers.d/ditto-installer.conf", installer / "image/wayfire-installer.ini",
+             installer / "image/pam.d/ditto-installer", source / "shell/installer/shell.qml"]
     if not modules or not all(path.is_file() and not path.is_symlink() for path in files):
         parser.error("installer sources missing from the source archive")
+    runtime = installer_runtime(lock)
+    try:
+        validate(runtime, args.runtime_tree)
+    except (ValueError, OSError) as error:
+        parser.error(f"installer runtime subset: {error}")
     output = args.output
     output.mkdir(parents=True)
 
@@ -61,11 +80,28 @@ def generate_installer(args, parser, source, here, expected):
         put("extra/usr/lib/systemd/system/" + unit, (installer / "image/units" / unit).read_bytes())
     put("extra/usr/lib/sysusers.d/ditto-installer.conf",
         (installer / "image/sysusers.d/ditto-installer.conf").read_bytes())
+    put("extra/usr/lib/ditto-installer/wayfire-installer.ini", (installer / "image/wayfire-installer.ini").read_bytes())
+    put("extra/etc/pam.d/ditto-installer", (installer / "image/pam.d/ditto-installer").read_bytes())
+    put("extra/usr/lib/ditto-installer/wait-drm", (here / "wait-drm.py").read_bytes(), 0o755)
+    # The zh-TW screen uses the shared Shell components (Jelly, ui, i18n).
+    shutil.copytree(source / "shell", output / "extra/usr/lib/ditto-installer/shell", symlinks=True)
+    for name in runtime["files"]:
+        dest = output / "runtime" / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(args.runtime_tree / name, dest)
+    for name, target in runtime["symlinks"].items():
+        dest = output / "runtime" / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.symlink_to(target)
+    for helper in ("apply-runtime.py", "runtime_policy.py"):
+        shutil.copy2(here / helper, output / helper)
+    put("extra/usr/share/ditto/runtime-lock.json", (json.dumps(runtime, indent=2) + "\n").encode())
     put("extra/usr/lib/ditto-installer/installer.json", (json.dumps({
         "schema": 1, "manifest_sha256": args.payload_manifest_sha256, "medium_label": args.medium_label,
         "payload_dir": "ditto/payload", "frontend_user": "ditto-installer"}, indent=2) + "\n").encode())
     put("extra/usr/share/ditto/image-inputs.json", (json.dumps(expected | {
         "version": args.version, "runtime_lock_sha256": digest(args.runtime_lock), "mode": "installer",
+        "runtime_subset_files": len(runtime["files"]), "runtime_subset_symlinks": len(runtime["symlinks"]),
         "payload_manifest_sha256": args.payload_manifest_sha256, "medium_label": args.medium_label},
         indent=2) + "\n").encode())
     shutil.copy2(here / "finalize-installer.sh", output / "finalize.sh")
@@ -198,7 +234,7 @@ def main():
                                  or (firstboot / "ditto-firstboot-tty").is_symlink()):
             parser.error("PR A firstboot artifacts incomplete: need helper binary, crate, units and tmpfiles")
         if args.profile == "installer":
-            generate_installer(args, parser, source, here, expected)
+            generate_installer(args, parser, source, here, expected, lock)
             print(args.output)
             return
         output = args.output

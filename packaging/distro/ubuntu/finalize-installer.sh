@@ -10,6 +10,10 @@ if [[ -e "$root/etc/initrd-release" || -L "$root/etc/initrd-release" ]]; then
     echo 'installer image must not contain etc/initrd-release' >&2
     exit 1
 fi
+source_dir="${SRCDIR:?mkosi SRCDIR is required}"
+# Quickshell/Wayfire subset of the locked runtime; same ownership preflight as the image.
+python3 "$source_dir/apply-runtime.py" --root "$root" \
+    --runtime-tree "$source_dir/runtime" --runtime-lock "$root/usr/share/ditto/runtime-lock.json"
 commit="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["source_commit"])' "$root/usr/share/ditto/image-inputs.json")"
 printf '\nDITTO_SOURCE_COMMIT=%s\nDITTO_IMAGE_ROLE=installer\n' "$commit" >> "$root/usr/lib/os-release"
 printf 'ditto-installer\n' > "$root/etc/hostname"
@@ -18,6 +22,6 @@ printf 'LANG=C.UTF-8\n' > "$root/etc/locale.conf"
 rm -f "$root"/etc/ssh/ssh_host_*key* "$root/var/lib/systemd/random-seed"
 truncate -s 0 "$root/etc/machine-id"
 chroot "$root" usermod --lock root
-chroot "$root" systemctl enable ditto-installer-backend.service ditto-installer-text.service
+chroot "$root" systemctl enable ditto-installer-backend.service ditto-installer-ui.service
 chroot "$root" systemctl mask getty@tty1.service systemd-firstboot.service
 chroot "$root" systemctl set-default multi-user.target
