@@ -14,6 +14,14 @@ linux-image-7.0.0-38-generic
 # (usr/lib/systemd/boot/efi/linuxx64.efi.stub) and fails without it; ukify runs
 # from the builder/tools tree, not the image. Universe, 259.9-0ubuntu0.1 in -updates.
 systemd-boot-efi
+# finalize-installer.sh runs `chroot usermod --lock root`; usermod is in passwd
+# (builder attempt 3 stopped there with exit 127).
+passwd
+# /usr/sbin/nologin, the shell of the sysusers ditto-installer account.
+login
+# Wayfire, wlroots and its plugins link libGLESv2.so.2 (ldd of the same runtime in
+# the normal image); nothing else in this list pulls it in.
+libgles2
 # Display firmware only (the installed system carries the full linux-firmware).
 linux-firmware-amd-graphics
 linux-firmware-intel-graphics

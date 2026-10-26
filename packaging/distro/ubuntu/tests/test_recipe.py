@@ -7,6 +7,7 @@ import io
 import itertools
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import stat
@@ -2410,6 +2411,74 @@ source "$1"
         normal = [line for line in (RECIPE / "packages.txt").read_text().splitlines()
                   if line and not line.startswith("#")]
         self.assertIn("systemd-boot-efi", normal)
+
+    # Executable (or loaded object) the installer image runs -> package that must be
+    # named in packages-installer.txt. "essential": mkosi's Essential base always
+    # installs it; "runtime": the Quickshell/Wayfire runtime subset. Providers and
+    # the Depends closure were checked against the gpgv-verified snapshot indices
+    # (evidence installer-closure.json); this table keeps the list honest offline.
+    INSTALLER_PROVIDERS = {
+        "usermod": "passwd",                      # finalize: chroot usermod --lock root (attempt 3: exit 127)
+        "systemctl": "systemd",                   # finalize: enable/mask/set-default; backend: reboot
+        "/usr/bin/python3": "python3",            # backend and text frontend shebang
+        "/bin/bash": "essential",                 # UI wrapper shebang
+        "/usr/bin/env": "essential",              # wait-drm shebang ...
+        "python3": "python3",                     # ... and its interpreter
+        "dbus-run-session": "dbus",               # UI wrapper (dbus -> dbus-daemon)
+        "mktemp": "essential", "rm": "essential", "kill": "essential",
+        "quickshell": "runtime", "wayfire": "runtime",
+        "mount": "mount",                         # medium.py: mount -t iso9660
+        "zstd": "zstd",                           # writer.py: zstd -q -d -c
+        "pam_permit.so": "essential", "pam_loginuid.so": "essential",
+        "pam_systemd.so": "libpam-systemd",
+        "/usr/sbin/nologin": "login",             # sysusers shell of ditto-installer
+        "libGLESv2.so.2": "libgles2",             # Wayfire/wlroots NEEDED
+        "linuxx64.efi.stub": "systemd-boot-efi",  # mkosi Format=uki reads it from the image
+        "/usr/lib/systemd/systemd": "systemd",    # mkosi links /init to it
+    }
+
+    def test_installer_list_carries_every_invoked_tool(self):
+        listed = {line.strip() for line in (RECIPE / "packages-installer.txt").read_text().splitlines()
+                  if line.strip() and not line.startswith("#")}
+        installer = REPO / "packaging/distro/installer"
+        image = installer / "image"
+        invoked = {}
+        finalize = (RECIPE / "finalize-installer.sh").read_text()
+        for command in re.findall(r'chroot "\$root" ([A-Za-z0-9_.-]+)', finalize):
+            invoked[command] = "finalize-installer.sh"
+        for unit in sorted((image / "units").glob("*.service")):
+            for key, value in re.findall(r"^(Exec[A-Za-z]*)=-?(\S+)", unit.read_text(), re.M):
+                script = image / Path(value).name
+                if not script.is_file() and Path(value).name == "wait-drm":
+                    script = RECIPE / "wait-drm.py"
+                shebang = script.read_text().splitlines()[0][2:].split()
+                invoked[shebang[0]] = f"{unit.name} {key}"
+                if Path(shebang[0]).name == "env":
+                    invoked[shebang[1]] = f"{unit.name} {key}"
+        wrapper = (image / "ditto-installer-ui").read_text()
+        for command in ("dbus-run-session", "mktemp", "rm", "kill", "quickshell", "wayfire"):
+            self.assertRegex(wrapper, rf"(^|[\s(]){re.escape(command)}\s", command)
+            invoked[command] = "ditto-installer-ui"
+        backend = "\n".join(path.read_text() for path in (installer / "ditto_installer").glob("*.py")
+                            if path.name != "payload.py")   # payload.py is builder-only
+        for command in re.findall(r'\(\[\s*"([a-z0-9-]+)"', backend) + re.findall(r'zstd_command=\("([a-z]+)"', backend):
+            invoked[command] = "ditto_installer"
+        for module in re.findall(r"\b(pam_[a-z]+\.so)\b", (image / "pam.d/ditto-installer").read_text()):
+            invoked[module] = "pam.d/ditto-installer"
+        invoked[(image / "sysusers.d/ditto-installer.conf").read_text().split()[-1]] = "sysusers.d"
+        invoked["libGLESv2.so.2"] = "runtime ELF NEEDED"
+        invoked["linuxx64.efi.stub"] = invoked["/usr/lib/systemd/systemd"] = "mkosi Format=uki"
+        self.assertTrue({"usermod", "systemctl", "/usr/bin/python3", "/bin/bash", "mount", "zstd"} <= set(invoked))
+        for command, origin in sorted(invoked.items()):
+            with self.subTest(command=command, origin=origin):
+                self.assertIn(command, self.INSTALLER_PROVIDERS, "invoked tool without a known provider")
+                provider = self.INSTALLER_PROVIDERS[command]
+                if provider not in ("essential", "runtime"):
+                    self.assertIn(provider, listed)
+        # Runtime-provided tools really are in the installer runtime subset.
+        output, _ = self.generate(flags=self.INSTALLER_FLAGS)
+        staged = {p.name for p in (output / "runtime/usr/bin").iterdir()}
+        self.assertEqual({c for c, p in self.INSTALLER_PROVIDERS.items() if p == "runtime"}, staged)
 
     def test_installer_profile_argument_contract(self):
         rows = [("--profile", "installer"),
