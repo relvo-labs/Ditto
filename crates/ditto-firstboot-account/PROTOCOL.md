@@ -72,3 +72,9 @@ JSON 範例中的密碼位置應由使用者輸入的值取代；不得把請求
 標記缺失時，復原只允許回復 root pending 指定、仍符合 useradd 初始狀態的帳號：本機 passwd 為 `x`、UID 在人員範圍、home 為 `/home/<name>`、shell 為 `/bin/bash`，且唯一 shadow 條目的密碼欄**恰為 `!`**；本機與 NSS 不得有其他人員帳號。帳號尚不存在也可嘗試清理。任何已設定密碼的帳號（包含鎖住的 hash 或非 yescrypt hash）都受保護，不因 home／sudo 成員已變更而被刪除。
 
 因此「chpasswd 已完成、標記尚未提交」的中斷狀態也會保守保留：`--recover` 回 `internal_rollback_failed`、保留 pending 與帳號；新建請求回 `already_provisioned`，不建立替代管理員。須由 root 核對後處理紀錄，不能以重送請求或刪除標記強制重新建立。只有尚未設定密碼的真實 useradd 後中斷，才自動回復並重新建立。
+
+## 文字模式的終端中斷（#220）
+
+`--tty` 的 SignalGuard 接住 INT／QUIT／TERM／HUP，只設中斷旗標；QUIT 不再觸發預設的 core 動作，既有 `RLIMIT_CORE=0` 與 `PR_SET_DUMPABLE=0` 仍保留。提示輸入時中斷會停止並恢復 echo。`pending` 持久化後，交易會觀察旗標並將中斷延後至一致結束：工具成功仍完成回讀、提交與 pending 清理；工具或 IO 失敗走既有持鎖回復。中斷旗標本身不觸發 userdel，因此不會僅因按鍵而刪除剛設好密碼的帳號。沒有新增提示、請求欄位或回應代碼。
+
+useradd、chpasswd、userdel 與 getent 都以自己的程序群組啟動，離開 controlling tty 的前景群組；stdin／stdout／stderr 保持 `/dev/null` 或 pipe，避免背景讀寫 tty 引發 SIGTTIN／SIGTTOU。helper 仍同步等待並收回每個工具，包括密碼 pipe 寫入失敗的路徑。不建立新 session，也不離開 systemd cgroup；直接送給工具的 TERM／HUP、manager 的最終 SIGKILL、斷電及 IO 失敗仍可能留下待檢查狀態，沿用上述保守復原。

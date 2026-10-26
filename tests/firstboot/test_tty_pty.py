@@ -5,6 +5,7 @@ opens are redirected to that slave; this does not qualify systemd/VT or PAM.
 """
 import contextlib
 import fcntl
+import functools
 import json
 import os
 from pathlib import Path
@@ -20,7 +21,7 @@ import traceback
 import unittest
 from unittest import mock
 
-from test_tty_launcher import load_launcher
+from test_tty_launcher import REPO, load_launcher
 
 
 RETRY = b'Press Enter for one more setup attempt, or Ctrl-D to stop and return to sign-in: '
@@ -221,6 +222,22 @@ class TTYRealPTYTests(unittest.TestCase):
             terminal.finish(0)
 
 
+@functools.cache
+def rust_signal_helper():
+    """Build the test-only helper offline; denial/build failure must fail the row."""
+    result = subprocess.run(
+        ['cargo', 'test', '-p', 'ditto-firstboot-account', '--offline', '--locked',
+         '--lib', '--no-run', '--message-format=json'],
+        cwd=REPO, capture_output=True, text=True, check=True, timeout=120)
+    artifacts = [json.loads(line) for line in result.stdout.splitlines()]
+    binaries = [item['executable'] for item in artifacts
+                if item.get('reason') == 'compiler-artifact'
+                and item.get('target', {}).get('name') == 'ditto_firstboot_account'
+                and item.get('executable')]
+    assert len(binaries) == 1, (binaries, result.stderr)
+    return binaries[0]
+
+
 class SignalTerminalSession(TerminalSession):
     """Production run/wait and /dev/tty, with an exec'ed account helper double.
 
@@ -230,6 +247,7 @@ class SignalTerminalSession(TerminalSession):
     def __init__(self, case, phase):
         self.scratch = tempfile.TemporaryDirectory(prefix='ditto-tty-signals-')
         self.root = Path(self.scratch.name)
+        rust_helper = rust_signal_helper() if phase == 'rust-guard' else None
         helper = self.root / 'helper'
         helper.write_text(f'''#!{sys.executable} -I
 import os
@@ -244,6 +262,9 @@ assert os.tcgetpgrp(0) == os.getpgrp()
 assert signal.getsignal(signal.SIGINT) != signal.SIG_IGN
 for sig in (signal.SIGQUIT, signal.SIGTERM, signal.SIGHUP):
     assert signal.getsignal(sig) == signal.SIG_DFL
+if {phase!r} == 'rust-guard':
+    os.execve({rust_helper!r}, [{rust_helper!r}, '--exact', 'unix::tests::tty_signal_helper_child', '--nocapture'],
+              {{'DITTO_220_PTY_ROOT': str(root)}})
 with (root / 'calls').open('a') as stream:
     stream.write('call\\n')
 received = []
@@ -251,8 +272,8 @@ def interrupted(sig, frame):
     received.append(sig)
 for sig in (signal.SIGINT, signal.SIGQUIT, signal.SIGTERM, signal.SIGHUP):
     signal.signal(sig, interrupted)
-# QUIT is handled only by this double. Rust SignalGuard handles INT/TERM/HUP;
-# these tests assert launcher waiting, not new Rust QUIT transaction semantics.
+# This Python double only asserts launcher waiting. The rust-guard phase
+# above execs a test-only helper using the real Rust SignalGuard.
 if {phase!r} == 'after':
     (root / 'created').write_text('committed fixture\\n')
 os.write(1, b'Fixture signal helper ready\\n')
@@ -352,7 +373,7 @@ class TTYSignalPTYTests(unittest.TestCase):
     def terminal_signal(self, phase, value, sig):
         with self.session(phase) as terminal:
             terminal.send(value)  # Kernel ISIG delivers to the foreground group.
-            if phase in ('before', 'rollback'):
+            if phase in ('before', 'no-account'):
                 terminal.expect(RETRY)
                 terminal.send(b'\x04')
                 terminal.expect(STOP)
@@ -364,7 +385,7 @@ class TTYSignalPTYTests(unittest.TestCase):
             self.assertTrue((terminal.root / 'completed').exists(), 'helper was killed before completion')
             self.assertTrue(report['restored'], report)
             self.assertEqual(len(report['reads']), 3, report)
-            self.assertEqual(report['reads'][-1], {'human': phase in ('mid', 'after'), 'completed': True})
+            self.assertEqual(report['reads'][-1], {'human': phase in ('mid', 'after', 'rust-guard'), 'completed': True})
             self.assertEqual(diagnostic, b'')
 
     def test_vintr_before_transaction(self):
@@ -373,8 +394,9 @@ class TTYSignalPTYTests(unittest.TestCase):
     def test_vintr_mid_transaction_completes_before_account_readback(self):
         self.terminal_signal('mid', b'\x03', signal.SIGINT)
 
-    def test_vintr_mid_transaction_rollback_returns_to_bounded_flow(self):
-        self.terminal_signal('rollback', b'\x03', signal.SIGINT)
+    def test_vintr_helper_without_account_returns_to_bounded_flow(self):
+        # This fixture creates no account; it is not transaction rollback evidence.
+        self.terminal_signal('no-account', b'\x03', signal.SIGINT)
 
     def test_vintr_after_commit_waits_for_helper(self):
         self.terminal_signal('after', b'\x03', signal.SIGINT)
@@ -384,6 +406,9 @@ class TTYSignalPTYTests(unittest.TestCase):
 
     def test_vquit_mid_transaction_waits_for_helper(self):
         self.terminal_signal('mid', b'\x1c', signal.SIGQUIT)
+
+    def test_vquit_with_real_rust_guard_survives_and_returns_to_sign_in(self):
+        self.terminal_signal('rust-guard', b'\x1c', signal.SIGQUIT)
 
     def test_vquit_after_commit_waits_for_helper(self):
         self.terminal_signal('after', b'\x1c', signal.SIGQUIT)

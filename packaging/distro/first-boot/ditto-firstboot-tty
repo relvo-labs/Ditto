@@ -232,8 +232,9 @@ def tty_session():
                 # Inherit the unit's tty-force stdin/output, never pipe secrets.
                 with contextlib.ExitStack() as signals:
                     # The foreground group also signals the helper. Let it exit
-                    # on its own: KeyboardInterrupt makes subprocess.run kill
-                    # it before SignalGuard can finish/roll back a transaction.
+                    # on its own: keep the helper alive; the tool results decide
+                    # commit or rollback. KeyboardInterrupt would make
+                    # subprocess.run kill it before that coherent end.
                     # A callable resets on exec; SIG_IGN would be inherited.
                     # TERM/HUP keep their normal systemd stop/hangup behaviour.
                     for signum in (signal.SIGINT, signal.SIGQUIT):

@@ -8,7 +8,10 @@ use std::{
     io::{self, Read, Write},
     os::{
         fd::AsRawFd,
-        unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
+        unix::{
+            fs::{DirBuilderExt, MetadataExt, OpenOptionsExt},
+            process::CommandExt,
+        },
     },
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -31,7 +34,12 @@ pub trait AccountTools: Send + Sync {
 pub struct SystemTools;
 fn command(executable: &str) -> Command {
     let mut c = Command::new(executable);
-    c.env_clear()
+    // Each tool gets its own background group: tty INT/QUIT must not interrupt
+    // account database writes or rollback. Never give these children tty IO;
+    // null/pipe descriptors also avoid job-control SIGTTIN/SIGTTOU (TOSTOP).
+    // This changes neither session nor systemd cgroup; all callers still wait.
+    c.process_group(0)
+        .env_clear()
         .env("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
         .env("LC_ALL", "C")
         .stdin(Stdio::null())
@@ -325,6 +333,13 @@ impl<T: AccountTools> Engine<T> {
             phase(log, "marker", "begin");
             self.atomic_journal("account-created", &journal)
         })();
+        // Once pending is durable, defer terminal interruption to a coherent
+        // end. In particular, never delete a passworded account just because
+        // INT/QUIT arrived: successful tools still verify/commit/clear pending.
+        // Actual tool/IO failures retain the existing locked rollback path.
+        if crate::unix::check_tty_signal().is_err() {
+            phase(log, "interrupt", "deferred");
+        }
         if applied.is_err() {
             return Err(self.rollback(&request.username, log));
         }
@@ -661,5 +676,110 @@ mod tests {
         assert!(human_exists("a:x:60000:1::/:/bin/bash", 1000, 60000).unwrap());
         assert!(!human_exists("a:x:999:1::/:/bin/false", 1000, 60000).unwrap());
         assert!(human_exists("malformed", 1000, 60000).is_err());
+    }
+
+    #[test]
+    fn tool_probe_child() {
+        if std::env::var_os("DITTO_220_TOOL_PROBE").is_none() {
+            return;
+        }
+        // SAFETY: process queries have no pointer preconditions.
+        unsafe {
+            assert_eq!(libc::getpgrp(), libc::getpid());
+            assert_ne!(libc::getpgrp(), libc::getpgid(libc::getppid()));
+            for fd in 0..=2 {
+                assert_eq!(libc::isatty(fd), 0);
+            }
+        }
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input).unwrap();
+        assert!(input.is_empty() || input == "pipe input\n");
+        println!("probe completed");
+    }
+    #[test]
+    fn tool_commands_leave_foreground_group_and_reap_with_null_or_pipes() {
+        if std::env::var_os("DITTO_220_TOOL_PARENT").is_some() {
+            assert_eq!(unsafe { libc::tcgetpgrp(0) }, unsafe { libc::getpgrp() });
+            let mut attrs = std::mem::MaybeUninit::<libc::termios>::uninit();
+            assert_eq!(unsafe { libc::tcgetattr(0, attrs.as_mut_ptr()) }, 0);
+            let mut attrs = unsafe { attrs.assume_init() };
+            attrs.c_lflag |= libc::TOSTOP;
+            assert_eq!(unsafe { libc::tcsetattr(0, libc::TCSANOW, &attrs) }, 0);
+            for piped in [false, true] {
+                let mut c = command(std::env::current_exe().unwrap().to_str().unwrap());
+                c.args([
+                    "--exact",
+                    "transaction::tests::tool_probe_child",
+                    "--nocapture",
+                ])
+                .env("DITTO_220_TOOL_PROBE", "1");
+                if piped {
+                    c.stdin(Stdio::piped()).stdout(Stdio::piped());
+                }
+                let mut child = c.spawn().unwrap();
+                let pid = child.id() as libc::pid_t;
+                if piped {
+                    child
+                        .stdin
+                        .take()
+                        .unwrap()
+                        .write_all(b"pipe input\n")
+                        .unwrap();
+                }
+                let output = child.wait_with_output().unwrap();
+                assert!(output.status.success(), "tool probe: {:?}", output.status);
+                if piped {
+                    assert!(String::from_utf8(output.stdout)
+                        .unwrap()
+                        .contains("probe completed"));
+                }
+                let mut status = 0;
+                assert_eq!(
+                    unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) },
+                    -1
+                );
+                assert_eq!(
+                    io::Error::last_os_error().raw_os_error(),
+                    Some(libc::ECHILD)
+                );
+            }
+            return;
+        }
+        use std::os::{fd::FromRawFd, unix::process::CommandExt};
+        let (mut master, mut slave) = (-1, -1);
+        assert_eq!(
+            unsafe {
+                libc::openpty(
+                    &mut master,
+                    &mut slave,
+                    std::ptr::null_mut(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                )
+            },
+            0
+        );
+        let _master = unsafe { File::from_raw_fd(master) };
+        let slave = unsafe { File::from_raw_fd(slave) };
+        let mut c = Command::new(std::env::current_exe().unwrap());
+        c.args([
+            "--exact",
+            "transaction::tests::tool_commands_leave_foreground_group_and_reap_with_null_or_pipes",
+            "--nocapture",
+        ])
+        .env("DITTO_220_TOOL_PARENT", "1")
+        .stdin(slave.try_clone().unwrap())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+        // SAFETY: only async-signal-safe session/controlling tty syscalls.
+        unsafe {
+            c.pre_exec(|| {
+                if libc::setsid() < 0 || libc::ioctl(0, libc::TIOCSCTTY, 0) < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        assert!(c.status().unwrap().success());
     }
 }
