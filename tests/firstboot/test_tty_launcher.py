@@ -137,11 +137,14 @@ class TTYLauncherTests(unittest.TestCase):
 
     def session(self, answers='', human=False, helper=None):
         m = self.launcher
-        tty = io.StringIO(answers)
-        # Keep output readable after context exit. No real controlling VT opened.
-        manager = contextlib.nullcontext(tty)
+        reader = io.BytesIO(answers.encode('utf-8'))
+        tty = io.StringIO()
+        # Separate queues for policy tests only; test_tty_pty.py covers real IO.
+        def terminal_open(path, mode, **kwargs):
+            self.assertEqual(path, '/dev/tty')
+            return contextlib.nullcontext(reader if mode == 'rb' else tty)
         reads = mock.Mock(side_effect=human) if isinstance(human, list) else mock.Mock(return_value=human)
-        with mock.patch.object(m, 'human_account_exists', reads), mock.patch.object(m, 'retire_greeter'), mock.patch.object(m, 'activate_tty1') as vt, mock.patch('builtins.open', return_value=manager), mock.patch.object(m.subprocess, 'run', side_effect=helper) as run, contextlib.redirect_stdout(io.StringIO()) as output:
+        with mock.patch.object(m, 'human_account_exists', reads), mock.patch.object(m, 'retire_greeter'), mock.patch.object(m, 'activate_tty1') as vt, mock.patch('builtins.open', side_effect=terminal_open), mock.patch.object(m.subprocess, 'run', side_effect=helper) as run, contextlib.redirect_stderr(io.StringIO()) as output:
             result = m.tty_session()
             return result, run.call_args_list, vt.call_count, tty.getvalue(), output.getvalue()
 
@@ -161,7 +164,7 @@ class TTYLauncherTests(unittest.TestCase):
         m = self.launcher
         tty = mock.MagicMock()
         tty.__enter__.return_value = tty
-        tty.readline.return_value = '\n'
+        tty.readline.return_value = b'\n'
         with mock.patch.object(m, 'human_account_exists', return_value=False), mock.patch.object(m, 'retire_greeter'), mock.patch.object(m, 'activate_tty1'), mock.patch('builtins.open', return_value=tty), mock.patch.object(m.subprocess, 'run') as run:
             self.assertEqual(m.tty_session(), 0)
             self.assertEqual(run.call_count, 3)
@@ -169,7 +172,7 @@ class TTYLauncherTests(unittest.TestCase):
             self.assertTrue(any('Setup stopped.' in c.args[0] for c in tty.write.call_args_list))
 
     def test_tty_eof(self):
-        # StringIO input is exhausted after explanatory output, matching EOF.
+        # Empty policy-fixture input yields EOF independently of output writes.
         result, calls, _, text, _ = self.session()
         self.assertEqual((result, len(calls)), (0, 1))
         self.assertIn('Setup stopped.', text)

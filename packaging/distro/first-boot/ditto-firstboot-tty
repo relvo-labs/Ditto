@@ -214,10 +214,16 @@ def tty_session():
     try:
         if human_account_exists():
             return 0
-        with open('/dev/tty', 'r+', buffering=1, encoding='utf-8') as tty:
+        # Buffered r+ requires seeking, which a terminal cannot support.
+        # Unbuffered binary readline consumes at most 32 bytes, with no decoded
+        # read-ahead stealing UTF-8 account input from the next helper. Only LF
+        # confirms a retry; account text/encoding remains the helper's concern.
+        with open('/dev/tty', 'rb', buffering=0) as reader, open('/dev/tty', 'w', buffering=1, encoding='utf-8') as tty:
             for attempt in range(3):
                 if human_account_exists():
                     return 0
+                tty.flush()
+                # Inherit the unit's tty-force stdin/output, never pipe secrets.
                 subprocess.run([HELPER, '--tty'], env=ENV, check=False)
                 if human_account_exists():
                     tty.write('An account was found. Returning to sign-in; interrupted setup may still require administrator recovery.\n')
@@ -226,15 +232,19 @@ def tty_session():
                 if attempt == 2:
                     break
                 tty.write('Press Enter for one more setup attempt, or Ctrl-D to stop and return to sign-in: ')
-                if tty.readline(32) != '\n':
+                tty.flush()
+                if reader.readline(32) != b'\n':
                     break
             tty.write('Setup stopped. Sign-in needs an existing account. Restart to retry setup, or ask an administrator for recovery.\n')
             tty.write('Press Enter to return to sign-in: ')
-            tty.readline(32)
+            tty.flush()
+            reader.readline(32)
         return 0
     except (OSError, ValueError, KeyError, subprocess.SubprocessError, KeyboardInterrupt):
         # No assertion that rollback succeeded. Never restart the helper here.
-        print('Setup stopped; account state could not be confirmed. Returning to sign-in. Restart or ask an administrator for recovery.', flush=True)
+        # The controlling terminal may be hung up. The unit sends stderr to the
+        # journal, so do not attempt this diagnostic on its failed tty stdout.
+        print('Setup stopped; account state could not be confirmed. Returning to sign-in. Restart or ask an administrator for recovery.', file=sys.stderr, flush=True)
         return 1
 
 
