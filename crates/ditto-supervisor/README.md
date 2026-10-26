@@ -46,11 +46,21 @@ handler: Socket {
 | --- | --- | --- |
 | 沒有 socket、或沒有程序在聽（`ENOENT`／`ECONNREFUSED`） | 不存在 | 無。Shell 退出由 Core 的受控啟動器處理 |
 | 在聽，但**從未**回過 `pong` | 尚未武裝 | 無 |
-| 收到 `pong` | 已武裝，未回應次數歸零 | 無 |
-| 已武裝後連續 3 次未回應（約 6～7 秒） | 已觸發 | `SIGKILL` Shell → 寫 `rescue-request.json` → `systemctl --user start --no-block ditto-rescue.service` |
+| 從不存在、尚未武裝或已觸發，收到 `pong` | 已武裝，進入**啟動寬限**（60 秒） | 無。日誌 `state` 帶 `phase="startup"` |
+| 已武裝後收到 `pong` | 已武裝，未回應次數歸零 | 無。不延長寬限 |
+| 啟動寬限內連續 10 次未回應（約 19～21 秒） | 已觸發 | 同下一列；日誌帶 `phase="startup"` |
+| 寬限結束後連續 3 次未回應（約 6～7 秒） | 已觸發 | `SIGKILL` Shell → 寫 `rescue-request.json` → `systemctl --user start --no-block ditto-rescue.service`；日誌帶 `phase="steady"` |
 | 已觸發後 | 等新的 Shell 回 `pong` 才重新武裝 | 同一個卡住的 Shell 不會被處理兩次 |
 
 「尚未武裝」是刻意的限制：在第一次回 `pong` 之前就卡住的 Shell，supervisor 不會處理。啟動期的卡住要由 Core 的啟動就緒檢查負責。
+
+**啟動寬限**（#226）：Shell 的 `SocketServer` 一起來就會回 `pong`，所以 supervisor 很早就武裝；接著 Shell 的主執行緒在建立 Core 連線、掛載開機供應者時會停頓。在不開 KVM 的 QEMU（TCG）上實測停頓 6.1 秒與 5.1 秒，後者之後還有約 2 秒、1 秒的慢回覆；KVM 上最大 0.5 秒。套用 3 次規則會把正常啟動的 Shell 殺掉並進入救援。因此每一代 Shell 從武裝起 60 秒內，要連續 10 次未回應才觸發：
+
+- 門檻依**每次未回應被觀察到的時間**（supervisor 自己的單調時鐘）落在寬限內或外決定。連續次數不因寬限結束而歸零：寬限一結束，跨過邊界的連續未回應累計達 3 次就觸發。
+- 上限：啟動中真的卡死，從卡住起約 21 秒內觸發，不會變成永遠不處理；寬限結束後就是原本的 3 次規則，常態期（NFR-08 的 10 秒）沒有放寬。
+- 每次重新武裝（第一次回覆、Shell 退出後的新 Shell、觸發後的新 Shell，例如從救援回到一般桌面）都重新開始寬限。寬限結束時記一行 `grace_ended`。
+- 已知限制：新的 Shell 若在一個 ping 間隔內取代舊的、supervisor 沒觀察到「不存在」，它沿用舊 Shell 的狀態，不會重新寬限。
+- 依據與取捨見 [D-53](../../.agents/notes/decisions/2026-10-27-d53-supervisor-startup-grace.md)。
 
 非阻塞 connect：`SIGSTOP` 的 Shell 不再 accept，listen backlog 滿了以後阻塞式 connect 會把 supervisor 一起卡住。backlog 滿（`EAGAIN`）也算一次未回應。
 
@@ -78,14 +88,17 @@ handler: Socket {
 
 ```
 ditto-supervisor [--socket PATH] [--interval-ms 2000] [--timeout-ms 1000] [--misses 3]
+                 [--startup-grace-ms 60000] [--startup-misses 10]
                  [--shell-scope NAME]... [--pid-file PATH] [--rescue-unit ditto-rescue.service] [--no-rescue]
 ditto-supervisor --on-core-failure
 ditto-supervisor --once
 ```
 
-日誌是 stderr 上的 `ditto-supervisor event=<名稱> key="value"` 行，由 journal 依 unit 保存。
+`--startup-grace-ms 0` 關閉啟動寬限。`--startup-misses` 不得小於 `--misses`，否則拒絕啟動；未指定時取 10 與 `--misses` 的較大值，所以原有的呼叫方式（例如 `--misses 100000`）照常可用。
+
+日誌是 stderr 上的 `ditto-supervisor event=<名稱> key="value"` 行，由 journal 依 unit 保存。`started` 記錄生效的門檻（含 `startup_grace_ms`、`startup_misses`）；`state` 在進入已武裝或已觸發時帶 `phase`，`shell_unresponsive` 也帶 `phase`，用來分辨啟動期與常態期的觸發。
 
 ## 已知限制
 
 - `ditto-rescue.service` 由 systemd 啟動，**沒有受控啟動器的 token**，所以這條路徑上的救援介面只能用離線模式（D-29）。Core 仍活著時，由 Core 以 `--rescue-ui` 規格啟動的救援介面才能線上操作；兩者如何分工屬於 D-29，見 plan/03/08。
-- 從 `SIGSTOP` 到終止的時間在開發機上實測約 6.1～6.6 秒（Python 替身與加上上述 `ping` 分支的 Quickshell 0.3.1 各一次，headless Wayfire，`--no-rescue`）。這是開發證據，不是 EX1-12 ① 的結果；救援介面本身的啟動時間另計。
+- 從 `SIGSTOP` 到終止的時間在開發機上實測約 6.1～6.6 秒（Python 替身與加上上述 `ping` 分支的 Quickshell 0.3.1 各一次，headless Wayfire，`--no-rescue`）。這是開發證據，不是 EX1-12 ① 的結果；救援介面本身的啟動時間另計。該量測早於啟動寬限，對應的是常態期的 3 次規則；寬限內卡住到終止的時間（上限約 21 秒）只有單元測試，尚未在 VM 實測。
