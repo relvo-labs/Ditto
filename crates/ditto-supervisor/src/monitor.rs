@@ -64,7 +64,8 @@ impl Phase {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Peer {
     /// The process listening on the socket (`SO_PEERCRED`), with its start
-    /// time (field 22 of `/proc/<pid>/stat`) so a reused PID is another Shell.
+    /// time (field 22 of `/proc/<pid>/stat`, `None` if unreadable) so a
+    /// reused PID can be told apart. Compare with `provably_differs_from`.
     Process { pid: u32, start: Option<u64> },
     /// The peer could not be read. It never starts a generation by itself:
     /// while armed it is taken to be the same Shell, so the supervisor errs
@@ -77,6 +78,43 @@ impl Peer {
         match self {
             Peer::Process { pid, .. } => format!("pid:{pid}"),
             Peer::Unknown { .. } => "unknown".into(),
+        }
+    }
+
+    /// **The identity rule.** Two observations are possibly the same process
+    /// unless they are provably different: both identified and either the
+    /// PIDs differ, or the PID is the same and both start times are known
+    /// and differ. A missing start time or an unknown peer proves nothing.
+    /// Uncertain means the same generation, which keeps the grace from being
+    /// renewed: the supervisor errs toward rescue, never away from it. (A
+    /// replacement that cannot be told apart may then be judged by the steady
+    /// rule while it starts.) Never compare peers with `==` for this.
+    pub fn provably_differs_from(self, other: Peer) -> bool {
+        match (self, other) {
+            (Peer::Process { pid: a, start: sa }, Peer::Process { pid: b, start: sb }) => {
+                a != b || matches!((sa, sb), (Some(x), Some(y)) if x != y)
+            }
+            _ => false,
+        }
+    }
+
+    /// What is known about the armed process after `observed`, which is not
+    /// provably different from it: a start time learnt for the same PID is
+    /// kept, so a later reuse of that PID can be told apart. Never forgets.
+    fn learn(armed: Option<Peer>, observed: Peer) -> Option<Peer> {
+        match (armed, observed) {
+            (None, Peer::Process { .. }) => Some(observed),
+            (
+                Some(Peer::Process { pid, start: None }),
+                Peer::Process {
+                    pid: seen,
+                    start: Some(start),
+                },
+            ) if pid == seen => Some(Peer::Process {
+                pid,
+                start: Some(start),
+            }),
+            _ => armed,
         }
     }
 }
@@ -152,20 +190,22 @@ impl Monitor {
         }
         let identified = matches!(peer, Peer::Process { .. }).then_some(peer);
         let (next, action) = match (self.state, outcome) {
-            // Armed, and an identified process other than this generation's
+            // Armed, and a process provably different from this generation's
             // answers: a replacement the supervisor did not see exit (Core
             // relaunches faster than one ping interval). New generation.
             (State::Armed { .. }, Outcome::Pong)
-                if self.peer.is_some() && identified.is_some() && identified != self.peer =>
+                if self
+                    .peer
+                    .is_some_and(|armed| armed.provably_differs_from(peer)) =>
             {
                 self.new_generation(identified, now_ms)
             }
-            // Armed, and the same process answers, or the peer is unknown, or
-            // this generation's process was not known yet (then it is
-            // recorded): the same generation and its grace. Neither a stalling
-            // Shell nor an unreadable peer can earn a new grace by reconnecting.
+            // Armed, and possibly the same process (see the identity rule):
+            // the same generation and its grace, learning what can be learnt
+            // about its identity. No observation pattern of one Shell, and no
+            // reconnect, can earn it a new grace.
             (State::Armed { .. }, Outcome::Pong) => {
-                self.peer = self.peer.or(identified);
+                self.peer = Peer::learn(self.peer, peer);
                 (State::Armed { misses: 0 }, Action::None)
             }
             // After an observed exit, a Shell that never answered, or a trip:
@@ -908,5 +948,246 @@ mod tests {
         let mut monitor = Monitor::new(3).with_startup_grace(Duration::ZERO, 10);
         monitor.observe(&Outcome::Pong, SHELL_A, 0);
         assert_eq!(monitor.phase, Phase::Steady);
+    }
+
+    #[test]
+    fn the_identity_rule() {
+        let process = |pid, start| Peer::Process { pid, start };
+        let unknown = Peer::Unknown { connection: 1 };
+        let cases = [
+            (process(1, Some(10)), process(1, Some(10)), false),
+            (process(1, Some(10)), process(1, None), false),
+            (process(1, None), process(1, Some(10)), false),
+            (process(1, None), process(1, None), false),
+            (process(1, Some(10)), process(1, Some(11)), true),
+            (process(1, Some(10)), process(2, Some(10)), true),
+            (process(1, None), process(2, None), true),
+            (process(1, Some(10)), unknown, false),
+            (unknown, process(1, Some(10)), false),
+            (unknown, Peer::Unknown { connection: 2 }, false),
+        ];
+        for (a, b, different) in cases {
+            assert_eq!(a.provably_differs_from(b), different, "{a:?} vs {b:?}");
+            assert_eq!(b.provably_differs_from(a), different, "symmetric");
+        }
+        // Learning: a start time for the armed PID is kept, never forgotten.
+        assert_eq!(
+            Peer::learn(Some(process(1, None)), process(1, Some(10))),
+            Some(process(1, Some(10)))
+        );
+        assert_eq!(
+            Peer::learn(Some(process(1, Some(10))), process(1, None)),
+            Some(process(1, Some(10)))
+        );
+        assert_eq!(
+            Peer::learn(Some(process(1, Some(10))), unknown),
+            Some(process(1, Some(10)))
+        );
+        assert_eq!(Peer::learn(None, unknown), None);
+        assert_eq!(Peer::learn(None, process(1, None)), Some(process(1, None)));
+    }
+
+    // Exhaustive no-escape evidence (review round 3). One real Shell: pid
+    // `P`, start time `T`. Every way the pinger can see it is enumerated
+    // against every stall pattern, and the monitor must behave exactly as if
+    // the Shell had been identified perfectly every time.
+
+    const P: u32 = 4100;
+    const T: u64 = 900;
+
+    /// How one observation of that single Shell can look to the pinger.
+    #[derive(Clone, Copy, Debug)]
+    enum Seen {
+        /// `SO_PEERCRED` and `/proc/<pid>/stat` both read.
+        WithStart,
+        /// `SO_PEERCRED` read, the start time not.
+        WithoutStart,
+        /// Peer unreadable, on the connection already open.
+        UnknownSame,
+        /// Peer unreadable, on a new connection.
+        UnknownNew,
+    }
+
+    const SEEN: [Seen; 4] = [
+        Seen::WithStart,
+        Seen::WithoutStart,
+        Seen::UnknownSame,
+        Seen::UnknownNew,
+    ];
+
+    struct Observer {
+        connection: u64,
+    }
+
+    impl Observer {
+        fn peer(&mut self, seen: Seen) -> Peer {
+            match seen {
+                Seen::WithStart => Peer::Process {
+                    pid: P,
+                    start: Some(T),
+                },
+                Seen::WithoutStart => Peer::Process {
+                    pid: P,
+                    start: None,
+                },
+                Seen::UnknownSame => Peer::Unknown {
+                    connection: self.connection,
+                },
+                Seen::UnknownNew => {
+                    self.connection += 1;
+                    Peer::Unknown {
+                        connection: self.connection,
+                    }
+                }
+            }
+        }
+    }
+
+    /// The default timing on the monitor clock: a ping starts every 2 s, a
+    /// pong is observed 3 ms later, a miss 1 s later. `stall: Some(k)` is k
+    /// misses then one pong, over and over; `None` is hung after the first
+    /// pong. Pong `j` is seen as `seen[j % len]`. Returns the first trip's
+    /// time, if any before `until`.
+    fn first_trip(seen: &[Seen], stall: Option<u32>, until: u64) -> Option<u64> {
+        let mut monitor = Monitor::from_timing(&Timing::default());
+        let mut observer = Observer { connection: 1 };
+        let missed = miss();
+        let (mut pongs, mut since_pong) = (0usize, 0u32);
+        for n in 0.. {
+            let start: u64 = n * 2_000;
+            if start > until {
+                return None;
+            }
+            let seen = seen[pongs % seen.len()];
+            if n == 0 || stall == Some(since_pong) {
+                let peer = observer.peer(seen);
+                pongs += 1;
+                since_pong = 0;
+                monitor.observe(&Outcome::Pong, peer, start + 3);
+            } else {
+                // Every miss drops the connection; the next ping reconnects.
+                observer.connection += 1;
+                since_pong += 1;
+                let peer = observer.peer(seen);
+                if let Action::Trip { .. } = monitor.observe(&missed, peer, start + 1_000) {
+                    return Some(start + 1_000);
+                }
+            }
+        }
+        unreachable!()
+    }
+
+    /// First arming at 3 ms, the 60 s grace, then the steady bound: three
+    /// misses at 2 s intervals and the last one's 1 s deadline.
+    const NO_ESCAPE_BOUND: u64 = 3 + 60_000 + 3 * 2_000 + 1_000;
+
+    #[test]
+    fn no_observation_sequence_lets_one_shell_escape() {
+        let until = NO_ESCAPE_BOUND + 4_000;
+        let stalls: Vec<Option<u32>> = (1..=9).map(Some).chain([None]).collect();
+        // The truth, with the Shell identified perfectly every time.
+        let truth: Vec<Option<u64>> = stalls
+            .iter()
+            .map(|&stall| first_trip(&[Seen::WithStart], stall, until))
+            .collect();
+        for (stall, trip) in stalls.iter().zip(&truth) {
+            match stall {
+                // Answering at least every 6 s: the steady rule never trips
+                // such a Shell either.
+                Some(k) if *k < 3 => assert_eq!(*trip, None, "k={k}"),
+                _ => assert!(
+                    trip.is_some_and(|at| at <= NO_ESCAPE_BOUND),
+                    "{stall:?} {trip:?}"
+                ),
+            }
+        }
+        let mut seen = [Seen::WithStart; 8];
+        let mut runs = 0;
+        for code in 0..4usize.pow(8) {
+            for (i, slot) in seen.iter_mut().enumerate() {
+                *slot = SEEN[code / 4usize.pow(i as u32) % 4];
+            }
+            for (&stall, &expected) in stalls.iter().zip(&truth) {
+                assert_eq!(
+                    first_trip(&seen, stall, until),
+                    expected,
+                    "seen {seen:?}, stall {stall:?}"
+                );
+                runs += 1;
+            }
+        }
+        assert_eq!(runs, 655_360);
+    }
+
+    /// The inverse: a provably different Shell replacing an armed one past
+    /// its grace (the fast replacement, no Absent seen) gets a new grace and
+    /// survives a 6 s startup stall; one that cannot be told apart keeps the
+    /// generation and trips by the steady rule (toward rescue). The armed
+    /// Shell is seen through every sequence of 4 over {with start, without
+    /// start, unknown}, applied cyclically to its 31 pongs.
+    #[test]
+    fn a_provably_different_shell_still_gets_the_grace() {
+        let kinds = [Seen::WithStart, Seen::WithoutStart, Seen::UnknownNew];
+        let other_pid = |start| Peer::Process { pid: 4200, start };
+        let replacements = [
+            (other_pid(Some(1_300)), "other pid, start known"),
+            (other_pid(None), "other pid, start unknown"),
+            (
+                Peer::Process {
+                    pid: P,
+                    start: Some(5_000),
+                },
+                "pid reused, other start",
+            ),
+            (
+                Peer::Process {
+                    pid: P,
+                    start: None,
+                },
+                "pid reused, start unknown",
+            ),
+            (Peer::Unknown { connection: 999 }, "unidentified"),
+        ];
+        let mut checked = 0;
+        for code in 0..3usize.pow(4) {
+            let armed: Vec<Seen> = (0..4).map(|i| kinds[code / 3usize.pow(i) % 3]).collect();
+            let pid_known = armed.iter().any(|s| !matches!(s, Seen::UnknownNew));
+            let start_known = armed.iter().any(|s| matches!(s, Seen::WithStart));
+            for (replacement, label) in replacements {
+                let provable = match replacement {
+                    Peer::Process { pid, .. } if pid != P => pid_known,
+                    Peer::Process { start: Some(_), .. } => start_known,
+                    _ => false,
+                };
+                let mut monitor = Monitor::from_timing(&Timing::default());
+                let mut observer = Observer { connection: 1 };
+                for n in 0..31u64 {
+                    let peer = observer.peer(armed[n as usize % 4]);
+                    monitor.observe(&Outcome::Pong, peer, n * 2_000 + 3);
+                }
+                monitor.observe(&reset(), replacement, 63_000);
+                monitor.observe(&Outcome::Pong, replacement, 64_003);
+                // Read now: after a trip, the next pong is a new generation
+                // whoever answers (the 6efa9b5 rule).
+                let generation = monitor.generation;
+                let mut trips = vec![];
+                for (n, outcome) in [miss(), miss(), miss(), Outcome::Pong].iter().enumerate() {
+                    let at = 66_000 + 2_000 * n as u64 + 1_000;
+                    if monitor.observe(outcome, replacement, at) != Action::None {
+                        trips.push(at);
+                    }
+                }
+                let context = format!("armed seen {armed:?}, replacement {label}");
+                if provable {
+                    assert_eq!(generation, 2, "{context}");
+                    assert!(trips.is_empty(), "{context}: {trips:?}");
+                } else {
+                    assert_eq!(generation, 1, "{context}");
+                    assert_eq!(trips, [71_000], "{context}");
+                }
+                checked += 1;
+            }
+        }
+        assert_eq!(checked, 405);
     }
 }
