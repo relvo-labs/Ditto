@@ -1,6 +1,6 @@
 # 整碟安裝器（#221，進行中）
 
-這是 #221 ISO 預覽版安裝器的**後端核心與 payload 抽取**。目前沒有 ISO、安裝畫面、installer 開機映像，也沒有在 builder 或 VM 執行過；下列「組裝」與「待驗證」兩節是計畫。範圍依 owner 2026-10-26 決定（[#152 留言](https://github.com/relvo-labs/Ditto/issues/152#issuecomment-6414217695)）：選一整顆磁碟、二次確認、寫入隨附且驗過 hash 的 Ditto 映像、讀回核對、拔除媒體後重開機，首次開機走 #212 的建帳號畫面。不做 live 桌面、雙系統、保留分割區或 LUKS；Secure Boot 須由使用者關閉。
+這是 #221 ISO 預覽版安裝器的原始碼：後端核心、root 後端服務與協定、英文文字前端、installer 映像設定（`generate.py --profile installer`）、payload 抽取與 builder 專用的 `assemble-iso`。**還沒有建出任何 ISO 或 installer 映像，也沒有在 builder 或 VM 執行過**；下列「組裝」與「待驗證」兩節是計畫。繁中圖形畫面尚未加入。範圍依 owner 2026-10-26 決定（[#152 留言](https://github.com/relvo-labs/Ditto/issues/152#issuecomment-6414217695)）：選一整顆磁碟、二次確認、寫入隨附且驗過 hash 的 Ditto 映像、讀回核對、拔除媒體後重開機，首次開機走 #212 的建帳號畫面。不做 live 桌面、雙系統、保留分割區或 LUKS；Secure Boot 須由使用者關閉。
 
 ## 安裝器做什麼、不做什麼
 
@@ -20,6 +20,11 @@
 | `ditto_installer/session.py` | 列出 → 選擇 → 二次確認 → 安裝的狀態機 |
 | `ditto_installer/messages.py` | 原因與結果代碼的繁中／英文文案 |
 | `ditto_installer/payload.py`、`make-payload.py` | builder 專用：從 finish 後的整碟映像依 GPT byte range 切出 payload 與清單 |
+| `ditto_installer/protocol.py`、`backend.py`、`service.py` | root 後端：Unix socket、`SO_PEERCRED` 只接受固定前端 UID、一行一個 JSON 的固定動作 |
+| `ditto_installer/medium.py` | 以固定 ISO label 找安裝媒體、固定 argv 唯讀掛載，並回報要排除的裝置 |
+| `ditto_installer/client.py`、`textui.py` | 前端連線與英文文字畫面（無 DRM 時使用） |
+| `image/` | installer 映像內的啟動器、systemd units 與 sysusers |
+| `assemble-iso` | builder 專用：組 UEFI hybrid ISO 與 `SHA256SUMS` |
 
 後端是唯一權威。畫面只送固定動作：列出、以隨機 token 選擇、以確認畫面發出的一次性 token 確認、取消；不能指定路徑、偏移或 payload 檔。
 
@@ -52,8 +57,8 @@
 
 1. 以本分支重建 normal 映像並跑 `finish-image.sh`（含 pristine scan），保留 `out/disk.sha256`。
 2. `python3 packaging/distro/installer/make-payload.py --disk out/ditto.raw --disk-sha256 <disk.sha256> --image-version <版本> --source-commit <commit> --output <新目錄>`，取得清單 SHA256。
-3. 同一 generator、同一 snapshot 與 runtime lock 建 installer profile 映像，內嵌第 2 步的清單 SHA256（turn 2）。
-4. xorriso／mtools／erofs-utils 只在可丟棄 builder 內組 UEFI-only hybrid ISO：El Torito EFI 映像（systemd-boot＋installer UKI）、`ditto/installer-root.erofs`、`ditto/payload/`（turn 2）。
+3. `generate.py --profile installer --payload-manifest-sha256 <第 2 步> --medium-label DITTO_INSTALL_<版本>` 後以 mkosi 建 installer UKI（`Format=uki`，整個 installer 在 initrd，從 RAM 執行）。
+4. `assemble-iso` 以 xorriso／mtools／dosfstools 組 UEFI-only hybrid ISO：El Torito 與 GPT 分割區 2 是同一個 FAT 映像，只含 `EFI/BOOT/BOOTX64.EFI`（installer UKI）；ISO 9660 內是 `ditto/payload/`。
 
 ## 本機測試
 
@@ -65,7 +70,7 @@ python3 packaging/distro/installer/tests/test_installer.py -v
 
 ## 已知限制與待驗證
 
-- 尚無 ISO、installer 開機鏈、繁中圖形畫面、無 DRM 英文文字畫面與前後端協定（turn 2）。
+- 尚未建出 ISO 或 installer UKI；繁中圖形畫面尚未加入。mkosi `Format=uki` 的行為、installer 的 RAM 需求與 UKI 大小、大型 El Torito FAT 映像在光碟開機的相容性，都要在 builder／VM 確認。
 - 只支援 UEFI x86_64 與 512-byte 邏輯磁區；可移除式裝置不列為目標。
 - 清單 SHA256 綁定安裝器與同一媒體上的 payload，是完整性檢查，不是簽章；真實性依 GitHub pre-release 的 `SHA256SUMS`。
 - 檔案系統 UUID 來自固定 mkosi Seed，所有安裝相同；只有 GPT GUID 隨機。交 #152 後續處理。

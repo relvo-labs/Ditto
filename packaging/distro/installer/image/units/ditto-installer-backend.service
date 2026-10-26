@@ -1,0 +1,21 @@
+[Unit]
+Description=Ditto installer backend (sole writer of the target disk)
+After=systemd-udevd.service local-fs.target
+Wants=systemd-udevd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/ditto-installer/ditto-installer-backend
+RuntimeDirectory=ditto-installer
+RuntimeDirectoryMode=0755
+# A restart would forget an interrupted write; the frontend reports "result unknown" instead.
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+# #221 installer image. The whole image becomes the initrd of one UKI and runs
+# from RAM, so this list stays far smaller than packages.txt. Same snapshot and
+# kernel pin as the Ditto image; names checked in the gpgv-verified index.
+# No greetd, first-account flow, SSH server or desktop services.
+systemd
+systemd-sysv
+udev
+mount
+util-linux
+kmod
+kbd
+linux-image-7.0.0-38-generic
+# Display firmware only (the installed system carries the full linux-firmware).
+linux-firmware-amd-graphics
+linux-firmware-intel-graphics
+linux-firmware-nvidia-graphics
+linux-firmware-amd-misc
+linux-firmware-intel-misc
+# Backend: python3 core, fdisk/sfdisk for diagnostics, zstd to unpack the payload.
+python3
+fdisk
+zstd

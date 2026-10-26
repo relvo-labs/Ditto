@@ -54,6 +54,41 @@ RESULTS = {
                        "The result could not be determined. Do not boot from this disk; run the installation again."),
 }
 
+RESULTS.update({
+    "medium_unavailable": ("找不到安裝媒體，或媒體上的安裝資料不完整，沒有寫入任何磁碟。請確認隨身碟已插好；問題持續時請重新製作安裝媒體。",
+                           "The installation medium was not found or its data is incomplete. Nothing was written. Check the USB drive; if this persists, recreate the medium."),
+    "service_lost": ("安裝服務已停止，目前無法確認結果。請不要從目標磁碟開機；重新開機後再安裝一次。",
+                     "The installer service stopped and the result is unknown. Do not start from the target disk; restart and install again."),
+    "stale_action": ("這個畫面已過期，已重新整理磁碟清單。", "That screen was out of date; the disk list was refreshed."),
+})
+
+STATUS = {
+    "searching": ("正在尋找安裝媒體…", "Looking for the installation medium..."),
+    "no_disk": ("沒有可以安裝的磁碟。", "No disk can be used for installation."),
+    "erase_warning": ("將清除整顆磁碟的全部資料", "ALL DATA ON THIS WHOLE DISK WILL BE ERASED"),
+    "remove_media": ("請拔除安裝媒體，再重新開機。", "Remove the installation medium, then restart."),
+    "cancelling": ("正在取消…", "Cancelling..."),
+}
+
+STAGES = {
+    "verify": ("正在核對安裝資料", "Checking the installation data"),
+    "preflight": ("正在準備磁碟", "Preparing the disk"),
+    "wipe": ("正在清除舊的分割表", "Erasing the old partition table"),
+    "write": ("正在寫入", "Writing"),
+    "readback": ("正在讀回核對", "Reading back to verify"),
+    "commit": ("正在寫入分割表", "Writing the partition table"),
+    "done": ("完成", "Done"),
+}
+
+
+def size_text(size_bytes):
+    """Decimal units, as printed on disk labels."""
+    for unit, scale in (("TB", 10**12), ("GB", 10**9), ("MB", 10**6)):
+        if size_bytes >= scale:
+            return f"{size_bytes / scale:.1f} {unit}"
+    return f"{size_bytes} B"
+
+
 DISK_STATE = {
     "untouched": ("這顆磁碟的資料沒有被更動。", "The disk was not changed."),
     "partially_written": ("這顆磁碟的原有資料已被部分清除，目前無法開機。可以重新安裝，或改用其他磁碟。",

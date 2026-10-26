@@ -135,7 +135,10 @@ class RecipeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.shared = tempfile.TemporaryDirectory(prefix="ditto-regression-source-")
         cls.archive = Path(cls.shared.name) / "source.tar"
-        cls.commit = call("git", "-C", REPO, "rev-parse", "HEAD").stdout.strip()
+        # Default: the committed HEAD. DITTO_RECIPE_SOURCE_COMMIT lets a writer validate
+        # a not-yet-committed tree through an unreferenced `git commit-tree` object.
+        cls.commit = (os.environ.get("DITTO_RECIPE_SOURCE_COMMIT") or
+                      call("git", "-C", REPO, "rev-parse", "HEAD").stdout.strip())
         result = call("git", "-C", REPO, "archive", "--format=tar", "--output", cls.archive, cls.commit)
         if result.returncode:
             raise RuntimeError(result.stderr)
@@ -2194,6 +2197,107 @@ source "$1"
         profile = configparser.ConfigParser()
         profile.read(output / "extra/usr/lib/ditto/firstboot-fcitx5-profile")
         self.assertEqual(profile["Groups/0"]["DefaultIM"], "chewing")
+
+
+    # -- #221 installer profile ---------------------------------------------
+    INSTALLER_FLAGS = ("--profile", "installer", "--payload-manifest-sha256", "a" * 64,
+                       "--medium-label", "DITTO_INSTALL_7")
+
+    def test_installer_profile_is_a_ram_uki_without_desktop_login(self):
+        output, _ = self.generate(flags=self.INSTALLER_FLAGS)
+        conf = configparser.ConfigParser(interpolation=None, strict=True)
+        conf.optionxform = str
+        conf.read(output / "mkosi.conf")
+        self.assertEqual((conf["Output"]["Format"], conf["Output"]["ImageId"]), ("uki", "ditto-installer"))
+        self.assertEqual(conf["Distribution"]["Snapshot"], SNAPSHOT)
+        packages = conf["Content"]["Packages"].split(",")
+        listed = [line for line in (RECIPE / "packages-installer.txt").read_text().splitlines()
+                  if line and not line.startswith("#")]
+        self.assertEqual(packages, listed)
+        self.assertIn("linux-image-7.0.0-38-generic", packages)
+        for absent in ("greetd", "openssh-server", "linux-firmware", "dracut", "gnome-keyring"):
+            self.assertNotIn(absent, packages)
+        self.assertNotIn("root=", conf["Content"]["KernelCommandLine"])
+        self.assertFalse((output / "mkosi.repart").exists())
+        self.assertFalse((output / "runtime").exists())
+        extra = output / "extra"
+        self.assertFalse((extra / "etc/greetd").exists())
+        self.assertFalse(list(extra.rglob("ditto-firstboot*")))
+        self.assertFalse((extra / "usr/lib/ditto").exists())
+        self.assertEqual((output / "finalize.sh").read_bytes(), (RECIPE / "finalize-installer.sh").read_bytes())
+        inputs = json.loads((extra / "usr/share/ditto/image-inputs.json").read_text())
+        self.assertEqual((inputs["mode"], inputs["payload_manifest_sha256"], inputs["medium_label"]),
+                         ("installer", "a" * 64, "DITTO_INSTALL_7"))
+        # Installer code and units are byte-identical to the source archive.
+        with tarfile.open(self.archive) as source:
+            names = [m.name for m in source.getmembers() if m.isfile()]
+            modules = [n for n in names if n.startswith("packaging/distro/installer/ditto_installer/")
+                       and n.endswith(".py")]
+            self.assertIn("packaging/distro/installer/ditto_installer/backend.py", modules)
+            pairs = [(n, "usr/lib/ditto-installer/ditto_installer/" + Path(n).name) for n in modules]
+            pairs += [("packaging/distro/installer/image/" + n, "usr/lib/ditto-installer/" + n)
+                      for n in ("ditto-installer-backend", "ditto-installer-text")]
+            pairs += [("packaging/distro/installer/image/units/" + n, "usr/lib/systemd/system/" + n)
+                      for n in ("ditto-installer-backend.service", "ditto-installer-text.service")]
+            pairs.append(("packaging/distro/installer/image/sysusers.d/ditto-installer.conf",
+                          "usr/lib/sysusers.d/ditto-installer.conf"))
+            for src, dest in pairs:
+                self.assertEqual((extra / dest).read_bytes(), source.extractfile(src).read(), dest)
+        self.assertTrue(os.access(extra / "usr/lib/ditto-installer/ditto-installer-backend", os.X_OK))
+        # The generated config is accepted by the backend's own strict parser.
+        sys.path.insert(0, str(extra / "usr/lib/ditto-installer"))
+        try:
+            from ditto_installer.service import parse_config
+        finally:
+            sys.path.pop(0)
+            for name in [n for n in sys.modules if n == "ditto_installer" or n.startswith("ditto_installer.")]:
+                del sys.modules[name]
+        config = parse_config((extra / "usr/lib/ditto-installer/installer.json").read_text())
+        self.assertEqual((config["manifest_sha256"], config["medium_label"]), ("a" * 64, "DITTO_INSTALL_7"))
+
+    def test_installer_profile_argument_contract(self):
+        rows = [("--profile", "installer"),
+                ("--profile", "installer", "--payload-manifest-sha256", "A" * 64, "--medium-label", "DITTO_X"),
+                ("--profile", "installer", "--payload-manifest-sha256", "a" * 64, "--medium-label", "ditto_x"),
+                ("--profile", "installer", "--payload-manifest-sha256", "a" * 64, "--medium-label",
+                 "DITTO_" + "X" * 27),
+                (*self.INSTALLER_FLAGS, "--dev-software-render"),
+                ("--medium-label", "DITTO_INSTALL_7"),
+                ("--payload-manifest-sha256", "a" * 64)]
+        for flags in rows:
+            with self.subTest(flags=flags):
+                self.generate(2, flags=flags)
+
+    def test_installer_finalizer(self):
+        output, _ = self.generate(flags=self.INSTALLER_FLAGS)
+        image = self.pristine_image("installer-root")
+        self.put("etc/machine-id", "0123456789abcdef0123456789abcdef\n", image)
+        (image / "var/lib/systemd").mkdir(parents=True)
+        (image / "var/lib/systemd/random-seed").write_bytes(b"seed")
+        shutil.copytree(output / "extra", image, dirs_exist_ok=True, symlinks=True)
+        script = '''
+chroot() { printf '%s\\n' "$*" >> "$BUILDROOT/chroot-actions"; }
+source "$1"
+'''
+        def run():
+            return subprocess.run(["bash", "-c", script, "finalize-test", str(output / "finalize.sh")],
+                                  env={**os.environ, "BUILDROOT": str(image), "SRCDIR": str(output)},
+                                  text=True, capture_output=True, timeout=30)
+        result = run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        actions = (image / "chroot-actions").read_text().splitlines()
+        self.assertIn(f"{image} usermod --lock root", actions)
+        self.assertIn(f"{image} systemctl enable ditto-installer-backend.service ditto-installer-text.service",
+                      actions)
+        self.assertIn(f"{image} systemctl set-default multi-user.target", actions)
+        self.assertFalse(any("greetd" in line or "ssh" in line for line in actions))
+        self.assertEqual((image / "etc/machine-id").read_text(), "")
+        self.assertFalse((image / "var/lib/systemd/random-seed").exists())
+        self.assertIn("DITTO_IMAGE_ROLE=installer", (image / "usr/lib/os-release").read_text())
+        self.put("etc/initrd-release", "ID=initrd\n", image)
+        result = run()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("initrd-release", result.stderr)
 
 
 class DecisionTableTests(unittest.TestCase):

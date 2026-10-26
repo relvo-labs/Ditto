@@ -22,6 +22,79 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+INSTALLER_UNITS = ("ditto-installer-backend.service", "ditto-installer-text.service")
+INSTALLER_LAUNCHERS = ("ditto-installer-backend", "ditto-installer-text")
+
+
+def read_packages(path):
+    return [line for line in path.read_text().splitlines() if line and not line.startswith("#")]
+
+
+def generate_installer(args, parser, source, here, expected):
+    """#221 installer: a full OS packed as the initrd of one UKI, run from RAM.
+
+    It carries the installer backend/frontends from the same source archive and
+    the payload manifest SHA256; it never stages the Ditto runtime, greetd or the
+    first-account flow. Same snapshot, kernel pin and runtime-lock provenance.
+    """
+    installer = source / "packaging/distro/installer"
+    modules = sorted((installer / "ditto_installer").glob("*.py"))
+    files = [*modules, *(installer / "image" / name for name in INSTALLER_LAUNCHERS),
+             *(installer / "image/units" / unit for unit in INSTALLER_UNITS),
+             installer / "image/sysusers.d/ditto-installer.conf"]
+    if not modules or not all(path.is_file() and not path.is_symlink() for path in files):
+        parser.error("installer sources missing from the source archive")
+    output = args.output
+    output.mkdir(parents=True)
+
+    def put(name, value, mode=0o644):
+        path = output / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(value)
+        path.chmod(mode)
+
+    for module in modules:
+        put("extra/usr/lib/ditto-installer/ditto_installer/" + module.name, module.read_bytes())
+    for name in INSTALLER_LAUNCHERS:
+        put("extra/usr/lib/ditto-installer/" + name, (installer / "image" / name).read_bytes(), 0o755)
+    for unit in INSTALLER_UNITS:
+        put("extra/usr/lib/systemd/system/" + unit, (installer / "image/units" / unit).read_bytes())
+    put("extra/usr/lib/sysusers.d/ditto-installer.conf",
+        (installer / "image/sysusers.d/ditto-installer.conf").read_bytes())
+    put("extra/usr/lib/ditto-installer/installer.json", (json.dumps({
+        "schema": 1, "manifest_sha256": args.payload_manifest_sha256, "medium_label": args.medium_label,
+        "payload_dir": "ditto/payload", "frontend_user": "ditto-installer"}, indent=2) + "\n").encode())
+    put("extra/usr/share/ditto/image-inputs.json", (json.dumps(expected | {
+        "version": args.version, "runtime_lock_sha256": digest(args.runtime_lock), "mode": "installer",
+        "payload_manifest_sha256": args.payload_manifest_sha256, "medium_label": args.medium_label},
+        indent=2) + "\n").encode())
+    shutil.copy2(here / "finalize-installer.sh", output / "finalize.sh")
+    packages = read_packages(here / "packages-installer.txt")
+    put("mkosi.conf", f"""[Distribution]
+Distribution=ubuntu
+Release=resolute
+Architecture=x86-64
+Snapshot={args.snapshot}
+Repositories=universe
+[Output]
+Format=uki
+Output=ditto-installer
+OutputDirectory=out
+ManifestFormat=json
+ImageId=ditto-installer
+ImageVersion={args.version}
+[Content]
+Packages={','.join(packages)}
+ExtraTrees=extra
+FinalizeScripts=finalize.sh
+KernelCommandLine=console=tty0 rd.systemd.gpt_auto=no systemd.gpt_auto=no
+[Build]
+BuildSources=.
+[Validation]
+SecureBoot=no
+""".encode())
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-tar", type=Path, required=True)
@@ -34,7 +107,23 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dev-software-render", action="store_true",
                         help="TEST ONLY: allow software rendering in the generated session")
+    parser.add_argument("--profile", choices=("image", "installer"), default="image",
+                        help="image: the Ditto disk; installer: the #221 RAM-only installer UKI")
+    parser.add_argument("--payload-manifest-sha256",
+                        help="installer only: SHA256 printed by make-payload.py for the payload it will carry")
+    parser.add_argument("--medium-label", help="installer only: ISO volume label, e.g. DITTO_INSTALL_7")
     args = parser.parse_args()
+    installer_args = (args.payload_manifest_sha256, args.medium_label)
+    if args.profile == "installer":
+        if (not isinstance(args.payload_manifest_sha256, str) or
+                not re.fullmatch(r"[0-9a-f]{64}", args.payload_manifest_sha256) or
+                not isinstance(args.medium_label, str) or
+                not re.fullmatch(r"DITTO_[A-Z0-9_]{1,26}", args.medium_label)):
+            parser.error("installer profile needs --payload-manifest-sha256 and a DITTO_ --medium-label")
+        if args.dev_software_render:
+            parser.error("--dev-software-render applies to the image profile only")
+    elif any(value is not None for value in installer_args):
+        parser.error("--payload-manifest-sha256/--medium-label apply to the installer profile only")
     for value, pattern in ((args.version, r"[0-9][A-Za-z0-9.\-]{0,31}"),
                            (args.snapshot, r"[0-9]{8}T[0-9]{6}Z"),
                            (args.source_commit, r"[0-9a-f]{40}"),
@@ -108,6 +197,10 @@ def main():
                                  or not (firstboot / "ditto-firstboot-tty").is_file()
                                  or (firstboot / "ditto-firstboot-tty").is_symlink()):
             parser.error("PR A firstboot artifacts incomplete: need helper binary, crate, units and tmpfiles")
+        if args.profile == "installer":
+            generate_installer(args, parser, source, here, expected)
+            print(args.output)
+            return
         output = args.output
         output.mkdir(parents=True)
         extra = output / "extra"

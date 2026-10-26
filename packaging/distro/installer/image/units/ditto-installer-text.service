@@ -1,0 +1,28 @@
+[Unit]
+Description=Ditto installer (English text screen)
+Requires=ditto-installer-backend.service
+After=ditto-installer-backend.service systemd-user-sessions.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+User=ditto-installer
+Group=ditto-installer
+ExecStart=/usr/lib/ditto-installer/ditto-installer-text
+StandardInput=tty
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

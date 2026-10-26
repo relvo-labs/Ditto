@@ -772,8 +772,25 @@ class SessionTests(Fixture):
         result = sess.confirm(prompt.token)
         worker.join(5)
         self.assertEqual((result.outcome, sess.state), ("cancelled", session.CANCELLED))
+        # After a cancelled attempt the user may choose a disk again.
+        self.assertTrue(any(o.token for o in sess.list_disks()))
+        self.assertEqual((sess.state, sess.result), (session.LISTING, None))
+
+    def test_no_return_to_list_after_success_and_writer_crash_is_failure(self):
+        sess, *_ = self.setup_session()
+        offers = sess.list_disks()
+        self.assertEqual(sess.confirm(sess.select(next(o.token for o in offers if o.token)).token).outcome,
+                         "succeeded")
         with self.assertRaises(session.SessionError):
             sess.list_disks()
+
+        def crashing(disk, cancel_check):
+            raise RuntimeError("writer bug")
+        sess, *_ = self.setup_session(install=crashing)
+        offers = sess.list_disks()
+        result = sess.confirm(sess.select(next(o.token for o in offers if o.token)).token)
+        self.assertEqual((result.outcome, result.code, result.disk_state, sess.state),
+                         ("failed", "internal_error", "unknown", session.FAILED))
 
 
 class TextAndCliTests(Fixture):

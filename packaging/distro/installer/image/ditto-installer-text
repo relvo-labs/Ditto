@@ -1,0 +1,6 @@
+#!/usr/bin/python3 -I
+"""English console frontend; runs as the unprivileged ditto-installer user."""
+import sys
+sys.path.insert(0, "/usr/lib/ditto-installer")
+from ditto_installer.textui import main  # noqa: E402
+main()

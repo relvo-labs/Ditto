@@ -49,10 +49,11 @@ class Session:
         self.notice = None   # e.g. "disk_changed" after returning to the list
 
     def list_disks(self):
+        """Also the way back after a failed or cancelled attempt; never after success."""
         with self._lock:
-            if self.state not in (LISTING, CONFIRMING):
+            if self.state not in (LISTING, CONFIRMING, FAILED, CANCELLED):
                 raise SessionError("busy")
-            self.state, self._confirmation = LISTING, None
+            self.state, self._confirmation, self.result = LISTING, None, None
             offers, self._offers = [], {}
             for candidate in self._enumerate():
                 token = self._token() if candidate.eligible else None
@@ -80,7 +81,12 @@ class Session:
                 raise SessionError("not_confirming")
             self.state, self._confirmation = LISTING, None
 
-    def confirm(self, token):
+    def begin(self, token):
+        """Check the token and the disk again; on success the session is INSTALLING.
+
+        Returns the confirmed disk, or None (state LISTING, notice disk_changed).
+        There is no confirmed-but-not-started state: the caller must run() next.
+        """
         with self._lock:
             pending = self._confirmation
             if self.state != CONFIRMING or pending is None:
@@ -95,7 +101,20 @@ class Session:
                 return None
             self.state = INSTALLING
             self._cancel.clear()
-        result = self._install(pending.disk, self._cancel.is_set)
+            return pending.disk
+
+    def confirm(self, token):
+        disk = self.begin(token)
+        return None if disk is None else self.run(disk)
+
+    def run(self, disk):
+        with self._lock:
+            if self.state != INSTALLING:
+                raise SessionError("not_installing")
+        try:
+            result = self._install(disk, self._cancel.is_set)
+        except Exception:  # noqa: BLE001 - an escaping writer bug must not look like success
+            result = None
         with self._lock:
             if not isinstance(result, Result):
                 result = Result("failed", "done", "internal_error", "unknown")
