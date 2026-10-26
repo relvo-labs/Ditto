@@ -1,5 +1,7 @@
 #!/usr/bin/python3 -I
 """Fixed first-boot tty1 handoff. No caller-selected command or account data."""
+import contextlib
+import errno
 import fcntl
 import os
 from pathlib import Path
@@ -195,8 +197,12 @@ def retire_greeter():
                 continue
             try:
                 text = (entry / 'status').read_text()
-            except FileNotFoundError:
-                continue
+            except OSError as error:
+                # logind can reap this process between opening and reading its
+                # status. Only a vanished entry is safe to treat as gone.
+                if isinstance(error, (FileNotFoundError, ProcessLookupError)) or error.errno == errno.ESRCH:
+                    continue
+                raise
             fields = dict(line.split(':', 1) for line in text.splitlines() if ':' in line)
             if int(fields['Uid'].split()[0]) == uid and not fields['State'].lstrip().startswith('Z'):
                 alive = True
@@ -224,7 +230,16 @@ def tty_session():
                     return 0
                 tty.flush()
                 # Inherit the unit's tty-force stdin/output, never pipe secrets.
-                subprocess.run([HELPER, '--tty'], env=ENV, check=False)
+                with contextlib.ExitStack() as signals:
+                    # The foreground group also signals the helper. Let it exit
+                    # on its own: KeyboardInterrupt makes subprocess.run kill
+                    # it before SignalGuard can finish/roll back a transaction.
+                    # A callable resets on exec; SIG_IGN would be inherited.
+                    # TERM/HUP keep their normal systemd stop/hangup behaviour.
+                    for signum in (signal.SIGINT, signal.SIGQUIT):
+                        previous = signal.signal(signum, lambda _signal, _frame: None)
+                        signals.callback(signal.signal, signum, previous)
+                    subprocess.run([HELPER, '--tty'], env=ENV, check=False)
                 if human_account_exists():
                     tty.write('An account was found. Returning to sign-in; interrupted setup may still require administrator recovery.\n')
                     return 0
