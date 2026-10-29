@@ -10,11 +10,12 @@ mod shell;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use monitor::{Clock, Effects, Outcome, State, Timing};
+use monitor::{Clock, Effects, Outcome, Peer, Phase, State, Timing};
 use shell::{Locator, SocketPinger};
 
 const USAGE: &str =
     "usage: ditto-supervisor [--socket PATH] [--interval-ms N] [--timeout-ms N] [--misses N] \
+[--startup-grace-ms N] [--startup-misses N] \
 [--shell-scope NAME]... [--pid-file PATH] [--rescue-unit NAME] [--no-rescue]\n       \
 ditto-supervisor --on-core-failure\n       ditto-supervisor --once";
 
@@ -59,6 +60,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Options, String> {
         runtime_dir,
     };
     let mut scopes = Vec::new();
+    let mut startup_misses = None;
     let mut arguments = arguments.peekable();
     let number = |value: Option<String>, name: &str| -> Result<u64, String> {
         value
@@ -77,6 +79,17 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Options, String> {
                     Duration::from_millis(number(arguments.next(), "--timeout-ms")?)
             }
             "--misses" => options.timing.misses = number(arguments.next(), "--misses")? as u32,
+            "--startup-grace-ms" => {
+                options.timing.startup_grace =
+                    Duration::from_millis(number(arguments.next(), "--startup-grace-ms")?)
+            }
+            "--startup-misses" => {
+                let value = number(arguments.next(), "--startup-misses")?;
+                startup_misses = Some(
+                    u32::try_from(value)
+                        .map_err(|_| format!("--startup-misses is too large\n{USAGE}"))?,
+                );
+            }
             "--shell-scope" => scopes.push(arguments.next().ok_or(USAGE)?),
             "--pid-file" => options.locator.pid_file = arguments.next().ok_or(USAGE)?.into(),
             "--rescue-unit" => options.rescue_unit = Some(arguments.next().ok_or(USAGE)?),
@@ -92,6 +105,16 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Options, String> {
     }
     if options.timing.timeout >= options.timing.interval {
         return Err("--timeout-ms must be shorter than --interval-ms".into());
+    }
+    // The startup grace may only be more patient than the steady rule. Left
+    // unset it follows a larger --misses, so existing invocations keep working.
+    let steady = options.timing.misses.max(1);
+    match startup_misses {
+        Some(misses) if misses < steady => {
+            return Err("--startup-misses must be at least --misses".into());
+        }
+        Some(misses) => options.timing.startup_misses = misses,
+        None => options.timing.startup_misses = options.timing.startup_misses.max(steady),
     }
     Ok(options)
 }
@@ -121,7 +144,7 @@ struct RealEffects<'a> {
 }
 
 impl Effects for RealEffects<'_> {
-    fn trip(&mut self, misses: u32, last: &Outcome) {
+    fn trip(&mut self, misses: u32, last: &Outcome, phase: Phase) {
         let reason = match last {
             Outcome::NoReply(reason) => reason.as_str(),
             _ => "",
@@ -137,6 +160,7 @@ impl Effects for RealEffects<'_> {
             "shell_unresponsive",
             &[
                 ("misses", &misses.to_string()),
+                ("phase", phase.as_str()),
                 ("last", reason),
                 ("source", killed.source),
                 ("killed", &pids),
@@ -159,19 +183,34 @@ impl Effects for RealEffects<'_> {
         }
     }
 
-    fn transition(&mut self, from: State, to: State, outcome: &Outcome) {
+    fn transition(&mut self, from: State, to: State, outcome: &Outcome, phase: Phase, peer: Peer) {
         let detail = match outcome {
             Outcome::NoReply(reason) => reason.clone(),
+            // Armed to Armed is a Shell replaced without an observed exit.
+            _ if matches!(from, State::Armed { .. }) && matches!(to, State::Armed { .. }) => {
+                "new_shell".into()
+            }
             _ => String::new(),
         };
-        log(
-            "state",
-            &[
-                ("from", &format!("{from:?}")),
-                ("to", &format!("{to:?}")),
-                ("detail", &detail),
-            ],
-        );
+        let from = format!("{from:?}");
+        let to_text = format!("{to:?}");
+        let peer = peer.describe();
+        let mut fields = vec![
+            ("from", from.as_str()),
+            ("to", to_text.as_str()),
+            ("detail", detail.as_str()),
+        ];
+        // Armed: which rule the Shell is now judged by. Tripped: which rule
+        // tripped it. Tells a startup stall from a steady hang in the journal.
+        if matches!(to, State::Armed { .. } | State::Tripped) {
+            fields.push(("phase", phase.as_str()));
+            fields.push(("peer", peer.as_str()));
+        }
+        log("state", &fields);
+    }
+
+    fn grace_ended(&mut self, misses: u32) {
+        log("grace_ended", &[("misses", &misses.to_string())]);
     }
 }
 
@@ -225,6 +264,11 @@ fn main() {
                         &options.timing.interval.as_millis().to_string(),
                     ),
                     ("misses", &options.timing.misses.to_string()),
+                    (
+                        "startup_grace_ms",
+                        &options.timing.startup_grace.as_millis().to_string(),
+                    ),
+                    ("startup_misses", &options.timing.startup_misses.to_string()),
                 ],
             );
             let clock = RealClock(Instant::now());
@@ -279,5 +323,46 @@ mod tests {
         assert!(parse(args(&["--interval-ms", "1000", "--timeout-ms", "1000"])).is_err());
         assert!(parse(args(&["--misses"])).is_err());
         assert!(parse(args(&["--bogus"])).is_err());
+    }
+
+    #[test]
+    fn startup_grace_defaults_and_flags() {
+        let options = parse(args(&[])).unwrap();
+        assert_eq!(options.timing.startup_grace, Duration::from_secs(60));
+        assert_eq!(options.timing.startup_misses, 10);
+
+        let options = parse(args(&[
+            "--startup-grace-ms",
+            "30000",
+            "--startup-misses",
+            "6",
+        ]))
+        .unwrap();
+        assert_eq!(options.timing.startup_grace, Duration::from_secs(30));
+        assert_eq!(options.timing.startup_misses, 6);
+        assert_eq!(options.timing.misses, 3, "the steady rule is untouched");
+
+        // Zero turns the grace off; equal to --misses is allowed.
+        let options = parse(args(&["--startup-grace-ms", "0", "--startup-misses", "3"])).unwrap();
+        assert_eq!(options.timing.startup_grace, Duration::ZERO);
+        assert_eq!(options.timing.startup_misses, 3);
+
+        // An existing invocation with a larger --misses keeps working, and
+        // the grace is never stricter than it.
+        let options = parse(args(&["--misses", "100000"])).unwrap();
+        assert_eq!(options.timing.misses, 100_000);
+        assert_eq!(options.timing.startup_misses, 100_000);
+    }
+
+    #[test]
+    fn bad_startup_values_are_refused() {
+        assert!(parse(args(&["--startup-misses", "2"])).is_err());
+        assert!(parse(args(&["--startup-misses", "0"])).is_err());
+        assert!(parse(args(&["--misses", "5", "--startup-misses", "4"])).is_err());
+        assert!(parse(args(&["--startup-misses", "4294967296"])).is_err());
+        assert!(parse(args(&["--startup-misses", "-1"])).is_err());
+        assert!(parse(args(&["--startup-misses"])).is_err());
+        assert!(parse(args(&["--startup-grace-ms", "soon"])).is_err());
+        assert!(parse(args(&["--startup-grace-ms"])).is_err());
     }
 }
