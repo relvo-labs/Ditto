@@ -1181,8 +1181,10 @@ mod tests {
                 }
                 monitor.observe(&reset(), replacement, 63_000);
                 monitor.observe(&Outcome::Pong, replacement, 64_003);
-                // Read now: after a trip, the next pong is a new generation
-                // whoever answers (the 6efa9b5 rule).
+                // Read now: after a trip, the next pong opens a new
+                // generation only if it is provably another process
+                // (different PID, or same PID with both start times known
+                // and different); otherwise the armed generation continues.
                 let generation = monitor.generation;
                 let mut trips = vec![];
                 for (n, outcome) in [miss(), miss(), miss(), Outcome::Pong].iter().enumerate() {
